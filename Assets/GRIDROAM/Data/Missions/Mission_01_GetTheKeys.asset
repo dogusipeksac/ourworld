@@ -15,6 +15,7 @@ MonoBehaviour:
   missionId: m01_get_the_keys
   titleKey: m01.title
   summaryKey: m01.summary
+  rewardMoney: 100
   nextMissionId: m02_last_delivery
   autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot
@@ -33,6 +34,10 @@ MonoBehaviour:
     tailMinDistance: 12
     tailMaxDistance: 65
     tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
   - stepType: 2
     objectiveKey: m01.step2.objective
     targetAnchorId: player_sedan
@@ -45,3 +50,7 @@ MonoBehaviour:
     tailMinDistance: 12
     tailMaxDistance: 65
     tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 

@@ -22,8 +22,9 @@ namespace Gridroam.Editor
 
             System.Random rng = new System.Random(1234);
             List<SeatInteractable> outdoorBenchSeats = new List<SeatInteractable>();
+            _activeBenchPrefab = prefabs != null ? prefabs.WoodenBench : null;
 
-            BuildTownRoads(townRoot.transform, mats);
+            BuildTownRoads(townRoot.transform, mats, prefabs, outdoorBenchSeats);
             BuildMainStreetShops(townRoot.transform, mats, rng);
             BuildGasStation(townRoot.transform, mats);
             BuildTownSquare(townRoot.transform, mats, prefabs, outdoorBenchSeats);
@@ -145,21 +146,98 @@ namespace Gridroam.Editor
             return mesh;
         }
 
-        private static void BuildTownRoads(Transform parent, MaterialSet mats)
+        private static void BuildTownRoads(
+            Transform parent,
+            MaterialSet mats,
+            PrefabSet prefabs,
+            List<SeatInteractable> benchSeatCollector)
         {
             GameObject roadsRoot = new GameObject("Town_Roads");
             roadsRoot.transform.SetParent(parent, false);
 
+            // 1. Full-length Residential Lane (x = -46, connected from South Beach Loop z=-24 all the way to North Harbor z=246)
             CreateStaticBlock("Road_ResidentialLane", roadsRoot.transform,
-                new Vector3(-46f, 0.025f, 125f), new Vector3(6f, 0.08f, 230f),
+                new Vector3(-46f, 0.025f, 111f), new Vector3(7.5f, 0.08f, 278f),
                 mats.RoadAsphaltMain, addCollider: false);
 
+            // 2. Western Foothills Avenue (x = -82, z = -24..246) & Scenic Ring Road (x = -114, z = -24..246)
+            CreateStaticBlock("Road_WesternFoothillAve", roadsRoot.transform,
+                new Vector3(-82f, 0.025f, 111f), new Vector3(7.5f, 0.08f, 278f),
+                mats.RoadAsphaltMain, addCollider: false);
+            CreateStaticBlock("Road_WesternScenicRing", roadsRoot.transform,
+                new Vector3(-114f, 0.025f, 111f), new Vector3(8.5f, 0.08f, 278f),
+                mats.RoadAsphaltMain, addCollider: false);
+
+            // 3. Southern Coastal & Countryside Connector Loop (z = -24, x = -118..+30)
+            CreateStaticBlock("Road_SouthCoastalLoop", roadsRoot.transform,
+                new Vector3(-44f, 0.025f, -24f), new Vector3(148f, 0.08f, 10f),
+                mats.RoadAsphaltCross, addCollider: false);
+
+            // 4. Full East-West Cross-Streets at z = 92 and z = 174 connecting Coastal Road <-> Residential <-> Western Scenic Ring
             CreateStaticBlock("Road_CrossStreet_South_WestExt", roadsRoot.transform,
-                new Vector3(-38.5f, 0.025f, 92f), new Vector3(21f, 0.08f, 9f),
+                new Vector3(-72f, 0.025f, 92f), new Vector3(92f, 0.08f, 9f),
                 mats.RoadAsphaltCross, addCollider: false);
             CreateStaticBlock("Road_CrossStreet_North_WestExt", roadsRoot.transform,
-                new Vector3(-38.5f, 0.025f, 174f), new Vector3(21f, 0.08f, 9f),
+                new Vector3(-72f, 0.025f, 174f), new Vector3(92f, 0.08f, 9f),
                 mats.RoadAsphaltCross, addCollider: false);
+
+            // 5. Dashed white road markings on Western Scenic Ring & Cross-Streets
+            for (int z = -12; z <= 234; z += 14)
+            {
+                CreateStaticBlock($"WestRingDash_{z}", roadsRoot.transform,
+                    new Vector3(-114f, 0.075f, z), new Vector3(0.20f, 0.02f, 4.6f),
+                    mats.RoadMarkingWhite, addCollider: false);
+                CreateStaticBlock($"ResLaneDash_{z}", roadsRoot.transform,
+                    new Vector3(-46f, 0.075f, z), new Vector3(0.18f, 0.02f, 4.2f),
+                    mats.RoadMarkingWhite, addCollider: false);
+            }
+
+            // 6. Western Scenic Overlook Plaza (x = -126, z = 134) — paved lookout terrace with trees, lamps, benches & parked pickup
+            CreateTiledBox("WesternOverlook_Paving", roadsRoot.transform,
+                new Vector3(-125.5f, 0.08f, 134f), new Vector3(14f, 0.16f, 26f),
+                Quaternion.identity, mats.TownPaving, 2.0f, collider: true);
+
+            if (prefabs != null)
+            {
+                PlacePrefabInstance(prefabs.StreetLamp, roadsRoot.transform, new Vector3(-120.5f, 0.16f, 123f), Quaternion.Euler(0f, 90f, 0f));
+                PlacePrefabInstance(prefabs.StreetLamp, roadsRoot.transform, new Vector3(-120.5f, 0.16f, 145f), Quaternion.Euler(0f, 90f, 0f));
+                CreatePointLamp("Lamp_WestOverlook_S", roadsRoot.transform, new Vector3(-119.5f, 5.1f, 123f), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
+                CreatePointLamp("Lamp_WestOverlook_N", roadsRoot.transform, new Vector3(-119.5f, 5.1f, 145f), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
+
+                if (prefabs.TownCarWhitePickup != null)
+                {
+                    GameObject overlookTruck = PlacePrefabInstance(prefabs.TownCarWhitePickup, roadsRoot.transform,
+                        new Vector3(-123.5f, 0.28f, 139.5f), Quaternion.Euler(0f, 155f, 0f));
+                    overlookTruck.name = "Town_DrivableCar_OverlookPickup";
+                    InteractableTrigger trig = overlookTruck.GetComponent<InteractableTrigger>();
+                    if (trig != null)
+                    {
+                        trig.Configure(InteractableKind.TownVehicle, "town_car_overlook", "ui.btn.drive", 3.8f);
+                    }
+                }
+            }
+
+            var ovBench1 = CreateBench("Overlook_Bench_1", roadsRoot.transform, new Vector3(-129.5f, 0.16f, 129.5f), Quaternion.Euler(0f, 90f, 0f), mats);
+            var ovBench2 = CreateBench("Overlook_Bench_2", roadsRoot.transform, new Vector3(-129.5f, 0.16f, 138.5f), Quaternion.Euler(0f, 90f, 0f), mats);
+            if (benchSeatCollector != null)
+            {
+                benchSeatCollector.Add(ovBench1.leftSlot); benchSeatCollector.Add(ovBench1.rightSlot);
+                benchSeatCollector.Add(ovBench2.leftSlot); benchSeatCollector.Add(ovBench2.rightSlot);
+            }
+
+            // Scenic grove trees along Western Foothill Avenue & Scenic Ring
+            Vector3[] groveTrees =
+            {
+                new Vector3(-96f, 0.04f, 18f), new Vector3(-102f, 0.04f, 46f), new Vector3(-94f, 0.04f, 74f),
+                new Vector3(-98f, 0.04f, 112f), new Vector3(-95f, 0.04f, 148f), new Vector3(-101f, 0.04f, 194f),
+                new Vector3(-94f, 0.04f, 226f), new Vector3(-128f, 0.04f, 38f), new Vector3(-130f, 0.04f, 82f),
+                new Vector3(-131f, 0.04f, 162f), new Vector3(-128f, 0.04f, 214f), new Vector3(-72f, 0.04f, -14f),
+                new Vector3(-34f, 0.04f, -14f), new Vector3(8f, 0.04f, -14f)
+            };
+            for (int i = 0; i < groveTrees.Length; i++)
+            {
+                CreateTownTree($"CountryGrove_Tree_{i + 1:00}", roadsRoot.transform, groveTrees[i], mats, 1.05f + (i % 3) * 0.18f, i + 30);
+            }
         }
 
         private static void BuildMainStreetShops(Transform parent, MaterialSet mats, System.Random rng)
@@ -259,22 +337,24 @@ namespace Gridroam.Editor
                             facade, tileMeters, awning, pitchedRoof, mats, rng);
                     }
 
-                    cursorZ += widthZ;
+                    // Leave a 2.6m walkable pedestrian passage every 2 buildings so blocks are never solid walls
+                    float passageGap = (segLocalIdx % 2 == 1) ? 2.6f : 0.4f;
+                    cursorZ += widthZ + passageGap;
                     shopIdx++;
                     segLocalIdx++;
                 }
 
-                // West-facing Back-Alley companion row
+                // West-facing Back-Alley companion row (with matching walkable passages between buildings)
                 Vector2 alleySeg = alleyZSegments[segIdx];
                 float alleyZ = alleySeg.x;
                 int alleyLocalIdx = 0;
                 while (alleyZ < alleySeg.y - 6.0f)
                 {
                     float remaining = alleySeg.y - alleyZ;
-                    float widthZ = remaining < 13.5f
+                    float widthZ = remaining < 12.0f
                         ? remaining
-                        : Mathf.Min(remaining, 8.0f + (float)rng.NextDouble() * 3.0f);
-                    float depthX = 9.0f + (float)rng.NextDouble() * 1.5f;
+                        : Mathf.Min(remaining, 8.0f + (float)rng.NextDouble() * 2.5f);
+                    float depthX = 8.4f + (float)rng.NextDouble() * 1.2f;
                     int storeys = 2 + rng.Next(2);
                     float height = 3.2f + (storeys - 1) * 2.95f;
 
@@ -294,7 +374,8 @@ namespace Gridroam.Editor
                         facingEast: false,
                         facade, tileMeters, awning, pitchedRoof: (alleyLocalIdx % 2 == 1), mats, rng);
 
-                    alleyZ += widthZ;
+                    float alleyGap = (alleyLocalIdx % 2 == 1) ? 2.6f : 0.4f;
+                    alleyZ += widthZ + alleyGap;
                     alleyLocalIdx++;
                 }
             }
@@ -329,21 +410,45 @@ namespace Gridroam.Editor
                 new Vector3(depthX, height, widthZ),
                 Quaternion.identity, facadeMat, metersPerTile, collider: true);
 
+            // Ground-floor stone plinth & 3D framed storefront display windows
+            CreateTiledBox("GroundPlinth", root.transform,
+                new Vector3(frontX + frontSign * 0.04f, 0.32f, basePos.z),
+                new Vector3(0.12f, 0.64f, widthZ + 0.04f),
+                Quaternion.identity, mats.Concrete, 2.0f, collider: false);
+
+            float doorOffsetZ = (rng.Next(2) == 0 ? -1f : 1f) * Mathf.Min(1.5f, widthZ * 0.24f);
+            float glassCenterZ = basePos.z - doorOffsetZ * 0.45f;
+            float glassSpanZ = Mathf.Max(2.0f, widthZ - 2.6f);
+
             bool litShop = rng.NextDouble() < 0.65;
             Material shopGlassMat = litShop ? mats.WindowLitWarm : mats.SedanGlass;
+            CreateTiledBox("ShopWindowFrame", root.transform,
+                new Vector3(frontX + frontSign * 0.05f, 1.62f, glassCenterZ),
+                new Vector3(0.14f, 2.18f, glassSpanZ + 0.18f),
+                Quaternion.identity, mats.SedanTrimDark, 2.0f, collider: false);
             GameObject shopGlass = CreateTiledBox("ShopfrontGlass", root.transform,
-                new Vector3(frontX + frontSign * 0.05f, 1.55f, basePos.z),
-                new Vector3(0.10f, 2.55f, Mathf.Max(2.5f, widthZ - 1.1f)),
+                new Vector3(frontX + frontSign * 0.08f, 1.64f, glassCenterZ),
+                new Vector3(0.08f, 1.98f, glassSpanZ),
                 Quaternion.identity, shopGlassMat, 2.0f, collider: false, staticBatch: !litShop);
             if (litShop)
             {
                 AttachWindowNightLight(shopGlass);
             }
 
-            CreateTiledBox("ShopDoor", root.transform,
-                new Vector3(frontX + frontSign * 0.08f, 1.25f, basePos.z + (rng.Next(2) == 0 ? -1.4f : 1.4f)),
-                new Vector3(0.08f, 2.30f, 1.15f),
-                Quaternion.identity, mats.TownDoorDark, 2.0f, collider: false);
+            // 3D Framed Doorway with surround jambs, threshold step, panel & chrome handle
+            float doorZ = basePos.z + doorOffsetZ;
+            CreateTiledBox("ShopDoorSurround", root.transform,
+                new Vector3(frontX + frontSign * 0.06f, 1.24f, doorZ),
+                new Vector3(0.16f, 2.42f, 1.32f),
+                Quaternion.identity, mats.Concrete, 1.5f, collider: false);
+            CreateTiledBox("ShopDoorPanel", root.transform,
+                new Vector3(frontX + frontSign * 0.10f, 1.18f, doorZ),
+                new Vector3(0.08f, 2.24f, 1.10f),
+                Quaternion.identity, mats.TownDoorWood, 2.0f, collider: false);
+            CreateTiledBox("ShopDoorHandle", root.transform,
+                new Vector3(frontX + frontSign * 0.15f, 1.05f, doorZ + 0.38f),
+                new Vector3(0.04f, 0.24f, 0.04f),
+                Quaternion.identity, mats.SedanChrome, 1.0f, collider: false);
 
             float awningAngle = facingEast ? -22f : 22f;
             CreateTiledBox("Awning", root.transform,
@@ -1216,6 +1321,8 @@ namespace Gridroam.Editor
             return cycler;
         }
 
+        private static GameObject _activeBenchPrefab;
+
         private static (SeatInteractable leftSlot, SeatInteractable rightSlot) CreateBench(
             string name,
             Transform parent,
@@ -1227,16 +1334,25 @@ namespace Gridroam.Editor
             bench.transform.SetParent(parent, false);
             bench.transform.SetPositionAndRotation(pos, rot);
 
-            CreatePrimitiveChild("Seat", PrimitiveType.Cube, bench.transform,
-                new Vector3(0f, 0.45f, 0f), new Vector3(1.85f, 0.09f, 0.52f), mats.TownWood, removeCollider: true);
-            GameObject back = CreatePrimitiveChild("Backrest", PrimitiveType.Cube, bench.transform,
-                new Vector3(0f, 0.78f, -0.22f), new Vector3(1.85f, 0.38f, 0.08f), mats.TownWood, removeCollider: true);
-            back.transform.localRotation = Quaternion.Euler(-12f, 0f, 0f);
+            if (_activeBenchPrefab != null)
+            {
+                GameObject meshInst = PlacePrefabInstance(_activeBenchPrefab, bench.transform, Vector3.zero, Quaternion.identity);
+                meshInst.transform.localPosition = Vector3.zero;
+                meshInst.transform.localRotation = Quaternion.identity;
+            }
+            else
+            {
+                CreatePrimitiveChild("Seat", PrimitiveType.Cube, bench.transform,
+                    new Vector3(0f, 0.45f, 0f), new Vector3(1.85f, 0.09f, 0.52f), mats.TownWood, removeCollider: true);
+                GameObject back = CreatePrimitiveChild("Backrest", PrimitiveType.Cube, bench.transform,
+                    new Vector3(0f, 0.78f, -0.22f), new Vector3(1.85f, 0.38f, 0.08f), mats.TownWood, removeCollider: true);
+                back.transform.localRotation = Quaternion.Euler(-12f, 0f, 0f);
 
-            CreatePrimitiveChild("LegL", PrimitiveType.Cube, bench.transform,
-                new Vector3(-0.74f, 0.23f, 0f), new Vector3(0.10f, 0.46f, 0.46f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("LegR", PrimitiveType.Cube, bench.transform,
-                new Vector3(0.74f, 0.23f, 0f), new Vector3(0.10f, 0.46f, 0.46f), mats.SedanTrimDark, removeCollider: true);
+                CreatePrimitiveChild("LegL", PrimitiveType.Cube, bench.transform,
+                    new Vector3(-0.74f, 0.23f, 0f), new Vector3(0.10f, 0.46f, 0.46f), mats.SedanTrimDark, removeCollider: true);
+                CreatePrimitiveChild("LegR", PrimitiveType.Cube, bench.transform,
+                    new Vector3(0.74f, 0.23f, 0f), new Vector3(0.10f, 0.46f, 0.46f), mats.SedanTrimDark, removeCollider: true);
+            }
 
             BoxCollider col = bench.AddComponent<BoxCollider>();
             col.center = new Vector3(0f, 0.48f, -0.04f);
@@ -1286,6 +1402,10 @@ namespace Gridroam.Editor
             }
         }
 
+        private static Mesh _cachedTreeTrunkMesh;
+        private static Mesh _cachedTreeCanopyMeshA;
+        private static Mesh _cachedTreeCanopyMeshB;
+
         private static void CreateTownTree(
             string name,
             Transform parent,
@@ -1297,10 +1417,26 @@ namespace Gridroam.Editor
             GameObject tree = new GameObject(name);
             tree.transform.SetParent(parent, false);
             tree.transform.position = basePos;
+            tree.transform.localRotation = Quaternion.Euler(0f, (variantSeed * 67f) % 360f, 0f);
             tree.transform.localScale = Vector3.one * scale;
 
-            CreatePrimitiveChild("Trunk", PrimitiveType.Cylinder, tree.transform,
-                new Vector3(0f, 1.55f, 0f), new Vector3(0.36f, 1.55f, 0.36f), mats.TownBark, removeCollider: true);
+            if (_cachedTreeTrunkMesh == null)
+            {
+                _cachedTreeTrunkMesh = BuildOrganicTreeTrunkMesh();
+            }
+            if (_cachedTreeCanopyMeshA == null)
+            {
+                _cachedTreeCanopyMeshA = BuildOrganicTreeCanopyMesh(seed: 101, horizontalRadius: 1.55f, verticalRadius: 1.28f);
+            }
+            if (_cachedTreeCanopyMeshB == null)
+            {
+                _cachedTreeCanopyMeshB = BuildOrganicTreeCanopyMesh(seed: 209, horizontalRadius: 1.22f, verticalRadius: 0.98f);
+            }
+
+            GameObject trunkObj = new GameObject("OrganicTrunk");
+            trunkObj.transform.SetParent(tree.transform, false);
+            trunkObj.AddComponent<MeshFilter>().sharedMesh = _cachedTreeTrunkMesh;
+            trunkObj.AddComponent<MeshRenderer>().sharedMaterial = mats.TownBark;
 
             CapsuleCollider trunkCol = tree.AddComponent<CapsuleCollider>();
             trunkCol.center = new Vector3(0f, 1.55f, 0f);
@@ -1310,14 +1446,164 @@ namespace Gridroam.Editor
             Material folA = (variantSeed % 2 == 0) ? mats.TownFoliageA : mats.TownFoliageB;
             Material folB = (variantSeed % 2 == 0) ? mats.TownFoliageB : mats.TownFoliageA;
 
-            CreatePrimitiveChild("Canopy_Main", PrimitiveType.Sphere, tree.transform,
-                new Vector3(0f, 3.65f, 0f), new Vector3(2.45f, 2.05f, 2.45f), folA, removeCollider: true);
-            CreatePrimitiveChild("Canopy_SideA", PrimitiveType.Sphere, tree.transform,
-                new Vector3(0.75f, 3.25f, 0.45f), new Vector3(1.65f, 1.45f, 1.65f), folB, removeCollider: true);
-            CreatePrimitiveChild("Canopy_SideB", PrimitiveType.Sphere, tree.transform,
-                new Vector3(-0.68f, 3.35f, -0.40f), new Vector3(1.75f, 1.55f, 1.75f), folA, removeCollider: true);
+            (Vector3 pos, Quaternion rot, Vector3 sc, Mesh mesh, Material mat)[] clusters =
+            {
+                (new Vector3(0.0f, 3.85f, 0.0f), Quaternion.Euler(4f, 20f, -3f), new Vector3(1.12f, 1.02f, 1.08f), _cachedTreeCanopyMeshA, folA),
+                (new Vector3(0.82f, 3.35f, 0.48f), Quaternion.Euler(-8f, 110f, 6f), new Vector3(0.88f, 0.84f, 0.90f), _cachedTreeCanopyMeshB, folB),
+                (new Vector3(-0.78f, 3.45f, -0.44f), Quaternion.Euler(6f, 225f, -5f), new Vector3(0.92f, 0.86f, 0.88f), _cachedTreeCanopyMeshB, folA),
+                (new Vector3(-0.36f, 3.25f, 0.78f), Quaternion.Euler(-5f, 305f, 4f), new Vector3(0.80f, 0.76f, 0.82f), _cachedTreeCanopyMeshB, folB),
+                (new Vector3(0.45f, 4.35f, -0.35f), Quaternion.Euler(3f, 55f, 5f), new Vector3(0.76f, 0.72f, 0.78f), _cachedTreeCanopyMeshB, folA)
+            };
+
+            for (int i = 0; i < clusters.Length; i++)
+            {
+                GameObject cGo = new GameObject($"FoliageCluster_{i}");
+                cGo.transform.SetParent(tree.transform, false);
+                cGo.transform.localPosition = clusters[i].pos;
+                cGo.transform.localRotation = clusters[i].rot;
+                cGo.transform.localScale = clusters[i].sc;
+                cGo.AddComponent<MeshFilter>().sharedMesh = clusters[i].mesh;
+                cGo.AddComponent<MeshRenderer>().sharedMaterial = clusters[i].mat;
+            }
 
             MarkStaticEnvironment(tree);
+        }
+
+        private static Mesh BuildOrganicTreeTrunkMesh()
+        {
+            List<Vector3> verts = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> tris = new List<int>();
+
+            void AddTaperedLimb(Vector3 p0, Vector3 p1, Vector3 p2, float r0, float r1, float r2, int sides)
+            {
+                int baseIdx = verts.Count;
+                Vector3[] centers = { p0, p1, p2 };
+                float[] radii = { r0, r1, r2 };
+                float[] vCoords = { 0f, 0.55f, 1.1f };
+
+                for (int ring = 0; ring < 3; ring++)
+                {
+                    Vector3 tangent = ring == 0 ? (p1 - p0).normalized : (p2 - p0).normalized;
+                    Vector3 right = Vector3.Cross(Vector3.forward, tangent);
+                    if (right.sqrMagnitude < 0.01f) right = Vector3.right;
+                    right.Normalize();
+                    Vector3 fwd = Vector3.Cross(tangent, right).normalized;
+
+                    for (int s = 0; s <= sides; s++)
+                    {
+                        float frac = s / (float)sides;
+                        float ang = frac * Mathf.PI * 2f;
+                        float groove = 1f + Mathf.Sin(ang * 5f + ring * 1.1f) * 0.07f;
+                        float r = radii[ring] * groove;
+                        Vector3 offset = (right * Mathf.Cos(ang) + fwd * Mathf.Sin(ang)) * r;
+                        verts.Add(centers[ring] + offset);
+                        uvs.Add(new Vector2(frac, vCoords[ring]));
+                    }
+                }
+
+                int stride = sides + 1;
+                for (int ring = 0; ring < 2; ring++)
+                {
+                    int row0 = baseIdx + ring * stride;
+                    int row1 = row0 + stride;
+                    for (int s = 0; s < sides; s++)
+                    {
+                        tris.Add(row0 + s);
+                        tris.Add(row1 + s);
+                        tris.Add(row1 + s + 1);
+                        tris.Add(row0 + s);
+                        tris.Add(row1 + s + 1);
+                        tris.Add(row0 + s + 1);
+                    }
+                }
+            }
+
+            // Main tapered trunk + 3 natural forked upper limbs
+            AddTaperedLimb(new Vector3(0f, 0f, 0f), new Vector3(0.04f, 1.35f, -0.02f), new Vector3(0.02f, 2.65f, 0.03f), 0.24f, 0.17f, 0.12f, 8);
+            AddTaperedLimb(new Vector3(0.02f, 2.35f, 0.02f), new Vector3(0.45f, 2.95f, 0.25f), new Vector3(0.84f, 3.45f, 0.48f), 0.11f, 0.08f, 0.05f, 6);
+            AddTaperedLimb(new Vector3(0.01f, 2.40f, 0.01f), new Vector3(-0.42f, 3.00f, -0.24f), new Vector3(-0.80f, 3.50f, -0.45f), 0.11f, 0.08f, 0.05f, 6);
+            AddTaperedLimb(new Vector3(0.02f, 2.45f, 0.02f), new Vector3(-0.18f, 2.95f, 0.42f), new Vector3(-0.36f, 3.35f, 0.78f), 0.10f, 0.07f, 0.04f, 6);
+
+            Mesh m = new Mesh
+            {
+                name = "OrganicTreeTrunk_Mesh",
+                vertices = verts.ToArray(),
+                uv = uvs.ToArray(),
+                triangles = tris.ToArray()
+            };
+            m.RecalculateNormals();
+            m.RecalculateTangents();
+            m.RecalculateBounds();
+            return m;
+        }
+
+        private static Mesh BuildOrganicTreeCanopyMesh(int seed, float horizontalRadius, float verticalRadius)
+        {
+            const int latSegments = 8;
+            const int lonSegments = 12;
+            List<Vector3> verts = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> tris = new List<int>();
+
+            float seedOffset = seed * 0.73f;
+            for (int lat = 0; lat <= latSegments; lat++)
+            {
+                float v = lat / (float)latSegments;
+                float phi = v * Mathf.PI;
+                float sinPhi = Mathf.Sin(phi);
+                float cosPhi = Mathf.Cos(phi);
+
+                for (int lon = 0; lon <= lonSegments; lon++)
+                {
+                    float u = lon / (float)lonSegments;
+                    float theta = u * Mathf.PI * 2f;
+
+                    Vector3 dir = new Vector3(sinPhi * Mathf.Cos(theta), cosPhi, sinPhi * Mathf.Sin(theta));
+                    float lobe1 = Mathf.Sin(dir.x * 3.8f + seedOffset) * Mathf.Cos(dir.z * 3.8f - seedOffset);
+                    float lobe2 = Mathf.Sin(dir.y * 4.5f + dir.x * 2.7f + seedOffset * 1.4f);
+                    float displacement = 1f + lobe1 * 0.18f + lobe2 * 0.11f;
+
+                    // Flatten the bottom slightly so foliage crowns look natural
+                    float yFactor = dir.y < 0f ? 0.72f : 1.0f;
+                    Vector3 pos = new Vector3(
+                        dir.x * horizontalRadius * displacement,
+                        dir.y * verticalRadius * yFactor * displacement,
+                        dir.z * horizontalRadius * displacement);
+
+                    verts.Add(pos);
+                    uvs.Add(new Vector2(u * 2f, v * 2f));
+                }
+            }
+
+            int stride = lonSegments + 1;
+            for (int lat = 0; lat < latSegments; lat++)
+            {
+                int row0 = lat * stride;
+                int row1 = row0 + stride;
+                for (int lon = 0; lon < lonSegments; lon++)
+                {
+                    tris.Add(row0 + lon);
+                    tris.Add(row1 + lon + 1);
+                    tris.Add(row1 + lon);
+
+                    tris.Add(row0 + lon);
+                    tris.Add(row0 + lon + 1);
+                    tris.Add(row1 + lon + 1);
+                }
+            }
+
+            Mesh m = new Mesh
+            {
+                name = $"OrganicTreeCanopy_{seed}_Mesh",
+                vertices = verts.ToArray(),
+                uv = uvs.ToArray(),
+                triangles = tris.ToArray()
+            };
+            m.RecalculateNormals();
+            m.RecalculateTangents();
+            m.RecalculateBounds();
+            return m;
         }
 
         /// <summary>

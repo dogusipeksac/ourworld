@@ -349,6 +349,8 @@ namespace Gridroam.Editor
             public Material TownRoofTile;
             public Material TownBrickHouse;
             public Material TownGrass;
+            public Material CountryEarth;
+            public Material CoastalCliffRock;
             public Material TownAwningTerracotta;
             public Material TownAwningGreen;
             public Material TownAwningNavy;
@@ -442,17 +444,19 @@ namespace Gridroam.Editor
                 CharShoes = CreateOrLoadMaterial("MAT_Char_Shoes", urpLit, new Color(0.08f, 0.07f, 0.06f), 0.45f),
                 CharHair = CreateOrLoadMaterial("MAT_Char_Hair", urpLit, new Color(0.10f, 0.07f, 0.05f), 0.30f),
                 TownPaving = CreatePbrMaterial("MAT_Town_Paving", urpLit, "PavingStones070", new Color(0.86f, 0.83f, 0.78f), 0.18f, 0f, Vector2.one, 0.85f),
-                TownRoofTile = CreatePbrMaterial("MAT_Town_RoofTile", urpLit, "Bricks059", new Color(0.62f, 0.30f, 0.22f), 0.16f, 0f, Vector2.one, 0.95f),
+                TownRoofTile = CreatePbrMaterial("MAT_Town_RoofTile", urpLit, "RoofingTiles006", new Color(0.88f, 0.56f, 0.44f), 0.22f, 0f, new Vector2(2f, 2f), 0.95f),
                 TownBrickHouse = CreatePbrMaterial("MAT_Town_BrickHouse", urpLit, "Bricks059", new Color(0.86f, 0.74f, 0.64f), 0.16f, 0f, Vector2.one, 0.90f),
-                TownGrass = CreateOrLoadMaterial("MAT_Town_Grass", urpLit, new Color(0.28f, 0.42f, 0.18f), 0.10f),
+                TownGrass = CreatePbrMaterial("MAT_Town_Grass", urpLit, "Grass001", new Color(0.72f, 0.80f, 0.62f), 0.12f, 0f, new Vector2(28f, 52f), 0.85f),
+                CountryEarth = CreatePbrMaterial("MAT_Country_Earth", urpLit, "Ground037", new Color(0.76f, 0.82f, 0.66f), 0.14f, 0f, new Vector2(36f, 48f), 0.90f),
+                CoastalCliffRock = CreatePbrMaterial("MAT_Coastal_CliffRock", urpLit, "Rock030", new Color(0.74f, 0.72f, 0.68f), 0.18f, 0f, new Vector2(18f, 12f), 1.0f),
                 TownAwningTerracotta = CreateOrLoadMaterial("MAT_Town_Awning_Terracotta", urpLit, new Color(0.74f, 0.30f, 0.20f), 0.16f),
                 TownAwningGreen = CreateOrLoadMaterial("MAT_Town_Awning_Green", urpLit, new Color(0.16f, 0.42f, 0.25f), 0.16f),
                 TownAwningNavy = CreateOrLoadMaterial("MAT_Town_Awning_Navy", urpLit, new Color(0.14f, 0.24f, 0.44f), 0.16f),
                 TownAwningCream = CreateOrLoadMaterial("MAT_Town_Awning_Cream", urpLit, new Color(0.88f, 0.83f, 0.72f), 0.16f),
-                TownBark = CreateOrLoadMaterial("MAT_Town_Bark", urpLit, new Color(0.32f, 0.22f, 0.14f), 0.12f),
-                TownFoliageA = CreateOrLoadMaterial("MAT_Town_Foliage_A", urpLit, new Color(0.18f, 0.38f, 0.16f), 0.12f),
-                TownFoliageB = CreateOrLoadMaterial("MAT_Town_Foliage_B", urpLit, new Color(0.25f, 0.45f, 0.20f), 0.12f),
-                TownHedge = CreateOrLoadMaterial("MAT_Town_Hedge", urpLit, new Color(0.17f, 0.34f, 0.15f), 0.10f),
+                TownBark = CreatePbrMaterial("MAT_Town_Bark", urpLit, "Rock030", new Color(0.42f, 0.30f, 0.20f), 0.12f, 0f, new Vector2(1f, 3f), 0.95f),
+                TownFoliageA = CreatePbrMaterial("MAT_Town_Foliage_A", urpLit, "Grass001", new Color(0.46f, 0.62f, 0.38f), 0.14f, 0f, new Vector2(3f, 3f), 0.85f),
+                TownFoliageB = CreatePbrMaterial("MAT_Town_Foliage_B", urpLit, "Grass001", new Color(0.56f, 0.68f, 0.42f), 0.14f, 0f, new Vector2(3f, 3f), 0.85f),
+                TownHedge = CreatePbrMaterial("MAT_Town_Hedge", urpLit, "Grass001", new Color(0.42f, 0.58f, 0.36f), 0.12f, 0f, new Vector2(2f, 2f), 0.80f),
                 TownWood = CreateOrLoadMaterial("MAT_Town_Wood", urpLit, new Color(0.42f, 0.26f, 0.14f), 0.24f),
                 TownDoorDark = CreateOrLoadMaterial("MAT_Town_DoorDark", urpLit, new Color(0.24f, 0.15f, 0.09f), 0.26f),
                 TrafficLightBulb = CreateOrLoadMaterial("MAT_TrafficLight_Bulb", urpLit, new Color(0.14f, 0.14f, 0.15f), 0.55f, 0f, Color.black),
@@ -600,6 +604,7 @@ namespace Gridroam.Editor
             public GameObject FloodLights;
             public GameObject OceanBuoy;
             public GameObject RollerShutterDoor;
+            public GameObject WoodenBench;
         }
 
         private static PrefabSet CreatePrefabs(MaterialSet mats)
@@ -626,7 +631,8 @@ namespace Gridroam.Editor
                 OldTyre = BuildFbxPropPrefab("old_tyre", "Prop_OldTyre_CC0", 0.30f, addCollider: false, isStatic: true, fallbackMat: mats.WheelRubber),
                 FloodLights = BuildFbxPropPrefab("flood_lights", "Prop_FloodLights_CC0", 2.25f, addCollider: true, isStatic: true, fallbackMat: mats.GarageRoofMetal),
                 OceanBuoy = BuildFbxPropPrefab("ocean_buoy", "Prop_OceanBuoy_CC0", 2.8f, addCollider: false, isStatic: false, fallbackMat: mats.ContainerRed),
-                RollerShutterDoor = BuildFbxPropPrefab("rollershutter_door", "Prop_RollerShutter_CC0", 3.6f, addCollider: false, isStatic: true, fallbackMat: mats.GarageRoofMetal)
+                RollerShutterDoor = BuildFbxPropPrefab("rollershutter_door", "Prop_RollerShutter_CC0", 3.6f, addCollider: false, isStatic: true, fallbackMat: mats.GarageRoofMetal),
+                WoodenBench = BuildFbxPropPrefab("painted_wooden_bench", "Prop_WoodenBench_CC0", 0.86f, addCollider: false, isStatic: true, fallbackMat: mats.TownWood)
             };
         }
 
@@ -1590,13 +1596,14 @@ namespace Gridroam.Editor
             camData.renderPostProcessing = true;
             ThirdPersonCameraRig camRig = camObj.AddComponent<ThirdPersonCameraRig>();
 
-            // --- World Environment ---
+            // --- World Environment (Urban core slab + Natural grass terrain for residential & western hills) ---
             GameObject env = new GameObject("--- WORLD_ENVIRONMENT ---");
 
-            CreateStaticBlock("Ground_CoastalCity", env.transform, new Vector3(-18f, -0.5f, 125f), new Vector3(114f, 1f, 350f), mats.Ground);
+            CreateStaticBlock("Ground_UrbanCore", env.transform, new Vector3(4.5f, -0.5f, 125f), new Vector3(66f, 1f, 340f), mats.Ground);
+            CreateStaticBlock("Ground_ResidentialAndCountryGrass", env.transform, new Vector3(-92f, -0.5f, 125f), new Vector3(128f, 1f, 355f), mats.TownGrass);
             GameObject seaObj = CreateStaticBlock("Coastal_Sea", env.transform, new Vector3(155f, -1.6f, 125f), new Vector3(240f, 1f, 520f), mats.SeaWater, addCollider: false);
             CreateStaticBlock("Coastal_Seawall", env.transform, new Vector3(36.8f, 0.35f, 125f), new Vector3(1.8f, 1.5f, 330f), mats.Concrete);
-            CreateStaticBlock("Coastal_Promenade", env.transform, new Vector3(33.2f, 0.08f, 122f), new Vector3(5.2f, 0.16f, 256f), mats.Sidewalk);
+            CreateStaticBlock("Coastal_Promenade", env.transform, new Vector3(33.2f, 0.08f, 122f), new Vector3(5.2f, 0.16f, 290f), mats.Sidewalk);
 
             // E6: Procedural low-volume coastal wind & sea surf AudioSource near the seawall
             GameObject seaAudioObj = new GameObject("Coastal_SeaWindAmbience");
@@ -1605,13 +1612,13 @@ namespace Gridroam.Editor
             seaAudioObj.AddComponent<AudioSource>();
             seaAudioObj.AddComponent<CoastalAmbientAudio>();
 
-            // --- ROADS ---
-            CreateStaticBlock("Road_GarageConnector", env.transform, new Vector3(0f, 0.02f, 0f), new Vector3(64f, 0.08f, 12f), mats.RoadAsphaltCross, addCollider: false);
-            CreateStaticBlock("Road_CoastalMain", env.transform, new Vector3(24f, 0.03f, 122f), new Vector3(13f, 0.08f, 256f), mats.RoadAsphaltMain, addCollider: false);
-            CreateStaticBlock("Road_BackAlleyRoute", env.transform, new Vector3(-26f, 0.03f, 122f), new Vector3(8.5f, 0.08f, 256f), mats.RoadAsphaltMain, addCollider: false);
+            // --- ROADS (Full connected network across the entire map!) ---
+            CreateStaticBlock("Road_GarageConnector", env.transform, new Vector3(-42.5f, 0.02f, 0f), new Vector3(149f, 0.08f, 12f), mats.RoadAsphaltCross, addCollider: false);
+            CreateStaticBlock("Road_CoastalMain", env.transform, new Vector3(24f, 0.03f, 111f), new Vector3(13f, 0.08f, 278f), mats.RoadAsphaltMain, addCollider: false);
+            CreateStaticBlock("Road_BackAlleyRoute", env.transform, new Vector3(-26f, 0.03f, 111f), new Vector3(8.5f, 0.08f, 278f), mats.RoadAsphaltMain, addCollider: false);
             CreateStaticBlock("Road_CrossStreet_South", env.transform, new Vector3(-1f, 0.025f, 92f), new Vector3(54f, 0.08f, 9f), mats.RoadAsphaltCross, addCollider: false);
             CreateStaticBlock("Road_CrossStreet_North", env.transform, new Vector3(-1f, 0.025f, 174f), new Vector3(54f, 0.08f, 9f), mats.RoadAsphaltCross, addCollider: false);
-            CreateStaticBlock("Road_HarborConnector", env.transform, new Vector3(-1f, 0.025f, 246f), new Vector3(62f, 0.08f, 14f), mats.RoadAsphaltCross, addCollider: false);
+            CreateStaticBlock("Road_HarborConnector", env.transform, new Vector3(-42.5f, 0.025f, 246f), new Vector3(149f, 0.08f, 14f), mats.RoadAsphaltCross, addCollider: false);
 
             CreateStaticBlock("Sidewalk_MainWest", env.transform, new Vector3(15.6f, 0.08f, 122f), new Vector3(3.4f, 0.16f, 240f), mats.Sidewalk);
             CreateStaticBlock("Sidewalk_AlleyEast", env.transform, new Vector3(-20.4f, 0.08f, 122f), new Vector3(2.4f, 0.16f, 240f), mats.Sidewalk);

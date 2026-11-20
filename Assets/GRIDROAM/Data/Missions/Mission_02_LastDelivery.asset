@@ -15,8 +15,9 @@ MonoBehaviour:
   missionId: m02_last_delivery
   titleKey: m02.title
   summaryKey: m02.summary
-  nextMissionId: 
-  autoStartNextMission: 0
+  rewardMoney: 150
+  nextMissionId: m03_missing_car
+  autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot
   retryVehicleAnchorId: spawn_garage_sedan
   retryStartInVehicle: 1
@@ -33,6 +34,10 @@ MonoBehaviour:
     tailMinDistance: 12
     tailMaxDistance: 65
     tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
   - stepType: 1
     objectiveKey: m02.step2.objective
     targetAnchorId: npc_harbor_receiver
@@ -45,3 +50,7 @@ MonoBehaviour:
     tailMinDistance: 12
     tailMaxDistance: 65
     tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 

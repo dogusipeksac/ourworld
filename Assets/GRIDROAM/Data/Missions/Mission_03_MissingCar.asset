@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_03_MissingCar
+  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  missionId: m03_missing_car
+  titleKey: m03.title
+  summaryKey: m03.summary
+  rewardMoney: 150
+  nextMissionId: m04_night_tail
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 0
+  steps:
+  - stepType: 0
+    objectiveKey: m03.step1.objective
+    targetAnchorId: missing_car_zone
+    triggerRadius: 14
+    dialogueAsset: {fileID: 0}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 5
+    objectiveKey: m03.step2.objective
+    targetAnchorId: missing_car_clue
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 8d44f25e0a96e4c2aa87ef00bbdc835e, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 

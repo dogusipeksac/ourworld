@@ -15,3 +15,6 @@ MonoBehaviour:
   missions:
   - {fileID: 11400000, guid: 2f995ab1c4ebd46b8a847509e6416b11, type: 2}
   - {fileID: 11400000, guid: b90cf1ff326894e94a883de632362758, type: 2}
+  - {fileID: 11400000, guid: f6cc8062144e847e8a79f5d48d3f1288, type: 2}
+  - {fileID: 11400000, guid: b0e3cccde8dbd4e37b398099fa79a733, type: 2}
+  - {fileID: 11400000, guid: 09cbbeffc4f8844d7921e65e56ad993f, type: 2}

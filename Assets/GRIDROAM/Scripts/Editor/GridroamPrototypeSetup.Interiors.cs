@@ -1524,65 +1524,149 @@ namespace Gridroam.Editor
             GameObject boundaryRoot = new GameObject("World_BoundaryAndHills");
             boundaryRoot.transform.SetParent(envParent, false);
 
-            CreateStaticBlock("Meadow_WestBelt", boundaryRoot.transform,
-                new Vector3(-92f, -0.5f, 125f), new Vector3(38f, 1f, 380f), mats.TownGrass, addCollider: true);
-            CreateStaticBlock("Meadow_SouthBelt", boundaryRoot.transform,
-                new Vector3(-20f, -0.5f, -57f), new Vector3(120f, 1f, 22f), mats.TownGrass, addCollider: true);
-            CreateStaticBlock("Meadow_NorthBelt", boundaryRoot.transform,
-                new Vector3(-20f, -0.5f, 307f), new Vector3(120f, 1f, 22f), mats.TownGrass, addCollider: true);
-
+            // Extend coastal seawall cleanly along the expanded southern and northern coastline
             CreateStaticBlock("Coastal_Seawall_SouthCap", boundaryRoot.transform,
-                new Vector3(36.8f, 0.35f, -44f), new Vector3(1.8f, 1.5f, 9f), mats.Concrete);
+                new Vector3(36.8f, 0.35f, -44f), new Vector3(1.8f, 1.5f, 12f), mats.Concrete);
             CreateStaticBlock("Coastal_Seawall_NorthCap", boundaryRoot.transform,
-                new Vector3(36.8f, 0.35f, 294f), new Vector3(1.8f, 1.5f, 9f), mats.Concrete);
+                new Vector3(36.8f, 0.35f, 294f), new Vector3(1.8f, 1.5f, 12f), mats.Concrete);
 
-            CreateTiledBox("StoneWall_West", boundaryRoot.transform,
-                new Vector3(-78f, 0.85f, 125f), new Vector3(1.1f, 1.70f, 347.2f),
-                Quaternion.identity, mats.Concrete, 2.5f, collider: true);
-            CreateTiledBox("StoneWall_WestCoping", boundaryRoot.transform,
-                new Vector3(-78f, 1.78f, 125f), new Vector3(1.32f, 0.18f, 347.4f),
-                Quaternion.identity, mats.PlasterTrim, 2.5f, collider: false);
+            // Build a continuous, organic 3D coastal terrain ridge mesh outside the playable ring road
+            // (NO mid-map concrete walls at x=-78 and NO primitive sphere hills!)
+            BuildContinuousCoastalHillsMesh(
+                "CoastalTerrain_WestRange",
+                boundaryRoot.transform,
+                minX: -182f, maxX: -131f,
+                minZ: -58f, maxZ: 304f,
+                gridX: 22, gridZ: 64,
+                riseDirection: new Vector2(-1f, 0f),
+                maxElevation: 26f,
+                mats.CountryEarth);
 
-            CreateTiledBox("StoneWall_South", boundaryRoot.transform,
-                new Vector3(-20.6f, 0.85f, -48f), new Vector3(116.0f, 1.70f, 1.1f),
-                Quaternion.identity, mats.Concrete, 2.5f, collider: true);
-            CreateTiledBox("StoneWall_SouthCoping", boundaryRoot.transform,
-                new Vector3(-20.6f, 1.78f, -48f), new Vector3(116.2f, 0.18f, 1.32f),
-                Quaternion.identity, mats.PlasterTrim, 2.5f, collider: false);
+            BuildContinuousCoastalHillsMesh(
+                "CoastalTerrain_SouthHeadland",
+                boundaryRoot.transform,
+                minX: -134f, maxX: 35f,
+                minZ: -62f, maxZ: -32f,
+                gridX: 38, gridZ: 14,
+                riseDirection: new Vector2(0f, -1f),
+                maxElevation: 16f,
+                mats.CoastalCliffRock);
 
-            CreateTiledBox("StoneWall_North", boundaryRoot.transform,
-                new Vector3(-20.6f, 0.85f, 298f), new Vector3(116.0f, 1.70f, 1.1f),
-                Quaternion.identity, mats.Concrete, 2.5f, collider: true);
-            CreateTiledBox("StoneWall_NorthCoping", boundaryRoot.transform,
-                new Vector3(-20.6f, 1.78f, 298f), new Vector3(116.2f, 0.18f, 1.32f),
-                Quaternion.identity, mats.PlasterTrim, 2.5f, collider: false);
+            BuildContinuousCoastalHillsMesh(
+                "CoastalTerrain_NorthHeadland",
+                boundaryRoot.transform,
+                minX: -134f, maxX: 35f,
+                minZ: 279f, maxZ: 308f,
+                gridX: 38, gridZ: 14,
+                riseDirection: new Vector2(0f, 1f),
+                maxElevation: 18f,
+                mats.CoastalCliffRock);
+        }
 
-            (Vector3 pos, Vector3 scale)[] hills =
+        private static void BuildContinuousCoastalHillsMesh(
+            string name,
+            Transform parent,
+            float minX,
+            float maxX,
+            float minZ,
+            float maxZ,
+            int gridX,
+            int gridZ,
+            Vector2 riseDirection,
+            float maxElevation,
+            Material terrainMat)
+        {
+            GameObject go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = Vector3.zero;
+
+            int cols = Mathf.Max(2, gridX);
+            int rows = Mathf.Max(2, gridZ);
+            int vertCount = (cols + 1) * (rows + 1);
+
+            Vector3[] verts = new Vector3[vertCount];
+            Vector2[] uvs = new Vector2[vertCount];
+            int[] tris = new int[cols * rows * 6];
+
+            float spanX = maxX - minX;
+            float spanZ = maxZ - minZ;
+
+            int vIdx = 0;
+            for (int r = 0; r <= rows; r++)
             {
-                (new Vector3(-96f, -3.5f, -30f), new Vector3(40f, 18f, 68f)),
-                (new Vector3(-100f, -4.0f, 28f), new Vector3(46f, 22f, 76f)),
-                (new Vector3(-95f, -3.2f, 88f), new Vector3(38f, 17f, 66f)),
-                (new Vector3(-102f, -4.2f, 148f), new Vector3(48f, 24f, 78f)),
-                (new Vector3(-96f, -3.4f, 210f), new Vector3(40f, 19f, 70f)),
-                (new Vector3(-100f, -3.8f, 272f), new Vector3(44f, 21f, 74f)),
-                (new Vector3(-56f, -3.6f, -66f), new Vector3(64f, 18f, 38f)),
-                (new Vector3(-6f, -3.2f, -64f), new Vector3(58f, 15f, 34f)),
-                (new Vector3(24f, -3.0f, -62f), new Vector3(34f, 12f, 28f)),
-                (new Vector3(-56f, -3.6f, 316f), new Vector3(64f, 19f, 38f)),
-                (new Vector3(-6f, -3.2f, 314f), new Vector3(58f, 15f, 34f)),
-                (new Vector3(24f, -3.0f, 312f), new Vector3(34f, 12f, 28f))
-            };
+                float tz = r / (float)rows;
+                float wz = Mathf.Lerp(minZ, maxZ, tz);
 
-            for (int i = 0; i < hills.Length; i++)
-            {
-                GameObject hill = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                hill.name = $"CoastalHill_{i + 1:00}";
-                hill.transform.SetParent(boundaryRoot.transform, false);
-                hill.transform.position = hills[i].pos;
-                hill.transform.localScale = hills[i].scale;
-                hill.GetComponent<Renderer>().sharedMaterial = (i % 3 == 0) ? mats.TownFoliageB : mats.TownGrass;
-                MarkStaticEnvironment(hill);
+                for (int c = 0; c <= cols; c++)
+                {
+                    float tx = c / (float)cols;
+                    float wx = Mathf.Lerp(minX, maxX, tx);
+
+                    float distT;
+                    if (Mathf.Abs(riseDirection.x) > 0.5f)
+                    {
+                        distT = riseDirection.x < 0f ? (1f - tx) : tx;
+                    }
+                    else
+                    {
+                        distT = riseDirection.y < 0f ? (1f - tz) : tz;
+                    }
+
+                    // Smoothly blend from y = -0.15 at the inner playable edge up into organic multi-octave ridges
+                    float smoothRise = distT * distT * (3f - 2f * distT);
+                    float n1 = Mathf.PerlinNoise(wx * 0.025f + 13.7f, wz * 0.025f + 29.1f);
+                    float n2 = Mathf.PerlinNoise(wx * 0.065f + 51.3f, wz * 0.065f + 17.4f) * 0.42f;
+                    float ridge = (n1 + n2) * 0.72f;
+
+                    float y = -0.15f + smoothRise * maxElevation * (0.45f + ridge);
+                    verts[vIdx] = new Vector3(wx, y, wz);
+                    uvs[vIdx] = new Vector2(tx * (spanX / 12f), tz * (spanZ / 12f));
+                    vIdx++;
+                }
             }
+
+            int tIdx = 0;
+            int stride = cols + 1;
+            for (int r = 0; r < rows; r++)
+            {
+                int row0 = r * stride;
+                int row1 = row0 + stride;
+                for (int c = 0; c < cols; c++)
+                {
+                    tris[tIdx++] = row0 + c;
+                    tris[tIdx++] = row1 + c;
+                    tris[tIdx++] = row1 + c + 1;
+
+                    tris[tIdx++] = row0 + c;
+                    tris[tIdx++] = row1 + c + 1;
+                    tris[tIdx++] = row0 + c + 1;
+                }
+            }
+
+            Mesh mesh = new Mesh
+            {
+                name = name + "_Mesh",
+                vertices = verts,
+                uv = uvs,
+                triangles = tris
+            };
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
+
+            MeshFilter mf = go.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+
+            MeshRenderer mr = go.AddComponent<MeshRenderer>();
+            if (terrainMat != null)
+            {
+                mr.sharedMaterial = terrainMat;
+            }
+
+            MeshCollider mc = go.AddComponent<MeshCollider>();
+            mc.sharedMesh = mesh;
+
+            MarkStaticEnvironment(go);
         }
     }
 }

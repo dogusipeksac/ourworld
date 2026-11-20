@@ -14,7 +14,7 @@ namespace Gridroam.Editor
     public static class GridroamAutoSetup
     {
         private const string VersionKey = "GRIDROAM_SceneBuildVersion";
-        private const string CurrentBuildVersion = "v6_full_5missions_openworld";
+        private const string CurrentBuildVersion = "v7_open_reachable_terrain";
 
         static GridroamAutoSetup()
         {
