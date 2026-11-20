@@ -21,9 +21,14 @@ namespace Gridroam.CameraSystem
         [Header("Driving Profile")]
         [SerializeField] private Vector3 drivingPivotOffset = new Vector3(0f, 1.85f, 0f);
         [SerializeField] private float drivingDistance = 7.4f;
+        [SerializeField] private float drivingSpeedExtraDistance = 1.35f;
         [SerializeField] private float drivingDefaultPitch = 16f;
         [SerializeField] private float drivingAutoAlignDelay = 1.4f;
         [SerializeField] private float drivingAutoAlignSpeed = 3.2f;
+        [SerializeField] private float baseFov = 58f;
+        [SerializeField] private float drivingMaxFov = 68f;
+        [SerializeField] private float fovMaxSpeedKmh = 120f;
+        [SerializeField] private float fovSmoothSpeed = 5.5f;
 
         [Header("Smoothing & Collision")]
         [SerializeField] private float pivotFollowSpeed = 14f;
@@ -31,6 +36,8 @@ namespace Gridroam.CameraSystem
         [SerializeField] private float collisionRadius = 0.28f;
         [SerializeField] private LayerMask collisionMask = ~0;
 
+        private Camera _camera;
+        private Rigidbody _targetRb;
         private float _yaw;
         private float _pitch = 16f;
         private float _currentDistance;
@@ -44,9 +51,11 @@ namespace Gridroam.CameraSystem
 
         private void Start()
         {
+            _camera = GetComponent<Camera>();
             _currentDistance = footDistance;
             if (target != null)
             {
+                _targetRb = target.GetComponent<Rigidbody>();
                 _yaw = target.eulerAngles.y;
                 _smoothedPivot = target.position + footPivotOffset;
             }
@@ -56,6 +65,7 @@ namespace Gridroam.CameraSystem
         {
             target = newTarget;
             _isDrivingMode = drivingMode;
+            _targetRb = target != null ? target.GetComponent<Rigidbody>() : null;
 
             if (target != null && snapBehindTarget)
             {
@@ -104,8 +114,26 @@ namespace Gridroam.CameraSystem
             Vector3 desiredPivot = target.position + desiredOffset;
             _smoothedPivot = Vector3.Lerp(_smoothedPivot, desiredPivot, 1f - Mathf.Exp(-pivotFollowSpeed * Time.deltaTime));
 
-            float desiredDistance = _isDrivingMode ? drivingDistance : footDistance;
+            float speedFactor = 0f;
+            if (_isDrivingMode && _targetRb != null)
+            {
+                float speedKmh = _targetRb.linearVelocity.magnitude * 3.6f;
+                speedFactor = Mathf.InverseLerp(0f, fovMaxSpeedKmh, speedKmh);
+            }
+
+            float desiredDistance = _isDrivingMode
+                ? drivingDistance + speedFactor * drivingSpeedExtraDistance
+                : footDistance;
             _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distanceBlendSpeed * Time.deltaTime));
+
+            if (_camera == null) _camera = GetComponent<Camera>();
+            if (_camera != null)
+            {
+                float desiredFov = _isDrivingMode
+                    ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor)
+                    : baseFov;
+                _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, desiredFov, 1f - Mathf.Exp(-fovSmoothSpeed * Time.deltaTime));
+            }
 
             Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
             Vector3 backDir = rotation * Vector3.back;

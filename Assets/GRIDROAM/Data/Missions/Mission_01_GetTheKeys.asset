@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_01_GetTheKeys
+  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  missionId: m01_get_the_keys
+  titleKey: m01.title
+  summaryKey: m01.summary
+  nextMissionId: m02_last_delivery
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 0
+  steps:
+  - stepType: 1
+    objectiveKey: m01.step1.objective
+    targetAnchorId: npc_mechanic
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 10e6f5aea9afb4f8a8550c5976acba09, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 1
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+  - stepType: 2
+    objectiveKey: m01.step2.objective
+    targetAnchorId: player_sedan
+    triggerRadius: 0
+    dialogueAsset: {fileID: 0}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6

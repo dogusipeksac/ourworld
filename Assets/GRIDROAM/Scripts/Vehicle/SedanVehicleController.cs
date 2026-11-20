@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using Gridroam.Input;
+using Gridroam.Player;
 using UnityEngine;
 
 namespace Gridroam.Vehicle
 {
     /// <summary>
     /// Axle definition structured after Unity 6's official WheelCollider Tutorial.
-    /// Assign separate wheel visual transforms (e.g., from PolyDrive FREE) to sync pose automatically.
+    /// Assign separate wheel visual transforms to sync pose automatically.
     /// </summary>
     [Serializable]
     public class AxleInfo
@@ -21,8 +22,10 @@ namespace Gridroam.Vehicle
     }
 
     /// <summary>
-    /// Arcade-tuned WheelCollider sedan controller built for mobile touch (simultaneous steer + gas/brake)
-    /// and Unity Editor keyboard testing.
+    /// Realistic rear-wheel-drive WheelCollider sedan controller with torque curve,
+    /// 5-speed automatic gearbox, aerodynamic drag, Ackermann speed-sensitive steering,
+    /// 60/40 ABS braking, handbrake drift stiffness drop, body roll/pitch, dynamic lights,
+    /// and seated driver + steering wheel animation.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class SedanVehicleController : MonoBehaviour
@@ -30,34 +33,80 @@ namespace Gridroam.Vehicle
         [Header("Axles (Unity 6 WheelCollider Tutorial Pattern)")]
         [SerializeField] private List<AxleInfo> axleInfos = new List<AxleInfo>();
 
-        [Header("Handling")]
-        [SerializeField] private float maxMotorTorque = 1550f;
-        [SerializeField] private float maxReverseTorque = 900f;
-        [SerializeField] private float maxBrakeTorque = 2800f;
-        [SerializeField] private float parkedBrakeTorque = 3600f;
-        [SerializeField] private float maxSteeringAngleLowSpeed = 34f;
-        [SerializeField] private float maxSteeringAngleHighSpeed = 16f;
-        [SerializeField] private float maxForwardSpeedKmh = 88f;
-        [SerializeField] private float maxReverseSpeedKmh = 26f;
-        [SerializeField] private float steerResponseSpeed = 8f;
+        [Header("Drivetrain")]
+        [SerializeField] private float idleRpm = 850f;
+        [SerializeField] private float redlineRpm = 6500f;
+        [SerializeField] private float upshiftRpm = 5800f;
+        [SerializeField] private float downshiftRpm = 2200f;
+        [SerializeField] private float shiftDuration = 0.25f;
+        [SerializeField] private float finalDriveRatio = 3.9f;
+        [SerializeField] private float drivetrainEfficiency = 0.85f;
+        [SerializeField] private float[] gearRatios = { 3.6f, 2.2f, 1.5f, 1.15f, 0.92f };
+        [SerializeField] private float reverseGearRatio = 3.4f;
+        [SerializeField] private float maxReverseSpeedKmh = 25f;
 
-        [Header("Stability")]
-        [SerializeField] private Vector3 centerOfMassOffset = new Vector3(0f, -0.42f, 0.12f);
+        [Header("Braking & Aerodynamics")]
+        [SerializeField] private float maxBrakeTorque = 3200f;
+        [SerializeField] private float parkedBrakeTorque = 3800f;
+        [SerializeField] private float frontBrakeBias = 0.6f;
+        [SerializeField] private float absSlipThreshold = 0.35f;
+        [SerializeField] private float airDensity = 1.2f;
+        [SerializeField] private float dragCoefficient = 0.30f;
+        [SerializeField] private float frontalArea = 2.2f;
+        [SerializeField] private float rollingResistanceFactor = 12f;
+
+        [Header("Ackermann Steering")]
+        [SerializeField] private float wheelbase = 2.70f;
+        [SerializeField] private float trackWidth = 1.68f;
+        [SerializeField] private float maxSteeringAngleLowSpeed = 36f;
+        [SerializeField] private float maxSteeringAngleHighSpeed = 9f;
+        [SerializeField] private float steerRateLowSpeed = 120f;
+        [SerializeField] private float steerRateHighSpeed = 60f;
+
+        [Header("Tyre Drift & Stability")]
+        [SerializeField] private float baseRearSidewaysStiffness = 1.8f;
+        [SerializeField] private float handbrakeRearSidewaysStiffness = 0.9f;
+        [SerializeField] private Vector3 centerOfMassOffset = new Vector3(0f, -0.42f, 0.08f);
         [SerializeField] private float antiRollForce = 4200f;
-        [SerializeField] private float downforceFactor = 18f;
+        [SerializeField] private float downforceFactor = 16f;
 
         [Header("Entry / Exit Points")]
         [SerializeField] private Transform leftExitPoint;
         [SerializeField] private Transform rightExitPoint;
 
-        [Header("Visual Replacement Slot")]
-        [Tooltip("Drop PolyDrive FREE sedan body visual under this transform and remove placeholder meshes.")]
+        [Header("Visuals & Seated Driver")]
+        [Tooltip("Drop sedan body visual under this transform.")]
         [SerializeField] private Transform bodyVisualRoot;
+        [SerializeField] private GameObject seatedDriverObject;
+        [SerializeField] private Transform steeringWheelTransform;
+
+        private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
         private Rigidbody _rb;
         private bool _isPlayerDriving;
         private bool _inputLocked;
         private float _currentSteerAngle;
+        private float _shiftTimer;
+        private float _shiftCooldown;
+        private float _currentRearSidewaysStiffness = 1.8f;
+
+        // Body visual roll/pitch state
+        private Vector3 _prevVelocity;
+        private float _bodyPitch;
+        private float _bodyRoll;
+
+        // Lights & interior visual caches
+        private readonly List<Renderer> _taillightRenderers = new List<Renderer>();
+        private readonly List<Color> _taillightBaseEmissions = new List<Color>();
+        private readonly List<Renderer> _reverseRenderers = new List<Renderer>();
+        private MaterialPropertyBlock _mpb;
+        private bool _lastBrakingVisual;
+        private bool _lastReversingVisual;
+        private bool _lightsCached;
+
+        private ProceduralHumanoid _seatedDriverHumanoid;
+        private Quaternion _steeringWheelBaseRot = Quaternion.identity;
+        private bool _steeringWheelCached;
 
         public bool IsPlayerDriving => _isPlayerDriving;
         public float SpeedKmh => _rb != null ? _rb.linearVelocity.magnitude * 3.6f : 0f;
@@ -65,16 +114,27 @@ namespace Gridroam.Vehicle
         public Transform BodyVisualRoot => bodyVisualRoot;
         public List<AxleInfo> AxleInfos => axleInfos;
 
+        public int CurrentGear { get; private set; }
+        public float EngineRpm { get; private set; }
+        public bool IsBraking { get; private set; }
+        public bool IsReversing { get; private set; }
+        public float CurrentThrottle { get; private set; }
+        public float MaxRearSidewaysSlip { get; private set; }
+
         public void ConfigureSetup(
             List<AxleInfo> axles,
             Transform bodyRoot,
             Transform leftExit,
-            Transform rightExit)
+            Transform rightExit,
+            GameObject seatedDriver = null,
+            Transform steeringWheel = null)
         {
             axleInfos = axles;
             bodyVisualRoot = bodyRoot;
             leftExitPoint = leftExit;
             rightExitPoint = rightExit;
+            if (seatedDriver != null) seatedDriverObject = seatedDriver;
+            if (steeringWheel != null) steeringWheelTransform = steeringWheel;
         }
 
         private void Awake()
@@ -82,14 +142,100 @@ namespace Gridroam.Vehicle
             _rb = GetComponent<Rigidbody>();
             _rb.centerOfMass = centerOfMassOffset;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
+            EngineRpm = idleRpm;
+            CurrentGear = 0;
+            _currentRearSidewaysStiffness = baseRearSidewaysStiffness;
+            _mpb = new MaterialPropertyBlock();
+
+            CacheVisualReferences();
+            UpdateSeatedDriverVisibility();
+        }
+
+        private void CacheVisualReferences()
+        {
+            if (bodyVisualRoot == null) return;
+
+            if (!_lightsCached)
+            {
+                _lightsCached = true;
+                _taillightRenderers.Clear();
+                _taillightBaseEmissions.Clear();
+                _reverseRenderers.Clear();
+
+                Renderer[] renderers = bodyVisualRoot.GetComponentsInChildren<Renderer>(true);
+                foreach (Renderer r in renderers)
+                {
+                    if (r.gameObject.name == "Placeholder_TaillightL" || r.gameObject.name == "Placeholder_TaillightR")
+                    {
+                        _taillightRenderers.Add(r);
+                        Color baseEm = new Color(1.0f, 0.12f, 0.08f) * 2.6f;
+                        if (r.sharedMaterial != null && r.sharedMaterial.HasProperty(EmissionColorId))
+                        {
+                            baseEm = r.sharedMaterial.GetColor(EmissionColorId);
+                        }
+                        _taillightBaseEmissions.Add(baseEm);
+                    }
+                    else if (r.gameObject.name == "Placeholder_ReverseL" || r.gameObject.name == "Placeholder_ReverseR")
+                    {
+                        _reverseRenderers.Add(r);
+                    }
+                }
+            }
+
+            if (seatedDriverObject == null)
+            {
+                Transform found = bodyVisualRoot.Find("SeatedDriverRoot");
+                if (found != null) seatedDriverObject = found.gameObject;
+            }
+
+            if (seatedDriverObject != null && _seatedDriverHumanoid == null)
+            {
+                _seatedDriverHumanoid = seatedDriverObject.GetComponentInChildren<ProceduralHumanoid>(true);
+                if (_seatedDriverHumanoid != null)
+                {
+                    _seatedDriverHumanoid.SetSitting(true);
+                }
+            }
+
+            if (steeringWheelTransform == null)
+            {
+                steeringWheelTransform = bodyVisualRoot.Find("SteeringWheel");
+            }
+
+            if (steeringWheelTransform != null && !_steeringWheelCached)
+            {
+                _steeringWheelBaseRot = steeringWheelTransform.localRotation;
+                _steeringWheelCached = true;
+            }
+        }
+
+        private void UpdateSeatedDriverVisibility()
+        {
+            if (seatedDriverObject != null)
+            {
+                seatedDriverObject.SetActive(_isPlayerDriving);
+            }
         }
 
         public void SetPlayerDriving(bool driving)
         {
             _isPlayerDriving = driving;
-            if (!driving && InputHub.Instance != null)
+            UpdateSeatedDriverVisibility();
+
+            if (!driving)
             {
-                InputHub.Instance.ClearDrivingTouchInputs();
+                CurrentThrottle = 0f;
+                CurrentGear = 0;
+                IsBraking = false;
+                IsReversing = false;
+                if (InputHub.Instance != null)
+                {
+                    InputHub.Instance.ClearDrivingTouchInputs();
+                }
+            }
+            else if (CurrentGear == 0)
+            {
+                CurrentGear = 1;
             }
         }
 
@@ -123,6 +269,42 @@ namespace Gridroam.Vehicle
             _rb.angularVelocity = Vector3.zero;
             transform.SetPositionAndRotation(position, rotation);
             _currentSteerAngle = 0f;
+            _prevVelocity = Vector3.zero;
+            _bodyPitch = 0f;
+            _bodyRoll = 0f;
+            _shiftTimer = 0f;
+            EngineRpm = idleRpm;
+            CurrentGear = _isPlayerDriving ? 1 : 0;
+            IsBraking = false;
+            IsReversing = false;
+            CurrentThrottle = 0f;
+            MaxRearSidewaysSlip = 0f;
+            if (bodyVisualRoot != null)
+            {
+                bodyVisualRoot.localRotation = Quaternion.identity;
+            }
+        }
+
+        private float EvaluateEngineTorque(float rpm)
+        {
+            // Piecewise torque curve: 1000 rpm -> 180 Nm, 3500 rpm -> 260 Nm peak, 6200 rpm -> 200 Nm, redline 6500
+            if (rpm >= redlineRpm)
+            {
+                return 0f;
+            }
+            if (rpm <= 1000f)
+            {
+                return Mathf.Lerp(155f, 180f, Mathf.InverseLerp(idleRpm, 1000f, rpm));
+            }
+            if (rpm <= 3500f)
+            {
+                return Mathf.Lerp(180f, 260f, Mathf.InverseLerp(1000f, 3500f, rpm));
+            }
+            if (rpm <= 6200f)
+            {
+                return Mathf.Lerp(260f, 200f, Mathf.InverseLerp(3500f, 6200f, rpm));
+            }
+            return Mathf.Lerp(200f, 140f, Mathf.InverseLerp(6200f, redlineRpm, rpm));
         }
 
         private void FixedUpdate()
@@ -132,6 +314,7 @@ namespace Gridroam.Vehicle
                 return;
             }
 
+            float dt = Time.fixedDeltaTime;
             float speedKmh = SpeedKmh;
             float forwardMs = ForwardSpeedMs;
 
@@ -148,65 +331,196 @@ namespace Gridroam.Vehicle
                 handbrake = InputHub.Instance.HandbrakeHeld;
             }
 
-            float speedLerp = Mathf.InverseLerp(8f, maxForwardSpeedKmh, speedKmh);
-            float maxSteerAtSpeed = Mathf.Lerp(maxSteeringAngleLowSpeed, maxSteeringAngleHighSpeed, speedLerp);
-            float targetSteerAngle = steerInput * maxSteerAtSpeed;
-            _currentSteerAngle = Mathf.Lerp(_currentSteerAngle, targetSteerAngle, Time.fixedDeltaTime * steerResponseSpeed);
+            // --- B3: Speed-sensitive rate-limited steering with self-centering ---
+            float speedFactor120 = Mathf.InverseLerp(0f, 120f, speedKmh);
+            float maxSteerAtSpeed = Mathf.Lerp(maxSteeringAngleLowSpeed, maxSteeringAngleHighSpeed, speedFactor120);
+            float steerRate = Mathf.Lerp(steerRateLowSpeed, steerRateHighSpeed, speedFactor120);
 
-            float motorTorque = 0f;
-            float brakeTorque = 0f;
-
-            if (!_isPlayerDriving || _inputLocked)
+            if (Mathf.Abs(steerInput) > 0.01f)
             {
-                brakeTorque = parkedBrakeTorque;
-            }
-            else if (handbrake)
-            {
-                brakeTorque = parkedBrakeTorque;
-            }
-            else if (throttleInput > 0.01f)
-            {
-                if (forwardMs < -1.0f)
-                {
-                    // Braking from reverse before accelerating forward.
-                    brakeTorque = maxBrakeTorque * throttleInput;
-                }
-                else if (speedKmh < maxForwardSpeedKmh)
-                {
-                    motorTorque = maxMotorTorque * throttleInput;
-                }
-            }
-            else if (brakeInput > 0.01f)
-            {
-                if (forwardMs > 0.75f)
-                {
-                    brakeTorque = maxBrakeTorque * brakeInput;
-                }
-                else if (speedKmh < maxReverseSpeedKmh)
-                {
-                    motorTorque = -maxReverseTorque * brakeInput;
-                }
+                float targetSteer = steerInput * maxSteerAtSpeed;
+                _currentSteerAngle = Mathf.MoveTowards(_currentSteerAngle, targetSteer, steerRate * dt);
             }
             else
             {
-                // Gentle engine drag when coasting so car doesn't roll indefinitely on slopes.
-                brakeTorque = 180f;
+                // Self-centering force increases with vehicle speed
+                float centerRate = Mathf.Lerp(65f, 145f, Mathf.InverseLerp(0f, 60f, speedKmh));
+                _currentSteerAngle = Mathf.MoveTowards(_currentSteerAngle, 0f, centerRate * dt);
             }
 
+            ComputeAckermannAngles(_currentSteerAngle, out float leftSteerAngle, out float rightSteerAngle);
+
+            // --- B1: Automatic Gearbox & Engine RPM ---
+            if (_shiftTimer > 0f) _shiftTimer = Mathf.Max(0f, _shiftTimer - dt);
+            if (_shiftCooldown > 0f) _shiftCooldown = Mathf.Max(0f, _shiftCooldown - dt);
+
+            // Compute average driven wheel RPM
+            float drivenWheelRpmSum = 0f;
+            int drivenWheelCount = 0;
             foreach (AxleInfo axle in axleInfos)
             {
+                if (!axle.motor) continue;
+                if (axle.leftWheel != null)
+                {
+                    drivenWheelRpmSum += Mathf.Abs(axle.leftWheel.rpm);
+                    drivenWheelCount++;
+                }
+                if (axle.rightWheel != null)
+                {
+                    drivenWheelRpmSum += Mathf.Abs(axle.rightWheel.rpm);
+                    drivenWheelCount++;
+                }
+            }
+            float avgWheelRpm = drivenWheelCount > 0 ? drivenWheelRpmSum / drivenWheelCount : 0f;
+
+            float effectiveThrottle = 0f;
+            float serviceBrake = 0f;
+            bool parked = !_isPlayerDriving || _inputLocked;
+
+            if (parked)
+            {
+                CurrentGear = 0;
+                IsBraking = false;
+                IsReversing = false;
+            }
+            else
+            {
+                if (throttleInput > 0.01f)
+                {
+                    if (forwardMs < -0.6f)
+                    {
+                        // Braking out of reverse before accelerating forward
+                        serviceBrake = throttleInput;
+                        IsBraking = true;
+                        IsReversing = false;
+                    }
+                    else
+                    {
+                        if (CurrentGear <= 0) CurrentGear = 1;
+                        effectiveThrottle = throttleInput;
+                        IsBraking = false;
+                        IsReversing = false;
+                    }
+                }
+                else if (brakeInput > 0.01f)
+                {
+                    if (forwardMs > 0.6f)
+                    {
+                        serviceBrake = brakeInput;
+                        IsBraking = true;
+                        IsReversing = false;
+                    }
+                    else
+                    {
+                        CurrentGear = -1;
+                        IsBraking = false;
+                        IsReversing = true;
+                        if (-forwardMs * 3.6f < maxReverseSpeedKmh)
+                        {
+                            effectiveThrottle = brakeInput;
+                        }
+                    }
+                }
+                else
+                {
+                    IsBraking = handbrake;
+                    IsReversing = CurrentGear == -1 && forwardMs < -0.15f;
+                    if (CurrentGear == -1 && Mathf.Abs(forwardMs) < 0.25f)
+                    {
+                        CurrentGear = 1;
+                    }
+                }
+            }
+
+            CurrentThrottle = effectiveThrottle;
+
+            float activeGearRatio = 0f;
+            if (CurrentGear == -1)
+            {
+                activeGearRatio = reverseGearRatio;
+            }
+            else if (CurrentGear >= 1 && gearRatios != null && gearRatios.Length > 0)
+            {
+                int idx = Mathf.Clamp(CurrentGear - 1, 0, gearRatios.Length - 1);
+                activeGearRatio = gearRatios[idx];
+            }
+
+            // Compute smoothed engine RPM
+            float wheelDrivenRpm = avgWheelRpm * activeGearRatio * finalDriveRatio;
+            float clutchSlipFloor = idleRpm + effectiveThrottle * 750f;
+            float targetRpm = CurrentGear == 0
+                ? idleRpm
+                : Mathf.Clamp(Mathf.Max(clutchSlipFloor, wheelDrivenRpm), idleRpm, redlineRpm);
+
+            if (_shiftTimer > 0f)
+            {
+                targetRpm = Mathf.Max(idleRpm, targetRpm * 0.85f);
+            }
+
+            EngineRpm = Mathf.Lerp(EngineRpm, targetRpm, 1f - Mathf.Exp(-10f * dt));
+
+            // Automatic upshift / downshift in forward gears
+            if (!parked && CurrentGear >= 1 && gearRatios != null && _shiftTimer <= 0f && _shiftCooldown <= 0f)
+            {
+                if (EngineRpm >= upshiftRpm && CurrentGear < gearRatios.Length && effectiveThrottle > 0.1f)
+                {
+                    CurrentGear++;
+                    _shiftTimer = shiftDuration;
+                    _shiftCooldown = shiftDuration + 0.30f;
+                    activeGearRatio = gearRatios[CurrentGear - 1];
+                }
+                else if (EngineRpm <= downshiftRpm && CurrentGear > 1)
+                {
+                    CurrentGear--;
+                    _shiftTimer = shiftDuration * 0.75f;
+                    _shiftCooldown = shiftDuration + 0.30f;
+                    activeGearRatio = gearRatios[CurrentGear - 1];
+                }
+            }
+
+            // Compute wheel motor torque (zero during shift or handbrake)
+            float perDrivenWheelTorque = 0f;
+            if (!parked && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
+            {
+                float engineTorque = EvaluateEngineTorque(EngineRpm);
+                float totalWheelTorque = engineTorque * effectiveThrottle * activeGearRatio * finalDriveRatio * drivetrainEfficiency;
+                float sign = CurrentGear == -1 ? -1f : 1f;
+                perDrivenWheelTorque = (totalWheelTorque / drivenWheelCount) * sign;
+            }
+
+            // B5: Engine braking proportional to RPM when coasting in gear
+            float engineBrakeTorque = 0f;
+            if (!parked && !handbrake && serviceBrake <= 0.01f && effectiveThrottle <= 0.01f && CurrentGear != 0 && Mathf.Abs(forwardMs) > 0.4f)
+            {
+                float rpmNorm = Mathf.InverseLerp(idleRpm, redlineRpm, EngineRpm);
+                engineBrakeTorque = 18f + rpmNorm * 130f;
+            }
+
+            // B4: Smooth rear sideways stiffness drop while handbrake is held (drift)
+            float targetRearStiffness = (!parked && handbrake) ? handbrakeRearSidewaysStiffness : baseRearSidewaysStiffness;
+            float stiffnessRate = targetRearStiffness < _currentRearSidewaysStiffness ? 12f : 4.5f;
+            _currentRearSidewaysStiffness = Mathf.MoveTowards(_currentRearSidewaysStiffness, targetRearStiffness, stiffnessRate * dt);
+
+            float maxRearSlip = 0f;
+
+            for (int i = 0; i < axleInfos.Count; i++)
+            {
+                AxleInfo axle = axleInfos[i];
                 if (axle.leftWheel == null || axle.rightWheel == null) continue;
+
+                bool isFront = axle.steering;
+                bool isRear = !axle.steering;
 
                 if (axle.steering)
                 {
-                    axle.leftWheel.steerAngle = _currentSteerAngle;
-                    axle.rightWheel.steerAngle = _currentSteerAngle;
+                    axle.leftWheel.steerAngle = leftSteerAngle;
+                    axle.rightWheel.steerAngle = rightSteerAngle;
                 }
 
                 if (axle.motor)
                 {
-                    axle.leftWheel.motorTorque = motorTorque;
-                    axle.rightWheel.motorTorque = motorTorque;
+                    axle.leftWheel.motorTorque = perDrivenWheelTorque;
+                    axle.rightWheel.motorTorque = perDrivenWheelTorque;
                 }
                 else
                 {
@@ -214,16 +528,194 @@ namespace Gridroam.Vehicle
                     axle.rightWheel.motorTorque = 0f;
                 }
 
-                axle.leftWheel.brakeTorque = brakeTorque;
-                axle.rightWheel.brakeTorque = brakeTorque;
+                // Update rear sideways friction stiffness for handbrake drift
+                if (isRear)
+                {
+                    WheelFrictionCurve sideL = axle.leftWheel.sidewaysFriction;
+                    sideL.stiffness = _currentRearSidewaysStiffness;
+                    axle.leftWheel.sidewaysFriction = sideL;
+
+                    WheelFrictionCurve sideR = axle.rightWheel.sidewaysFriction;
+                    sideR.stiffness = _currentRearSidewaysStiffness;
+                    axle.rightWheel.sidewaysFriction = sideR;
+                }
+
+                // B5: 60/40 front/rear brake bias + ABS + rear-only handbrake + engine braking
+                float baseWheelBrake = 0f;
+                bool applyAbs = false;
+                if (parked)
+                {
+                    baseWheelBrake = parkedBrakeTorque;
+                }
+                else if (handbrake && isRear)
+                {
+                    baseWheelBrake = parkedBrakeTorque;
+                }
+                else if (serviceBrake > 0.01f)
+                {
+                    float biasMultiplier = isFront ? (frontBrakeBias * 2f) : ((1f - frontBrakeBias) * 2f);
+                    baseWheelBrake = maxBrakeTorque * serviceBrake * biasMultiplier;
+                    applyAbs = true;
+                }
+                else if (axle.motor && engineBrakeTorque > 0f)
+                {
+                    baseWheelBrake = engineBrakeTorque;
+                }
+
+                axle.leftWheel.brakeTorque = ComputeAbsBrakeTorque(axle.leftWheel, baseWheelBrake, applyAbs, isRear, ref maxRearSlip);
+                axle.rightWheel.brakeTorque = ComputeAbsBrakeTorque(axle.rightWheel, baseWheelBrake, applyAbs, isRear, ref maxRearSlip);
 
                 ApplyAntiRoll(axle.leftWheel, axle.rightWheel);
                 ApplyLocalPositionToVisuals(axle.leftWheel, axle.leftWheelVisual);
                 ApplyLocalPositionToVisuals(axle.rightWheel, axle.rightWheelVisual);
             }
 
-            // Subtle downforce improves tire grip at higher speed on coastal curves.
-            _rb.AddForce(-transform.up * (downforceFactor * _rb.linearVelocity.magnitude));
+            MaxRearSidewaysSlip = maxRearSlip;
+
+            // --- B2: Aerodynamic drag + rolling resistance (no hard forward speed clamp) ---
+            Vector3 vel = _rb.linearVelocity;
+            float speedMs = vel.magnitude;
+            if (speedMs > 0.05f)
+            {
+                float aeroDrag = 0.5f * airDensity * dragCoefficient * frontalArea * speedMs * speedMs;
+                float rollingDrag = rollingResistanceFactor * speedMs;
+                _rb.AddForce(-(vel / speedMs) * (aeroDrag + rollingDrag), ForceMode.Force);
+            }
+
+            // Subtle downforce improves tire grip at higher speed
+            _rb.AddForce(-transform.up * (downforceFactor * speedMs), ForceMode.Force);
+
+            // --- B6: Visual body roll & pitch from acceleration ---
+            UpdateBodyRollPitch(vel, dt);
+        }
+
+        private void LateUpdate()
+        {
+            // B6: Taillight / brake light & reverse light MaterialPropertyBlock updates
+            UpdateLightVisuals();
+
+            // B9: Steering wheel visual rotation & seated driver hand follow
+            if (steeringWheelTransform != null && _steeringWheelCached)
+            {
+                steeringWheelTransform.localRotation = _steeringWheelBaseRot * Quaternion.Euler(0f, -_currentSteerAngle * 8f, 0f);
+            }
+
+            if (_isPlayerDriving && _seatedDriverHumanoid != null)
+            {
+                _seatedDriverHumanoid.SetSteeringAngle(_currentSteerAngle);
+            }
+        }
+
+        private void ComputeAckermannAngles(float centerSteerDeg, out float leftDeg, out float rightDeg)
+        {
+            if (Mathf.Abs(centerSteerDeg) < 0.05f)
+            {
+                leftDeg = 0f;
+                rightDeg = 0f;
+                return;
+            }
+
+            float tanAngle = Mathf.Tan(Mathf.Abs(centerSteerDeg) * Mathf.Deg2Rad);
+            float turnRadius = wheelbase / Mathf.Max(0.0001f, tanAngle);
+            float halfTrack = trackWidth * 0.5f;
+
+            float innerDeg = Mathf.Atan(wheelbase / Mathf.Max(0.5f, turnRadius - halfTrack)) * Mathf.Rad2Deg;
+            float outerDeg = Mathf.Atan(wheelbase / (turnRadius + halfTrack)) * Mathf.Rad2Deg;
+            innerDeg = Mathf.Clamp(innerDeg, 0f, 45f);
+            outerDeg = Mathf.Clamp(outerDeg, 0f, 45f);
+
+            if (centerSteerDeg > 0f)
+            {
+                // Turning right: right wheel is inner
+                leftDeg = outerDeg;
+                rightDeg = innerDeg;
+            }
+            else
+            {
+                // Turning left: left wheel is inner
+                leftDeg = -innerDeg;
+                rightDeg = -outerDeg;
+            }
+        }
+
+        private float ComputeAbsBrakeTorque(
+            WheelCollider wc,
+            float requestedBrake,
+            bool applyAbs,
+            bool trackRearSlip,
+            ref float maxRearSlip)
+        {
+            if (wc.GetGroundHit(out WheelHit hit))
+            {
+                if (trackRearSlip)
+                {
+                    float sideSlip = Mathf.Abs(hit.sidewaysSlip);
+                    if (sideSlip > maxRearSlip) maxRearSlip = sideSlip;
+                }
+
+                if (applyAbs && requestedBrake > 0f && Mathf.Abs(hit.forwardSlip) > absSlipThreshold)
+                {
+                    return requestedBrake * 0.5f;
+                }
+            }
+
+            return requestedBrake;
+        }
+
+        private void UpdateBodyRollPitch(Vector3 currentVel, float dt)
+        {
+            if (bodyVisualRoot == null) return;
+
+            Vector3 worldAccel = (currentVel - _prevVelocity) / Mathf.Max(0.001f, dt);
+            _prevVelocity = currentVel;
+
+            float longAccel = Vector3.Dot(worldAccel, transform.forward);
+            float latAccel = Vector3.Dot(worldAccel, transform.right);
+
+            // Accelerating squats rear (-X pitch), braking dives nose (+X pitch); max +/- 2.5 deg
+            float targetPitch = Mathf.Clamp(-longAccel * 0.25f, -2.5f, 2.5f);
+            // Turning right (accel right) rolls body left (+Z roll); max +/- 3.5 deg
+            float targetRoll = Mathf.Clamp(latAccel * 0.30f, -3.5f, 3.5f);
+
+            float blend = 1f - Mathf.Exp(-7.5f * dt);
+            _bodyPitch = Mathf.Lerp(_bodyPitch, targetPitch, blend);
+            _bodyRoll = Mathf.Lerp(_bodyRoll, targetRoll, blend);
+
+            bodyVisualRoot.localRotation = Quaternion.Euler(_bodyPitch, 0f, _bodyRoll);
+        }
+
+        private void UpdateLightVisuals()
+        {
+            if (!_lightsCached) CacheVisualReferences();
+            if (_mpb == null) _mpb = new MaterialPropertyBlock();
+
+            if (IsBraking != _lastBrakingVisual)
+            {
+                _lastBrakingVisual = IsBraking;
+                float mult = IsBraking ? 4f : 1f;
+                for (int i = 0; i < _taillightRenderers.Count; i++)
+                {
+                    Renderer r = _taillightRenderers[i];
+                    if (r == null) continue;
+                    r.GetPropertyBlock(_mpb);
+                    _mpb.SetColor(EmissionColorId, _taillightBaseEmissions[i] * mult);
+                    r.SetPropertyBlock(_mpb);
+                }
+            }
+
+            if (IsReversing != _lastReversingVisual)
+            {
+                _lastReversingVisual = IsReversing;
+                Color revColor = IsReversing ? new Color(1.0f, 0.98f, 0.92f) * 3.5f : Color.black;
+                for (int i = 0; i < _reverseRenderers.Count; i++)
+                {
+                    Renderer r = _reverseRenderers[i];
+                    if (r == null) continue;
+                    r.GetPropertyBlock(_mpb);
+                    _mpb.SetColor(EmissionColorId, revColor);
+                    r.SetPropertyBlock(_mpb);
+                }
+            }
         }
 
         private void ApplyAntiRoll(WheelCollider leftWheel, WheelCollider rightWheel)

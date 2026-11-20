@@ -7,13 +7,14 @@ using UnityEngine.SceneManagement;
 namespace Gridroam.Editor
 {
     /// <summary>
-    /// Automatically generates and opens GRIDROAM_GarageHarbor_Test.unity on first Editor load
-    /// so pressing Play in Unity launches directly into GRIDROAM (Missions 1-2) with zero manual setup.
+    /// Automatically generates/upgrades and opens GRIDROAM_GarageHarbor_Test.unity on Editor load
+    /// so pressing Play launches directly into the latest realistic GRIDROAM world.
     /// </summary>
     [InitializeOnLoad]
     public static class GridroamAutoSetup
     {
-        private const string SessionKey = "GRIDROAM_AutoSetupCompleted";
+        private const string VersionKey = "GRIDROAM_SceneBuildVersion";
+        private const string CurrentBuildVersion = "v3_town_humanoid_realdrive";
 
         static GridroamAutoSetup()
         {
@@ -30,21 +31,17 @@ namespace Gridroam.Editor
                 return;
             }
 
-            if (SessionState.GetBool(SessionKey, false))
-            {
-                return;
-            }
+            string builtVersion = EditorPrefs.GetString(VersionKey, string.Empty);
+            bool needsRebuild = !File.Exists(GridroamPrototypeSetup.TestScenePath) || builtVersion != CurrentBuildVersion;
 
-            SessionState.SetBool(SessionKey, true);
-
-            if (!File.Exists(GridroamPrototypeSetup.TestScenePath))
+            if (needsRebuild)
             {
-                Debug.Log("[GRIDROAM] First-time setup detected. Building and opening Garage-Harbor prototype scene automatically...");
+                EditorPrefs.SetString(VersionKey, CurrentBuildVersion);
+                Debug.Log($"[GRIDROAM] Upgrading scene to {CurrentBuildVersion} (Liman Kasabası small town, procedural humanoid, realistic RWD driving + audio)...");
                 GridroamPrototypeSetup.BuildFullPrototype(showDialog: false);
                 return;
             }
 
-            // If Unity is still on the untouched template SampleScene, switch directly to GRIDROAM's test scene.
             Scene active = SceneManager.GetActiveScene();
             if (!active.isDirty &&
                 (string.IsNullOrEmpty(active.path) || active.path == "Assets/Scenes/SampleScene.unity"))
