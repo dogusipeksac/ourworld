@@ -2360,3 +2360,4 @@ MonoBehaviour:
   hipsBaseY: 0.95
   autoRandomWave: 1
   isSitting: 0
+  isDrivingSeat: 0

@@ -6,16 +6,14 @@ using UnityEngine.UI;
 namespace Gridroam.UI
 {
     /// <summary>
-    /// Multi-touch safe press-and-hold UGUI button built for simultaneous Android & iOS driving
-    /// (e.g., holding Left/Right steering with left thumb while holding Gas/Brake with right thumb).
-    /// By default stays pressed until the tracked finger lifts (OnPointerUp) so small thumb drift
-    /// never cuts throttle or steering mid-corner.
+    /// Multi-touch safe press-and-hold UGUI button built for simultaneous Android & iOS driving and sprint.
+    /// Scales smoothly to 0.92 and brightens when pressed.
     /// </summary>
     public class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
     {
         [SerializeField] private Image targetGraphic;
-        [SerializeField] private Color normalColor = new Color(0.12f, 0.16f, 0.22f, 0.78f);
-        [SerializeField] private Color pressedColor = new Color(0.95f, 0.62f, 0.18f, 0.92f);
+        [SerializeField] private Color normalColor = new Color(0.07f, 0.09f, 0.11f, 0.68f);
+        [SerializeField] private Color pressedColor = new Color(0.31f, 0.70f, 0.66f, 0.92f);
         [Tooltip("Keep false for driving pedals/steering so slight thumb drift on iPhone/Android does not drop input.")]
         [SerializeField] private bool releaseOnPointerExit = false;
 
@@ -35,6 +33,7 @@ namespace Gridroam.UI
         private void OnDisable()
         {
             ForceRelease();
+            transform.localScale = Vector3.one;
         }
 
         private void OnApplicationFocus(bool hasFocus)
@@ -78,14 +77,26 @@ namespace Gridroam.UI
             SetPressed(false);
         }
 
+        private void Update()
+        {
+            float dt = Time.unscaledDeltaTime;
+            if (dt <= 0f) return;
+
+            float targetScale = IsPressed ? 0.92f : 1.0f;
+            float nextScale = Mathf.Lerp(transform.localScale.x, targetScale, 1f - Mathf.Exp(-20f * dt));
+            transform.localScale = new Vector3(nextScale, nextScale, 1f);
+
+            if (targetGraphic != null)
+            {
+                Color targetCol = IsPressed ? pressedColor : normalColor;
+                targetGraphic.color = Color.Lerp(targetGraphic.color, targetCol, 1f - Mathf.Exp(-20f * dt));
+            }
+        }
+
         private void SetPressed(bool pressed)
         {
             if (IsPressed == pressed) return;
             IsPressed = pressed;
-            if (targetGraphic != null)
-            {
-                targetGraphic.color = pressed ? pressedColor : normalColor;
-            }
             OnStateChanged?.Invoke(pressed);
         }
     }

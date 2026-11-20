@@ -8,13 +8,13 @@ namespace Gridroam.Editor
 {
     /// <summary>
     /// Automatically generates/upgrades and opens GRIDROAM_GarageHarbor_Test.unity on Editor load
-    /// so pressing Play launches directly into the latest realistic GRIDROAM world.
+    /// so pressing Play launches directly into the latest realistic GRIDROAM open world.
     /// </summary>
     [InitializeOnLoad]
     public static class GridroamAutoSetup
     {
         private const string VersionKey = "GRIDROAM_SceneBuildVersion";
-        private const string CurrentBuildVersion = "v3_town_humanoid_realdrive";
+        private const string CurrentBuildVersion = "v6_full_5missions_openworld";
 
         static GridroamAutoSetup()
         {
@@ -37,7 +37,7 @@ namespace Gridroam.Editor
             if (needsRebuild)
             {
                 EditorPrefs.SetString(VersionKey, CurrentBuildVersion);
-                Debug.Log($"[GRIDROAM] Upgrading scene to {CurrentBuildVersion} (Liman Kasabası small town, procedural humanoid, realistic RWD driving + audio)...");
+                Debug.Log($"[GRIDROAM] Upgrading scene to {CurrentBuildVersion} (open-world side jobs, economy, day/night cycle, shops & gas station, phone map & minimap, Turkish localization, calm modern HUD)...");
                 GridroamPrototypeSetup.BuildFullPrototype(showDialog: false);
                 return;
             }

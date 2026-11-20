@@ -218,6 +218,10 @@ namespace Gridroam.Missions
                 if (vehicleAnchor != null && mode.PlayerSedan != null)
                 {
                     mode.PlayerSedan.TeleportAndReset(vehicleAnchor.transform.position, vehicleAnchor.transform.rotation);
+                    if (mode.PlayerSedan.Fuel < 0.25f)
+                    {
+                        mode.PlayerSedan.SetFuel(0.6f);
+                    }
                 }
 
                 WorldAnchor playerAnchor = WorldAnchorRegistry.Get(missionToRetry.retryPlayerAnchorId);
@@ -254,6 +258,7 @@ namespace Gridroam.Missions
                 if (vehicleAnchor != null && mode.PlayerSedan != null)
                 {
                     mode.PlayerSedan.TeleportAndReset(vehicleAnchor.transform.position, vehicleAnchor.transform.rotation);
+                    mode.PlayerSedan.SetFuel(0.8f);
                 }
 
                 WorldAnchor playerAnchor = WorldAnchorRegistry.Get("spawn_garage_foot");
@@ -418,14 +423,53 @@ namespace Gridroam.Missions
                 return;
             }
 
-            bool isTargetMatch = string.Equals(trigger.InteractableId, step.targetAnchorId, StringComparison.OrdinalIgnoreCase);
-            if (!isTargetMatch)
+            bool isPrimaryMatch = string.Equals(trigger.InteractableId, step.targetAnchorId, StringComparison.OrdinalIgnoreCase);
+            bool isSecondaryMatch = !string.IsNullOrEmpty(step.secondaryTargetAnchorId) &&
+                                    string.Equals(trigger.InteractableId, step.secondaryTargetAnchorId, StringComparison.OrdinalIgnoreCase);
+
+            if (!isPrimaryMatch && !isSecondaryMatch)
             {
                 return;
             }
 
             if (step.stepType == MissionStepType.TalkToNpc || step.stepType == MissionStepType.InspectTarget)
             {
+                // Hide picked-up mission packages when collected
+                if (trigger.Kind == InteractableKind.PickupPackage ||
+                    string.Equals(trigger.InteractableId, "tail_dropped_package", StringComparison.OrdinalIgnoreCase))
+                {
+                    trigger.gameObject.SetActive(false);
+                }
+
+                if (SaveManager.Instance != null)
+                {
+                    string choiceToRecord = isSecondaryMatch ? step.secondaryChoiceId : step.primaryChoiceId;
+                    if (!string.IsNullOrEmpty(choiceToRecord))
+                    {
+                        SaveManager.Instance.Data.lastEndingChoice = choiceToRecord;
+                        SaveManager.Instance.Save();
+                    }
+                }
+
+                DialogueData chosenDialogue = (isSecondaryMatch && step.secondaryDialogueAsset != null)
+                    ? step.secondaryDialogueAsset
+                    : step.dialogueAsset;
+                CompleteCurrentStepWithDialogue(step, chosenDialogue);
+            }
+        }
+
+        public void NotifyTailTargetArrived()
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed || IsDialoguePlaying)
+            {
+                return;
+            }
+
+            if (step.stepType == MissionStepType.TailVehicle)
+            {
+                _tailWarningState = TailWarningState.None;
+                OnTailStatusChanged?.Invoke(TailWarningState.None, 0f);
                 CompleteCurrentStep(step);
             }
         }
@@ -460,14 +504,19 @@ namespace Gridroam.Missions
 
         private void CompleteCurrentStep(MissionStepData step)
         {
-            if (step.unlocksVehicleKeys && SaveManager.Instance != null)
+            CompleteCurrentStepWithDialogue(step, step != null ? step.dialogueAsset : null);
+        }
+
+        private void CompleteCurrentStepWithDialogue(MissionStepData step, DialogueData dialogue)
+        {
+            if (step != null && step.unlocksVehicleKeys && SaveManager.Instance != null)
             {
                 SaveManager.Instance.SetVehicleKeysUnlocked(true);
             }
 
-            if (step.dialogueAsset != null && step.dialogueAsset.lines != null && step.dialogueAsset.lines.Count > 0)
+            if (dialogue != null && dialogue.lines != null && dialogue.lines.Count > 0)
             {
-                StartDialogue(step.dialogueAsset, AdvanceToNextStep);
+                StartDialogue(dialogue, AdvanceToNextStep);
             }
             else
             {
@@ -488,6 +537,10 @@ namespace Gridroam.Missions
 
             if (SaveManager.Instance != null)
             {
+                if (finished.rewardMoney > 0)
+                {
+                    SaveManager.Instance.AddMoney(finished.rewardMoney);
+                }
                 SaveManager.Instance.MarkMissionCompleted(finished.missionId, finished.nextMissionId);
             }
 

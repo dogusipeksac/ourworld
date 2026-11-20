@@ -5,6 +5,7 @@ namespace Gridroam.World
     /// <summary>
     /// Lightweight runtime traffic light cycler using MaterialPropertyBlock emission
     /// so mobile draw calls stay batched with zero per-instance material allocation.
+    /// Exposes current signal state so AmbientTrafficManager stops cleanly at red lights.
     /// </summary>
     public class TrafficLightCycler : MonoBehaviour
     {
@@ -24,6 +25,12 @@ namespace Gridroam.World
 
         private MaterialPropertyBlock _mpb;
         private int _lastState = -1;
+
+        public int CurrentState => _lastState;
+        public bool IsGreen => _lastState == 0;
+        public bool IsAmber => _lastState == 1;
+        public bool IsRed => _lastState == 2;
+        public bool IsRedOrAmber => _lastState == 1 || _lastState == 2;
 
         public void Configure(Renderer red, Renderer amber, Renderer green, float offsetSeconds = 0f)
         {

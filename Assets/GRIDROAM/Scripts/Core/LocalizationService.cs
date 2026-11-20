@@ -6,17 +6,16 @@ namespace Gridroam.Core
 {
     /// <summary>
     /// Lightweight JSON-backed localization service.
-    /// Defaults to English ("en") and loads Resources/Localization/{lang}.json.
-    /// Mission and dialogue text stay separated from C# logic so Turkish ("tr")
-    /// or other languages can be added or updated cleanly without code changes.
+    /// Defaults to Turkish ("tr") as the primary language and loads Resources/Localization/{lang}.json,
+    /// with English ("en") available as the secondary localization.
     /// </summary>
     public class LocalizationService : MonoBehaviour
     {
         public static LocalizationService Instance { get; private set; }
 
-        [SerializeField] private string defaultLanguageCode = "en";
+        [SerializeField] private string defaultLanguageCode = "tr";
 
-        public string CurrentLanguage { get; private set; } = "en";
+        public string CurrentLanguage { get; private set; } = "tr";
         public event Action<string> OnLanguageChanged;
 
         private readonly Dictionary<string, string> _table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -44,22 +43,49 @@ namespace Gridroam.Core
             }
 
             Instance = this;
-            string initialLang = string.IsNullOrWhiteSpace(defaultLanguageCode) ? "en" : defaultLanguageCode;
+
+            string initialLang = defaultLanguageCode;
+            if (SaveManager.Instance != null && SaveManager.Instance.Data != null && !string.IsNullOrWhiteSpace(SaveManager.Instance.Data.languageCode))
+            {
+                initialLang = SaveManager.Instance.Data.languageCode;
+            }
+            if (string.IsNullOrWhiteSpace(initialLang))
+            {
+                initialLang = "tr";
+            }
+
             LoadLanguage(initialLang);
+        }
+
+        private void Start()
+        {
+            if (SaveManager.Instance != null && SaveManager.Instance.Data != null)
+            {
+                string savedLang = SaveManager.Instance.Data.languageCode;
+                if (!string.IsNullOrWhiteSpace(savedLang) && !string.Equals(savedLang, CurrentLanguage, StringComparison.OrdinalIgnoreCase))
+                {
+                    LoadLanguage(savedLang);
+                }
+            }
         }
 
         public bool LoadLanguage(string languageCode)
         {
             if (string.IsNullOrWhiteSpace(languageCode))
             {
-                languageCode = "en";
+                languageCode = "tr";
             }
 
             TextAsset asset = Resources.Load<TextAsset>($"Localization/{languageCode}");
             if (asset == null)
             {
-                Debug.LogWarning($"[LocalizationService] Missing localization table 'Resources/Localization/{languageCode}.json'. Falling back to 'en'.");
-                if (languageCode != "en")
+                Debug.LogWarning($"[LocalizationService] Missing localization table 'Resources/Localization/{languageCode}.json'. Falling back to 'tr'.");
+                if (languageCode != "tr")
+                {
+                    asset = Resources.Load<TextAsset>("Localization/tr");
+                    languageCode = "tr";
+                }
+                if (asset == null)
                 {
                     asset = Resources.Load<TextAsset>("Localization/en");
                     languageCode = "en";
@@ -68,7 +94,7 @@ namespace Gridroam.Core
 
             if (asset == null)
             {
-                Debug.LogError("[LocalizationService] Could not load default English localization table.");
+                Debug.LogError("[LocalizationService] Could not load localization table.");
                 return false;
             }
 
@@ -88,6 +114,15 @@ namespace Gridroam.Core
             CurrentLanguage = languageCode;
             OnLanguageChanged?.Invoke(CurrentLanguage);
             return true;
+        }
+
+        public void ToggleLanguage()
+        {
+            string next = string.Equals(CurrentLanguage, "tr", StringComparison.OrdinalIgnoreCase) ? "en" : "tr";
+            if (LoadLanguage(next) && SaveManager.Instance != null)
+            {
+                SaveManager.Instance.SetLanguageCode(CurrentLanguage);
+            }
         }
 
         public string Get(string key, string fallback = null)

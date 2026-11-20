@@ -48,6 +48,14 @@ namespace Gridroam.Missions
         public float tailMinDistance = 12f;
         public float tailMaxDistance = 65f;
         public float tailGraceSeconds = 6f;
+
+        [Header("Branching Delivery Settings (Mission 5: End of Shift)")]
+        [Tooltip("Optional alternative WorldAnchor ID (e.g. 'npc_elena_neighborhood') that also completes this step.")]
+        public string secondaryTargetAnchorId;
+        [Tooltip("Dialogue played if the player interacts with secondaryTargetAnchorId.")]
+        public DialogueData secondaryDialogueAsset;
+        public string primaryChoiceId;
+        public string secondaryChoiceId;
     }
 
     /// <summary>
@@ -62,6 +70,7 @@ namespace Gridroam.Missions
         public string missionId = "m01_get_the_keys";
         public string titleKey = "m01.title";
         public string summaryKey = "m01.summary";
+        public int rewardMoney = 100;
 
         [Header("Chaining & Free Roam")]
         [Tooltip("Next mission ID to queue upon completion. Leave empty for Free Roam.")]

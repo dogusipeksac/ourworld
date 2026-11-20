@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Gridroam.Core;
 using Gridroam.Input;
 using Gridroam.Player;
+using Gridroam.World;
 using UnityEngine;
 
 namespace Gridroam.Vehicle
 {
-    /// <summary>
-    /// Axle definition structured after Unity 6's official WheelCollider Tutorial.
-    /// Assign separate wheel visual transforms to sync pose automatically.
-    /// </summary>
     [Serializable]
     public class AxleInfo
     {
@@ -22,9 +20,9 @@ namespace Gridroam.Vehicle
     }
 
     /// <summary>
-    /// Realistic rear-wheel-drive WheelCollider sedan controller with torque curve,
-    /// 5-speed automatic gearbox, aerodynamic drag, Ackermann speed-sensitive steering,
-    /// 60/40 ABS braking, handbrake drift stiffness drop, body roll/pitch, dynamic lights,
+    /// Realistic WheelCollider vehicle controller with torque curve, 5-speed automatic gearbox,
+    /// aerodynamic drag, Ackermann speed-sensitive steering, 60/40 ABS braking, handbrake drift,
+    /// fuel tank consumption (~15 min full tank), night-aware headlights, collision impulse reporting,
     /// and seated driver + steering wheel animation.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
@@ -44,6 +42,9 @@ namespace Gridroam.Vehicle
         [SerializeField] private float[] gearRatios = { 3.6f, 2.2f, 1.5f, 1.15f, 0.92f };
         [SerializeField] private float reverseGearRatio = 3.4f;
         [SerializeField] private float maxReverseSpeedKmh = 25f;
+
+        [Header("Fuel")]
+        [SerializeField] private float fuel = 0.8f;
 
         [Header("Braking & Aerodynamics")]
         [SerializeField] private float maxBrakeTorque = 3200f;
@@ -75,7 +76,6 @@ namespace Gridroam.Vehicle
         [SerializeField] private Transform rightExitPoint;
 
         [Header("Visuals & Seated Driver")]
-        [Tooltip("Drop sedan body visual under this transform.")]
         [SerializeField] private Transform bodyVisualRoot;
         [SerializeField] private GameObject seatedDriverObject;
         [SerializeField] private Transform steeringWheelTransform;
@@ -83,28 +83,32 @@ namespace Gridroam.Vehicle
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
         private Rigidbody _rb;
+        private InteractableTrigger _selfTrigger;
         private bool _isPlayerDriving;
         private bool _inputLocked;
+        private bool _warnedEmptyFuel;
         private float _currentSteerAngle;
         private float _shiftTimer;
         private float _shiftCooldown;
         private float _currentRearSidewaysStiffness = 1.8f;
 
-        // Body visual roll/pitch state
         private Vector3 _prevVelocity;
         private float _bodyPitch;
         private float _bodyRoll;
 
-        // Lights & interior visual caches
+        private readonly List<Renderer> _headlightRenderers = new List<Renderer>();
         private readonly List<Renderer> _taillightRenderers = new List<Renderer>();
         private readonly List<Color> _taillightBaseEmissions = new List<Color>();
         private readonly List<Renderer> _reverseRenderers = new List<Renderer>();
         private MaterialPropertyBlock _mpb;
         private bool _lastBrakingVisual;
         private bool _lastReversingVisual;
+        private bool _lastHeadlightOnVisual;
+        private bool _headlightsInitialized;
         private bool _lightsCached;
 
         private ProceduralHumanoid _seatedDriverHumanoid;
+        private Light _headlightBeam;
         private Quaternion _steeringWheelBaseRot = Quaternion.identity;
         private bool _steeringWheelCached;
 
@@ -113,6 +117,20 @@ namespace Gridroam.Vehicle
         public float ForwardSpeedMs => _rb != null ? Vector3.Dot(_rb.linearVelocity, transform.forward) : 0f;
         public Transform BodyVisualRoot => bodyVisualRoot;
         public List<AxleInfo> AxleInfos => axleInfos;
+        public float Fuel => fuel;
+
+        public string VehicleSaveId
+        {
+            get
+            {
+                if (_selfTrigger == null) _selfTrigger = GetComponent<InteractableTrigger>();
+                if (_selfTrigger != null && !string.IsNullOrEmpty(_selfTrigger.InteractableId))
+                {
+                    return _selfTrigger.InteractableId;
+                }
+                return gameObject.name;
+            }
+        }
 
         public int CurrentGear { get; private set; }
         public float EngineRpm { get; private set; }
@@ -120,6 +138,8 @@ namespace Gridroam.Vehicle
         public bool IsReversing { get; private set; }
         public float CurrentThrottle { get; private set; }
         public float MaxRearSidewaysSlip { get; private set; }
+
+        public event Action<SedanVehicleController, float> OnCollisionImpulse;
 
         public void ConfigureSetup(
             List<AxleInfo> axles,
@@ -137,18 +157,83 @@ namespace Gridroam.Vehicle
             if (steeringWheel != null) steeringWheelTransform = steeringWheel;
         }
 
+        public void ConfigureTuning(
+            float wheelbaseMeters,
+            float trackWidthMeters,
+            float antiRoll,
+            Vector3 comOffset,
+            float maxBrake = 3200f,
+            float finalDrive = 3.9f)
+        {
+            wheelbase = wheelbaseMeters;
+            trackWidth = trackWidthMeters;
+            antiRollForce = antiRoll;
+            centerOfMassOffset = comOffset;
+            maxBrakeTorque = maxBrake;
+            finalDriveRatio = finalDrive;
+        }
+
+        public void SetFuel(float normalizedFuel)
+        {
+            fuel = Mathf.Clamp01(normalizedFuel);
+            if (fuel > 0.02f)
+            {
+                _warnedEmptyFuel = false;
+            }
+
+            if (PlayerModeController.Instance != null && PlayerModeController.Instance.PlayerSedan == this &&
+                SaveManager.Instance != null && SaveManager.Instance.Data != null)
+            {
+                SaveManager.Instance.Data.missionSedanFuel = fuel;
+            }
+        }
+
         private void Awake()
         {
             _rb = GetComponent<Rigidbody>();
+            _selfTrigger = GetComponent<InteractableTrigger>();
             _rb.centerOfMass = centerOfMassOffset;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             EngineRpm = idleRpm;
             CurrentGear = 0;
+            fuel = Mathf.Clamp01(fuel);
             _currentRearSidewaysStiffness = baseRearSidewaysStiffness;
             _mpb = new MaterialPropertyBlock();
 
             CacheVisualReferences();
             UpdateSeatedDriverVisibility();
+        }
+
+        private void Start()
+        {
+            if (DayNightCycle.Instance != null)
+            {
+                DayNightCycle.Instance.OnNightStateChanged += HandleNightStateChanged;
+            }
+            UpdateHeadlightState();
+        }
+
+        private void OnDestroy()
+        {
+            if (DayNightCycle.Instance != null)
+            {
+                DayNightCycle.Instance.OnNightStateChanged -= HandleNightStateChanged;
+            }
+        }
+
+        private void HandleNightStateChanged(bool _)
+        {
+            UpdateHeadlightState();
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (collision == null) return;
+            float impulse = collision.impulse.magnitude;
+            if (impulse > 150f)
+            {
+                OnCollisionImpulse?.Invoke(this, impulse);
+            }
         }
 
         private void CacheVisualReferences()
@@ -158,6 +243,7 @@ namespace Gridroam.Vehicle
             if (!_lightsCached)
             {
                 _lightsCached = true;
+                _headlightRenderers.Clear();
                 _taillightRenderers.Clear();
                 _taillightBaseEmissions.Clear();
                 _reverseRenderers.Clear();
@@ -165,7 +251,12 @@ namespace Gridroam.Vehicle
                 Renderer[] renderers = bodyVisualRoot.GetComponentsInChildren<Renderer>(true);
                 foreach (Renderer r in renderers)
                 {
-                    if (r.gameObject.name == "Placeholder_TaillightL" || r.gameObject.name == "Placeholder_TaillightR")
+                    string objName = r.gameObject.name;
+                    if (objName == "Placeholder_HeadlightL" || objName == "Placeholder_HeadlightR")
+                    {
+                        _headlightRenderers.Add(r);
+                    }
+                    else if (objName == "Placeholder_TaillightL" || objName == "Placeholder_TaillightR")
                     {
                         _taillightRenderers.Add(r);
                         Color baseEm = new Color(1.0f, 0.12f, 0.08f) * 2.6f;
@@ -175,7 +266,7 @@ namespace Gridroam.Vehicle
                         }
                         _taillightBaseEmissions.Add(baseEm);
                     }
-                    else if (r.gameObject.name == "Placeholder_ReverseL" || r.gameObject.name == "Placeholder_ReverseR")
+                    else if (objName == "Placeholder_ReverseL" || objName == "Placeholder_ReverseR")
                     {
                         _reverseRenderers.Add(r);
                     }
@@ -193,8 +284,14 @@ namespace Gridroam.Vehicle
                 _seatedDriverHumanoid = seatedDriverObject.GetComponentInChildren<ProceduralHumanoid>(true);
                 if (_seatedDriverHumanoid != null)
                 {
-                    _seatedDriverHumanoid.SetSitting(true);
+                    _seatedDriverHumanoid.SetSitting(true, driving: true);
                 }
+            }
+
+            if (_headlightBeam == null)
+            {
+                Transform beamTr = bodyVisualRoot.Find("Headlight_Beam");
+                if (beamTr != null) _headlightBeam = beamTr.GetComponent<Light>();
             }
 
             if (steeringWheelTransform == null)
@@ -214,6 +311,35 @@ namespace Gridroam.Vehicle
             if (seatedDriverObject != null)
             {
                 seatedDriverObject.SetActive(_isPlayerDriving);
+            }
+            UpdateHeadlightState();
+        }
+
+        private void UpdateHeadlightState()
+        {
+            bool nightNow = DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
+            bool headlightsOn = _isPlayerDriving && nightNow;
+
+            if (_headlightBeam != null)
+            {
+                _headlightBeam.enabled = headlightsOn;
+            }
+
+            if (!_headlightsInitialized || headlightsOn != _lastHeadlightOnVisual)
+            {
+                _headlightsInitialized = true;
+                _lastHeadlightOnVisual = headlightsOn;
+                if (_mpb == null) _mpb = new MaterialPropertyBlock();
+
+                Color headEmission = headlightsOn ? new Color(1.0f, 0.90f, 0.66f) * 3.0f : Color.black;
+                for (int i = 0; i < _headlightRenderers.Count; i++)
+                {
+                    Renderer r = _headlightRenderers[i];
+                    if (r == null) continue;
+                    r.GetPropertyBlock(_mpb);
+                    _mpb.SetColor(EmissionColorId, headEmission);
+                    r.SetPropertyBlock(_mpb);
+                }
             }
         }
 
@@ -287,7 +413,6 @@ namespace Gridroam.Vehicle
 
         private float EvaluateEngineTorque(float rpm)
         {
-            // Piecewise torque curve: 1000 rpm -> 180 Nm, 3500 rpm -> 260 Nm peak, 6200 rpm -> 200 Nm, redline 6500
             if (rpm >= redlineRpm)
             {
                 return 0f;
@@ -331,7 +456,6 @@ namespace Gridroam.Vehicle
                 handbrake = InputHub.Instance.HandbrakeHeld;
             }
 
-            // --- B3: Speed-sensitive rate-limited steering with self-centering ---
             float speedFactor120 = Mathf.InverseLerp(0f, 120f, speedKmh);
             float maxSteerAtSpeed = Mathf.Lerp(maxSteeringAngleLowSpeed, maxSteeringAngleHighSpeed, speedFactor120);
             float steerRate = Mathf.Lerp(steerRateLowSpeed, steerRateHighSpeed, speedFactor120);
@@ -343,18 +467,15 @@ namespace Gridroam.Vehicle
             }
             else
             {
-                // Self-centering force increases with vehicle speed
                 float centerRate = Mathf.Lerp(65f, 145f, Mathf.InverseLerp(0f, 60f, speedKmh));
                 _currentSteerAngle = Mathf.MoveTowards(_currentSteerAngle, 0f, centerRate * dt);
             }
 
             ComputeAckermannAngles(_currentSteerAngle, out float leftSteerAngle, out float rightSteerAngle);
 
-            // --- B1: Automatic Gearbox & Engine RPM ---
             if (_shiftTimer > 0f) _shiftTimer = Mathf.Max(0f, _shiftTimer - dt);
             if (_shiftCooldown > 0f) _shiftCooldown = Mathf.Max(0f, _shiftCooldown - dt);
 
-            // Compute average driven wheel RPM
             float drivenWheelRpmSum = 0f;
             int drivenWheelCount = 0;
             foreach (AxleInfo axle in axleInfos)
@@ -389,7 +510,6 @@ namespace Gridroam.Vehicle
                 {
                     if (forwardMs < -0.6f)
                     {
-                        // Braking out of reverse before accelerating forward
                         serviceBrake = throttleInput;
                         IsBraking = true;
                         IsReversing = false;
@@ -432,6 +552,25 @@ namespace Gridroam.Vehicle
                 }
             }
 
+            bool hasFuel = fuel > 0.0001f;
+            if (!hasFuel)
+            {
+                if (_isPlayerDriving && effectiveThrottle > 0.1f && !_warnedEmptyFuel)
+                {
+                    _warnedEmptyFuel = true;
+                    if (PlayerNeedsController.Instance != null)
+                    {
+                        // Surface empty-tank hint once
+                        PlayerModeController mode = PlayerModeController.Instance;
+                        if (mode != null)
+                        {
+                            mode.RaiseStatusMessage(LocalizationService.Tr("ui.fuel.empty", "Yakıt bitti! Benzin istasyonuna uğra."));
+                        }
+                    }
+                }
+                effectiveThrottle = 0f;
+            }
+
             CurrentThrottle = effectiveThrottle;
 
             float activeGearRatio = 0f;
@@ -445,22 +584,35 @@ namespace Gridroam.Vehicle
                 activeGearRatio = gearRatios[idx];
             }
 
-            // Compute smoothed engine RPM
             float wheelDrivenRpm = avgWheelRpm * activeGearRatio * finalDriveRatio;
-            float clutchSlipFloor = idleRpm + effectiveThrottle * 750f;
-            float targetRpm = CurrentGear == 0
-                ? idleRpm
+            float clutchSlipFloor = hasFuel ? (idleRpm + effectiveThrottle * 750f) : 0f;
+            float targetRpm = (CurrentGear == 0 || !hasFuel)
+                ? (hasFuel ? idleRpm : 0f)
                 : Mathf.Clamp(Mathf.Max(clutchSlipFloor, wheelDrivenRpm), idleRpm, redlineRpm);
 
-            if (_shiftTimer > 0f)
+            if (_shiftTimer > 0f && hasFuel)
             {
                 targetRpm = Mathf.Max(idleRpm, targetRpm * 0.85f);
             }
 
             EngineRpm = Mathf.Lerp(EngineRpm, targetRpm, 1f - Mathf.Exp(-10f * dt));
 
-            // Automatic upshift / downshift in forward gears
-            if (!parked && CurrentGear >= 1 && gearRatios != null && _shiftTimer <= 0f && _shiftCooldown <= 0f)
+            // Consume fuel proportional to throttle * rpm (full tank ≈ 15 minutes of driving)
+            if (_isPlayerDriving && !_inputLocked && hasFuel)
+            {
+                float rpmNorm = Mathf.Clamp01(EngineRpm / Mathf.Max(1000f, redlineRpm));
+                float burnFactor = 0.03f + 0.97f * (effectiveThrottle * rpmNorm);
+                float burnPerSec = burnFactor / 380f;
+                fuel = Mathf.Max(0f, fuel - burnPerSec * dt);
+
+                if (PlayerModeController.Instance != null && PlayerModeController.Instance.PlayerSedan == this &&
+                    SaveManager.Instance != null && SaveManager.Instance.Data != null)
+                {
+                    SaveManager.Instance.Data.missionSedanFuel = fuel;
+                }
+            }
+
+            if (!parked && hasFuel && CurrentGear >= 1 && gearRatios != null && _shiftTimer <= 0f && _shiftCooldown <= 0f)
             {
                 if (EngineRpm >= upshiftRpm && CurrentGear < gearRatios.Length && effectiveThrottle > 0.1f)
                 {
@@ -478,9 +630,8 @@ namespace Gridroam.Vehicle
                 }
             }
 
-            // Compute wheel motor torque (zero during shift or handbrake)
             float perDrivenWheelTorque = 0f;
-            if (!parked && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
+            if (!parked && hasFuel && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
             {
                 float engineTorque = EvaluateEngineTorque(EngineRpm);
                 float totalWheelTorque = engineTorque * effectiveThrottle * activeGearRatio * finalDriveRatio * drivetrainEfficiency;
@@ -488,7 +639,6 @@ namespace Gridroam.Vehicle
                 perDrivenWheelTorque = (totalWheelTorque / drivenWheelCount) * sign;
             }
 
-            // B5: Engine braking proportional to RPM when coasting in gear
             float engineBrakeTorque = 0f;
             if (!parked && !handbrake && serviceBrake <= 0.01f && effectiveThrottle <= 0.01f && CurrentGear != 0 && Mathf.Abs(forwardMs) > 0.4f)
             {
@@ -496,7 +646,6 @@ namespace Gridroam.Vehicle
                 engineBrakeTorque = 18f + rpmNorm * 130f;
             }
 
-            // B4: Smooth rear sideways stiffness drop while handbrake is held (drift)
             float targetRearStiffness = (!parked && handbrake) ? handbrakeRearSidewaysStiffness : baseRearSidewaysStiffness;
             float stiffnessRate = targetRearStiffness < _currentRearSidewaysStiffness ? 12f : 4.5f;
             _currentRearSidewaysStiffness = Mathf.MoveTowards(_currentRearSidewaysStiffness, targetRearStiffness, stiffnessRate * dt);
@@ -528,7 +677,6 @@ namespace Gridroam.Vehicle
                     axle.rightWheel.motorTorque = 0f;
                 }
 
-                // Update rear sideways friction stiffness for handbrake drift
                 if (isRear)
                 {
                     WheelFrictionCurve sideL = axle.leftWheel.sidewaysFriction;
@@ -540,7 +688,6 @@ namespace Gridroam.Vehicle
                     axle.rightWheel.sidewaysFriction = sideR;
                 }
 
-                // B5: 60/40 front/rear brake bias + ABS + rear-only handbrake + engine braking
                 float baseWheelBrake = 0f;
                 bool applyAbs = false;
                 if (parked)
@@ -572,7 +719,6 @@ namespace Gridroam.Vehicle
 
             MaxRearSidewaysSlip = maxRearSlip;
 
-            // --- B2: Aerodynamic drag + rolling resistance (no hard forward speed clamp) ---
             Vector3 vel = _rb.linearVelocity;
             float speedMs = vel.magnitude;
             if (speedMs > 0.05f)
@@ -582,19 +728,14 @@ namespace Gridroam.Vehicle
                 _rb.AddForce(-(vel / speedMs) * (aeroDrag + rollingDrag), ForceMode.Force);
             }
 
-            // Subtle downforce improves tire grip at higher speed
             _rb.AddForce(-transform.up * (downforceFactor * speedMs), ForceMode.Force);
-
-            // --- B6: Visual body roll & pitch from acceleration ---
             UpdateBodyRollPitch(vel, dt);
         }
 
         private void LateUpdate()
         {
-            // B6: Taillight / brake light & reverse light MaterialPropertyBlock updates
             UpdateLightVisuals();
 
-            // B9: Steering wheel visual rotation & seated driver hand follow
             if (steeringWheelTransform != null && _steeringWheelCached)
             {
                 steeringWheelTransform.localRotation = _steeringWheelBaseRot * Quaternion.Euler(0f, -_currentSteerAngle * 8f, 0f);
@@ -626,13 +767,11 @@ namespace Gridroam.Vehicle
 
             if (centerSteerDeg > 0f)
             {
-                // Turning right: right wheel is inner
                 leftDeg = outerDeg;
                 rightDeg = innerDeg;
             }
             else
             {
-                // Turning left: left wheel is inner
                 leftDeg = -innerDeg;
                 rightDeg = -outerDeg;
             }
@@ -672,9 +811,7 @@ namespace Gridroam.Vehicle
             float longAccel = Vector3.Dot(worldAccel, transform.forward);
             float latAccel = Vector3.Dot(worldAccel, transform.right);
 
-            // Accelerating squats rear (-X pitch), braking dives nose (+X pitch); max +/- 2.5 deg
             float targetPitch = Mathf.Clamp(-longAccel * 0.25f, -2.5f, 2.5f);
-            // Turning right (accel right) rolls body left (+Z roll); max +/- 3.5 deg
             float targetRoll = Mathf.Clamp(latAccel * 0.30f, -3.5f, 3.5f);
 
             float blend = 1f - Mathf.Exp(-7.5f * dt);
@@ -688,6 +825,8 @@ namespace Gridroam.Vehicle
         {
             if (!_lightsCached) CacheVisualReferences();
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
+
+            UpdateHeadlightState();
 
             if (IsBraking != _lastBrakingVisual)
             {
@@ -748,9 +887,6 @@ namespace Gridroam.Vehicle
             }
         }
 
-        /// <summary>
-        /// Syncs each WheelCollider's physics pose to its visual wheel transform (Unity 6 official pattern).
-        /// </summary>
         private static void ApplyLocalPositionToVisuals(WheelCollider collider, Transform visualWheel)
         {
             if (visualWheel == null)

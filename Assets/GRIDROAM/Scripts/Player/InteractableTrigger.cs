@@ -8,11 +8,22 @@ namespace Gridroam.Player
         Npc,
         PlayerVehicle,
         InspectObject,
-        PickupPackage
+        PickupPackage,
+        Door,
+        Seat,
+        PaintableHouse,
+        TownVehicle,
+        JobBoard,
+        ShopCounter,
+        Bed,
+        FuelPump,
+        VendingMachine
     }
 
     /// <summary>
-    /// Marks any world object the player can interact with on foot (NPC, Sedan, Clue, Package).
+    /// Marks any world object the player can interact with
+    /// (NPC, Vehicle, Clue, Package, Door, Seat, PaintableHouse, TownVehicle,
+    /// JobBoard, ShopCounter, Bed, FuelPump, VendingMachine).
     /// </summary>
     public class InteractableTrigger : MonoBehaviour
     {
@@ -36,13 +47,13 @@ namespace Gridroam.Player
 
         public string GetLocalizedPrompt()
         {
-            return LocalizationService.Tr(promptLocalizationKey, "INTERACT");
+            return LocalizationService.Tr(promptLocalizationKey, "Etkileş");
         }
 
 #if UNITY_EDITOR
         private void OnDrawGizmosSelected()
         {
-            Gizmos.color = new Color(0.25f, 0.85f, 1f, 0.65f);
+            Gizmos.color = new Color(0.31f, 0.70f, 0.66f, 0.65f);
             Gizmos.DrawWireSphere(transform.position, interactionRadius);
         }
 #endif

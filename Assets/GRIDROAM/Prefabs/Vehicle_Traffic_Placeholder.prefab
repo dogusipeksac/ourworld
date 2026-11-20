@@ -47,6 +47,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7187071815871960414}
   - component: {fileID: 4012199001806267320}
+  - component: {fileID: 7754539916269940455}
   m_Layer: 0
   m_Name: Vehicle_Traffic_Placeholder
   m_TagString: Untagged
@@ -91,6 +92,26 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.85, y: 1.35, z: 4.15}
   m_Center: {x: 0, y: 0.72, z: 0}
+--- !u!114 &7754539916269940455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 908448317223646564}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d9959e6b9bb84732aa5bd10dc22454a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.World.NightLight
+  targetLight: {fileID: 0}
+  emissiveRenderers:
+  - {fileID: 374288747044241550}
+  - {fileID: 8078733879309448544}
+  nightEmissionColor: {r: 2.8, g: 2.464, b: 1.736, a: 2.8}
+  overrideBaseColor: 0
+  dayBaseColor: {r: 0.09, g: 0.13, b: 0.18, a: 1}
+  nightBaseColor: {r: 1, g: 0.83, b: 0.54, a: 1}
 --- !u!1 &1112051214164848743
 GameObject:
   m_ObjectHideFlags: 0

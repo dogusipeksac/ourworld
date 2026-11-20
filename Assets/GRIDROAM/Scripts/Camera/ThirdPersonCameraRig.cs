@@ -1,19 +1,22 @@
+using System.Collections.Generic;
 using Gridroam.Input;
 using UnityEngine;
 
 namespace Gridroam.CameraSystem
 {
     /// <summary>
-    /// Smooth third-person camera supporting both On-Foot exploration and Driving modes,
-    /// touch/mouse orbit, gentle driving auto-align, and collision pull-in via SphereCast.
+    /// Smooth third-person camera supporting On-Foot, Seated, Indoor, and Driving modes,
+    /// touch/mouse orbit, gentle driving auto-align, indoor max-distance pull-in, and
+    /// multi-hit SphereCast wall collision so the camera never clips through walls.
     /// </summary>
     public class ThirdPersonCameraRig : MonoBehaviour
     {
         [Header("Targets")]
         [SerializeField] private Transform target;
 
-        [Header("On-Foot Profile")]
+        [Header("On-Foot & Seated Profiles")]
         [SerializeField] private Vector3 footPivotOffset = new Vector3(0f, 1.55f, 0f);
+        [SerializeField] private Vector3 seatedPivotOffset = new Vector3(0f, 0.95f, 0f);
         [SerializeField] private float footDistance = 4.6f;
         [SerializeField] private float footMinPitch = -18f;
         [SerializeField] private float footMaxPitch = 58f;
@@ -33,8 +36,12 @@ namespace Gridroam.CameraSystem
         [Header("Smoothing & Collision")]
         [SerializeField] private float pivotFollowSpeed = 14f;
         [SerializeField] private float distanceBlendSpeed = 6f;
-        [SerializeField] private float collisionRadius = 0.28f;
+        [SerializeField] private float collisionRadius = 0.25f;
+        [SerializeField] private float minCollisionDistance = 0.45f;
         [SerializeField] private LayerMask collisionMask = ~0;
+
+        private readonly RaycastHit[] _sphereHits = new RaycastHit[16];
+        private readonly Dictionary<Object, float> _indoorZones = new Dictionary<Object, float>();
 
         private Camera _camera;
         private Rigidbody _targetRb;
@@ -43,11 +50,13 @@ namespace Gridroam.CameraSystem
         private float _currentDistance;
         private Vector3 _smoothedPivot;
         private bool _isDrivingMode;
+        private bool _isSeatedMode;
         private float _timeSinceManualLook = 99f;
 
         public float Yaw => _yaw;
         public Vector3 FlatForward => Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         public Vector3 FlatRight => Quaternion.Euler(0f, _yaw, 0f) * Vector3.right;
+        public bool IsIndoors => _indoorZones.Count > 0;
 
         private void Start()
         {
@@ -65,15 +74,54 @@ namespace Gridroam.CameraSystem
         {
             target = newTarget;
             _isDrivingMode = drivingMode;
+            if (drivingMode)
+            {
+                _isSeatedMode = false;
+            }
             _targetRb = target != null ? target.GetComponent<Rigidbody>() : null;
 
             if (target != null && snapBehindTarget)
             {
                 _yaw = target.eulerAngles.y;
                 _pitch = drivingMode ? drivingDefaultPitch : 14f;
-                _smoothedPivot = target.position + (drivingMode ? drivingPivotOffset : footPivotOffset);
-                _currentDistance = drivingMode ? drivingDistance : footDistance;
+                Vector3 offset = drivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
+                _smoothedPivot = target.position + offset;
+                _currentDistance = drivingMode ? drivingDistance : GetEffectiveFootMaxDistance();
             }
+        }
+
+        public void SetSeatedMode(bool seated)
+        {
+            _isSeatedMode = seated;
+        }
+
+        public void SetIndoorZone(Object zoneKey, bool inside, float maxDistance = 2.2f)
+        {
+            if (zoneKey == null) return;
+            if (inside)
+            {
+                _indoorZones[zoneKey] = Mathf.Max(1.2f, maxDistance);
+            }
+            else
+            {
+                _indoorZones.Remove(zoneKey);
+            }
+        }
+
+        private float GetEffectiveFootMaxDistance()
+        {
+            float dist = footDistance;
+            if (_indoorZones.Count > 0)
+            {
+                foreach (KeyValuePair<Object, float> kvp in _indoorZones)
+                {
+                    if (kvp.Key != null && kvp.Value < dist)
+                    {
+                        dist = kvp.Value;
+                    }
+                }
+            }
+            return dist;
         }
 
         private void LateUpdate()
@@ -110,7 +158,9 @@ namespace Gridroam.CameraSystem
             float maxPitch = _isDrivingMode ? 42f : footMaxPitch;
             _pitch = Mathf.Clamp(_pitch, minPitch, maxPitch);
 
-            Vector3 desiredOffset = _isDrivingMode ? drivingPivotOffset : footPivotOffset;
+            Vector3 desiredOffset = _isDrivingMode
+                ? drivingPivotOffset
+                : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
             Vector3 desiredPivot = target.position + desiredOffset;
             _smoothedPivot = Vector3.Lerp(_smoothedPivot, desiredPivot, 1f - Mathf.Exp(-pivotFollowSpeed * Time.deltaTime));
 
@@ -123,7 +173,7 @@ namespace Gridroam.CameraSystem
 
             float desiredDistance = _isDrivingMode
                 ? drivingDistance + speedFactor * drivingSpeedExtraDistance
-                : footDistance;
+                : GetEffectiveFootMaxDistance();
             _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distanceBlendSpeed * Time.deltaTime));
 
             if (_camera == null) _camera = GetComponent<Camera>();
@@ -138,18 +188,46 @@ namespace Gridroam.CameraSystem
             Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
             Vector3 backDir = rotation * Vector3.back;
 
-            float finalDistance = _currentDistance;
-            if (Physics.SphereCast(_smoothedPivot, collisionRadius, backDir, out RaycastHit hit, _currentDistance, collisionMask, QueryTriggerInteraction.Ignore))
-            {
-                // Ignore colliders belonging to the tracked target hierarchy (player or sedan).
-                if (!hit.transform.IsChildOf(target) && hit.transform != target)
-                {
-                    finalDistance = Mathf.Max(1.25f, hit.distance - 0.15f);
-                }
-            }
+            float finalDistance = ComputeCollisionAdjustedDistance(_smoothedPivot, backDir, _currentDistance);
 
             transform.position = _smoothedPivot + backDir * finalDistance;
             transform.LookAt(_smoothedPivot);
+        }
+
+        private float ComputeCollisionAdjustedDistance(Vector3 origin, Vector3 direction, float maxDist)
+        {
+            int hitCount = Physics.SphereCastNonAlloc(
+                origin,
+                collisionRadius,
+                direction,
+                _sphereHits,
+                maxDist,
+                collisionMask,
+                QueryTriggerInteraction.Ignore);
+
+            float closest = maxDist;
+            for (int i = 0; i < hitCount; i++)
+            {
+                Transform hitTr = _sphereHits[i].transform;
+                if (hitTr == null || hitTr == target || hitTr.IsChildOf(target))
+                {
+                    continue;
+                }
+
+                float d = _sphereHits[i].distance;
+                if (d < closest)
+                {
+                    closest = d;
+                }
+            }
+
+            if (closest < maxDist)
+            {
+                float minClamp = _isDrivingMode ? 1.25f : minCollisionDistance;
+                return Mathf.Max(minClamp, closest - 0.12f);
+            }
+
+            return maxDist;
         }
     }
 }

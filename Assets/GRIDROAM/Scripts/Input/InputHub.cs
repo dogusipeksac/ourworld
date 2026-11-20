@@ -5,8 +5,8 @@ using UnityEngine.InputSystem;
 namespace Gridroam.Input
 {
     /// <summary>
-    /// Combines mobile UGUI touch controls (joystick, camera touch zone, simultaneous steering + gas/brake)
-    /// with Unity 6 Input System keyboard & mouse controls for Editor testing.
+    /// Combines mobile UGUI touch controls (floating joystick, camera touch zone, sprint,
+    /// simultaneous steering + gas/brake/handbrake, phone) with Unity 6 Input System keyboard & mouse.
     /// </summary>
     public class InputHub : MonoBehaviour
     {
@@ -24,9 +24,12 @@ namespace Gridroam.Input
         private float _touchSteerRight;
         private float _touchGas;
         private float _touchBrake;
+        private bool _touchHandbrake;
+        private bool _touchSprint;
         private bool _touchInteractQueued;
         private bool _touchExitVehicleQueued;
         private bool _touchContinueDialogueQueued;
+        private bool _touchPhoneQueued;
 
         public Vector2 MoveInput { get; private set; }
         public bool SprintHeld { get; private set; }
@@ -41,6 +44,7 @@ namespace Gridroam.Input
         public event Action OnExitVehiclePressed;
         public event Action OnContinueDialoguePressed;
         public event Action OnRetryPressed;
+        public event Action OnTogglePhonePressed;
         public event Action OnTogglePerfOverlayPressed;
         public event Action OnCycleGraphicsPressed;
         public event Action OnExportPerfReportPressed;
@@ -78,9 +82,9 @@ namespace Gridroam.Input
             }
             MoveInput = combinedMove;
 
-            SprintHeld = (kb != null && kb.leftShiftKey.isPressed) || _touchMove.magnitude > 0.85f;
+            SprintHeld = (kb != null && kb.leftShiftKey.isPressed) || _touchSprint || _touchMove.magnitude > 0.88f;
 
-            // --- Camera look (Right-side touch drag + RMB drag in Editor + Q/E fallback) ---
+            // --- Camera look (Right-side touch drag + RMB drag in Editor + Q/Alt+E fallback) ---
             Vector2 look = _touchLookAccumulator * touchLookSensitivity;
             bool manualLook = _touchLookAccumulator.sqrMagnitude > 0.0001f;
             _touchLookAccumulator = Vector2.zero;
@@ -110,7 +114,7 @@ namespace Gridroam.Input
             LookDelta = look;
             IsLookingManually = manualLook;
 
-            // --- Driving controls (Simultaneous steering + throttle/brake supported!) ---
+            // --- Driving controls (Simultaneous steering + throttle/brake + handbrake) ---
             float kbSteer = 0f;
             float kbGas = 0f;
             float kbBrake = 0f;
@@ -129,16 +133,23 @@ namespace Gridroam.Input
             DriveSteer = Mathf.Clamp(Mathf.Abs(touchSteer) > 0.01f ? touchSteer : kbSteer, -1f, 1f);
             DriveThrottle = Mathf.Clamp01(Mathf.Max(_touchGas, kbGas));
             DriveBrake = Mathf.Clamp01(Mathf.Max(_touchBrake, kbBrake));
-            HandbrakeHeld = kbHandbrake;
+            HandbrakeHeld = kbHandbrake || _touchHandbrake;
 
             // --- Discrete actions ---
             bool interact = _touchInteractQueued || (kb != null && kb.eKey.wasPressedThisFrame && !kb.leftAltKey.isPressed);
             bool exitVehicle = _touchExitVehicleQueued || (kb != null && (kb.fKey.wasPressedThisFrame || (kb.eKey.wasPressedThisFrame && !kb.leftAltKey.isPressed)));
             bool continueDlg = _touchContinueDialogueQueued || (kb != null && (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame || kb.eKey.wasPressedThisFrame));
+            bool togglePhone = _touchPhoneQueued || (kb != null && kb.mKey.wasPressedThisFrame);
 
             _touchInteractQueued = false;
             _touchExitVehicleQueued = false;
             _touchContinueDialogueQueued = false;
+            _touchPhoneQueued = false;
+
+            if (togglePhone)
+            {
+                OnTogglePhonePressed?.Invoke();
+            }
 
             if (continueDlg)
             {
@@ -184,6 +195,7 @@ namespace Gridroam.Input
         {
             _touchMove = Vector2.zero;
             _touchLookAccumulator = Vector2.zero;
+            _touchSprint = false;
             ClearDrivingTouchInputs();
         }
 
@@ -194,9 +206,12 @@ namespace Gridroam.Input
         public void SetTouchSteerRight(bool pressed) => _touchSteerRight = pressed ? 1f : 0f;
         public void SetTouchGas(bool pressed) => _touchGas = pressed ? 1f : 0f;
         public void SetTouchBrake(bool pressed) => _touchBrake = pressed ? 1f : 0f;
+        public void SetTouchHandbrake(bool pressed) => _touchHandbrake = pressed;
+        public void SetTouchSprint(bool pressed) => _touchSprint = pressed;
         public void TriggerTouchInteract() => _touchInteractQueued = true;
         public void TriggerTouchExitVehicle() => _touchExitVehicleQueued = true;
         public void TriggerTouchContinueDialogue() => _touchContinueDialogueQueued = true;
+        public void TriggerTouchPhone() => _touchPhoneQueued = true;
 
         public void ClearDrivingTouchInputs()
         {
@@ -204,6 +219,7 @@ namespace Gridroam.Input
             _touchSteerRight = 0f;
             _touchGas = 0f;
             _touchBrake = 0f;
+            _touchHandbrake = false;
         }
     }
 }

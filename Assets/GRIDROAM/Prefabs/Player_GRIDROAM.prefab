@@ -2064,6 +2064,7 @@ MonoBehaviour:
   hipsBaseY: 0.95
   autoRandomWave: 0
   isSitting: 0
+  isDrivingSeat: 0
 --- !u!1 &7081525776174710294
 GameObject:
   m_ObjectHideFlags: 0

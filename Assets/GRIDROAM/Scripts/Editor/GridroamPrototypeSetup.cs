@@ -3,6 +3,7 @@ using System.IO;
 using Gridroam.CameraSystem;
 using Gridroam.Core;
 using Gridroam.Input;
+using Gridroam.Jobs;
 using Gridroam.Missions;
 using Gridroam.Player;
 using Gridroam.UI;
@@ -12,8 +13,6 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
@@ -24,11 +23,10 @@ namespace Gridroam.Editor
     /// <summary>
     /// One-click Unity Editor setup tool for GRIDROAM (Android + iOS):
     /// - Configures shared Landscape settings, Android (API 26+, IL2CPP ARM64), iOS (iOS 15+, Defer System Gestures, IL2CPP)
-    /// - Creates shared Mobile URP Low/Medium profiles + ACES/Bloom Evening Post-Processing Volume
-    /// - Binds CC0 Poly Haven Evening Coastal HDRI Skybox + 9 ambientCG 1K PBR Texture Sets
-    /// - Builds procedural jointed humanoid player/NPC prefabs, realistic RWD sedan with procedural audio, and Poly Haven FBX props
-    /// - Generates data-driven Mission 1 & Mission 2 ScriptableObjects
-    /// - Builds the playable Evening Coastal Garage-Harbor + "Liman Kasabası" small town scene and iPhone/Android Safe-Area HUD
+    /// - Creates shared Mobile URP Low/Medium profiles + ACES/Bloom Post-Processing Volume
+    /// - Generates 9-sliced UI sprites (UI_RoundedRect, UI_Circle, UI_Ring) and orthographic TownMap.png
+    /// - Builds procedural jointed humanoid player/NPCs, 4 drivable vehicles with fuel, enterable houses & shops,
+    ///   Side Jobs, Economy, Day/Night Cycle, Gas Station, Phone/Map, Minimap, and Turkish-first calm modern HUD.
     /// </summary>
     public static partial class GridroamPrototypeSetup
     {
@@ -58,22 +56,23 @@ namespace Gridroam.Editor
             ConfigureCrossPlatformMobileSettings();
             ConfigureAllImportedTextures();
 
+            GeneratedUiSprites uiSprites = GenerateUiSprites();
             var (lowUrp, medUrp) = CreateOrUpdateUrpProfiles();
             VolumeProfile eveningVolume = CreateOrUpdateEveningVolumeProfile();
             MaterialSet mats = CreateMaterials();
             PrefabSet prefabs = CreatePrefabs(mats);
             MissionCatalog catalog = CreateMissionDataAssets();
 
-            BuildTestScene(mats, prefabs, catalog, lowUrp, medUrp, eveningVolume);
+            BuildTestScene(mats, prefabs, catalog, lowUrp, medUrp, eveningVolume, uiSprites);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[GRIDROAM] Coastal Garage-Harbor + Liman Kasabası small town scene (procedural humanoid, realistic RWD driving + synth audio, HDRI sky, 1K PBR sets, Poly Haven props, Missions 1-2) built successfully!");
+            Debug.Log("[GRIDROAM] Open-World Liman Kasabası v5 (Side Jobs, Economy, Day/Night Cycle, Shops & Gas Station, Phone/Map & Minimap, Turkish UI) built successfully!");
             if (showDialog)
             {
                 EditorUtility.DisplayDialog(
-                    "GRIDROAM Coastal Town World Ready (Android & iOS)",
-                    "Evening Coastal Garage-Harbor & Liman Kasabası small town scene with procedural animated humanoid character, realistic RWD sedan driving & engine audio, town square, shops, residential quarter, park, pedestrians, and Missions 1 & 2 is ready.\n\nPress Play to explore!",
+                    "GRIDROAM Open-World Liman Kasabası Ready (Android & iOS)",
+                    "Liman Kasabası open world with Side Jobs (Pizza, Taxi, Street Cleanup, House Painting), Economy, Day/Night Cycle, Café/Market/Gas Station, Phone Map & Minimap, Turkish primary localization, and Missions 1 & 2 is ready.\n\nPress Play to explore!",
                     "OK");
             }
         }
@@ -100,13 +99,11 @@ namespace Gridroam.Editor
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
             PlayerSettings.statusBarHidden = true;
 
-            // --- Android ---
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, bundleId);
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
 
-            // --- iOS (iPhone Notch / Dynamic Island + Landscape Gesture Safety) ---
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, bundleId);
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.iOS, ScriptingImplementation.IL2CPP);
             PlayerSettings.iOS.targetOSVersionString = "15.0";
@@ -122,7 +119,7 @@ namespace Gridroam.Editor
         {
             string[] dirs =
             {
-                RootDir, ArtDir, ArtMatDir, PrefabDir, DataDir, MissionDir, DialogueDir, SettingsDir, SceneDir
+                RootDir, ArtDir, ArtMatDir, GeneratedArtDir, PrefabDir, DataDir, MissionDir, DialogueDir, SettingsDir, SceneDir
             };
 
             foreach (string dir in dirs)
@@ -138,7 +135,6 @@ namespace Gridroam.Editor
 
         private static void ConfigureAllImportedTextures()
         {
-            // 1. Configure Evening Coastal HDRI Skybox
             string hdriPath = $"{HdriDir}/venice_sunset_2k.hdr";
             TextureImporter hdriImporter = AssetImporter.GetAtPath(hdriPath) as TextureImporter;
             if (hdriImporter != null)
@@ -152,7 +148,6 @@ namespace Gridroam.Editor
                 if (dirty) hdriImporter.SaveAndReimport();
             }
 
-            // 2. Configure all 1K PBR textures under Art/Textures and Art/Models (1024 max for mobile 30 FPS)
             string[] scanRoots = { TexturesDir, ModelsDir };
             foreach (string root in scanRoots)
             {
@@ -340,17 +335,16 @@ namespace Gridroam.Editor
             public Material WheelRubber;
             public Material TrafficBody;
             public Material BeaconGlow;
+            public Material JobRingGlow;
             public Material LampGlow;
             public Material WindowLitWarm;
             public Material RedBeaconGlow;
             public Material ReverseLightOff;
-            // Humanoid character materials
             public Material CharSkin;
             public Material CharShirt;
             public Material CharPants;
             public Material CharShoes;
             public Material CharHair;
-            // Small Town ("Liman Kasabası") materials
             public Material TownPaving;
             public Material TownRoofTile;
             public Material TownBrickHouse;
@@ -371,6 +365,19 @@ namespace Gridroam.Editor
             public Material PedShirtMustard;
             public Material PedShirtTeal;
             public Material PedShirtBurgundy;
+            public Material TownWoodFloor;
+            public Material TownDoorWood;
+            public Material TownInteriorPaintWarm;
+            public Material TownInteriorPaintCream;
+            public Material TownInteriorPaintPearl;
+            public Material TownFabricGrey;
+            public Material TownFabricTeal;
+            public Material TownFabricMustard;
+            public Material TownFurnitureWood;
+            public Material TownPaintCan;
+            public Material CarRed;
+            public Material CarWhite;
+            public Material CarDarkGreen;
         }
 
         private static MaterialSet CreateMaterials()
@@ -384,7 +391,7 @@ namespace Gridroam.Editor
             if (hdriTex != null && skyPanoramic != null)
             {
                 skyMat.SetTexture("_MainTex", hdriTex);
-                skyMat.SetFloat("_Exposure", 0.92f);
+                skyMat.SetFloat("_Exposure", 1.10f);
                 skyMat.SetFloat("_Rotation", 108f);
                 skyMat.SetFloat("_Mapping", 1f);
                 skyMat.SetFloat("_ImageType", 0f);
@@ -400,7 +407,7 @@ namespace Gridroam.Editor
                 RoadMarkingYellow = CreateOrLoadMaterial("MAT_Road_Marking_Yellow", urpLit, new Color(0.92f, 0.72f, 0.18f), 0.22f),
                 Ground = CreatePbrMaterial("MAT_Ground_Urban", urpLit, "Concrete034", new Color(0.55f, 0.55f, 0.57f), 0.14f, 0f, new Vector2(22f, 64f), 0.7f),
                 Sidewalk = CreatePbrMaterial("MAT_Sidewalk_Paving", urpLit, "PavingStones070", new Color(0.84f, 0.82f, 0.80f), 0.18f, 0f, new Vector2(2f, 44f), 0.85f),
-                SeaWater = CreateOrLoadMaterial("MAT_Sea_Evening", urpLit, new Color(0.04f, 0.13f, 0.22f), 0.92f, 0.16f),
+                SeaWater = CreateOrLoadMaterial("MAT_Sea_Evening", urpLit, new Color(0.06f, 0.19f, 0.30f), 0.92f, 0.16f),
                 HarborDock = CreatePbrMaterial("MAT_Harbor_Dock", urpLit, "Concrete034", new Color(0.74f, 0.73f, 0.72f), 0.22f, 0f, new Vector2(10f, 6f), 0.95f),
                 GarageBrick = CreatePbrMaterial("MAT_Garage_Bricks", urpLit, "Bricks059", new Color(0.88f, 0.84f, 0.82f), 0.18f, 0f, new Vector2(3.5f, 2f), 1.0f),
                 GarageRoofMetal = CreatePbrMaterial("MAT_Garage_RoofMetal", urpLit, "CorrugatedSteel005", new Color(0.52f, 0.55f, 0.58f), 0.42f, 0.55f, new Vector2(4f, 3f), 0.9f),
@@ -424,17 +431,16 @@ namespace Gridroam.Editor
                 WheelRubber = CreateOrLoadMaterial("MAT_Wheel_Rubber", urpLit, new Color(0.11f, 0.11f, 0.12f), 0.20f),
                 TrafficBody = CreateOrLoadMaterial("MAT_Traffic_Placeholder", urpLit, new Color(0.24f, 0.30f, 0.38f), 0.75f, 0.42f),
                 BeaconGlow = CreateOrLoadMaterial("MAT_Objective_Beacon", urpLit, new Color(1.0f, 0.72f, 0.15f), 0.3f, 0f, new Color(1.0f, 0.65f, 0.12f) * 2.1f),
+                JobRingGlow = CreateOrLoadMaterial("MAT_Job_RingTeal", urpLit, new Color(0.31f, 0.70f, 0.66f), 0.35f, 0f, new Color(0.31f, 0.70f, 0.66f) * 2.3f),
                 LampGlow = CreateOrLoadMaterial("MAT_StreetLamp_Glow", urpLit, new Color(1.0f, 0.88f, 0.62f), 0.2f, 0f, new Color(1.0f, 0.80f, 0.42f) * 3.0f),
                 WindowLitWarm = CreateOrLoadMaterial("MAT_Window_LitWarm", urpLit, new Color(1.0f, 0.82f, 0.52f), 0.5f, 0f, new Color(1.0f, 0.74f, 0.36f) * 1.65f),
                 RedBeaconGlow = CreateOrLoadMaterial("MAT_Harbor_RedBeacon", urpLit, new Color(1.0f, 0.18f, 0.14f), 0.2f, 0f, new Color(1.0f, 0.14f, 0.10f) * 3.2f),
                 ReverseLightOff = CreateOrLoadMaterial("MAT_Sedan_ReverseLight", urpLit, new Color(0.86f, 0.86f, 0.84f), 0.6f, 0f, Color.black),
-                // Humanoid character materials
                 CharSkin = CreateOrLoadMaterial("MAT_Char_Skin", urpLit, new Color(0.86f, 0.67f, 0.54f), 0.35f),
                 CharShirt = CreateOrLoadMaterial("MAT_Char_Shirt", urpLit, new Color(0.16f, 0.27f, 0.42f), 0.20f),
                 CharPants = CreateOrLoadMaterial("MAT_Char_Pants", urpLit, new Color(0.13f, 0.13f, 0.15f), 0.15f),
                 CharShoes = CreateOrLoadMaterial("MAT_Char_Shoes", urpLit, new Color(0.08f, 0.07f, 0.06f), 0.45f),
                 CharHair = CreateOrLoadMaterial("MAT_Char_Hair", urpLit, new Color(0.10f, 0.07f, 0.05f), 0.30f),
-                // Small Town ("Liman Kasabası") materials
                 TownPaving = CreatePbrMaterial("MAT_Town_Paving", urpLit, "PavingStones070", new Color(0.86f, 0.83f, 0.78f), 0.18f, 0f, Vector2.one, 0.85f),
                 TownRoofTile = CreatePbrMaterial("MAT_Town_RoofTile", urpLit, "Bricks059", new Color(0.62f, 0.30f, 0.22f), 0.16f, 0f, Vector2.one, 0.95f),
                 TownBrickHouse = CreatePbrMaterial("MAT_Town_BrickHouse", urpLit, "Bricks059", new Color(0.86f, 0.74f, 0.64f), 0.16f, 0f, Vector2.one, 0.90f),
@@ -454,10 +460,22 @@ namespace Gridroam.Editor
                 PedShirtOlive = CreateOrLoadMaterial("MAT_Ped_Shirt_Olive", urpLit, new Color(0.30f, 0.40f, 0.22f), 0.20f),
                 PedShirtMustard = CreateOrLoadMaterial("MAT_Ped_Shirt_Mustard", urpLit, new Color(0.76f, 0.58f, 0.18f), 0.20f),
                 PedShirtTeal = CreateOrLoadMaterial("MAT_Ped_Shirt_Teal", urpLit, new Color(0.15f, 0.44f, 0.46f), 0.20f),
-                PedShirtBurgundy = CreateOrLoadMaterial("MAT_Ped_Shirt_Burgundy", urpLit, new Color(0.44f, 0.14f, 0.24f), 0.20f)
+                PedShirtBurgundy = CreateOrLoadMaterial("MAT_Ped_Shirt_Burgundy", urpLit, new Color(0.44f, 0.14f, 0.24f), 0.20f),
+                TownWoodFloor = CreateOrLoadMaterial("MAT_Town_WoodFloor", urpLit, new Color(0.45f, 0.30f, 0.18f), 0.35f),
+                TownDoorWood = CreateOrLoadMaterial("MAT_Town_DoorWood", urpLit, new Color(0.28f, 0.17f, 0.10f), 0.32f),
+                TownInteriorPaintWarm = CreatePbrMaterial("MAT_Town_InteriorPaint_WarmWhite", urpLit, "Plaster003", new Color(0.95f, 0.93f, 0.88f), 0.14f, 0f, Vector2.one, 0.35f),
+                TownInteriorPaintCream = CreatePbrMaterial("MAT_Town_InteriorPaint_Cream", urpLit, "Plaster003", new Color(0.94f, 0.90f, 0.82f), 0.14f, 0f, Vector2.one, 0.35f),
+                TownInteriorPaintPearl = CreatePbrMaterial("MAT_Town_InteriorPaint_Pearl", urpLit, "Plaster003", new Color(0.91f, 0.92f, 0.90f), 0.14f, 0f, Vector2.one, 0.35f),
+                TownFabricGrey = CreateOrLoadMaterial("MAT_Town_Fabric_Grey", urpLit, new Color(0.42f, 0.43f, 0.46f), 0.12f),
+                TownFabricTeal = CreateOrLoadMaterial("MAT_Town_Fabric_Teal", urpLit, new Color(0.18f, 0.44f, 0.46f), 0.12f),
+                TownFabricMustard = CreateOrLoadMaterial("MAT_Town_Fabric_Mustard", urpLit, new Color(0.76f, 0.58f, 0.20f), 0.12f),
+                TownFurnitureWood = CreateOrLoadMaterial("MAT_Town_FurnitureWood", urpLit, new Color(0.50f, 0.33f, 0.19f), 0.38f),
+                TownPaintCan = CreateOrLoadMaterial("MAT_Town_PaintCan", urpLit, new Color(0.80f, 0.83f, 0.87f), 0.68f, 0.55f),
+                CarRed = CreateOrLoadMaterial("MAT_Car_Red", urpLit, new Color(0.55f, 0.06f, 0.05f), 0.75f, 0.40f),
+                CarWhite = CreateOrLoadMaterial("MAT_Car_White", urpLit, new Color(0.92f, 0.92f, 0.90f), 0.78f, 0.32f),
+                CarDarkGreen = CreateOrLoadMaterial("MAT_Car_DarkGreen", urpLit, new Color(0.07f, 0.23f, 0.15f), 0.76f, 0.42f)
             };
 
-            // Add subtle animated ripple normal to the coastal evening sea
             Texture2D waterNormal = FindTextureBySuffix($"{TexturesDir}/Plaster003", "_NormalGL.jpg");
             if (waterNormal != null)
             {
@@ -551,10 +569,22 @@ namespace Gridroam.Editor
             return mat;
         }
 
+        private enum VehicleBodyVariant
+        {
+            Sedan,
+            Hatchback,
+            Pickup
+        }
+
+        private static MaterialSet _activeMaterialSet;
+
         private class PrefabSet
         {
             public GameObject Player;
             public GameObject PlayerSedan;
+            public GameObject TownCarRedHatchback;
+            public GameObject TownCarWhitePickup;
+            public GameObject TownCarGreenSedan;
             public GameObject NpcMechanic;
             public GameObject NpcHarborReceiver;
             public GameObject ApartmentBuilding;
@@ -574,10 +604,14 @@ namespace Gridroam.Editor
 
         private static PrefabSet CreatePrefabs(MaterialSet mats)
         {
+            _activeMaterialSet = mats;
             return new PrefabSet
             {
                 Player = BuildPlayerPrefab(mats),
-                PlayerSedan = BuildPlayerSedanPrefab(mats),
+                PlayerSedan = BuildSedanPrefab("Vehicle_PlayerSedan", "player_sedan", mats.SedanBody, InteractableKind.PlayerVehicle),
+                TownCarRedHatchback = BuildVehicleVariantPrefab("Vehicle_TownHatchback_Red", string.Empty, mats.CarRed, InteractableKind.TownVehicle, VehicleBodyVariant.Hatchback, mats),
+                TownCarWhitePickup = BuildVehicleVariantPrefab("Vehicle_TownPickup_White", string.Empty, mats.CarWhite, InteractableKind.TownVehicle, VehicleBodyVariant.Pickup, mats),
+                TownCarGreenSedan = BuildSedanPrefab("Vehicle_TownSedan_Green", string.Empty, mats.CarDarkGreen, InteractableKind.TownVehicle),
                 NpcMechanic = BuildNpcPrefab("NPC_Mechanic", "npc_mechanic", mats, mats.MechanicSuit, mats.MechanicSuit),
                 NpcHarborReceiver = BuildNpcPrefab("NPC_HarborReceiver", "npc_harbor_receiver", mats, mats.ReceiverSuit, mats.CharPants),
                 ApartmentBuilding = BuildApartmentPrefab(mats),
@@ -596,10 +630,6 @@ namespace Gridroam.Editor
             };
         }
 
-        /// <summary>
-        /// Imports a CC0 Poly Haven FBX model into a mobile-optimized URP prefab with
-        /// automatic 1K URP Lit material binding, grounded Y=0 pivot, and single simple BoxCollider.
-        /// </summary>
         private static GameObject BuildFbxPropPrefab(
             string modelId,
             string prefabName,
@@ -634,7 +664,6 @@ namespace Gridroam.Editor
                 instance.transform.localPosition = Vector3.zero;
                 instance.transform.localRotation = Quaternion.identity;
 
-                // Strip any MeshColliders from imported FBX for Android/iOS physics speed
                 foreach (Collider col in instance.GetComponentsInChildren<Collider>(true))
                 {
                     Object.DestroyImmediate(col);
@@ -655,12 +684,10 @@ namespace Gridroam.Editor
                         }
                     }
 
-                    // Normalize real-world height and align bottom flush to y = 0
                     float rawHeight = Mathf.Max(0.001f, combinedBounds.size.y);
                     float scaleFactor = targetHeightMeters / rawHeight;
                     instance.transform.localScale = Vector3.one * scaleFactor;
 
-                    // Recompute grounded bounds after uniform scale
                     Bounds scaledBounds = new Bounds(combinedBounds.center * scaleFactor, combinedBounds.size * scaleFactor);
                     Vector3 centerShift = new Vector3(-scaledBounds.center.x, -scaledBounds.min.y, -scaledBounds.center.z);
                     instance.transform.localPosition = centerShift;
@@ -674,9 +701,10 @@ namespace Gridroam.Editor
                     new Vector3(targetHeightMeters, targetHeightMeters, targetHeightMeters), fallbackMat, removeCollider: true);
             }
 
+            GameObject bulbGo = null;
             if (addLampGlow && lampGlowMat != null)
             {
-                CreatePrimitiveChild("Lantern_WarmBulb", PrimitiveType.Sphere, visualRoot.transform,
+                bulbGo = CreatePrimitiveChild("Lantern_WarmBulb", PrimitiveType.Sphere, visualRoot.transform,
                     new Vector3(0f, combinedBounds.size.y * 0.88f, 0f),
                     new Vector3(0.32f, 0.42f, 0.32f), lampGlowMat, removeCollider: true);
             }
@@ -694,6 +722,13 @@ namespace Gridroam.Editor
             if (isStatic)
             {
                 MarkStaticEnvironment(root);
+            }
+
+            if (bulbGo != null)
+            {
+                MarkStaticPaintable(bulbGo);
+                NightLight nl = bulbGo.AddComponent<NightLight>();
+                nl.Configure(null, new[] { bulbGo.GetComponent<Renderer>() }, new Color(1.0f, 0.80f, 0.42f) * 3.0f);
             }
 
             return SaveAsPrefab(root, $"{PrefabDir}/{prefabName}.prefab");
@@ -781,115 +816,194 @@ namespace Gridroam.Editor
             return SaveAsPrefab(root, $"{PrefabDir}/Player_GRIDROAM.prefab");
         }
 
-        private static GameObject BuildPlayerSedanPrefab(MaterialSet mats)
+        private static GameObject BuildSedanPrefab(
+            string prefabName,
+            string anchorId,
+            Material bodyMat,
+            InteractableKind kind)
         {
-            GameObject root = new GameObject("Vehicle_PlayerSedan");
+            return BuildVehicleVariantPrefab(prefabName, anchorId, bodyMat, kind, VehicleBodyVariant.Sedan, _activeMaterialSet);
+        }
+
+        private static GameObject BuildVehicleVariantPrefab(
+            string prefabName,
+            string anchorId,
+            Material bodyMat,
+            InteractableKind kind,
+            VehicleBodyVariant variant,
+            MaterialSet mats)
+        {
+            GameObject root = new GameObject(prefabName);
+
+            bool isHatchback = variant == VehicleBodyVariant.Hatchback;
+            bool isPickup = variant == VehicleBodyVariant.Pickup;
+
+            float massKg = isHatchback ? 1150f : (isPickup ? 1800f : 1350f);
+            float bodyLength = isHatchback ? 3.90f : (isPickup ? 5.00f : 4.42f);
+            float bodyWidth = isHatchback ? 1.80f : (isPickup ? 1.94f : 1.88f);
+            float halfLen = bodyLength * 0.5f;
+            float halfWid = bodyWidth * 0.5f;
 
             Rigidbody rb = root.AddComponent<Rigidbody>();
-            rb.mass = 1350f;
+            rb.mass = massKg;
             rb.linearDamping = 0.05f;
             rb.angularDamping = 0.25f;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
 
-            WorldAnchor anchor = root.AddComponent<WorldAnchor>();
-            anchor.Configure("player_sedan", 3.8f, new Vector3(0f, 2.3f, 0f));
+            if (!string.IsNullOrEmpty(anchorId))
+            {
+                WorldAnchor anchor = root.AddComponent<WorldAnchor>();
+                anchor.Configure(anchorId, 3.8f, new Vector3(0f, 2.3f, 0f));
+            }
 
+            string triggerId = !string.IsNullOrEmpty(anchorId) ? anchorId : prefabName.ToLowerInvariant();
+            string promptKey = kind == InteractableKind.PlayerVehicle ? "ui.btn.enter_car" : "ui.btn.drive";
             InteractableTrigger interactable = root.AddComponent<InteractableTrigger>();
-            interactable.Configure(InteractableKind.PlayerVehicle, "player_sedan", "ui.btn.enter_car", 3.8f);
+            interactable.Configure(kind, triggerId, promptKey, 3.8f);
 
-            // Simple box collider for chassis
             GameObject chassisColObj = new GameObject("ChassisCollider");
             chassisColObj.transform.SetParent(root.transform, false);
             BoxCollider chassisBox = chassisColObj.AddComponent<BoxCollider>();
-            chassisBox.center = new Vector3(0f, 0.72f, 0f);
-            chassisBox.size = new Vector3(1.90f, 0.95f, 4.45f);
+            chassisBox.center = new Vector3(0f, isPickup ? 0.78f : 0.72f, 0f);
+            chassisBox.size = new Vector3(bodyWidth + 0.02f, isPickup ? 1.05f : 0.95f, bodyLength + 0.04f);
 
-            // VisualRoot (sculpted sedan placeholder with windscreen, mirrors, door lines, wheel arches & interior)
             GameObject visualRoot = new GameObject("VisualRoot");
             visualRoot.transform.SetParent(root.transform, false);
 
-            // Lower chassis + hood + trunk + cabin + bumpers + headlights + taillights + reverse lights
-            CreatePrimitiveChild("Placeholder_LowerBody", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.62f, 0f), new Vector3(1.88f, 0.56f, 4.42f), mats.SedanBody, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.86f, 1.38f), new Vector3(1.74f, 0.14f, 1.48f), mats.SedanBody, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 1.30f, -0.22f), new Vector3(1.54f, 0.34f, 1.76f), mats.SedanBody, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 1.14f, -0.22f), new Vector3(1.58f, 0.36f, 1.72f), mats.SedanGlass, removeCollider: true);
+            float frontAxleZ = isHatchback ? 1.22f : (isPickup ? 1.56f : 1.38f);
+            float rearAxleZ = isHatchback ? -1.22f : (isPickup ? -1.56f : -1.32f);
+            float wheelX = isHatchback ? 0.80f : (isPickup ? 0.87f : 0.84f);
 
-            // Sloped windscreen & sloped rear glass
-            GameObject windscreen = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 1.16f, 0.80f), new Vector3(1.54f, 0.56f, 0.08f), mats.SedanGlass, removeCollider: true);
-            windscreen.transform.localRotation = Quaternion.Euler(36f, 0f, 0f);
+            if (isPickup)
+            {
+                CreatePrimitiveChild("Placeholder_LowerBodyCab", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.66f, 0.96f), new Vector3(bodyWidth, 0.58f, 3.04f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.96f, 1.70f), new Vector3(bodyWidth - 0.12f, 0.16f, 1.52f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.44f, 0.36f), new Vector3(1.62f, 0.36f, 1.30f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.26f, 0.36f), new Vector3(1.66f, 0.38f, 1.26f), mats.SedanGlass, removeCollider: true);
 
-            GameObject rearGlass = CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 1.17f, -1.24f), new Vector3(1.52f, 0.54f, 0.08f), mats.SedanGlass, removeCollider: true);
-            rearGlass.transform.localRotation = Quaternion.Euler(-34f, 0f, 0f);
+                GameObject ws = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.24f, 1.04f), new Vector3(1.60f, 0.56f, 0.08f), mats.SedanGlass, removeCollider: true);
+                ws.transform.localRotation = Quaternion.Euler(34f, 0f, 0f);
 
-            // Side mirrors
+                CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.25f, -0.30f), new Vector3(1.56f, 0.40f, 0.06f), mats.SedanGlass, removeCollider: true);
+
+                CreatePrimitiveChild("Pickup_BedFloor", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.54f, -1.52f), new Vector3(bodyWidth - 0.06f, 0.24f, 1.94f), mats.SedanTrimDark, removeCollider: true);
+                CreatePrimitiveChild("Pickup_BedWallL", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(-halfWid + 0.05f, 0.84f, -1.52f), new Vector3(0.10f, 0.48f, 1.94f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Pickup_BedWallR", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(halfWid - 0.05f, 0.84f, -1.52f), new Vector3(0.10f, 0.48f, 1.94f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Pickup_Tailgate", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.82f, -halfLen + 0.05f), new Vector3(bodyWidth - 0.06f, 0.46f, 0.10f), bodyMat, removeCollider: true);
+            }
+            else if (isHatchback)
+            {
+                CreatePrimitiveChild("Placeholder_LowerBody", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.60f, 0f), new Vector3(bodyWidth, 0.54f, bodyLength - 0.04f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.84f, 1.20f), new Vector3(bodyWidth - 0.12f, 0.13f, 1.24f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.28f, -0.34f), new Vector3(1.48f, 0.34f, 2.04f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.12f, -0.34f), new Vector3(1.52f, 0.36f, 2.00f), mats.SedanGlass, removeCollider: true);
+
+                GameObject ws = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.14f, 0.72f), new Vector3(1.48f, 0.54f, 0.08f), mats.SedanGlass, removeCollider: true);
+                ws.transform.localRotation = Quaternion.Euler(36f, 0f, 0f);
+
+                GameObject rg = CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.12f, -1.46f), new Vector3(1.44f, 0.50f, 0.08f), mats.SedanGlass, removeCollider: true);
+                rg.transform.localRotation = Quaternion.Euler(-22f, 0f, 0f);
+            }
+            else
+            {
+                CreatePrimitiveChild("Placeholder_LowerBody", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.62f, 0f), new Vector3(1.88f, 0.56f, 4.42f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.86f, 1.38f), new Vector3(1.74f, 0.14f, 1.48f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.30f, -0.22f), new Vector3(1.54f, 0.34f, 1.76f), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.14f, -0.22f), new Vector3(1.58f, 0.36f, 1.72f), mats.SedanGlass, removeCollider: true);
+
+                GameObject windscreen = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.16f, 0.80f), new Vector3(1.54f, 0.56f, 0.08f), mats.SedanGlass, removeCollider: true);
+                windscreen.transform.localRotation = Quaternion.Euler(36f, 0f, 0f);
+
+                GameObject rearGlass = CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.17f, -1.24f), new Vector3(1.52f, 0.54f, 0.08f), mats.SedanGlass, removeCollider: true);
+                rearGlass.transform.localRotation = Quaternion.Euler(-34f, 0f, 0f);
+            }
+
+            float mirrorZ = isPickup ? 0.88f : 0.56f;
+            float mirrorY = isPickup ? 1.04f : 0.95f;
             CreatePrimitiveChild("Placeholder_MirrorStemL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.92f, 0.94f, 0.56f), new Vector3(0.14f, 0.05f, 0.06f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(-halfWid + 0.02f, mirrorY - 0.02f, mirrorZ), new Vector3(0.14f, 0.05f, 0.06f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_MirrorL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-1.04f, 0.96f, 0.55f), new Vector3(0.16f, 0.11f, 0.13f), mats.SedanBody, removeCollider: true);
+                new Vector3(-halfWid - 0.10f, mirrorY, mirrorZ - 0.01f), new Vector3(0.16f, 0.11f, 0.13f), bodyMat, removeCollider: true);
             CreatePrimitiveChild("Placeholder_MirrorStemR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.92f, 0.94f, 0.56f), new Vector3(0.14f, 0.05f, 0.06f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(halfWid - 0.02f, mirrorY - 0.02f, mirrorZ), new Vector3(0.14f, 0.05f, 0.06f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_MirrorR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(1.04f, 0.96f, 0.55f), new Vector3(0.16f, 0.11f, 0.13f), mats.SedanBody, removeCollider: true);
+                new Vector3(halfWid + 0.10f, mirrorY, mirrorZ - 0.01f), new Vector3(0.16f, 0.11f, 0.13f), bodyMat, removeCollider: true);
 
-            // Door lines & side molding
             CreatePrimitiveChild("Placeholder_DoorSeamL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.945f, 0.64f, -0.08f), new Vector3(0.02f, 0.50f, 0.03f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(-halfWid - 0.005f, 0.64f, isPickup ? 0.20f : -0.08f), new Vector3(0.02f, 0.50f, 0.03f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_DoorSeamR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.945f, 0.64f, -0.08f), new Vector3(0.02f, 0.50f, 0.03f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(halfWid + 0.005f, 0.64f, isPickup ? 0.20f : -0.08f), new Vector3(0.02f, 0.50f, 0.03f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_DoorSillL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.945f, 0.54f, -0.04f), new Vector3(0.025f, 0.04f, 1.92f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(-halfWid - 0.005f, 0.54f, 0f), new Vector3(0.025f, 0.04f, bodyLength * 0.42f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_DoorSillR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.945f, 0.54f, -0.04f), new Vector3(0.025f, 0.04f, 1.92f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(halfWid + 0.005f, 0.54f, 0f), new Vector3(0.025f, 0.04f, bodyLength * 0.42f), mats.SedanTrimDark, removeCollider: true);
 
-            // Wheel arches above each wheel
             CreatePrimitiveChild("Placeholder_WheelArchFL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.94f, 0.78f, 1.38f), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(-halfWid, 0.78f, frontAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_WheelArchFR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.94f, 0.78f, 1.38f), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(halfWid, 0.78f, frontAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_WheelArchRL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.94f, 0.78f, -1.32f), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(-halfWid, 0.78f, rearAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_WheelArchRR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.94f, 0.78f, -1.32f), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(halfWid, 0.78f, rearAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
+
+            float frontZ = halfLen + 0.02f;
+            float rearZ = -halfLen - 0.02f;
+            float lightX = halfWid - 0.28f;
 
             CreatePrimitiveChild("Placeholder_FrontBumper", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.44f, 2.24f), new Vector3(1.92f, 0.24f, 0.18f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(0f, 0.44f, frontZ), new Vector3(bodyWidth + 0.04f, 0.24f, 0.18f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_RearBumper", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.44f, -2.24f), new Vector3(1.92f, 0.24f, 0.18f), mats.SedanTrimDark, removeCollider: true);
+                new Vector3(0f, 0.44f, rearZ), new Vector3(bodyWidth + 0.04f, 0.24f, 0.18f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("Placeholder_Grille", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.64f, 2.22f), new Vector3(0.76f, 0.20f, 0.08f), mats.SedanChrome, removeCollider: true);
+                new Vector3(0f, isPickup ? 0.72f : 0.64f, frontZ - 0.02f), new Vector3(0.78f, isPickup ? 0.26f : 0.20f, 0.08f), mats.SedanChrome, removeCollider: true);
             CreatePrimitiveChild("Placeholder_HeadlightL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.66f, 0.68f, 2.22f), new Vector3(0.38f, 0.15f, 0.08f), mats.LampGlow, removeCollider: true);
+                new Vector3(-lightX, isPickup ? 0.76f : 0.68f, frontZ - 0.02f), new Vector3(0.38f, 0.15f, 0.08f), mats.LampGlow, removeCollider: true);
             CreatePrimitiveChild("Placeholder_HeadlightR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.66f, 0.68f, 2.22f), new Vector3(0.38f, 0.15f, 0.08f), mats.LampGlow, removeCollider: true);
+                new Vector3(lightX, isPickup ? 0.76f : 0.68f, frontZ - 0.02f), new Vector3(0.38f, 0.15f, 0.08f), mats.LampGlow, removeCollider: true);
             CreatePrimitiveChild("Placeholder_TaillightL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.66f, 0.70f, -2.22f), new Vector3(0.42f, 0.15f, 0.08f), mats.TaillightGlow, removeCollider: true);
+                new Vector3(-lightX, 0.70f, rearZ + 0.02f), new Vector3(0.40f, 0.15f, 0.08f), mats.TaillightGlow, removeCollider: true);
             CreatePrimitiveChild("Placeholder_TaillightR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.66f, 0.70f, -2.22f), new Vector3(0.42f, 0.15f, 0.08f), mats.TaillightGlow, removeCollider: true);
+                new Vector3(lightX, 0.70f, rearZ + 0.02f), new Vector3(0.40f, 0.15f, 0.08f), mats.TaillightGlow, removeCollider: true);
             CreatePrimitiveChild("Placeholder_ReverseL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.37f, 0.70f, -2.22f), new Vector3(0.14f, 0.13f, 0.08f), mats.ReverseLightOff, removeCollider: true);
+                new Vector3(-lightX + 0.28f, 0.70f, rearZ + 0.02f), new Vector3(0.14f, 0.13f, 0.08f), mats.ReverseLightOff, removeCollider: true);
             CreatePrimitiveChild("Placeholder_ReverseR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.37f, 0.70f, -2.22f), new Vector3(0.14f, 0.13f, 0.08f), mats.ReverseLightOff, removeCollider: true);
+                new Vector3(lightX - 0.28f, 0.70f, rearZ + 0.02f), new Vector3(0.14f, 0.13f, 0.08f), mats.ReverseLightOff, removeCollider: true);
 
-            // Steering wheel (tilted 65 deg, rotates visually with steering angle)
             GameObject steeringWheel = new GameObject("SteeringWheel");
             steeringWheel.transform.SetParent(visualRoot.transform, false);
-            steeringWheel.transform.localPosition = new Vector3(-0.38f, 1.0f, 0.35f);
+            steeringWheel.transform.localPosition = new Vector3(-0.38f, isPickup ? 1.08f : 1.0f, isPickup ? 0.72f : 0.35f);
             steeringWheel.transform.localRotation = Quaternion.Euler(65f, 0f, 0f);
             CreatePrimitiveChild("SteeringWheelRim", PrimitiveType.Cylinder, steeringWheel.transform,
                 Vector3.zero, new Vector3(0.34f, 0.025f, 0.34f), mats.SedanTrimDark, removeCollider: true);
             CreatePrimitiveChild("SteeringWheelSpoke", PrimitiveType.Cube, steeringWheel.transform,
                 Vector3.zero, new Vector3(0.30f, 0.03f, 0.045f), mats.SedanChrome, removeCollider: true);
 
-            // Seated driver visual inside cabin (shown only while IsPlayerDriving)
             GameObject seatedDriverRoot = new GameObject("SeatedDriverRoot");
             seatedDriverRoot.transform.SetParent(visualRoot.transform, false);
-            seatedDriverRoot.transform.localPosition = new Vector3(-0.38f, 0.45f, -0.25f);
+            seatedDriverRoot.transform.localPosition = new Vector3(-0.38f, isPickup ? 0.52f : 0.45f, isPickup ? 0.12f : -0.25f);
             ProceduralHumanoid seatedDriver = ProceduralHumanoid.Build(
                 seatedDriverRoot.transform,
                 mats.CharSkin,
@@ -898,13 +1012,12 @@ namespace Gridroam.Editor
                 mats.CharShoes,
                 mats.CharHair,
                 1.78f);
-            seatedDriver.SetSitting(true);
+            seatedDriver.SetSitting(true, driving: true);
             seatedDriverRoot.SetActive(false);
 
-            // Real evening headlight beam illuminating asphalt ahead (shadowless for mobile 30 FPS)
             GameObject beamObj = new GameObject("Headlight_Beam");
             beamObj.transform.SetParent(visualRoot.transform, false);
-            beamObj.transform.localPosition = new Vector3(0f, 0.76f, 2.28f);
+            beamObj.transform.localPosition = new Vector3(0f, 0.76f, frontZ + 0.04f);
             beamObj.transform.localRotation = Quaternion.Euler(7f, 0f, 0f);
             Light headlight = beamObj.AddComponent<Light>();
             headlight.type = LightType.Spot;
@@ -913,18 +1026,24 @@ namespace Gridroam.Editor
             headlight.spotAngle = 56f;
             headlight.intensity = 4.2f;
             headlight.shadows = LightShadows.None;
+            headlight.enabled = false;
 
-            // WheelColliders & WheelVisuals (Unity 6 official WheelCollider tutorial hierarchy)
             GameObject wcParent = new GameObject("WheelColliders");
             wcParent.transform.SetParent(root.transform, false);
 
             GameObject wvParent = new GameObject("WheelVisuals");
             wvParent.transform.SetParent(root.transform, false);
 
-            WheelCollider fl = CreateWheelCollider("WheelFL", wcParent.transform, new Vector3(-0.84f, 0.40f, 1.38f));
-            WheelCollider fr = CreateWheelCollider("WheelFR", wcParent.transform, new Vector3(0.84f, 0.40f, 1.38f));
-            WheelCollider rl = CreateWheelCollider("WheelRL", wcParent.transform, new Vector3(-0.84f, 0.40f, -1.32f));
-            WheelCollider rr = CreateWheelCollider("WheelRR", wcParent.transform, new Vector3(0.84f, 0.40f, -1.32f));
+            float wheelRadius = isPickup ? 0.37f : (isHatchback ? 0.32f : 0.34f);
+            float suspDist = isPickup ? 0.28f : (isHatchback ? 0.21f : 0.22f);
+            float springRate = isPickup ? 25000f : (isHatchback ? 32000f : 35000f);
+            float damperRate = isPickup ? 3300f : (isHatchback ? 4200f : 4500f);
+            float wheelY = isPickup ? 0.44f : 0.40f;
+
+            WheelCollider fl = CreateWheelCollider("WheelFL", wcParent.transform, new Vector3(-wheelX, wheelY, frontAxleZ), wheelRadius, suspDist, springRate, damperRate);
+            WheelCollider fr = CreateWheelCollider("WheelFR", wcParent.transform, new Vector3(wheelX, wheelY, frontAxleZ), wheelRadius, suspDist, springRate, damperRate);
+            WheelCollider rl = CreateWheelCollider("WheelRL", wcParent.transform, new Vector3(-wheelX, wheelY, rearAxleZ), wheelRadius, suspDist, springRate, damperRate);
+            WheelCollider rr = CreateWheelCollider("WheelRR", wcParent.transform, new Vector3(wheelX, wheelY, rearAxleZ), wheelRadius, suspDist, springRate, damperRate);
 
             Transform vfl = CreateWheelVisual("WheelVisual_FL", wvParent.transform, fl.transform.localPosition, mats.WheelRubber, mats.SedanChrome);
             Transform vfr = CreateWheelVisual("WheelVisual_FR", wvParent.transform, fr.transform.localPosition, mats.WheelRubber, mats.SedanChrome);
@@ -933,22 +1052,30 @@ namespace Gridroam.Editor
 
             GameObject exitL = new GameObject("ExitLeft");
             exitL.transform.SetParent(root.transform, false);
-            exitL.transform.localPosition = new Vector3(-1.85f, 0.08f, 0.1f);
+            exitL.transform.localPosition = new Vector3(-1.90f, 0.08f, 0.1f);
 
             GameObject exitR = new GameObject("ExitRight");
             exitR.transform.SetParent(root.transform, false);
-            exitR.transform.localPosition = new Vector3(1.85f, 0.08f, 0.1f);
+            exitR.transform.localPosition = new Vector3(1.90f, 0.08f, 0.1f);
 
-            // Rear-wheel drive by default (front axle motor = false, rear axle motor = true)
+            bool frontMotor = isHatchback;
+            bool rearMotor = !isHatchback;
+
             SedanVehicleController controller = root.AddComponent<SedanVehicleController>();
             List<AxleInfo> axles = new List<AxleInfo>
             {
-                new AxleInfo { leftWheel = fl, rightWheel = fr, leftWheelVisual = vfl, rightWheelVisual = vfr, motor = false, steering = true },
-                new AxleInfo { leftWheel = rl, rightWheel = rr, leftWheelVisual = vrl, rightWheelVisual = vrr, motor = true, steering = false }
+                new AxleInfo { leftWheel = fl, rightWheel = fr, leftWheelVisual = vfl, rightWheelVisual = vfr, motor = frontMotor, steering = true },
+                new AxleInfo { leftWheel = rl, rightWheel = rr, leftWheelVisual = vrl, rightWheelVisual = vrr, motor = rearMotor, steering = false }
             };
             controller.ConfigureSetup(axles, visualRoot.transform, exitL.transform, exitR.transform, seatedDriverRoot, steeringWheel.transform);
+            controller.ConfigureTuning(
+                wheelbaseMeters: frontAxleZ - rearAxleZ,
+                trackWidthMeters: wheelX * 2f,
+                antiRoll: isPickup ? 3000f : 4200f,
+                comOffset: isPickup ? new Vector3(0f, -0.38f, 0.12f) : new Vector3(0f, -0.42f, 0.08f),
+                maxBrake: isPickup ? 3600f : 3200f,
+                finalDrive: isHatchback ? 4.1f : 3.9f);
 
-            // Procedural engine & tyre skid audio
             AudioSource engineSrc = root.AddComponent<AudioSource>();
             engineSrc.spatialBlend = 0.6f;
             engineSrc.loop = true;
@@ -965,10 +1092,17 @@ namespace Gridroam.Editor
             EngineAudio engineAudio = root.AddComponent<EngineAudio>();
             engineAudio.Configure(controller, engineSrc, skidSrc);
 
-            return SaveAsPrefab(root, $"{PrefabDir}/Vehicle_PlayerSedan.prefab");
+            return SaveAsPrefab(root, $"{PrefabDir}/{prefabName}.prefab");
         }
 
-        private static WheelCollider CreateWheelCollider(string wheelName, Transform parent, Vector3 localPos)
+        private static WheelCollider CreateWheelCollider(
+            string wheelName,
+            Transform parent,
+            Vector3 localPos,
+            float radius = 0.34f,
+            float suspDist = 0.22f,
+            float springRate = 35000f,
+            float damperRate = 4500f)
         {
             GameObject go = new GameObject(wheelName);
             go.transform.SetParent(parent, false);
@@ -976,14 +1110,14 @@ namespace Gridroam.Editor
 
             WheelCollider wc = go.AddComponent<WheelCollider>();
             wc.mass = 20f;
-            wc.radius = 0.34f;
+            wc.radius = radius;
             wc.wheelDampingRate = 0.25f;
-            wc.suspensionDistance = 0.22f;
+            wc.suspensionDistance = suspDist;
             wc.forceAppPointDistance = 0.1f;
 
             JointSpring spring = wc.suspensionSpring;
-            spring.spring = 35000f;
-            spring.damper = 4500f;
+            spring.spring = springRate;
+            spring.damper = damperRate;
             spring.targetPosition = 0.5f;
             wc.suspensionSpring = spring;
 
@@ -1067,12 +1201,10 @@ namespace Gridroam.Editor
             GameObject root = new GameObject("Building_Apartment_Placeholder");
             MarkStaticEnvironment(root);
 
-            // Single simple BoxCollider for Android & iOS physics performance
             BoxCollider col = root.AddComponent<BoxCollider>();
             col.center = new Vector3(0f, 7.0f, 0f);
             col.size = new Vector3(14f, 14f, 14f);
 
-            // LOD0: PBR Facade + Ground Plinth + Parapet + Rooftop HVAC + Warm Dusk Windows
             GameObject lod0 = new GameObject("LOD0_Detailed");
             lod0.transform.SetParent(root.transform, false);
 
@@ -1091,7 +1223,6 @@ namespace Gridroam.Editor
             GameObject lod0Win3 = CreatePrimitiveChild("LitWindow_West", PrimitiveType.Cube, lod0.transform,
                 new Vector3(-7.04f, 8.0f, -2.5f), new Vector3(0.10f, 1.25f, 2.4f), mats.WindowLitWarm, removeCollider: true);
 
-            // LOD1: Single simplified PBR block for distance rendering
             GameObject lod1 = new GameObject("LOD1_Medium");
             lod1.transform.SetParent(root.transform, false);
             GameObject lod1Main = CreatePrimitiveChild("SimpleBlock", PrimitiveType.Cube, lod1.transform,
@@ -1135,20 +1266,28 @@ namespace Gridroam.Editor
                 new Vector3(0f, 0.58f, 0f), new Vector3(1.82f, 0.56f, 4.10f), mats.TrafficBody, removeCollider: true);
             CreatePrimitiveChild("Roof", PrimitiveType.Cube, visualRoot.transform,
                 new Vector3(0f, 1.12f, -0.15f), new Vector3(1.50f, 0.48f, 1.95f), mats.SedanGlass, removeCollider: true);
-            CreatePrimitiveChild("HeadL", PrimitiveType.Cube, visualRoot.transform,
+            GameObject headL = CreatePrimitiveChild("HeadL", PrimitiveType.Cube, visualRoot.transform,
                 new Vector3(-0.62f, 0.62f, 2.06f), new Vector3(0.32f, 0.14f, 0.06f), mats.LampGlow, removeCollider: true);
-            CreatePrimitiveChild("HeadR", PrimitiveType.Cube, visualRoot.transform,
+            GameObject headR = CreatePrimitiveChild("HeadR", PrimitiveType.Cube, visualRoot.transform,
                 new Vector3(0.62f, 0.62f, 2.06f), new Vector3(0.32f, 0.14f, 0.06f), mats.LampGlow, removeCollider: true);
             CreatePrimitiveChild("TailL", PrimitiveType.Cube, visualRoot.transform,
                 new Vector3(-0.62f, 0.64f, -2.06f), new Vector3(0.34f, 0.14f, 0.06f), mats.TaillightGlow, removeCollider: true);
             CreatePrimitiveChild("TailR", PrimitiveType.Cube, visualRoot.transform,
                 new Vector3(0.62f, 0.64f, -2.06f), new Vector3(0.34f, 0.14f, 0.06f), mats.TaillightGlow, removeCollider: true);
 
+            // E2: Traffic vehicle headlights glow at night (20:00-06:00) and turn off during day
+            NightLight trafficHeadlights = root.AddComponent<NightLight>();
+            trafficHeadlights.Configure(
+                null,
+                new[] { headL.GetComponent<Renderer>(), headR.GetComponent<Renderer>() },
+                new Color(1.0f, 0.88f, 0.62f) * 2.8f);
+
             return SaveAsPrefab(root, $"{PrefabDir}/Vehicle_Traffic_Placeholder.prefab");
         }
 
         private static MissionCatalog CreateMissionDataAssets()
         {
+            // Dialogue 1: Marco hands over the sedan keys
             DialogueData dlgM1 = CreateOrLoadAsset<DialogueData>($"{DialogueDir}/DLG_M01_Mechanic.asset");
             dlgM1.lines = new List<DialogueLine>
             {
@@ -1159,6 +1298,7 @@ namespace Gridroam.Editor
             dlgM1.choices = new List<DialogueChoice>();
             EditorUtility.SetDirty(dlgM1);
 
+            // Dialogue 2: Elena accepts the delivery and mentions the missing dark sedan
             DialogueData dlgM2 = CreateOrLoadAsset<DialogueData>($"{DialogueDir}/DLG_M02_HarborReceiver.asset");
             dlgM2.lines = new List<DialogueLine>
             {
@@ -1169,10 +1309,55 @@ namespace Gridroam.Editor
             dlgM2.choices = new List<DialogueChoice>();
             EditorUtility.SetDirty(dlgM2);
 
+            // Dialogue 3: Inspecting the missing car reveals the harbor courier manifest
+            DialogueData dlgM3 = CreateOrLoadAsset<DialogueData>($"{DialogueDir}/DLG_M03_MissingCarClue.asset");
+            dlgM3.lines = new List<DialogueLine>
+            {
+                new DialogueLine { speakerKey = "npc.player.name", textKey = "m03.dlg.1" },
+                new DialogueLine { speakerKey = "npc.player.name", textKey = "m03.dlg.2" },
+                new DialogueLine { speakerKey = "npc.player.name", textKey = "m03.dlg.3" }
+            };
+            dlgM3.choices = new List<DialogueChoice>();
+            EditorUtility.SetDirty(dlgM3);
+
+            // Dialogue 4: Collecting the dropped courier package in the north back alley
+            DialogueData dlgM4 = CreateOrLoadAsset<DialogueData>($"{DialogueDir}/DLG_M04_PackagePickup.asset");
+            dlgM4.lines = new List<DialogueLine>
+            {
+                new DialogueLine { speakerKey = "npc.player.name", textKey = "m04.dlg.1" },
+                new DialogueLine { speakerKey = "npc.player.name", textKey = "m04.dlg.2" }
+            };
+            dlgM4.choices = new List<DialogueChoice>();
+            EditorUtility.SetDirty(dlgM4);
+
+            // Dialogue 5A: Ending if the player delivers the package to Marco at the Repair Garage
+            DialogueData dlgM5Marco = CreateOrLoadAsset<DialogueData>($"{DialogueDir}/DLG_M05_Ending_Marco.asset");
+            dlgM5Marco.lines = new List<DialogueLine>
+            {
+                new DialogueLine { speakerKey = "npc.mechanic.name", textKey = "m05.marco.dlg.1" },
+                new DialogueLine { speakerKey = "npc.mechanic.name", textKey = "m05.marco.dlg.2" },
+                new DialogueLine { speakerKey = "npc.mechanic.name", textKey = "m05.marco.dlg.3" }
+            };
+            dlgM5Marco.choices = new List<DialogueChoice>();
+            EditorUtility.SetDirty(dlgM5Marco);
+
+            // Dialogue 5B: Ending if the player delivers the package to Elena at the Town Square
+            DialogueData dlgM5Elena = CreateOrLoadAsset<DialogueData>($"{DialogueDir}/DLG_M05_Ending_Elena.asset");
+            dlgM5Elena.lines = new List<DialogueLine>
+            {
+                new DialogueLine { speakerKey = "npc.harbor_receiver.name", textKey = "m05.elena.dlg.1" },
+                new DialogueLine { speakerKey = "npc.harbor_receiver.name", textKey = "m05.elena.dlg.2" },
+                new DialogueLine { speakerKey = "npc.harbor_receiver.name", textKey = "m05.elena.dlg.3" }
+            };
+            dlgM5Elena.choices = new List<DialogueChoice>();
+            EditorUtility.SetDirty(dlgM5Elena);
+
+            // Mission 1: Get the Keys
             MissionData m01 = CreateOrLoadAsset<MissionData>($"{MissionDir}/Mission_01_GetTheKeys.asset");
             m01.missionId = "m01_get_the_keys";
             m01.titleKey = "m01.title";
             m01.summaryKey = "m01.summary";
+            m01.rewardMoney = 100;
             m01.nextMissionId = "m02_last_delivery";
             m01.autoStartNextMission = true;
             m01.retryPlayerAnchorId = "spawn_garage_foot";
@@ -1197,12 +1382,14 @@ namespace Gridroam.Editor
             };
             EditorUtility.SetDirty(m01);
 
+            // Mission 2: Last Delivery
             MissionData m02 = CreateOrLoadAsset<MissionData>($"{MissionDir}/Mission_02_LastDelivery.asset");
             m02.missionId = "m02_last_delivery";
             m02.titleKey = "m02.title";
             m02.summaryKey = "m02.summary";
-            m02.nextMissionId = string.Empty;
-            m02.autoStartNextMission = false;
+            m02.rewardMoney = 150;
+            m02.nextMissionId = "m03_missing_car";
+            m02.autoStartNextMission = true;
             m02.retryPlayerAnchorId = "spawn_garage_foot";
             m02.retryVehicleAnchorId = "spawn_garage_sedan";
             m02.retryStartInVehicle = true;
@@ -1226,8 +1413,113 @@ namespace Gridroam.Editor
             };
             EditorUtility.SetDirty(m02);
 
+            // Mission 3: Missing Car
+            MissionData m03 = CreateOrLoadAsset<MissionData>($"{MissionDir}/Mission_03_MissingCar.asset");
+            m03.missionId = "m03_missing_car";
+            m03.titleKey = "m03.title";
+            m03.summaryKey = "m03.summary";
+            m03.rewardMoney = 150;
+            m03.nextMissionId = "m04_night_tail";
+            m03.autoStartNextMission = true;
+            m03.retryPlayerAnchorId = "spawn_garage_foot";
+            m03.retryVehicleAnchorId = "spawn_garage_sedan";
+            m03.retryStartInVehicle = false;
+            m03.steps = new List<MissionStepData>
+            {
+                new MissionStepData
+                {
+                    stepType = MissionStepType.ReachLocation,
+                    objectiveKey = "m03.step1.objective",
+                    targetAnchorId = "missing_car_zone",
+                    triggerRadius = 14f
+                },
+                new MissionStepData
+                {
+                    stepType = MissionStepType.InspectTarget,
+                    objectiveKey = "m03.step2.objective",
+                    targetAnchorId = "missing_car_clue",
+                    dialogueAsset = dlgM3,
+                    requiresOnFoot = true
+                }
+            };
+            EditorUtility.SetDirty(m03);
+
+            // Mission 4: Night Tail
+            MissionData m04 = CreateOrLoadAsset<MissionData>($"{MissionDir}/Mission_04_NightTail.asset");
+            m04.missionId = "m04_night_tail";
+            m04.titleKey = "m04.title";
+            m04.summaryKey = "m04.summary";
+            m04.rewardMoney = 200;
+            m04.nextMissionId = "m05_end_of_shift";
+            m04.autoStartNextMission = true;
+            m04.retryPlayerAnchorId = "spawn_harbor_tail_start";
+            m04.retryVehicleAnchorId = "spawn_harbor_tail_start";
+            m04.retryStartInVehicle = true;
+            m04.steps = new List<MissionStepData>
+            {
+                new MissionStepData
+                {
+                    stepType = MissionStepType.ReachLocation,
+                    objectiveKey = "m04.step1.objective",
+                    targetAnchorId = "tail_start_zone",
+                    triggerRadius = 11f
+                },
+                new MissionStepData
+                {
+                    stepType = MissionStepType.TailVehicle,
+                    objectiveKey = "m04.step2.objective",
+                    targetAnchorId = "tail_target_car",
+                    tailMinDistance = 11f,
+                    tailMaxDistance = 76f,
+                    tailGraceSeconds = 6.5f
+                },
+                new MissionStepData
+                {
+                    stepType = MissionStepType.InspectTarget,
+                    objectiveKey = "m04.step3.objective",
+                    targetAnchorId = "tail_dropped_package",
+                    dialogueAsset = dlgM4,
+                    requiresOnFoot = true
+                }
+            };
+            EditorUtility.SetDirty(m04);
+
+            // Mission 5: End of Shift (Two routes back to neighborhood + choice between Marco and Elena)
+            MissionData m05 = CreateOrLoadAsset<MissionData>($"{MissionDir}/Mission_05_EndOfShift.asset");
+            m05.missionId = "m05_end_of_shift";
+            m05.titleKey = "m05.title";
+            m05.summaryKey = "m05.summary";
+            m05.rewardMoney = 300;
+            m05.nextMissionId = string.Empty;
+            m05.autoStartNextMission = false;
+            m05.retryPlayerAnchorId = "spawn_garage_foot";
+            m05.retryVehicleAnchorId = "spawn_garage_sedan";
+            m05.retryStartInVehicle = false;
+            m05.steps = new List<MissionStepData>
+            {
+                new MissionStepData
+                {
+                    stepType = MissionStepType.ReachLocation,
+                    objectiveKey = "m05.step1.objective",
+                    targetAnchorId = "neighborhood_return_zone",
+                    triggerRadius = 15f
+                },
+                new MissionStepData
+                {
+                    stepType = MissionStepType.TalkToNpc,
+                    objectiveKey = "m05.step2.objective",
+                    targetAnchorId = "npc_mechanic",
+                    dialogueAsset = dlgM5Marco,
+                    primaryChoiceId = "marco",
+                    secondaryTargetAnchorId = "npc_elena_neighborhood",
+                    secondaryDialogueAsset = dlgM5Elena,
+                    secondaryChoiceId = "elena"
+                }
+            };
+            EditorUtility.SetDirty(m05);
+
             MissionCatalog catalog = CreateOrLoadAsset<MissionCatalog>($"{MissionDir}/MissionCatalog.asset");
-            catalog.missions = new List<MissionData> { m01, m02 };
+            catalog.missions = new List<MissionData> { m01, m02, m03, m04, m05 };
             EditorUtility.SetDirty(catalog);
             return catalog;
         }
@@ -1238,33 +1530,33 @@ namespace Gridroam.Editor
             MissionCatalog catalog,
             UniversalRenderPipelineAsset lowUrp,
             UniversalRenderPipelineAsset medUrp,
-            VolumeProfile eveningVolume)
+            VolumeProfile eveningVolume,
+            GeneratedUiSprites uiSprites)
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // --- Realistic Evening Coastal HDRI Skybox & Atmospheric Dusk Lighting ---
+            // --- Morning 09:00 Default Coastal Skybox & Sunlight (managed dynamically by DayNightCycle) ---
             RenderSettings.skybox = mats.EveningSkybox;
             RenderSettings.ambientMode = AmbientMode.Skybox;
-            RenderSettings.ambientIntensity = 1.0f;
+            RenderSettings.ambientIntensity = 1.12f;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
             RenderSettings.reflectionIntensity = 1.0f;
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.26f, 0.24f, 0.30f);
-            RenderSettings.fogDensity = 0.0028f;
+            RenderSettings.fogColor = new Color(0.62f, 0.70f, 0.78f);
+            RenderSettings.fogDensity = 0.0016f;
 
-            GameObject sunObj = new GameObject("Sun_EveningCoastal");
+            GameObject sunObj = new GameObject("Sun_CoastalDirectional");
             Light sun = sunObj.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1.0f, 0.68f, 0.42f);
+            sun.color = new Color(1.0f, 0.94f, 0.84f);
             sun.intensity = 1.85f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.78f;
-            sunObj.transform.rotation = Quaternion.Euler(14f, -52f, 0f);
+            sun.shadowStrength = 0.75f;
+            sunObj.transform.rotation = Quaternion.Euler(34f, -38f, 0f);
             RenderSettings.sun = sun;
 
-            // Global Post-Processing Volume (ACES Tonemapping + Warm Bloom + Subtle Vignette)
             GameObject volObj = new GameObject("GlobalVolume_EveningCoastal");
             Volume vol = volObj.AddComponent<Volume>();
             vol.isGlobal = true;
@@ -1276,12 +1568,15 @@ namespace Gridroam.Editor
             systems.AddComponent<LocalizationService>();
             systems.AddComponent<InputHub>();
             systems.AddComponent<PerformanceMonitor>();
+            systems.AddComponent<DayNightCycle>();
 
             GraphicsProfileManager gfxMgr = systems.AddComponent<GraphicsProfileManager>();
             gfxMgr.ConfigureAssets(lowUrp, medUrp);
 
+            PlayerNeedsController needsController = systems.AddComponent<PlayerNeedsController>();
             PlayerModeController modeController = systems.AddComponent<PlayerModeController>();
             MissionManager missionManager = systems.AddComponent<MissionManager>();
+            JobManager jobManager = systems.AddComponent<JobManager>();
 
             // --- Third-Person Camera ---
             GameObject camObj = new GameObject("Main Camera");
@@ -1298,13 +1593,19 @@ namespace Gridroam.Editor
             // --- World Environment ---
             GameObject env = new GameObject("--- WORLD_ENVIRONMENT ---");
 
-            // Main urban ground & reflective coastal sea
             CreateStaticBlock("Ground_CoastalCity", env.transform, new Vector3(-18f, -0.5f, 125f), new Vector3(114f, 1f, 350f), mats.Ground);
             GameObject seaObj = CreateStaticBlock("Coastal_Sea", env.transform, new Vector3(155f, -1.6f, 125f), new Vector3(240f, 1f, 520f), mats.SeaWater, addCollider: false);
             CreateStaticBlock("Coastal_Seawall", env.transform, new Vector3(36.8f, 0.35f, 125f), new Vector3(1.8f, 1.5f, 330f), mats.Concrete);
             CreateStaticBlock("Coastal_Promenade", env.transform, new Vector3(33.2f, 0.08f, 122f), new Vector3(5.2f, 0.16f, 256f), mats.Sidewalk);
 
-            // --- ROADS (1K CC0 Asphalt 012 + Sidewalks + Painted Lane Markings) ---
+            // E6: Procedural low-volume coastal wind & sea surf AudioSource near the seawall
+            GameObject seaAudioObj = new GameObject("Coastal_SeaWindAmbience");
+            seaAudioObj.transform.SetParent(env.transform, false);
+            seaAudioObj.transform.position = new Vector3(35.5f, 1.5f, 130f);
+            seaAudioObj.AddComponent<AudioSource>();
+            seaAudioObj.AddComponent<CoastalAmbientAudio>();
+
+            // --- ROADS ---
             CreateStaticBlock("Road_GarageConnector", env.transform, new Vector3(0f, 0.02f, 0f), new Vector3(64f, 0.08f, 12f), mats.RoadAsphaltCross, addCollider: false);
             CreateStaticBlock("Road_CoastalMain", env.transform, new Vector3(24f, 0.03f, 122f), new Vector3(13f, 0.08f, 256f), mats.RoadAsphaltMain, addCollider: false);
             CreateStaticBlock("Road_BackAlleyRoute", env.transform, new Vector3(-26f, 0.03f, 122f), new Vector3(8.5f, 0.08f, 256f), mats.RoadAsphaltMain, addCollider: false);
@@ -1312,12 +1613,10 @@ namespace Gridroam.Editor
             CreateStaticBlock("Road_CrossStreet_North", env.transform, new Vector3(-1f, 0.025f, 174f), new Vector3(54f, 0.08f, 9f), mats.RoadAsphaltCross, addCollider: false);
             CreateStaticBlock("Road_HarborConnector", env.transform, new Vector3(-1f, 0.025f, 246f), new Vector3(62f, 0.08f, 14f), mats.RoadAsphaltCross, addCollider: false);
 
-            // Sidewalks along interior blocks
             CreateStaticBlock("Sidewalk_MainWest", env.transform, new Vector3(15.6f, 0.08f, 122f), new Vector3(3.4f, 0.16f, 240f), mats.Sidewalk);
             CreateStaticBlock("Sidewalk_AlleyEast", env.transform, new Vector3(-20.4f, 0.08f, 122f), new Vector3(2.4f, 0.16f, 240f), mats.Sidewalk);
             CreateStaticBlock("Sidewalk_AlleyWest", env.transform, new Vector3(-31.8f, 0.08f, 122f), new Vector3(2.8f, 0.16f, 240f), mats.Sidewalk);
 
-            // Crisp road lane markings (Coastal Main Road dashed centerline + edge stripes)
             GameObject markingsRoot = new GameObject("Road_Markings");
             markingsRoot.transform.SetParent(env.transform, false);
             CreateStaticBlock("Coastal_EdgeLine_East", markingsRoot.transform, new Vector3(29.8f, 0.08f, 122f), new Vector3(0.18f, 0.02f, 244f), mats.RoadMarkingYellow, addCollider: false);
@@ -1327,7 +1626,6 @@ namespace Gridroam.Editor
                 CreateStaticBlock($"CenterDash_{z}", markingsRoot.transform, new Vector3(24f, 0.08f, z), new Vector3(0.22f, 0.02f, 4.8f), mats.RoadMarkingWhite, addCollider: false);
             }
 
-            // Harbor Delivery Bay painted outline
             CreateStaticBlock("DeliveryBay_North", markingsRoot.transform, new Vector3(11f, 0.14f, 253f), new Vector3(9.5f, 0.02f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
             CreateStaticBlock("DeliveryBay_South", markingsRoot.transform, new Vector3(11f, 0.14f, 243f), new Vector3(9.5f, 0.02f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
             CreateStaticBlock("DeliveryBay_West", markingsRoot.transform, new Vector3(6.2f, 0.14f, 248f), new Vector3(0.3f, 0.02f, 10.2f), mats.RoadMarkingYellow, addCollider: false);
@@ -1341,9 +1639,11 @@ namespace Gridroam.Editor
             CreateStaticBlock("Garage_SideWallL", garageRoot.transform, new Vector3(-17f, 3.0f, 9.5f), new Vector3(1f, 6f, 11f), mats.GarageBrick);
             CreateStaticBlock("Garage_SideWallR", garageRoot.transform, new Vector3(-2.8f, 3.0f, 11.8f), new Vector3(1f, 6f, 6.4f), mats.GarageBrick);
             CreateStaticBlock("Garage_Roof", garageRoot.transform, new Vector3(-10f, 6.2f, 9.5f), new Vector3(16.2f, 0.6f, 12.2f), mats.GarageRoofMetal);
-            CreateStaticBlock("Garage_SignFascia", garageRoot.transform, new Vector3(-10f, 6.5f, 3.4f), new Vector3(12f, 0.8f, 0.35f), mats.LampGlow, addCollider: false);
+            GameObject garageFascia = CreateStaticBlock("Garage_SignFascia", garageRoot.transform, new Vector3(-10f, 6.5f, 3.4f), new Vector3(12f, 0.8f, 0.35f), mats.LampGlow, addCollider: false);
+            MarkStaticPaintable(garageFascia);
+            NightLight garageSignNl = garageFascia.AddComponent<NightLight>();
+            garageSignNl.Configure(null, new[] { garageFascia.GetComponent<Renderer>() }, new Color(1.0f, 0.80f, 0.42f) * 2.5f);
 
-            // Real Poly Haven CC0 Props at Marco's Garage
             PlacePrefabInstance(prefabs.RollerShutterDoor, garageRoot.transform, new Vector3(-10.5f, 0.10f, 13.85f), Quaternion.Euler(0f, 180f, 0f));
             PlacePrefabInstance(prefabs.ToolCart, garageRoot.transform, new Vector3(-7.4f, 0.10f, 8.2f), Quaternion.Euler(0f, 28f, 0f));
             PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-14.6f, 0.10f, 11.2f), Quaternion.Euler(0f, 20f, 0f));
@@ -1356,10 +1656,11 @@ namespace Gridroam.Editor
             PlacePrefabInstance(prefabs.ConcreteBarrier, garageRoot.transform, new Vector3(10.5f, 0.04f, 13.5f), Quaternion.identity);
             CreatePointLamp("Lamp_GarageBay", garageRoot.transform, new Vector3(-6.5f, 5.2f, 7.5f), new Color(1f, 0.78f, 0.45f), 22f, 3.4f);
 
-            // --- SMALL TOWN ("Liman Kasabası") ---
-            BuildSmallTown(env.transform, mats, prefabs);
+            // --- SMALL TOWN ("Liman Kasabası") & GENTLE WORLD BOUNDARY ---
+            List<TrafficStopLine> stopLines = BuildSmallTown(env.transform, mats, prefabs);
+            BuildWorldBoundary(env.transform, mats);
 
-            // Real Poly Haven Street Lamps along Coastal Promenade & Back Alleys
+            // Street Lamps along Coastal Promenade & Back Alleys
             for (int z = 20; z <= 220; z += 40)
             {
                 PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(32.8f, 0.16f, z), Quaternion.Euler(0f, -90f, 0f));
@@ -1379,13 +1680,11 @@ namespace Gridroam.Editor
             CreateStaticBlock("Harbor_WarehouseRoof", harborRoot.transform, new Vector3(-12f, 8.3f, 268f), new Vector3(19f, 0.7f, 15f), mats.GarageRoofMetal);
             PlacePrefabInstance(prefabs.RollerShutterDoor, harborRoot.transform, new Vector3(-12f, 0.14f, 260.85f), Quaternion.Euler(0f, 180f, 0f));
 
-            // Corrugated steel shipping containers
             CreateStaticBlock("Harbor_Container_01", harborRoot.transform, new Vector3(24f, 1.6f, 266f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerRed);
             CreateStaticBlock("Harbor_Container_02", harborRoot.transform, new Vector3(28f, 1.6f, 266f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerBlue);
             CreateStaticBlock("Harbor_Container_03", harborRoot.transform, new Vector3(26f, 4.6f, 266f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerOchre);
             CreateStaticBlock("Harbor_Container_04", harborRoot.transform, new Vector3(19f, 1.6f, 270f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerBlue);
 
-            // Harbor Gantry Crane silhouette (adds dramatic coastal port skyline!)
             GameObject crane = new GameObject("Harbor_GantryCrane");
             crane.transform.SetParent(harborRoot.transform, false);
             CreateStaticBlock("Crane_Leg_FL", crane.transform, new Vector3(31f, 8.5f, 250f), new Vector3(1.1f, 17f, 1.1f), mats.GantrySteel);
@@ -1396,7 +1695,6 @@ namespace Gridroam.Editor
             CreateStaticBlock("Crane_Cab", crane.transform, new Vector3(26f, 15.2f, 255f), new Vector3(4.2f, 2.8f, 3.6f), mats.SedanGlass, addCollider: false);
             CreateStaticBlock("Crane_TopBeacon", crane.transform, new Vector3(31f, 18.7f, 255f), new Vector3(0.6f, 0.6f, 0.6f), mats.RedBeaconGlow, addCollider: false);
 
-            // Real Poly Haven CC0 Harbor Props (Crates, Barrels, Concrete Barriers, Flood Lights, Ocean Buoys)
             PlacePrefabInstance(prefabs.WoodenCrate, harborRoot.transform, new Vector3(5.2f, 0.14f, 254.2f), Quaternion.Euler(0f, 14f, 0f));
             PlacePrefabInstance(prefabs.WoodenCrate, harborRoot.transform, new Vector3(6.6f, 0.14f, 254.6f), Quaternion.Euler(0f, -8f, 0f));
             PlacePrefabInstance(prefabs.WoodenCrate, harborRoot.transform, new Vector3(5.8f, 1.18f, 254.4f), Quaternion.Euler(0f, 32f, 0f));
@@ -1408,35 +1706,104 @@ namespace Gridroam.Editor
             PlacePrefabInstance(prefabs.ConcreteBarrier, harborRoot.transform, new Vector3(35.5f, 0.14f, 262f), Quaternion.Euler(0f, 90f, 0f));
             CreatePointLamp("Lamp_HarborDock", harborRoot.transform, new Vector3(11f, 8.2f, 251f), new Color(1f, 0.82f, 0.50f), 32f, 4.2f);
 
-            // Floating buoys in the evening sea + lightweight wave animation
             GameObject buoy1 = PlacePrefabInstance(prefabs.OceanBuoy, env.transform, new Vector3(52f, -1.35f, 115f), Quaternion.identity);
             GameObject buoy2 = PlacePrefabInstance(prefabs.OceanBuoy, env.transform, new Vector3(56f, -1.35f, 245f), Quaternion.Euler(0f, 65f, 0f));
             SeaWaveAnimator waveAnim = seaObj.AddComponent<SeaWaveAnimator>();
             waveAnim.Configure(seaObj.GetComponent<Renderer>(), new[] { buoy1.transform, buoy2.transform });
 
-            // --- WORLD ANCHORS & SPAWNS ---
+            // Render top-down orthographic TownMap.png from the completed environment before adding dynamic actors
+            Texture2D townMapTexture = RenderAndSaveTownMapTexture(sun);
+
+            // --- WORLD ANCHORS & SPAWNS (Missions 1-5) ---
             GameObject anchorsRoot = new GameObject("--- WORLD_ANCHORS ---");
             CreateWorldAnchor("Spawn_GarageFoot", "spawn_garage_foot", anchorsRoot.transform, new Vector3(-8.5f, 0.14f, -6.0f), Quaternion.Euler(0f, 25f, 0f), 2f);
             CreateWorldAnchor("Spawn_GarageSedan", "spawn_garage_sedan", anchorsRoot.transform, new Vector3(3.5f, 0.28f, 4.5f), Quaternion.Euler(0f, 90f, 0f), 3.5f);
             CreateWorldAnchor("Harbor_DeliveryZone", "harbor_delivery_zone", anchorsRoot.transform, new Vector3(11f, 0.18f, 248f), Quaternion.identity, 7.5f);
+            CreateWorldAnchor("MissingCar_SearchZone", "missing_car_zone", anchorsRoot.transform, new Vector3(-24.5f, 0.14f, 64f), Quaternion.identity, 14f);
+            CreateWorldAnchor("Tail_StartLookoutZone", "tail_start_zone", anchorsRoot.transform, new Vector3(21f, 0.14f, 224f), Quaternion.Euler(0f, 180f, 0f), 11f);
+            CreateWorldAnchor("Spawn_HarborTailStart", "spawn_harbor_tail_start", anchorsRoot.transform, new Vector3(21f, 0.28f, 232f), Quaternion.Euler(0f, 180f, 0f), 4f);
+            CreateWorldAnchor("Neighborhood_ReturnZone", "neighborhood_return_zone", anchorsRoot.transform, new Vector3(-1f, 0.14f, 92f), Quaternion.identity, 15f);
 
-            // --- ACTORS (Player, Sedan, NPCs) ---
+            // --- ACTORS (Player, Sedan, Story NPCs, Mission 3-5 Actors, Taxi Passenger) ---
             GameObject actorsRoot = new GameObject("--- ACTORS ---");
             GameObject playerObj = PlacePrefabInstance(prefabs.Player, actorsRoot.transform, new Vector3(-8.5f, 0.14f, -6.0f), Quaternion.Euler(0f, 25f, 0f));
             GameObject sedanObj = PlacePrefabInstance(prefabs.PlayerSedan, actorsRoot.transform, new Vector3(3.5f, 0.28f, 4.5f), Quaternion.Euler(0f, 90f, 0f));
             PlacePrefabInstance(prefabs.NpcMechanic, actorsRoot.transform, new Vector3(-4.5f, 0.10f, 6.2f), Quaternion.Euler(0f, 165f, 0f));
             PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(2.2f, 0.16f, 255.5f), Quaternion.Euler(0f, 160f, 0f));
 
+            // Mission 3: Missing Dark Sedan parked in back-alley courtyard with manifest clue
+            GameObject missingCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(-21.2f, 0.04f, 64.0f), Quaternion.Euler(0f, 14f, 0f));
+            missingCarObj.name = "Mission03_MissingDarkSedan";
+            WorldAnchor missingCarAnchor = missingCarObj.AddComponent<WorldAnchor>();
+            missingCarAnchor.Configure("missing_car_clue", 4.2f, new Vector3(0f, 2.2f, 0f));
+            InteractableTrigger missingCarTrig = missingCarObj.AddComponent<InteractableTrigger>();
+            missingCarTrig.Configure(InteractableKind.InspectObject, "missing_car_clue", "ui.btn.inspect", 4.2f);
+
+            // Mission 4: Harbor Courier Tail Vehicle + Dropped Package in North Back Alley
+            GameObject tailCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(21.0f, 0.04f, 212.0f), Quaternion.Euler(0f, 180f, 0f));
+            tailCarObj.name = "Mission04_TailCourierCar";
+            WorldAnchor tailCarAnchor = tailCarObj.AddComponent<WorldAnchor>();
+            tailCarAnchor.Configure("tail_target_car", 5.0f, new Vector3(0f, 2.4f, 0f));
+
+            GameObject droppedPkgObj = PlacePrefabInstance(prefabs.WoodenCrate, actorsRoot.transform, new Vector3(-23.6f, 0.14f, 158.0f), Quaternion.Euler(0f, 25f, 0f));
+            droppedPkgObj.name = "Mission04_DroppedPackage";
+            droppedPkgObj.transform.localScale = new Vector3(0.65f, 0.65f, 0.65f);
+            GameObjectUtility.SetStaticEditorFlags(droppedPkgObj, 0);
+            WorldAnchor pkgAnchor = droppedPkgObj.AddComponent<WorldAnchor>();
+            pkgAnchor.Configure("tail_dropped_package", 3.6f, new Vector3(0f, 1.8f, 0f));
+            InteractableTrigger pkgTrig = droppedPkgObj.AddComponent<InteractableTrigger>();
+            pkgTrig.Configure(InteractableKind.PickupPackage, "tail_dropped_package", "ui.btn.pickup", 3.6f);
+
+            TailTargetVehicleController tailCtrl = tailCarObj.AddComponent<TailTargetVehicleController>();
+            List<Vector3> tailRoute = new List<Vector3>
+            {
+                new Vector3(21.0f, 0.04f, 212.0f),
+                new Vector3(21.0f, 0.04f, 174.0f),
+                new Vector3(21.0f, 0.04f, 92.0f),
+                new Vector3(-26.0f, 0.04f, 92.0f),
+                new Vector3(-26.0f, 0.04f, 158.0f)
+            };
+            tailCtrl.Configure(tailRoute, droppedPkgObj);
+
+            // Mission 5: Elena also waits at the Town Square fountain so player can choose Marco (Garage) OR Elena (Square)
+            GameObject elenaSquareObj = PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(4.8f, 0.12f, 131.5f), Quaternion.Euler(0f, -110f, 0f));
+            elenaSquareObj.name = "NPC_Elena_TownSquare";
+            WorldAnchor elenaSqAnchor = elenaSquareObj.GetComponent<WorldAnchor>();
+            if (elenaSqAnchor != null) elenaSqAnchor.Configure("npc_elena_neighborhood", 3.6f, new Vector3(0f, 2.3f, 0f));
+            InteractableTrigger elenaSqTrig = elenaSquareObj.GetComponent<InteractableTrigger>();
+            if (elenaSqTrig != null) elenaSqTrig.Configure(InteractableKind.Npc, "npc_elena_neighborhood", "ui.btn.talk", 3.6f);
+
+            // Dedicated Taxi Passenger actor (inactive until Taxi job starts)
+            GameObject taxiPassengerObj = new GameObject("NPC_TaxiPassenger");
+            taxiPassengerObj.transform.SetParent(actorsRoot.transform, false);
+            CapsuleCollider taxiCol = taxiPassengerObj.AddComponent<CapsuleCollider>();
+            taxiCol.center = new Vector3(0f, 0.9f, 0f);
+            taxiCol.radius = 0.34f;
+            taxiCol.height = 1.76f;
+            ProceduralHumanoid taxiHum = ProceduralHumanoid.Build(
+                taxiPassengerObj.transform,
+                mats.CharSkin,
+                mats.PedShirtTeal,
+                mats.CharPants,
+                mats.CharShoes,
+                mats.CharHair,
+                1.74f);
+            taxiPassengerObj.SetActive(false);
+
             modeController.ConfigureReferences(
                 playerObj.GetComponent<PlayerFootController>(),
                 sedanObj.GetComponent<SedanVehicleController>(),
                 camRig);
 
-            // --- 3D Objective Beacon ---
-            ObjectiveBeacon beacon = BuildObjectiveBeacon(mats.BeaconGlow);
-            missionManager.Configure(catalog, beacon);
+            // --- 3D Beacons (Story Mission Beacon + Side-Job Teal Beacon) ---
+            ObjectiveBeacon missionBeacon = BuildObjectiveBeacon("ObjectiveBeacon", mats.BeaconGlow);
+            missionManager.Configure(catalog, missionBeacon);
 
-            // --- Pooled Ambient Traffic along Coastal Loop ---
+            ObjectiveBeacon jobBeacon = BuildObjectiveBeacon("JobObjectiveBeacon", mats.JobRingGlow);
+            jobBeacon.SetVisible(false);
+            jobManager.Configure(jobBeacon, taxiPassengerObj, taxiHum, mats.ContainerOchre, mats.TownFabricTeal);
+
+            // --- Pooled Ambient Traffic along Coastal Loop (stops at red lights & yields via SphereCast) ---
             GameObject trafficRoot = new GameObject("AmbientTrafficManager");
             AmbientTrafficManager trafficMgr = trafficRoot.AddComponent<AmbientTrafficManager>();
             List<Transform> waypoints = new List<Transform>();
@@ -1458,19 +1825,19 @@ namespace Gridroam.Editor
                 wp.transform.position = wpCoords[i];
                 waypoints.Add(wp.transform);
             }
-            trafficMgr.Configure(prefabs.TrafficVehicle, waypoints);
+            trafficMgr.Configure(prefabs.TrafficVehicle, waypoints, stopLines);
 
-            // --- HUD & InputSystem EventSystem ---
-            BuildHudCanvas();
+            // --- Calm Modern HUD, Minimap, Shop Panel, Paint Palette & Phone/Map ---
+            BuildHudCanvas(uiSprites, townMapTexture, needsController);
 
             DynamicGI.UpdateEnvironment();
             EditorSceneManager.SaveScene(scene, TestScenePath);
             RegisterSceneInBuildSettings(TestScenePath);
         }
 
-        private static ObjectiveBeacon BuildObjectiveBeacon(Material beaconMat)
+        private static ObjectiveBeacon BuildObjectiveBeacon(string objectName, Material beaconMat)
         {
-            GameObject root = new GameObject("ObjectiveBeacon");
+            GameObject root = new GameObject(objectName);
             ObjectiveBeacon beacon = root.AddComponent<ObjectiveBeacon>();
 
             GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -1492,179 +1859,6 @@ namespace Gridroam.Editor
 
             beacon.ConfigureParts(marker.transform, ring.transform);
             return beacon;
-        }
-
-        private static void BuildHudCanvas()
-        {
-            GameObject esObj = new GameObject("EventSystem");
-            esObj.AddComponent<EventSystem>();
-            esObj.AddComponent<InputSystemUIInputModule>();
-
-            GameObject canvasObj = new GameObject("Canvas_GRIDROAM_HUD");
-            Canvas canvas = canvasObj.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 10;
-
-            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-            canvasObj.AddComponent<GraphicRaycaster>();
-
-            GameHUDController hud = canvasObj.AddComponent<GameHUDController>();
-            Font uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
-            GameObject safeRoot = CreateUiRect("SafeAreaRoot", canvasObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            safeRoot.AddComponent<SafeAreaFitter>();
-
-            GameObject camPad = CreateUiRect("CameraTouchZone", safeRoot.transform, new Vector2(0.45f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
-            Image camPadImg = camPad.AddComponent<Image>();
-            camPadImg.color = new Color(0f, 0f, 0f, 0f);
-            camPad.AddComponent<CameraTouchZone>();
-
-            GameObject missionBox = CreateUiPanel("MissionBox", safeRoot.transform,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(28f, -24f), new Vector2(540f, 134f), new Color(0.07f, 0.10f, 0.15f, 0.78f));
-            Text missionTitle = CreateUiText("MissionTitle", missionBox.transform, uiFont, "GET THE KEYS", 28, TextAnchor.UpperLeft,
-                new Color(1f, 0.76f, 0.25f), new Vector2(18f, -14f), new Vector2(504f, 38f), FontStyle.Bold);
-            Text missionObj = CreateUiText("MissionObjective", missionBox.transform, uiFont, "Walk to the repair garage and talk to Marco.", 22, TextAnchor.UpperLeft,
-                Color.white, new Vector2(18f, -54f), new Vector2(504f, 68f));
-
-            GameObject waypointBox = CreateUiPanel("WaypointIndicator", safeRoot.transform,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -24f), new Vector2(210f, 74f), new Color(0.07f, 0.10f, 0.15f, 0.78f));
-            Text arrowText = CreateUiText("Arrow", waypointBox.transform, uiFont, "^", 38, TextAnchor.MiddleCenter,
-                new Color(1f, 0.76f, 0.25f), new Vector2(14f, -8f), new Vector2(58f, 58f), FontStyle.Bold);
-            Text distText = CreateUiText("Distance", waypointBox.transform, uiFont, "0 m", 26, TextAnchor.MiddleCenter,
-                Color.white, new Vector2(76f, -12f), new Vector2(120f, 50f), FontStyle.Bold);
-            ObjectiveWaypointIndicator waypointComp = canvasObj.AddComponent<ObjectiveWaypointIndicator>();
-            waypointComp.Configure(waypointBox, arrowText.rectTransform, distText);
-
-            GameObject timerBox = CreateUiPanel("TimerBox", safeRoot.transform,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -108f), new Vector2(170f, 54f), new Color(0.15f, 0.08f, 0.08f, 0.85f));
-            Text timerText = CreateUiText("TimerText", timerBox.transform, uiFont, "01:35", 30, TextAnchor.MiddleCenter,
-                Color.white, new Vector2(0f, 0f), new Vector2(170f, 54f), FontStyle.Bold);
-
-            GameObject tailBox = CreateUiPanel("TailWarningBox", safeRoot.transform,
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -170f), new Vector2(440f, 52f), new Color(0.14f, 0.46f, 0.28f, 0.80f));
-            Text tailText = CreateUiText("TailWarningText", tailBox.transform, uiFont, "HOLDING SAFE DISTANCE", 22, TextAnchor.MiddleCenter,
-                Color.white, Vector2.zero, new Vector2(440f, 52f), FontStyle.Bold);
-
-            GameObject perfPanel = CreateUiPanel("TelemetryPanel", safeRoot.transform,
-                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-28f, -24f), new Vector2(460f, 44f), new Color(0.05f, 0.08f, 0.12f, 0.78f));
-            Button perfBtn = perfPanel.AddComponent<Button>();
-            perfBtn.targetGraphic = perfPanel.GetComponent<Image>();
-            Text perfText = CreateUiText("TelemetryText", perfPanel.transform, uiFont, "FPS -- | -- ms | -- MB", 18, TextAnchor.MiddleCenter,
-                new Color(0.65f, 0.96f, 0.75f), Vector2.zero, new Vector2(460f, 44f));
-
-            var (gfxBtn, gfxLbl) = CreateUiButton("Btn_GraphicsTier", safeRoot.transform, uiFont, "GFX: MED",
-                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-168f, -78f), new Vector2(150f, 48f), new Color(0.14f, 0.22f, 0.34f, 0.86f), 20);
-
-            var (resetBtn, resetLbl) = CreateUiButton("Btn_ResetSave", safeRoot.transform, uiFont, "RESET",
-                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-28f, -78f), new Vector2(126f, 48f), new Color(0.38f, 0.16f, 0.16f, 0.86f), 20);
-
-            GameObject onFootRoot = CreateUiRect("OnFootControls", safeRoot.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-            GameObject joyBg = CreateUiPanel("VirtualJoystick_BG", onFootRoot.transform,
-                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
-                new Vector2(60f, 58f), new Vector2(210f, 210f), new Color(0.10f, 0.14f, 0.20f, 0.56f));
-            GameObject joyHandle = CreateUiPanel("Joystick_Handle", joyBg.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(88f, 88f), new Color(0.95f, 0.72f, 0.24f, 0.85f));
-            VirtualJoystick joystick = joyBg.AddComponent<VirtualJoystick>();
-            joystick.Configure(joyBg.GetComponent<RectTransform>(), joyHandle.GetComponent<RectTransform>(), 70f);
-
-            var (interactBtn, interactLbl) = CreateUiButton("Btn_Interact", onFootRoot.transform, uiFont, "INTERACT",
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-64f, 84f), new Vector2(220f, 92f), new Color(0.92f, 0.58f, 0.16f, 0.92f), 26);
-
-            GameObject drivingRoot = CreateUiRect("DrivingControls", safeRoot.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-            HoldButton steerL = CreateHoldButton("Btn_SteerLeft", drivingRoot.transform, uiFont, "<",
-                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
-                new Vector2(48f, 64f), new Vector2(150f, 130f), new Color(0.12f, 0.16f, 0.22f, 0.82f), 44);
-            HoldButton steerR = CreateHoldButton("Btn_SteerRight", drivingRoot.transform, uiFont, ">",
-                new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
-                new Vector2(218f, 64f), new Vector2(150f, 130f), new Color(0.12f, 0.16f, 0.22f, 0.82f), 44);
-
-            HoldButton brakeBtn = CreateHoldButton("Btn_Brake", drivingRoot.transform, uiFont, "BRAKE",
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-232f, 64f), new Vector2(156f, 130f), new Color(0.55f, 0.18f, 0.16f, 0.85f), 26);
-            HoldButton gasBtn = CreateHoldButton("Btn_Gas", drivingRoot.transform, uiFont, "GAS",
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-54f, 64f), new Vector2(156f, 155f), new Color(0.18f, 0.56f, 0.30f, 0.88f), 28);
-
-            var (exitBtn, exitLbl) = CreateUiButton("Btn_ExitCar", drivingRoot.transform, uiFont, "EXIT CAR",
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-54f, 244f), new Vector2(180f, 66f), new Color(0.18f, 0.24f, 0.34f, 0.88f), 22);
-
-            GameObject speedPanel = CreateUiPanel("Speedometer", drivingRoot.transform,
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 52f), new Vector2(210f, 64f), new Color(0.07f, 0.10f, 0.15f, 0.78f));
-            Text speedText = CreateUiText("SpeedText", speedPanel.transform, uiFont, "0 KM/H", 28, TextAnchor.MiddleCenter,
-                Color.white, Vector2.zero, new Vector2(210f, 64f), FontStyle.Bold);
-
-            Text toastText = CreateUiText("StatusToast", safeRoot.transform, uiFont, "", 24, TextAnchor.MiddleCenter,
-                new Color(1f, 0.85f, 0.35f), Vector2.zero, new Vector2(760f, 46f), FontStyle.Bold);
-            toastText.rectTransform.anchorMin = new Vector2(0.5f, 0f);
-            toastText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
-            toastText.rectTransform.pivot = new Vector2(0.5f, 0f);
-            toastText.rectTransform.anchoredPosition = new Vector2(0f, 134f);
-
-            Text hintText = CreateUiText("EditorControlsHint", safeRoot.transform, uiFont, "", 16, TextAnchor.LowerCenter,
-                new Color(0.85f, 0.88f, 0.94f, 0.75f), Vector2.zero, new Vector2(820f, 30f));
-            hintText.rectTransform.anchorMin = new Vector2(0.5f, 0f);
-            hintText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
-            hintText.rectTransform.pivot = new Vector2(0.5f, 0f);
-            hintText.rectTransform.anchoredPosition = new Vector2(0f, 12f);
-
-            GameObject dlgPanel = CreateUiPanel("DialoguePanel", safeRoot.transform,
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 36f), new Vector2(1060f, 210f), new Color(0.06f, 0.09f, 0.14f, 0.94f));
-            Text dlgSpeaker = CreateUiText("SpeakerName", dlgPanel.transform, uiFont, "Speaker", 26, TextAnchor.UpperLeft,
-                new Color(1f, 0.76f, 0.25f), new Vector2(28f, -20f), new Vector2(760f, 38f), FontStyle.Bold);
-            Text dlgBody = CreateUiText("DialogueBody", dlgPanel.transform, uiFont, "Line...", 24, TextAnchor.UpperLeft,
-                Color.white, new Vector2(28f, -64f), new Vector2(780f, 122f));
-            var (dlgBtn, dlgContinueLbl) = CreateUiButton("Btn_DialogueContinue", dlgPanel.transform, uiFont, "CONTINUE",
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-24f, 24f), new Vector2(200f, 68f), new Color(0.92f, 0.58f, 0.16f, 0.95f), 22);
-
-            GameObject failPanel = CreateUiPanel("MissionFailedPanel", safeRoot.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(660f, 290f), new Color(0.14f, 0.06f, 0.07f, 0.95f));
-            Text failTitle = CreateUiText("FailedTitle", failPanel.transform, uiFont, "MISSION FAILED", 36, TextAnchor.MiddleCenter,
-                new Color(1f, 0.36f, 0.32f), new Vector2(0f, -28f), new Vector2(660f, 54f), FontStyle.Bold);
-            Text failReason = CreateUiText("FailedReason", failPanel.transform, uiFont, "Time ran out.", 24, TextAnchor.MiddleCenter,
-                Color.white, new Vector2(40f, -94f), new Vector2(580f, 84f));
-            var (retryBtn, retryLbl) = CreateUiButton("Btn_RetryMission", failPanel.transform, uiFont, "RETRY MISSION",
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 28f), new Vector2(300f, 68f), new Color(0.92f, 0.58f, 0.16f, 0.96f), 24);
-
-            GameObject bannerPanel = CreateUiPanel("MissionCompleteBanner", safeRoot.transform,
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(0f, 120f), new Vector2(640f, 128f), new Color(0.08f, 0.22f, 0.16f, 0.92f));
-            Text bannerText = CreateUiText("BannerText", bannerPanel.transform, uiFont, "MISSION COMPLETE", 30, TextAnchor.MiddleCenter,
-                new Color(0.75f, 1f, 0.80f), Vector2.zero, new Vector2(640f, 128f), FontStyle.Bold);
-
-            hud.WireReferences(
-                onFootRoot, drivingRoot,
-                interactBtn, interactLbl,
-                steerL, steerR, gasBtn, brakeBtn,
-                exitBtn, exitLbl, speedText,
-                missionTitle, missionObj,
-                timerBox, timerText,
-                tailBox, tailText, tailBox.GetComponent<Image>(),
-                toastText, hintText,
-                dlgPanel, dlgSpeaker, dlgBody, dlgBtn, dlgContinueLbl,
-                failPanel, failTitle, failReason, retryBtn, retryLbl,
-                bannerPanel, bannerText,
-                gfxBtn, gfxLbl, resetBtn, resetLbl,
-                perfPanel, perfText);
         }
 
         // --- Helper Builders ---
@@ -1733,7 +1927,10 @@ namespace Gridroam.Editor
             light.range = range;
             light.intensity = intensity;
             light.shadows = LightShadows.None;
-            light.lightmapBakeType = LightmapBakeType.Mixed;
+            light.enabled = false;
+
+            NightLight nl = go.AddComponent<NightLight>();
+            nl.Configure(light, null, Color.black);
         }
 
         private static void CreateWorldAnchor(string name, string id, Transform parent, Vector3 pos, Quaternion rot, float radius)
@@ -1816,20 +2013,6 @@ namespace Gridroam.Editor
             return go;
         }
 
-        private static GameObject CreateUiPanel(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
-        {
-            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(parent, false);
-            RectTransform rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-            go.GetComponent<Image>().color = color;
-            return go;
-        }
-
         private static Text CreateUiText(string name, Transform parent, Font font, string content, int fontSize, TextAnchor alignment, Color color, Vector2 pos, Vector2 size, FontStyle style = FontStyle.Normal)
         {
             GameObject go = new GameObject(name, typeof(RectTransform), typeof(Text));
@@ -1846,65 +2029,13 @@ namespace Gridroam.Editor
             txt.text = content;
             txt.fontSize = fontSize;
             txt.fontStyle = style;
+            txt.lineSpacing = 1.1f;
             txt.alignment = alignment;
             txt.color = color;
             txt.horizontalOverflow = HorizontalWrapMode.Wrap;
             txt.verticalOverflow = VerticalWrapMode.Overflow;
             txt.raycastTarget = false;
             return txt;
-        }
-
-        private static (Button button, Text label) CreateUiButton(
-            string name,
-            Transform parent,
-            Font font,
-            string labelText,
-            Vector2 anchorMin,
-            Vector2 anchorMax,
-            Vector2 pivot,
-            Vector2 pos,
-            Vector2 size,
-            Color color,
-            int fontSize)
-        {
-            GameObject go = CreateUiPanel(name, parent, anchorMin, anchorMax, pivot, pos, size, color);
-            Button btn = go.AddComponent<Button>();
-            btn.targetGraphic = go.GetComponent<Image>();
-
-            Text lbl = CreateUiText("Label", go.transform, font, labelText, fontSize, TextAnchor.MiddleCenter, Color.white, Vector2.zero, size, FontStyle.Bold);
-            lbl.rectTransform.anchorMin = Vector2.zero;
-            lbl.rectTransform.anchorMax = Vector2.one;
-            lbl.rectTransform.offsetMin = Vector2.zero;
-            lbl.rectTransform.offsetMax = Vector2.zero;
-
-            return (btn, lbl);
-        }
-
-        private static HoldButton CreateHoldButton(
-            string name,
-            Transform parent,
-            Font font,
-            string labelText,
-            Vector2 anchorMin,
-            Vector2 anchorMax,
-            Vector2 pivot,
-            Vector2 pos,
-            Vector2 size,
-            Color normalColor,
-            int fontSize)
-        {
-            GameObject go = CreateUiPanel(name, parent, anchorMin, anchorMax, pivot, pos, size, normalColor);
-            Image img = go.GetComponent<Image>();
-            HoldButton hold = go.AddComponent<HoldButton>();
-            hold.ConfigureVisual(img, normalColor, new Color(0.95f, 0.62f, 0.18f, 0.94f), releaseOnExit: false);
-
-            Text lbl = CreateUiText("Label", go.transform, font, labelText, fontSize, TextAnchor.MiddleCenter, Color.white, Vector2.zero, size, FontStyle.Bold);
-            lbl.rectTransform.anchorMin = Vector2.zero;
-            lbl.rectTransform.anchorMax = Vector2.one;
-            lbl.rectTransform.offsetMin = Vector2.zero;
-            lbl.rectTransform.offsetMax = Vector2.zero;
-
-            return hold;
         }
     }
 }

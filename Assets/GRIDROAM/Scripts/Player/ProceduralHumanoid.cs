@@ -1,11 +1,14 @@
+using System;
 using UnityEngine;
 
 namespace Gridroam.Player
 {
     /// <summary>
     /// Jointed primitive humanoid character with smooth procedural animation:
-    /// idle breathing/weight-shift/head look, distance-driven walk/run cycle,
-    /// turning lean, airborne tuck, one-shot right-arm wave, and seated driving pose.
+    /// idle breathing/weight-shift/head look, head-look IK-lite toward nearby interactables (max 60° yaw),
+    /// distance-driven walk/run cycle with footstep contact events, jump landing squat (knees 35° for 0.15 s),
+    /// turning lean, airborne tuck, one-shot right-arm wave, startled arms-up pose, chair/bench sitting,
+    /// and seated driving pose.
     /// </summary>
     public class ProceduralHumanoid : MonoBehaviour
     {
@@ -30,25 +33,43 @@ namespace Gridroam.Player
         [SerializeField] private float hipsBaseY = 0.95f;
         [SerializeField] private bool autoRandomWave;
         [SerializeField] private bool isSitting;
+        [SerializeField] private bool isDrivingSeat;
 
         private const float WalkSpeedRef = 3.4f;
         private const float RunSpeedRef = 6.2f;
         private const float WaveDuration = 1.5f;
+        private const float LandSquatDuration = 0.15f;
 
         private float _speedMs;
         private bool _grounded = true;
+        private bool _wasGrounded = true;
+        private float _airborneTimer;
+        private float _landSquatTimer = -1f;
         private float _verticalVelocity;
         private float _steerAngleDeg;
 
         private float _phase;
+        private int _lastStepCount;
         private float _idleTime;
         private float _noiseSeed;
         private float _prevYaw;
         private float _smoothedTurnLean;
         private float _waveTimer = -1f;
+        private float _startledTimer = -1f;
+        private float _startledDuration = 1.1f;
         private float _autoWaveCountdown = 8f;
         private Vector3 _chestBaseScale = new Vector3(0.39f, 0.20f, 0.23f);
         private bool _initialized;
+
+        // Head-look IK-lite state
+        private bool _hasLookPoint;
+        private Vector3 _lookWorldPoint;
+        private float _smoothedLookYaw;
+        private float _smoothedLookPitch;
+
+        public bool IsSitting => isSitting;
+        public event Action<float> OnFootstepContact;
+        public event Action OnLanded;
 
         public static ProceduralHumanoid Build(
             Transform parent,
@@ -71,12 +92,10 @@ namespace Gridroam.Player
             ProceduralHumanoid hum = root.AddComponent<ProceduralHumanoid>();
             hum.hipsBaseY = 0.95f;
 
-            // Hips pivot (y = 0.95 -> legs reach cleanly to y = 0.00)
             hum.hips = CreatePivot("Hips", root.transform, new Vector3(0f, 0.95f, 0f));
             CreatePart("Pelvis", PrimitiveType.Capsule, hum.hips,
                 new Vector3(0f, 0.00f, 0f), new Vector3(0.31f, 0.13f, 0.21f), pants);
 
-            // Spine / Torso (tapered: chest wider than waist)
             hum.spine = CreatePivot("Spine", hum.hips, new Vector3(0f, 0.06f, 0f));
             CreatePart("Waist", PrimitiveType.Capsule, hum.spine,
                 new Vector3(0f, 0.13f, 0f), new Vector3(0.30f, 0.17f, 0.20f), shirt);
@@ -85,7 +104,6 @@ namespace Gridroam.Player
             hum.chestVisual = chest.transform;
             hum._chestBaseScale = chest.transform.localScale;
 
-            // Neck & Head (~1/7.5 of height)
             hum.neck = CreatePivot("Neck", hum.spine, new Vector3(0f, 0.46f, 0f));
             CreatePart("NeckMesh", PrimitiveType.Cylinder, hum.neck,
                 new Vector3(0f, 0.045f, 0f), new Vector3(0.105f, 0.055f, 0.105f), skin);
@@ -98,11 +116,9 @@ namespace Gridroam.Player
             CreatePart("Nose", PrimitiveType.Cube, hum.head,
                 new Vector3(0f, 0.092f, 0.115f), new Vector3(0.036f, 0.048f, 0.042f), skin);
 
-            // Arms (reach mid-thigh)
             BuildArm("L", -1f, hum.spine, shirt, skin, out hum.lShoulder, out hum.lElbow);
             BuildArm("R", 1f, hum.spine, shirt, skin, out hum.rShoulder, out hum.rElbow);
 
-            // Legs (~half of height, bottom of foot rests at y = 0)
             BuildLeg("L", -1f, hum.hips, pants, shoes, out hum.lHip, out hum.lKnee, out hum.lAnkle);
             BuildLeg("R", 1f, hum.hips, pants, shoes, out hum.rHip, out hum.rKnee, out hum.rAnkle);
 
@@ -139,7 +155,6 @@ namespace Gridroam.Player
             out Transform kneePivot,
             out Transform anklePivot)
         {
-            // Hips at 0.95 -> hipJoint at 0.93 -> knee at 0.50 -> ankle at 0.08 -> foot bottom at 0.00
             hipPivot = CreatePivot($"{side}_Hip", hipsParent, new Vector3(xSign * 0.105f, -0.02f, 0f));
             CreatePart($"{side}_Thigh", PrimitiveType.Capsule, hipPivot,
                 new Vector3(0f, -0.215f, 0f), new Vector3(0.155f, 0.23f, 0.16f), pants);
@@ -209,9 +224,27 @@ namespace Gridroam.Player
 
         public void SetLocomotion(float speedMs, bool grounded, float verticalVelocity)
         {
+            if (_initialized && !_wasGrounded && grounded && _airborneTimer > 0.08f)
+            {
+                _landSquatTimer = 0f;
+                OnLanded?.Invoke();
+            }
+
+            _wasGrounded = grounded;
+            if (grounded)
+            {
+                _airborneTimer = 0f;
+            }
+
             _speedMs = Mathf.Max(0f, speedMs);
             _grounded = grounded;
             _verticalVelocity = verticalVelocity;
+        }
+
+        public void SetLookAtPoint(bool active, Vector3 worldPoint)
+        {
+            _hasLookPoint = active;
+            _lookWorldPoint = worldPoint;
         }
 
         public void PlayWave()
@@ -219,13 +252,25 @@ namespace Gridroam.Player
             _waveTimer = 0f;
         }
 
-        public void SetSitting(bool sitting)
+        public void PlayStartled(float duration = 1.1f)
+        {
+            _startledDuration = Mathf.Max(0.35f, duration);
+            _startledTimer = 0f;
+        }
+
+        public void SetSitting(bool sitting, bool driving = false)
         {
             isSitting = sitting;
+            isDrivingSeat = sitting && driving;
             if (!Application.isPlaying && sitting)
             {
                 ApplySittingPoseImmediate();
             }
+        }
+
+        public void SetSittingPose(bool onChair)
+        {
+            SetSitting(onChair, driving: false);
         }
 
         public void SetSteeringAngle(float wheelDegrees)
@@ -247,8 +292,8 @@ namespace Gridroam.Player
             if (_initialized) return;
             _initialized = true;
             _prevYaw = transform.eulerAngles.y;
-            _noiseSeed = Random.Range(0f, 100f);
-            _autoWaveCountdown = Random.Range(4f, 10f);
+            _noiseSeed = UnityEngine.Random.Range(0f, 100f);
+            _autoWaveCountdown = UnityEngine.Random.Range(4f, 10f);
             if (chestVisual != null)
             {
                 _chestBaseScale = chestVisual.localScale;
@@ -259,23 +304,46 @@ namespace Gridroam.Player
         {
             if (hips == null) return;
 
-            hips.localPosition = new Vector3(0f, 0.17f, 0f);
-            hips.localRotation = Quaternion.identity;
-            if (spine != null) spine.localRotation = Quaternion.Euler(-6f, 0f, 0f);
-            if (neck != null) neck.localRotation = Quaternion.Euler(4f, 0f, 0f);
-            if (head != null) head.localRotation = Quaternion.identity;
+            if (isDrivingSeat)
+            {
+                hips.localPosition = new Vector3(0f, 0.17f, 0f);
+                hips.localRotation = Quaternion.identity;
+                if (spine != null) spine.localRotation = Quaternion.Euler(-6f, 0f, 0f);
+                if (neck != null) neck.localRotation = Quaternion.Euler(4f, 0f, 0f);
+                if (head != null) head.localRotation = Quaternion.identity;
 
-            if (lHip != null) lHip.localRotation = Quaternion.Euler(-90f, 0f, -6f);
-            if (rHip != null) rHip.localRotation = Quaternion.Euler(-90f, 0f, 6f);
-            if (lKnee != null) lKnee.localRotation = Quaternion.Euler(80f, 0f, 0f);
-            if (rKnee != null) rKnee.localRotation = Quaternion.Euler(80f, 0f, 0f);
-            if (lAnkle != null) lAnkle.localRotation = Quaternion.Euler(10f, 0f, 0f);
-            if (rAnkle != null) rAnkle.localRotation = Quaternion.Euler(10f, 0f, 0f);
+                if (lHip != null) lHip.localRotation = Quaternion.Euler(-90f, 0f, -6f);
+                if (rHip != null) rHip.localRotation = Quaternion.Euler(-90f, 0f, 6f);
+                if (lKnee != null) lKnee.localRotation = Quaternion.Euler(80f, 0f, 0f);
+                if (rKnee != null) rKnee.localRotation = Quaternion.Euler(80f, 0f, 0f);
+                if (lAnkle != null) lAnkle.localRotation = Quaternion.Euler(10f, 0f, 0f);
+                if (rAnkle != null) rAnkle.localRotation = Quaternion.Euler(10f, 0f, 0f);
 
-            if (lShoulder != null) lShoulder.localRotation = Quaternion.Euler(-62f, 10f, -10f);
-            if (rShoulder != null) rShoulder.localRotation = Quaternion.Euler(-62f, -10f, 10f);
-            if (lElbow != null) lElbow.localRotation = Quaternion.Euler(-32f, 0f, 0f);
-            if (rElbow != null) rElbow.localRotation = Quaternion.Euler(-32f, 0f, 0f);
+                if (lShoulder != null) lShoulder.localRotation = Quaternion.Euler(-62f, 10f, -10f);
+                if (rShoulder != null) rShoulder.localRotation = Quaternion.Euler(-62f, -10f, 10f);
+                if (lElbow != null) lElbow.localRotation = Quaternion.Euler(-32f, 0f, 0f);
+                if (rElbow != null) rElbow.localRotation = Quaternion.Euler(-32f, 0f, 0f);
+            }
+            else
+            {
+                hips.localPosition = new Vector3(0f, 0.08f, -0.02f);
+                hips.localRotation = Quaternion.identity;
+                if (spine != null) spine.localRotation = Quaternion.Euler(-4f, 0f, 0f);
+                if (neck != null) neck.localRotation = Quaternion.Euler(3f, 0f, 0f);
+                if (head != null) head.localRotation = Quaternion.identity;
+
+                if (lHip != null) lHip.localRotation = Quaternion.Euler(-90f, 0f, -5f);
+                if (rHip != null) rHip.localRotation = Quaternion.Euler(-90f, 0f, 5f);
+                if (lKnee != null) lKnee.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                if (rKnee != null) rKnee.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                if (lAnkle != null) lAnkle.localRotation = Quaternion.identity;
+                if (rAnkle != null) rAnkle.localRotation = Quaternion.identity;
+
+                if (lShoulder != null) lShoulder.localRotation = Quaternion.Euler(-22f, 8f, 10f);
+                if (rShoulder != null) rShoulder.localRotation = Quaternion.Euler(-22f, -8f, -10f);
+                if (lElbow != null) lElbow.localRotation = Quaternion.Euler(-58f, 0f, -12f);
+                if (rElbow != null) rElbow.localRotation = Quaternion.Euler(-58f, 0f, 12f);
+            }
         }
 
         private void LateUpdate()
@@ -287,6 +355,28 @@ namespace Gridroam.Player
             if (dt <= 0.00001f) return;
 
             _idleTime += dt;
+            if (!_grounded)
+            {
+                _airborneTimer += dt;
+            }
+
+            if (_landSquatTimer >= 0f)
+            {
+                _landSquatTimer += dt;
+                if (_landSquatTimer >= LandSquatDuration)
+                {
+                    _landSquatTimer = -1f;
+                }
+            }
+
+            if (_startledTimer >= 0f)
+            {
+                _startledTimer += dt;
+                if (_startledTimer >= _startledDuration)
+                {
+                    _startledTimer = -1f;
+                }
+            }
 
             if (autoRandomWave && !isSitting && _speedMs < 0.1f)
             {
@@ -294,7 +384,7 @@ namespace Gridroam.Player
                 if (_autoWaveCountdown <= 0f)
                 {
                     PlayWave();
-                    _autoWaveCountdown = Random.Range(8f, 12f);
+                    _autoWaveCountdown = UnityEngine.Random.Range(8f, 12f);
                 }
             }
 
@@ -326,14 +416,26 @@ namespace Gridroam.Player
             float moveBlend = Mathf.Clamp01((_speedMs - 0.08f) / 1.2f);
             float runBlend = Mathf.InverseLerp(WalkSpeedRef, RunSpeedRef, _speedMs);
 
-            // Advance gait phase by distance travelled
+            // Advance gait phase by distance travelled & fire footstep contact events
             if (_speedMs > 0.05f && _grounded)
             {
                 float strideLength = Mathf.Lerp(1.4f, 2.2f, runBlend);
                 _phase += (_speedMs * dt / strideLength) * (Mathf.PI * 2f);
+
+                if (_speedMs > 0.25f)
+                {
+                    int currentStepCount = Mathf.FloorToInt((_phase + Mathf.PI * 0.5f) / Mathf.PI);
+                    if (currentStepCount != _lastStepCount)
+                    {
+                        _lastStepCount = currentStepCount;
+                        OnFootstepContact?.Invoke(runBlend);
+                    }
+                }
+
                 if (_phase > Mathf.PI * 200f)
                 {
                     _phase -= Mathf.PI * 200f;
+                    _lastStepCount = Mathf.FloorToInt((_phase + Mathf.PI * 0.5f) / Mathf.PI);
                 }
             }
 
@@ -343,6 +445,30 @@ namespace Gridroam.Player
             float idleWeightShiftX = Mathf.Sin(_idleTime * Mathf.PI * 2f * 0.2f) * 0.015f;
             float headNoise = (Mathf.PerlinNoise(_noiseSeed, _idleTime * 0.18f) - 0.5f) * 2f;
             float idleHeadYaw = headNoise * 10f;
+
+            // --- Head-look IK-lite toward nearest interactable within 4 m (max 60 deg yaw) ---
+            float desiredLookYaw = 0f;
+            float desiredLookPitch = 0f;
+            bool useLookIk = false;
+            if (_hasLookPoint && _grounded)
+            {
+                Vector3 localTarget = transform.InverseTransformPoint(_lookWorldPoint) - new Vector3(0f, 1.54f, 0f);
+                float horizDist = new Vector2(localTarget.x, localTarget.z).magnitude;
+                if (horizDist > 0.12f)
+                {
+                    float rawYaw = Mathf.Atan2(localTarget.x, localTarget.z) * Mathf.Rad2Deg;
+                    if (Mathf.Abs(rawYaw) <= 100f)
+                    {
+                        desiredLookYaw = Mathf.Clamp(rawYaw, -60f, 60f);
+                        desiredLookPitch = Mathf.Clamp(-Mathf.Atan2(localTarget.y, horizDist) * Mathf.Rad2Deg, -18f, 18f);
+                        useLookIk = true;
+                    }
+                }
+            }
+
+            float lookBlendRate = 1f - Mathf.Exp(-7.5f * dt);
+            _smoothedLookYaw = Mathf.Lerp(_smoothedLookYaw, useLookIk ? desiredLookYaw : 0f, lookBlendRate);
+            _smoothedLookPitch = Mathf.Lerp(_smoothedLookPitch, useLookIk ? desiredLookPitch : 0f, lookBlendRate);
 
             // --- Walk / Run components ---
             float sinL = Mathf.Sin(_phase);
@@ -355,27 +481,22 @@ namespace Gridroam.Player
             float bobAmp = Mathf.Lerp(0.02f, 0.05f, runBlend);
             float torsoForwardLean = Mathf.Lerp(3f, 12f, runBlend);
 
-            // Negative X swings limb forward in Unity left-handed coords
             float walkThighL = -sinL * thighAmp;
             float walkThighR = -sinR * thighAmp;
 
-            // Knee bends during swing phase (positive X folds shin backward)
             float swingL = Mathf.Max(0f, Mathf.Sin(_phase + 1.15f));
             float swingR = Mathf.Max(0f, Mathf.Sin(_phase + Mathf.PI + 1.15f));
             float walkKneeL = swingL * maxKneeBend;
             float walkKneeR = swingR * maxKneeBend;
 
-            // Ankle compensates to keep foot flat near contact
             float walkAnkleL = Mathf.Clamp(-(walkThighL + walkKneeL) * 0.65f, -25f, 25f);
             float walkAnkleR = Mathf.Clamp(-(walkThighR + walkKneeR) * 0.65f, -25f, 25f);
 
-            // Arms swing opposite to legs
             float walkShoulderL = sinL * armAmp;
             float walkShoulderR = sinR * armAmp;
             float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -sinL) * 14f);
             float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, -sinR) * 14f);
 
-            // Vertical bob at twice step frequency + hip yaw counter-rotation
             float walkBobY = Mathf.Abs(Mathf.Sin(_phase)) * bobAmp - bobAmp * 0.45f;
             float walkHipYaw = sinL * 6f;
 
@@ -385,13 +506,21 @@ namespace Gridroam.Player
                 hipsBaseY + walkBobY * moveBlend,
                 0f);
 
+            float defaultHeadYaw = Mathf.Lerp(idleHeadYaw, 0f, moveBlend);
+            float finalHeadYaw = useLookIk || Mathf.Abs(_smoothedLookYaw) > 0.5f
+                ? (_smoothedLookYaw * 0.75f)
+                : defaultHeadYaw;
+
             Vector3 targetHipsRot = new Vector3(0f, walkHipYaw * moveBlend, 0f);
             Vector3 targetSpineRot = new Vector3(
                 Mathf.Lerp(idleChestPitch, torsoForwardLean, moveBlend),
                 -walkHipYaw * 0.55f * moveBlend,
                 _smoothedTurnLean);
-            Vector3 targetNeckRot = new Vector3(-targetSpineRot.x * 0.35f, 0f, -_smoothedTurnLean * 0.35f);
-            Vector3 targetHeadRot = new Vector3(0f, Mathf.Lerp(idleHeadYaw, 0f, moveBlend), 0f);
+            Vector3 targetNeckRot = new Vector3(
+                -targetSpineRot.x * 0.35f + _smoothedLookPitch * 0.25f,
+                _smoothedLookYaw * 0.25f,
+                -_smoothedTurnLean * 0.35f);
+            Vector3 targetHeadRot = new Vector3(_smoothedLookPitch * 0.75f, finalHeadYaw, 0f);
 
             Vector3 targetLHipRot = new Vector3(walkThighL * moveBlend, 0f, 0f);
             Vector3 targetRHipRot = new Vector3(walkThighR * moveBlend, 0f, 0f);
@@ -423,9 +552,36 @@ namespace Gridroam.Player
                 targetRElbowRot = new Vector3(-32f, 0f, 0f);
                 targetSpineRot.x = 6f;
             }
+            // --- Jump landing squat (knees 35 deg for 0.15 s) ---
+            else if (_landSquatTimer >= 0f)
+            {
+                float squatNorm = Mathf.Clamp01(_landSquatTimer / LandSquatDuration);
+                float squatEnv = Mathf.Sin(squatNorm * Mathf.PI);
+                targetHipsPos.y -= 0.11f * squatEnv;
+                targetLHipRot.x -= 18f * squatEnv;
+                targetRHipRot.x -= 18f * squatEnv;
+                targetLKneeRot.x = Mathf.Max(targetLKneeRot.x, 35f * squatEnv);
+                targetRKneeRot.x = Mathf.Max(targetRKneeRot.x, 35f * squatEnv);
+                targetLAnkleRot.x -= 17f * squatEnv;
+                targetRAnkleRot.x -= 17f * squatEnv;
+                targetSpineRot.x += 7f * squatEnv;
+            }
 
+            // --- Startled arms-up pose (pedestrian near fast vehicle) ---
+            if (_startledTimer >= 0f)
+            {
+                float sNorm = Mathf.Clamp01(_startledTimer / _startledDuration);
+                float sEnv = Mathf.Sin(sNorm * Mathf.PI);
+                sEnv = Mathf.Clamp01(sEnv * 2.0f);
+
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-135f, 0f, -28f), sEnv);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-135f, 0f, 28f), sEnv);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-22f, 0f, 0f), sEnv);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-22f, 0f, 0f), sEnv);
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -8f, sEnv);
+            }
             // --- One-shot right-arm wave overlay (~1.5 s) ---
-            if (_waveTimer >= 0f)
+            else if (_waveTimer >= 0f)
             {
                 float norm = _waveTimer / WaveDuration;
                 float env = Mathf.Sin(Mathf.Clamp01(norm) * Mathf.PI);
@@ -439,7 +595,6 @@ namespace Gridroam.Player
                 targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, 8f, env * 0.5f);
             }
 
-            // Subtle breathing chest scale during idle
             if (chestVisual != null)
             {
                 float breathScale = 1f + breathWave * 0.018f * (1f - moveBlend);
@@ -450,13 +605,12 @@ namespace Gridroam.Player
                 chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * dt));
             }
 
-            // Smooth all pivots with exponential damping (no snapping)
-            float damp = _grounded ? 14f : 10f;
-            hips.localPosition = Vector3.Lerp(hips.localPosition, targetHipsPos, 1f - Mathf.Exp(-12f * dt));
+            float damp = _landSquatTimer >= 0f ? 28f : (_grounded ? 14f : 10f);
+            hips.localPosition = Vector3.Lerp(hips.localPosition, targetHipsPos, 1f - Mathf.Exp(-damp * dt));
             SmoothRotate(hips, targetHipsRot, damp, dt);
             SmoothRotate(spine, targetSpineRot, damp, dt);
             SmoothRotate(neck, targetNeckRot, damp, dt);
-            SmoothRotate(head, targetHeadRot, 8f, dt);
+            SmoothRotate(head, targetHeadRot, 9f, dt);
 
             SmoothRotate(lHip, targetLHipRot, damp, dt);
             SmoothRotate(rHip, targetRHipRot, damp, dt);
@@ -473,29 +627,55 @@ namespace Gridroam.Player
 
         private void AnimateSitting(float dt)
         {
-            float steerNorm = Mathf.Clamp(_steerAngleDeg / 36f, -1f, 1f);
             float breath = Mathf.Sin(_idleTime * Mathf.PI * 2f * 0.25f) * 0.8f;
 
-            hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.17f, 0f), 1f - Mathf.Exp(-12f * dt));
-            SmoothRotate(hips, Vector3.zero, 12f, dt);
-            SmoothRotate(spine, new Vector3(-6f + breath, steerNorm * 5f, -steerNorm * 3f), 10f, dt);
-            SmoothRotate(neck, new Vector3(4f, 0f, 0f), 10f, dt);
-            SmoothRotate(head, new Vector3(0f, steerNorm * 14f, 0f), 8f, dt);
+            if (isDrivingSeat)
+            {
+                float steerNorm = Mathf.Clamp(_steerAngleDeg / 36f, -1f, 1f);
 
-            SmoothRotate(lHip, new Vector3(-90f, 0f, -6f), 12f, dt);
-            SmoothRotate(rHip, new Vector3(-90f, 0f, 6f), 12f, dt);
-            SmoothRotate(lKnee, new Vector3(80f, 0f, 0f), 12f, dt);
-            SmoothRotate(rKnee, new Vector3(80f, 0f, 0f), 12f, dt);
-            SmoothRotate(lAnkle, new Vector3(10f, 0f, 0f), 12f, dt);
-            SmoothRotate(rAnkle, new Vector3(10f, 0f, 0f), 12f, dt);
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.17f, 0f), 1f - Mathf.Exp(-12f * dt));
+                SmoothRotate(hips, Vector3.zero, 12f, dt);
+                SmoothRotate(spine, new Vector3(-6f + breath, steerNorm * 5f, -steerNorm * 3f), 10f, dt);
+                SmoothRotate(neck, new Vector3(4f, 0f, 0f), 10f, dt);
+                SmoothRotate(head, new Vector3(0f, steerNorm * 14f, 0f), 8f, dt);
 
-            // Hands follow the steering wheel turning
-            float leftReach = -62f - steerNorm * 14f;
-            float rightReach = -62f + steerNorm * 14f;
-            SmoothRotate(lShoulder, new Vector3(leftReach, 10f + steerNorm * 10f, -10f - steerNorm * 8f), 14f, dt);
-            SmoothRotate(rShoulder, new Vector3(rightReach, -10f + steerNorm * 10f, 10f - steerNorm * 8f), 14f, dt);
-            SmoothRotate(lElbow, new Vector3(-32f + steerNorm * 10f, 0f, 0f), 14f, dt);
-            SmoothRotate(rElbow, new Vector3(-32f - steerNorm * 10f, 0f, 0f), 14f, dt);
+                SmoothRotate(lHip, new Vector3(-90f, 0f, -6f), 12f, dt);
+                SmoothRotate(rHip, new Vector3(-90f, 0f, 6f), 12f, dt);
+                SmoothRotate(lKnee, new Vector3(80f, 0f, 0f), 12f, dt);
+                SmoothRotate(rKnee, new Vector3(80f, 0f, 0f), 12f, dt);
+                SmoothRotate(lAnkle, new Vector3(10f, 0f, 0f), 12f, dt);
+                SmoothRotate(rAnkle, new Vector3(10f, 0f, 0f), 12f, dt);
+
+                float leftReach = -62f - steerNorm * 14f;
+                float rightReach = -62f + steerNorm * 14f;
+                SmoothRotate(lShoulder, new Vector3(leftReach, 10f + steerNorm * 10f, -10f - steerNorm * 8f), 14f, dt);
+                SmoothRotate(rShoulder, new Vector3(rightReach, -10f + steerNorm * 10f, 10f - steerNorm * 8f), 14f, dt);
+                SmoothRotate(lElbow, new Vector3(-32f + steerNorm * 10f, 0f, 0f), 14f, dt);
+                SmoothRotate(rElbow, new Vector3(-32f - steerNorm * 10f, 0f, 0f), 14f, dt);
+            }
+            else
+            {
+                float headNoise = (Mathf.PerlinNoise(_noiseSeed, _idleTime * 0.16f) - 0.5f) * 2f;
+                float headLookYaw = headNoise * 11f;
+
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.08f, -0.02f), 1f - Mathf.Exp(-12f * dt));
+                SmoothRotate(hips, Vector3.zero, 12f, dt);
+                SmoothRotate(spine, new Vector3(-4f + breath, 0f, 0f), 10f, dt);
+                SmoothRotate(neck, new Vector3(3f, 0f, 0f), 10f, dt);
+                SmoothRotate(head, new Vector3(0f, headLookYaw, 0f), 6f, dt);
+
+                SmoothRotate(lHip, new Vector3(-90f, 0f, -5f), 12f, dt);
+                SmoothRotate(rHip, new Vector3(-90f, 0f, 5f), 12f, dt);
+                SmoothRotate(lKnee, new Vector3(90f, 0f, 0f), 12f, dt);
+                SmoothRotate(rKnee, new Vector3(90f, 0f, 0f), 12f, dt);
+                SmoothRotate(lAnkle, Vector3.zero, 12f, dt);
+                SmoothRotate(rAnkle, Vector3.zero, 12f, dt);
+
+                SmoothRotate(lShoulder, new Vector3(-22f, 8f, 10f), 12f, dt);
+                SmoothRotate(rShoulder, new Vector3(-22f, -8f, -10f), 12f, dt);
+                SmoothRotate(lElbow, new Vector3(-58f, 0f, -12f), 12f, dt);
+                SmoothRotate(rElbow, new Vector3(-58f, 0f, 12f), 12f, dt);
+            }
         }
 
         private static void SmoothRotate(Transform target, Vector3 targetEuler, float damp, float dt)
