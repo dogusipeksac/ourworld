@@ -1,0 +1,632 @@
+using System;
+using System.Collections;
+using Gridroam.Core;
+using Gridroam.Input;
+using Gridroam.Player;
+using Gridroam.Vehicle;
+using UnityEngine;
+
+namespace Gridroam.Missions
+{
+    public enum TailWarningState
+    {
+        None,
+        Safe,
+        TooClose,
+        TooFar
+    }
+
+    /// <summary>
+    /// Data-driven mission runner supporting sequential steps, NPC dialogues, timers,
+    /// vehicle enter/exit checks, tail distance monitoring, failure/retry, local save, and Free Roam.
+    /// </summary>
+    public class MissionManager : MonoBehaviour
+    {
+        public static MissionManager Instance { get; private set; }
+
+        [Header("Data")]
+        [SerializeField] private MissionCatalog missionCatalog;
+
+        [Header("Scene Visuals")]
+        [SerializeField] private ObjectiveBeacon objectiveBeacon;
+
+        [Header("Timing")]
+        [SerializeField] private float missionCompleteBannerSeconds = 2.6f;
+
+        private MissionData _activeMission;
+        private int _currentStepIndex = -1;
+        private WorldAnchor _currentTargetAnchor;
+        private bool _isFailed;
+        private bool _isInFreeRoam;
+
+        // Timer state
+        private bool _hasActiveTimer;
+        private float _remainingTime;
+
+        // Tail state (ready for Mission 4)
+        private float _tailGraceTimer;
+        private TailWarningState _tailWarningState = TailWarningState.None;
+
+        // Dialogue state
+        private DialogueData _activeDialogue;
+        private int _dialogueLineIndex;
+        private Action _onDialogueCompleted;
+        private bool _dialogueWaitingForChoice;
+
+        public MissionData ActiveMission => _activeMission;
+        public MissionStepData CurrentStep =>
+            (_activeMission != null && _currentStepIndex >= 0 && _currentStepIndex < _activeMission.steps.Count)
+                ? _activeMission.steps[_currentStepIndex]
+                : null;
+        public WorldAnchor CurrentTargetAnchor => _currentTargetAnchor;
+        public bool IsFailed => _isFailed;
+        public bool IsInFreeRoam => _isInFreeRoam;
+        public bool IsDialoguePlaying => _activeDialogue != null;
+        public bool HasActiveTimer => _hasActiveTimer;
+        public float RemainingTime => _remainingTime;
+        public TailWarningState CurrentTailWarning => _tailWarningState;
+
+        public event Action<MissionData, MissionStepData> OnObjectiveChanged;
+        public event Action<string, string> OnDialogueLineShown;
+        public event Action<DialogueData> OnDialogueChoicesShown;
+        public event Action OnDialogueClosed;
+        public event Action<string> OnMissionCompletedBanner;
+        public event Action<string> OnMissionFailed;
+        public event Action OnEnteredFreeRoam;
+        public event Action<TailWarningState, float> OnTailStatusChanged;
+
+        public void Configure(MissionCatalog catalog, ObjectiveBeacon beacon)
+        {
+            missionCatalog = catalog;
+            objectiveBeacon = beacon;
+        }
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+        }
+
+        private void Start()
+        {
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.OnInteracted += HandleInteracted;
+                PlayerModeController.Instance.OnEnteredVehicle += HandleEnteredVehicle;
+                PlayerModeController.Instance.OnExitedVehicle += HandleExitedVehicle;
+            }
+
+            if (InputHub.Instance != null)
+            {
+                InputHub.Instance.OnContinueDialoguePressed += AdvanceDialogue;
+                InputHub.Instance.OnRetryPressed += HandleRetryShortcut;
+            }
+
+            StartFromSavedProgress();
+        }
+
+        private void OnDestroy()
+        {
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.OnInteracted -= HandleInteracted;
+                PlayerModeController.Instance.OnEnteredVehicle -= HandleEnteredVehicle;
+                PlayerModeController.Instance.OnExitedVehicle -= HandleExitedVehicle;
+            }
+
+            if (InputHub.Instance != null)
+            {
+                InputHub.Instance.OnContinueDialoguePressed -= AdvanceDialogue;
+                InputHub.Instance.OnRetryPressed -= HandleRetryShortcut;
+            }
+        }
+
+        public void StartFromSavedProgress()
+        {
+            if (missionCatalog == null || missionCatalog.missions.Count == 0)
+            {
+                EnterFreeRoam();
+                return;
+            }
+
+            SaveData save = SaveManager.Instance != null ? SaveManager.Instance.Data : new SaveData();
+            MissionData nextMission = null;
+
+            if (!string.IsNullOrEmpty(save.nextMissionId))
+            {
+                nextMission = missionCatalog.GetById(save.nextMissionId);
+                if (nextMission != null && save.completedMissionIds.Contains(nextMission.missionId))
+                {
+                    nextMission = null;
+                }
+            }
+
+            if (nextMission == null)
+            {
+                nextMission = missionCatalog.GetFirstUncompleted(save.completedMissionIds);
+            }
+
+            if (nextMission != null)
+            {
+                StartMission(nextMission);
+            }
+            else
+            {
+                EnterFreeRoam();
+            }
+        }
+
+        public void StartMission(MissionData mission)
+        {
+            if (mission == null || mission.steps == null || mission.steps.Count == 0)
+            {
+                EnterFreeRoam();
+                return;
+            }
+
+            StopAllCoroutines();
+            _activeMission = mission;
+            _currentStepIndex = -1;
+            _isFailed = false;
+            _isInFreeRoam = false;
+            _hasActiveTimer = false;
+            _tailWarningState = TailWarningState.None;
+
+            AdvanceToNextStep();
+        }
+
+        public void EnterFreeRoam()
+        {
+            _activeMission = null;
+            _currentStepIndex = -1;
+            _currentTargetAnchor = null;
+            _isFailed = false;
+            _isInFreeRoam = true;
+            _hasActiveTimer = false;
+            _tailWarningState = TailWarningState.None;
+
+            if (objectiveBeacon != null)
+            {
+                objectiveBeacon.SetVisible(false);
+            }
+
+            OnEnteredFreeRoam?.Invoke();
+            OnObjectiveChanged?.Invoke(null, null);
+        }
+
+        public void RetryCurrentMission()
+        {
+            if (_activeMission == null)
+            {
+                return;
+            }
+
+            MissionData missionToRetry = _activeMission;
+            _isFailed = false;
+            CloseDialogueImmediate();
+
+            // Reset player & vehicle to safe retry anchors.
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode != null)
+            {
+                WorldAnchor vehicleAnchor = WorldAnchorRegistry.Get(missionToRetry.retryVehicleAnchorId);
+                if (vehicleAnchor != null && mode.PlayerSedan != null)
+                {
+                    mode.PlayerSedan.TeleportAndReset(vehicleAnchor.transform.position, vehicleAnchor.transform.rotation);
+                }
+
+                WorldAnchor playerAnchor = WorldAnchorRegistry.Get(missionToRetry.retryPlayerAnchorId);
+                if (playerAnchor != null && mode.FootController != null)
+                {
+                    mode.FootController.TeleportTo(playerAnchor.transform.position, playerAnchor.transform.rotation);
+                }
+
+                if (missionToRetry.retryStartInVehicle && mode.HasVehicleKeys)
+                {
+                    mode.ForceVehicleMode(snapCamera: true);
+                }
+                else
+                {
+                    mode.SetOnFootMode(snapCamera: true);
+                }
+            }
+
+            StartMission(missionToRetry);
+        }
+
+        public void ResetProgressAndRestart()
+        {
+            CloseDialogueImmediate();
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.ResetSave();
+            }
+
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode != null)
+            {
+                WorldAnchor vehicleAnchor = WorldAnchorRegistry.Get("spawn_garage_sedan");
+                if (vehicleAnchor != null && mode.PlayerSedan != null)
+                {
+                    mode.PlayerSedan.TeleportAndReset(vehicleAnchor.transform.position, vehicleAnchor.transform.rotation);
+                }
+
+                WorldAnchor playerAnchor = WorldAnchorRegistry.Get("spawn_garage_foot");
+                if (playerAnchor != null && mode.FootController != null)
+                {
+                    mode.FootController.TeleportTo(playerAnchor.transform.position, playerAnchor.transform.rotation);
+                }
+
+                mode.SetOnFootMode(snapCamera: true);
+            }
+
+            StartFromSavedProgress();
+        }
+
+        private void HandleRetryShortcut()
+        {
+            if (_isFailed)
+            {
+                RetryCurrentMission();
+            }
+        }
+
+        private void AdvanceToNextStep()
+        {
+            if (_activeMission == null)
+            {
+                return;
+            }
+
+            _currentStepIndex++;
+            _hasActiveTimer = false;
+            _tailGraceTimer = 0f;
+            _tailWarningState = TailWarningState.None;
+
+            if (_currentStepIndex >= _activeMission.steps.Count)
+            {
+                CompleteActiveMission();
+                return;
+            }
+
+            MissionStepData step = _activeMission.steps[_currentStepIndex];
+            _currentTargetAnchor = WorldAnchorRegistry.Get(step.targetAnchorId);
+
+            if (step.timeLimitSeconds > 0f)
+            {
+                _hasActiveTimer = true;
+                _remainingTime = step.timeLimitSeconds;
+            }
+
+            UpdateBeaconForCurrentStep();
+            OnObjectiveChanged?.Invoke(_activeMission, step);
+        }
+
+        private void UpdateBeaconForCurrentStep()
+        {
+            if (objectiveBeacon == null)
+            {
+                return;
+            }
+
+            MissionStepData step = CurrentStep;
+            if (step == null || _currentTargetAnchor == null)
+            {
+                objectiveBeacon.SetVisible(false);
+                return;
+            }
+
+            float radius = step.triggerRadius > 0f ? step.triggerRadius : _currentTargetAnchor.DefaultRadius;
+            objectiveBeacon.SetTarget(_currentTargetAnchor.transform.position, radius);
+        }
+
+        private void Update()
+        {
+            MissionStepData step = CurrentStep;
+            if (_activeMission == null || step == null || _isFailed || IsDialoguePlaying)
+            {
+                return;
+            }
+
+            if (_hasActiveTimer)
+            {
+                _remainingTime -= Time.deltaTime;
+                if (_remainingTime <= 0f)
+                {
+                    _remainingTime = 0f;
+                    FailActiveMission("ui.fail.timeout");
+                    return;
+                }
+            }
+
+            if (_currentTargetAnchor == null && !string.IsNullOrEmpty(step.targetAnchorId))
+            {
+                _currentTargetAnchor = WorldAnchorRegistry.Get(step.targetAnchorId);
+                UpdateBeaconForCurrentStep();
+            }
+
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode == null || _currentTargetAnchor == null)
+            {
+                return;
+            }
+
+            // Follow moving anchors (like vehicles) with the 3D beacon.
+            if (objectiveBeacon != null && objectiveBeacon.gameObject.activeSelf)
+            {
+                objectiveBeacon.transform.position = _currentTargetAnchor.transform.position;
+            }
+
+            Vector3 playerPos = mode.ActiveWorldPosition;
+            float dist = Vector3.Distance(playerPos, _currentTargetAnchor.transform.position);
+
+            if (step.stepType == MissionStepType.ReachLocation || step.stepType == MissionStepType.DeliverToZone)
+            {
+                bool modeMatches = (!step.requiresVehicle || mode.IsDriving) && (!step.requiresOnFoot || !mode.IsDriving);
+                float radius = step.triggerRadius > 0f ? step.triggerRadius : _currentTargetAnchor.DefaultRadius;
+                if (modeMatches && dist <= radius)
+                {
+                    CompleteCurrentStep(step);
+                }
+            }
+            else if (step.stepType == MissionStepType.TailVehicle)
+            {
+                EvaluateTailStep(step, dist);
+            }
+        }
+
+        private void EvaluateTailStep(MissionStepData step, float distance)
+        {
+            TailWarningState state = TailWarningState.Safe;
+            if (distance < step.tailMinDistance)
+            {
+                state = TailWarningState.TooClose;
+            }
+            else if (distance > step.tailMaxDistance)
+            {
+                state = TailWarningState.TooFar;
+            }
+
+            _tailWarningState = state;
+            OnTailStatusChanged?.Invoke(state, distance);
+
+            if (state == TailWarningState.Safe)
+            {
+                _tailGraceTimer = Mathf.Max(0f, _tailGraceTimer - Time.deltaTime * 1.5f);
+            }
+            else
+            {
+                _tailGraceTimer += Time.deltaTime;
+                if (_tailGraceTimer >= step.tailGraceSeconds)
+                {
+                    string reason = state == TailWarningState.TooClose ? "ui.fail.spotted" : "ui.fail.lost_target";
+                    FailActiveMission(reason);
+                }
+            }
+        }
+
+        private void HandleInteracted(InteractableTrigger trigger)
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed || IsDialoguePlaying || trigger == null)
+            {
+                return;
+            }
+
+            bool isTargetMatch = string.Equals(trigger.InteractableId, step.targetAnchorId, StringComparison.OrdinalIgnoreCase);
+            if (!isTargetMatch)
+            {
+                return;
+            }
+
+            if (step.stepType == MissionStepType.TalkToNpc || step.stepType == MissionStepType.InspectTarget)
+            {
+                CompleteCurrentStep(step);
+            }
+        }
+
+        private void HandleEnteredVehicle(SedanVehicleController sedan)
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed || IsDialoguePlaying)
+            {
+                return;
+            }
+
+            if (step.stepType == MissionStepType.EnterVehicle)
+            {
+                CompleteCurrentStep(step);
+            }
+        }
+
+        private void HandleExitedVehicle(SedanVehicleController sedan)
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed || IsDialoguePlaying)
+            {
+                return;
+            }
+
+            if (step.stepType == MissionStepType.ExitVehicle)
+            {
+                CompleteCurrentStep(step);
+            }
+        }
+
+        private void CompleteCurrentStep(MissionStepData step)
+        {
+            if (step.unlocksVehicleKeys && SaveManager.Instance != null)
+            {
+                SaveManager.Instance.SetVehicleKeysUnlocked(true);
+            }
+
+            if (step.dialogueAsset != null && step.dialogueAsset.lines != null && step.dialogueAsset.lines.Count > 0)
+            {
+                StartDialogue(step.dialogueAsset, AdvanceToNextStep);
+            }
+            else
+            {
+                AdvanceToNextStep();
+            }
+        }
+
+        private void CompleteActiveMission()
+        {
+            MissionData finished = _activeMission;
+            _hasActiveTimer = false;
+            _tailWarningState = TailWarningState.None;
+
+            if (objectiveBeacon != null)
+            {
+                objectiveBeacon.SetVisible(false);
+            }
+
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.MarkMissionCompleted(finished.missionId, finished.nextMissionId);
+            }
+
+            string title = LocalizationService.Tr(finished.titleKey, finished.missionId);
+            OnMissionCompletedBanner?.Invoke(title);
+
+            StartCoroutine(PostMissionTransitionRoutine(finished));
+        }
+
+        private IEnumerator PostMissionTransitionRoutine(MissionData finished)
+        {
+            yield return new WaitForSeconds(missionCompleteBannerSeconds);
+
+            MissionData next = missionCatalog != null ? missionCatalog.GetById(finished.nextMissionId) : null;
+            if (finished.autoStartNextMission && next != null)
+            {
+                StartMission(next);
+            }
+            else
+            {
+                EnterFreeRoam();
+            }
+        }
+
+        private void FailActiveMission(string reasonKey)
+        {
+            if (_isFailed)
+            {
+                return;
+            }
+
+            _isFailed = true;
+            _hasActiveTimer = false;
+            if (objectiveBeacon != null)
+            {
+                objectiveBeacon.SetVisible(false);
+            }
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.SetDialogueActive(true);
+            }
+
+            OnMissionFailed?.Invoke(LocalizationService.Tr(reasonKey));
+        }
+
+        // --- Dialogue Playback ---
+        public void StartDialogue(DialogueData data, Action onComplete)
+        {
+            _activeDialogue = data;
+            _dialogueLineIndex = 0;
+            _onDialogueCompleted = onComplete;
+            _dialogueWaitingForChoice = false;
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.SetDialogueActive(true);
+            }
+
+            ShowCurrentDialogueLine();
+        }
+
+        public void AdvanceDialogue()
+        {
+            if (_activeDialogue == null || _dialogueWaitingForChoice)
+            {
+                return;
+            }
+
+            _dialogueLineIndex++;
+            if (_dialogueLineIndex < _activeDialogue.lines.Count)
+            {
+                ShowCurrentDialogueLine();
+            }
+            else if (_activeDialogue.choices != null && _activeDialogue.choices.Count > 0)
+            {
+                _dialogueWaitingForChoice = true;
+                OnDialogueChoicesShown?.Invoke(_activeDialogue);
+            }
+            else
+            {
+                FinishDialogue();
+            }
+        }
+
+        public void SelectDialogueChoice(DialogueChoice choice)
+        {
+            if (_activeDialogue == null || choice == null)
+            {
+                return;
+            }
+
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.Data.lastEndingChoice = choice.choiceId;
+                SaveManager.Instance.Save();
+            }
+
+            _dialogueWaitingForChoice = false;
+            if (choice.followUpDialogue != null && choice.followUpDialogue.lines.Count > 0)
+            {
+                _activeDialogue = choice.followUpDialogue;
+                _dialogueLineIndex = 0;
+                ShowCurrentDialogueLine();
+            }
+            else
+            {
+                FinishDialogue();
+            }
+        }
+
+        private void ShowCurrentDialogueLine()
+        {
+            DialogueLine line = _activeDialogue.lines[_dialogueLineIndex];
+            string speaker = LocalizationService.Tr(line.speakerKey, string.Empty);
+            string text = LocalizationService.Tr(line.textKey, line.textKey);
+            OnDialogueLineShown?.Invoke(speaker, text);
+        }
+
+        private void FinishDialogue()
+        {
+            Action callback = _onDialogueCompleted;
+            CloseDialogueImmediate();
+            callback?.Invoke();
+        }
+
+        private void CloseDialogueImmediate()
+        {
+            _activeDialogue = null;
+            _dialogueLineIndex = 0;
+            _onDialogueCompleted = null;
+            _dialogueWaitingForChoice = false;
+
+            if (PlayerModeController.Instance != null && !_isFailed)
+            {
+                PlayerModeController.Instance.SetDialogueActive(false);
+            }
+
+            OnDialogueClosed?.Invoke();
+        }
+    }
+}
