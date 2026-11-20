@@ -11,11 +11,11 @@ namespace Gridroam.UI
     /// </summary>
     public class MinimapController : MonoBehaviour
     {
-        public const float MapWorldMinX = -165f;
-        public const float MapWorldMaxX = 175f;
+        public const float MapWorldMinX = -135f;
+        public const float MapWorldMaxX = 135f;
         public const float MapWorldMinZ = -55f;
-        public const float MapWorldMaxZ = 285f;
-        public const float MapWorldSpan = 340f;
+        public const float MapWorldMaxZ = 215f;
+        public const float MapWorldSpan = 270f;
 
         [SerializeField] private RectTransform mapRotator;
         [SerializeField] private RawImage mapRawImage;

@@ -127,6 +127,13 @@ namespace Gridroam.Core
                 Data.hasSavedPlayerState = false;
             }
 
+            // Clear stale world coordinates from pre-v8 map layouts so player spawns safely in the redesigned town
+            if (Data.schemaVersion < 3)
+            {
+                Data.schemaVersion = 3;
+                Data.hasSavedPlayerState = false;
+            }
+
             if (string.IsNullOrWhiteSpace(Data.languageCode))
             {
                 Data.languageCode = "tr";

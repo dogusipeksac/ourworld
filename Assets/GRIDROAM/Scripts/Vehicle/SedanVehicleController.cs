@@ -434,6 +434,15 @@ namespace Gridroam.Vehicle
 
         private void FixedUpdate()
         {
+            if (transform.position.y < -2.0f)
+            {
+                Vector3 safePos = new Vector3(
+                    Mathf.Clamp(transform.position.x, -95f, 95f),
+                    0.35f,
+                    Mathf.Clamp(transform.position.z, -36f, 194f));
+                TeleportAndReset(safePos, Quaternion.Euler(0f, transform.eulerAngles.y, 0f));
+                return;
+            }
             if (_rb == null || axleInfos == null || axleInfos.Count == 0)
             {
                 return;

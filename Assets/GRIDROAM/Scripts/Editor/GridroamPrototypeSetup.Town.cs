@@ -9,23 +9,30 @@ namespace Gridroam.Editor
 {
     public static partial class GridroamPrototypeSetup
     {
+        private static GameObject _activeBenchPrefab;
+        private static Mesh _cachedTreeTrunkMesh;
+        private static Mesh _cachedTreeCanopyMeshA;
+        private static Mesh _cachedTreeCanopyMeshB;
+
         /// <summary>
-        /// Builds the "Liman Kasabası" open-world coastal town:
-        /// Main Street shops (incl. PİZZA, KAFE, MARKET), Town Square with fountain & clock tower,
-        /// Coastal Gas Station (canopy, 2 fuel pumps, kiosk), 4 Side-Job boards, Vending Machines & Mailboxes,
-        /// 24 enterable Residential Houses with sleepable beds, Park, Traffic Stop Lines, and 14 scheduled Pedestrians.
+        /// Builds the clean, compact, 100% walkable & drivable "Çınarlı Kasabası" small town:
+        /// - 4x4 connected street grid (zero dead ends, zero raised curb colliders across intersections)
+        /// - 3 spacious enterable shops (PİZZA, KAFE, MARKET — zero fake glued-on dummy buildings)
+        /// - Central Town Square (Fountain, Clock Tower, 3D Wooden Benches, Trees)
+        /// - Çınarlı Park, Drive-Through Gas Station, 12 spacious Enterable & Paintable Houses
+        /// - 4 Side-Job boards, Vending Machines, Mailboxes, 8 Drivable Cars, Traffic Lights & 14 Pedestrians
         /// </summary>
         private static List<TrafficStopLine> BuildSmallTown(Transform envParent, MaterialSet mats, PrefabSet prefabs)
         {
-            GameObject townRoot = new GameObject("Zone_SmallTown_LimanKasabasi");
+            GameObject townRoot = new GameObject("Zone_SmallTown_Cinarli");
             townRoot.transform.SetParent(envParent, false);
 
             System.Random rng = new System.Random(1234);
             List<SeatInteractable> outdoorBenchSeats = new List<SeatInteractable>();
             _activeBenchPrefab = prefabs != null ? prefabs.WoodenBench : null;
 
-            BuildTownRoads(townRoot.transform, mats, prefabs, outdoorBenchSeats);
-            BuildMainStreetShops(townRoot.transform, mats, rng);
+            BuildTownGridRoads(townRoot.transform, mats);
+            BuildMainStreetShops(townRoot.transform, mats);
             BuildGasStation(townRoot.transform, mats);
             BuildTownSquare(townRoot.transform, mats, prefabs, outdoorBenchSeats);
             BuildResidentialAndPark(townRoot.transform, mats, rng, outdoorBenchSeats);
@@ -146,451 +153,162 @@ namespace Gridroam.Editor
             return mesh;
         }
 
-        private static void BuildTownRoads(
-            Transform parent,
-            MaterialSet mats,
-            PrefabSet prefabs,
-            List<SeatInteractable> benchSeatCollector)
+        private static void BuildTownGridRoads(Transform parent, MaterialSet mats)
         {
-            GameObject roadsRoot = new GameObject("Town_Roads");
+            GameObject roadsRoot = new GameObject("Town_GridRoads");
             roadsRoot.transform.SetParent(parent, false);
 
-            // 1. Full-length Residential Lane (x = -46, connected from South Beach Loop z=-24 all the way to North Harbor z=246)
-            CreateStaticBlock("Road_ResidentialLane", roadsRoot.transform,
-                new Vector3(-46f, 0.025f, 111f), new Vector3(7.5f, 0.08f, 278f),
-                mats.RoadAsphaltMain, addCollider: false);
-
-            // 2. Western Foothills Avenue (x = -82, z = -24..246) & Scenic Ring Road (x = -114, z = -24..246)
-            CreateStaticBlock("Road_WesternFoothillAve", roadsRoot.transform,
-                new Vector3(-82f, 0.025f, 111f), new Vector3(7.5f, 0.08f, 278f),
-                mats.RoadAsphaltMain, addCollider: false);
-            CreateStaticBlock("Road_WesternScenicRing", roadsRoot.transform,
-                new Vector3(-114f, 0.025f, 111f), new Vector3(8.5f, 0.08f, 278f),
-                mats.RoadAsphaltMain, addCollider: false);
-
-            // 3. Southern Coastal & Countryside Connector Loop (z = -24, x = -118..+30)
-            CreateStaticBlock("Road_SouthCoastalLoop", roadsRoot.transform,
-                new Vector3(-44f, 0.025f, -24f), new Vector3(148f, 0.08f, 10f),
-                mats.RoadAsphaltCross, addCollider: false);
-
-            // 4. Full East-West Cross-Streets at z = 92 and z = 174 connecting Coastal Road <-> Residential <-> Western Scenic Ring
-            CreateStaticBlock("Road_CrossStreet_South_WestExt", roadsRoot.transform,
-                new Vector3(-72f, 0.025f, 92f), new Vector3(92f, 0.08f, 9f),
-                mats.RoadAsphaltCross, addCollider: false);
-            CreateStaticBlock("Road_CrossStreet_North_WestExt", roadsRoot.transform,
-                new Vector3(-72f, 0.025f, 174f), new Vector3(92f, 0.08f, 9f),
-                mats.RoadAsphaltCross, addCollider: false);
-
-            // 5. Dashed white road markings on Western Scenic Ring & Cross-Streets
-            for (int z = -12; z <= 234; z += 14)
+            // 4 North-South Streets (x = -72, -24, +24, +72; z = -24..+184 -> length 219m, width 11m, flush visual layer)
+            float[] nsXs = { -72f, -24f, 24f, 72f };
+            for (int i = 0; i < nsXs.Length; i++)
             {
-                CreateStaticBlock($"WestRingDash_{z}", roadsRoot.transform,
-                    new Vector3(-114f, 0.075f, z), new Vector3(0.20f, 0.02f, 4.6f),
-                    mats.RoadMarkingWhite, addCollider: false);
-                CreateStaticBlock($"ResLaneDash_{z}", roadsRoot.transform,
-                    new Vector3(-46f, 0.075f, z), new Vector3(0.18f, 0.02f, 4.2f),
-                    mats.RoadMarkingWhite, addCollider: false);
-            }
+                CreateStaticBlock($"Road_NS_{i + 1}", roadsRoot.transform,
+                    new Vector3(nsXs[i], 0.012f, 80f), new Vector3(11f, 0.024f, 219f),
+                    mats.RoadAsphaltMain, addCollider: false);
 
-            // 6. Western Scenic Overlook Plaza (x = -126, z = 134) — paved lookout terrace with trees, lamps, benches & parked pickup
-            CreateTiledBox("WesternOverlook_Paving", roadsRoot.transform,
-                new Vector3(-125.5f, 0.08f, 134f), new Vector3(14f, 0.16f, 26f),
-                Quaternion.identity, mats.TownPaving, 2.0f, collider: true);
-
-            if (prefabs != null)
-            {
-                PlacePrefabInstance(prefabs.StreetLamp, roadsRoot.transform, new Vector3(-120.5f, 0.16f, 123f), Quaternion.Euler(0f, 90f, 0f));
-                PlacePrefabInstance(prefabs.StreetLamp, roadsRoot.transform, new Vector3(-120.5f, 0.16f, 145f), Quaternion.Euler(0f, 90f, 0f));
-                CreatePointLamp("Lamp_WestOverlook_S", roadsRoot.transform, new Vector3(-119.5f, 5.1f, 123f), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
-                CreatePointLamp("Lamp_WestOverlook_N", roadsRoot.transform, new Vector3(-119.5f, 5.1f, 145f), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
-
-                if (prefabs.TownCarWhitePickup != null)
+                // Dashed white centerlines (skipping intersections at z = -24, 44, 116, 184)
+                for (float z = -12f; z <= 172f; z += 12f)
                 {
-                    GameObject overlookTruck = PlacePrefabInstance(prefabs.TownCarWhitePickup, roadsRoot.transform,
-                        new Vector3(-123.5f, 0.28f, 139.5f), Quaternion.Euler(0f, 155f, 0f));
-                    overlookTruck.name = "Town_DrivableCar_OverlookPickup";
-                    InteractableTrigger trig = overlookTruck.GetComponent<InteractableTrigger>();
-                    if (trig != null)
-                    {
-                        trig.Configure(InteractableKind.TownVehicle, "town_car_overlook", "ui.btn.drive", 3.8f);
-                    }
+                    if (Mathf.Abs(z - 44f) < 9f || Mathf.Abs(z - 116f) < 9f) continue;
+                    CreateStaticBlock($"Dash_NS_{i}_{z:0}", roadsRoot.transform,
+                        new Vector3(nsXs[i], 0.028f, z), new Vector3(0.20f, 0.01f, 4.4f),
+                        mats.RoadMarkingWhite, addCollider: false);
                 }
             }
 
-            var ovBench1 = CreateBench("Overlook_Bench_1", roadsRoot.transform, new Vector3(-129.5f, 0.16f, 129.5f), Quaternion.Euler(0f, 90f, 0f), mats);
-            var ovBench2 = CreateBench("Overlook_Bench_2", roadsRoot.transform, new Vector3(-129.5f, 0.16f, 138.5f), Quaternion.Euler(0f, 90f, 0f), mats);
-            if (benchSeatCollector != null)
+            // 4 East-West Cross Streets (z = -24, +44, +116, +184; x = -72..+72 -> length 155m, width 11m)
+            float[] ewZs = { -24f, 44f, 116f, 184f };
+            for (int i = 0; i < ewZs.Length; i++)
             {
-                benchSeatCollector.Add(ovBench1.leftSlot); benchSeatCollector.Add(ovBench1.rightSlot);
-                benchSeatCollector.Add(ovBench2.leftSlot); benchSeatCollector.Add(ovBench2.rightSlot);
+                CreateStaticBlock($"Road_EW_{i + 1}", roadsRoot.transform,
+                    new Vector3(0f, 0.014f, ewZs[i]), new Vector3(155f, 0.024f, 11f),
+                    mats.RoadAsphaltCross, addCollider: false);
+
+                for (float x = -60f; x <= 60f; x += 12f)
+                {
+                    if (Mathf.Abs(x + 24f) < 9f || Mathf.Abs(x - 24f) < 9f) continue;
+                    CreateStaticBlock($"Dash_EW_{i}_{x:0}", roadsRoot.transform,
+                        new Vector3(x, 0.029f, ewZs[i]), new Vector3(4.4f, 0.01f, 0.20f),
+                        mats.RoadMarkingWhite, addCollider: false);
+                }
             }
 
-            // Scenic grove trees along Western Foothill Avenue & Scenic Ring
-            Vector3[] groveTrees =
+            // Flush non-blocking sidewalks framing the central commercial, square, and park blocks
+            float[] blockCentersZ = { 10f, 80f, 150f };
+            float[] blockSpansZ = { 54f, 58f, 54f };
+            for (int b = 0; b < blockCentersZ.Length; b++)
             {
-                new Vector3(-96f, 0.04f, 18f), new Vector3(-102f, 0.04f, 46f), new Vector3(-94f, 0.04f, 74f),
-                new Vector3(-98f, 0.04f, 112f), new Vector3(-95f, 0.04f, 148f), new Vector3(-101f, 0.04f, 194f),
-                new Vector3(-94f, 0.04f, 226f), new Vector3(-128f, 0.04f, 38f), new Vector3(-130f, 0.04f, 82f),
-                new Vector3(-131f, 0.04f, 162f), new Vector3(-128f, 0.04f, 214f), new Vector3(-72f, 0.04f, -14f),
-                new Vector3(-34f, 0.04f, -14f), new Vector3(8f, 0.04f, -14f)
-            };
-            for (int i = 0; i < groveTrees.Length; i++)
-            {
-                CreateTownTree($"CountryGrove_Tree_{i + 1:00}", roadsRoot.transform, groveTrees[i], mats, 1.05f + (i % 3) * 0.18f, i + 30);
+                CreateTiledBox($"Sidewalk_CenterBlock_{b}_E", roadsRoot.transform,
+                    new Vector3(17.0f, 0.015f, blockCentersZ[b]), new Vector3(3.0f, 0.03f, blockSpansZ[b]),
+                    Quaternion.identity, mats.Sidewalk, 2.0f, collider: false);
+                CreateTiledBox($"Sidewalk_CenterBlock_{b}_W", roadsRoot.transform,
+                    new Vector3(-17.0f, 0.015f, blockCentersZ[b]), new Vector3(3.0f, 0.03f, blockSpansZ[b]),
+                    Quaternion.identity, mats.Sidewalk, 2.0f, collider: false);
             }
         }
 
-        private static void BuildMainStreetShops(Transform parent, MaterialSet mats, System.Random rng)
+        private static void BuildMainStreetShops(Transform parent, MaterialSet mats)
         {
-            GameObject shopsRoot = new GameObject("Town_MainStreetShops");
+            GameObject shopsRoot = new GameObject("Town_CommercialShops");
             shopsRoot.transform.SetParent(parent, false);
 
-            Material[] facadeMats = { mats.BuildingFacadeA, mats.BuildingFacadeB, mats.BuildingFacadeC, mats.GarageBrick, mats.PlasterTrim };
-            Material[] awningMats = { mats.TownAwningTerracotta, mats.TownAwningGreen, mats.TownAwningNavy, mats.TownAwningCream };
+            // Flush paved courtyard under the commercial block (x = -15.5..+15.5, z = -15..+36) — 100% walkable!
+            CreateTiledBox("Commercial_CourtyardPaving", shopsRoot.transform,
+                new Vector3(0f, 0.012f, 10f), new Vector3(31f, 0.024f, 52f),
+                Quaternion.identity, mats.TownPaving, 2.5f, collider: false);
 
-            // North east-facing shop row stops at z = 213.5 so z = 216..237 hosts the Coastal Gas Station cleanly
-            Vector2[] eastZSegments =
-            {
-                new Vector2(20f, 85f),
-                new Vector2(100f, 120f),
-                new Vector2(148f, 166f),
-                new Vector2(182f, 213.5f)
-            };
+            // ONLY real, spacious, 100% enterable shops (zero fake solid dummy buildings!)
+            // Placed at x = +8.5 facing East (+X) onto Cumhuriyet Caddesi (x = +24), with 6.2m wide walkways between them!
+            BuildEnterableShopBuilding(
+                "Shop_01_Pizzeria",
+                "shop_pizza_01",
+                EnterableShopKind.Pizzeria,
+                shopsRoot.transform,
+                new Vector3(8.5f, 0f, -6.5f),
+                depthX: 10.0f, widthZ: 10.6f, height: 6.8f, storeys: 2,
+                mats.BuildingFacadeC, 3.0f, mats.TownAwningTerracotta, pitchedRoof: true, mats,
+                shopSeed: 4201);
 
-            Vector2[] alleyZSegments =
-            {
-                new Vector2(20f, 85f),
-                new Vector2(100f, 120f),
-                new Vector2(148f, 166f),
-                new Vector2(182f, 235f)
-            };
+            BuildEnterableShopBuilding(
+                "Shop_02_Cafe",
+                "shop_cafe_01",
+                EnterableShopKind.Cafe,
+                shopsRoot.transform,
+                new Vector3(8.5f, 0f, 10.0f),
+                depthX: 10.0f, widthZ: 10.6f, height: 6.8f, storeys: 2,
+                mats.BuildingFacadeA, 3.0f, mats.TownAwningGreen, pitchedRoof: false, mats,
+                shopSeed: 4254);
 
-            int shopIdx = 0;
-            for (int segIdx = 0; segIdx < eastZSegments.Length; segIdx++)
-            {
-                Vector2 seg = eastZSegments[segIdx];
-                float cursorZ = seg.x;
-                int segLocalIdx = 0;
+            BuildEnterableShopBuilding(
+                "Shop_03_Market",
+                "shop_market_01",
+                EnterableShopKind.Market,
+                shopsRoot.transform,
+                new Vector3(8.5f, 0f, 26.5f),
+                depthX: 10.0f, widthZ: 10.6f, height: 6.8f, storeys: 2,
+                mats.BuildingFacadeB, 3.0f, mats.TownAwningNavy, pitchedRoof: true, mats,
+                shopSeed: 4307);
 
-                while (cursorZ < seg.y - 5.5f)
-                {
-                    bool makeEnterable = segLocalIdx == 0 && (segIdx == 0 || segIdx == 1 || segIdx == 3);
-
-                    float remaining = seg.y - cursorZ;
-                    float widthZ;
-                    float depthX;
-                    if (makeEnterable)
-                    {
-                        widthZ = Mathf.Min(remaining, 9.2f);
-                        depthX = 9.4f;
-                    }
-                    else
-                    {
-                        widthZ = remaining < 12.5f
-                            ? remaining
-                            : Mathf.Min(remaining, 7.0f + (float)rng.NextDouble() * 3.0f);
-                        depthX = 9.0f + (float)rng.NextDouble() * 2.0f;
-                    }
-
-                    int storeys = 2 + rng.Next(3);
-                    float height = 3.6f + (storeys - 1) * 3.0f + (float)rng.NextDouble() * 0.45f;
-
-                    float centerZ = cursorZ + widthZ * 0.5f;
-                    float eastFaceX = 13.4f;
-                    float centerX = eastFaceX - depthX * 0.5f;
-
-                    Material facade = facadeMats[shopIdx % facadeMats.Length];
-                    float tileMeters = facade == mats.GarageBrick ? 1.5f : 3.0f;
-                    Material awning = awningMats[(shopIdx + rng.Next(2)) % awningMats.Length];
-                    bool pitchedRoof = (shopIdx % 2 == 0) && storeys <= 3;
-
-                    if (makeEnterable)
-                    {
-                        EnterableShopKind sKind = segIdx == 0
-                            ? EnterableShopKind.Pizzeria
-                            : (segIdx == 1 ? EnterableShopKind.Cafe : EnterableShopKind.Market);
-                        string sId = segIdx == 0
-                            ? "shop_pizza_01"
-                            : (segIdx == 1 ? "shop_cafe_01" : "shop_market_01");
-                        Material roleAwning = segIdx == 0
-                            ? mats.TownAwningTerracotta
-                            : (segIdx == 1 ? mats.TownAwningGreen : mats.TownAwningNavy);
-
-                        BuildEnterableShopBuilding(
-                            $"Shop_Main_{shopIdx + 1:00}_{sKind}",
-                            sId,
-                            sKind,
-                            shopsRoot.transform,
-                            new Vector3(centerX, 0f, centerZ),
-                            depthX, widthZ, height, storeys,
-                            facade, tileMeters, roleAwning, pitchedRoof, mats,
-                            shopSeed: 4200 + shopIdx * 53);
-                    }
-                    else
-                    {
-                        BuildShopBuilding(
-                            $"Shop_Main_{shopIdx + 1:00}",
-                            shopsRoot.transform,
-                            new Vector3(centerX, 0f, centerZ),
-                            depthX, widthZ, height, storeys,
-                            facingEast: true,
-                            facade, tileMeters, awning, pitchedRoof, mats, rng);
-                    }
-
-                    // Leave a 2.6m walkable pedestrian passage every 2 buildings so blocks are never solid walls
-                    float passageGap = (segLocalIdx % 2 == 1) ? 2.6f : 0.4f;
-                    cursorZ += widthZ + passageGap;
-                    shopIdx++;
-                    segLocalIdx++;
-                }
-
-                // West-facing Back-Alley companion row (with matching walkable passages between buildings)
-                Vector2 alleySeg = alleyZSegments[segIdx];
-                float alleyZ = alleySeg.x;
-                int alleyLocalIdx = 0;
-                while (alleyZ < alleySeg.y - 6.0f)
-                {
-                    float remaining = alleySeg.y - alleyZ;
-                    float widthZ = remaining < 12.0f
-                        ? remaining
-                        : Mathf.Min(remaining, 8.0f + (float)rng.NextDouble() * 2.5f);
-                    float depthX = 8.4f + (float)rng.NextDouble() * 1.2f;
-                    int storeys = 2 + rng.Next(2);
-                    float height = 3.2f + (storeys - 1) * 2.95f;
-
-                    float centerZ = alleyZ + widthZ * 0.5f;
-                    float westFaceX = -18.8f;
-                    float centerX = westFaceX + depthX * 0.5f;
-
-                    Material facade = facadeMats[(shopIdx + alleyLocalIdx + 2) % facadeMats.Length];
-                    float tileMeters = facade == mats.GarageBrick ? 1.5f : 3.0f;
-                    Material awning = awningMats[(alleyLocalIdx + 1) % awningMats.Length];
-
-                    BuildShopBuilding(
-                        $"Shop_Alley_{shopIdx + 1:00}_{alleyLocalIdx + 1}",
-                        shopsRoot.transform,
-                        new Vector3(centerX, 0f, centerZ),
-                        depthX, widthZ, height, storeys,
-                        facingEast: false,
-                        facade, tileMeters, awning, pitchedRoof: (alleyLocalIdx % 2 == 1), mats, rng);
-
-                    float alleyGap = (alleyLocalIdx % 2 == 1) ? 2.6f : 0.4f;
-                    alleyZ += widthZ + alleyGap;
-                    alleyLocalIdx++;
-                }
-            }
+            // Courtyard trees on the west side of the commercial block
+            CreateTownTree("Courtyard_Tree_1", shopsRoot.transform, new Vector3(-9.5f, 0f, -6.0f), mats, 1.0f, 11);
+            CreateTownTree("Courtyard_Tree_2", shopsRoot.transform, new Vector3(-9.5f, 0f, 10.0f), mats, 1.08f, 12);
+            CreateTownTree("Courtyard_Tree_3", shopsRoot.transform, new Vector3(-9.5f, 0f, 26.0f), mats, 0.96f, 13);
         }
 
-        private static void BuildShopBuilding(
-            string name,
-            Transform parent,
-            Vector3 basePos,
-            float depthX,
-            float widthZ,
-            float height,
-            int storeys,
-            bool facingEast,
-            Material facadeMat,
-            float metersPerTile,
-            Material awningMat,
-            bool pitchedRoof,
-            MaterialSet mats,
-            System.Random rng)
-        {
-            GameObject root = new GameObject(name);
-            root.transform.SetParent(parent, false);
-            root.transform.position = basePos;
-
-            float frontSign = facingEast ? 1f : -1f;
-            float frontX = basePos.x + frontSign * (depthX * 0.5f);
-            float backX = basePos.x - frontSign * (depthX * 0.5f);
-
-            CreateTiledBox("Body", root.transform,
-                new Vector3(basePos.x, height * 0.5f, basePos.z),
-                new Vector3(depthX, height, widthZ),
-                Quaternion.identity, facadeMat, metersPerTile, collider: true);
-
-            // Ground-floor stone plinth & 3D framed storefront display windows
-            CreateTiledBox("GroundPlinth", root.transform,
-                new Vector3(frontX + frontSign * 0.04f, 0.32f, basePos.z),
-                new Vector3(0.12f, 0.64f, widthZ + 0.04f),
-                Quaternion.identity, mats.Concrete, 2.0f, collider: false);
-
-            float doorOffsetZ = (rng.Next(2) == 0 ? -1f : 1f) * Mathf.Min(1.5f, widthZ * 0.24f);
-            float glassCenterZ = basePos.z - doorOffsetZ * 0.45f;
-            float glassSpanZ = Mathf.Max(2.0f, widthZ - 2.6f);
-
-            bool litShop = rng.NextDouble() < 0.65;
-            Material shopGlassMat = litShop ? mats.WindowLitWarm : mats.SedanGlass;
-            CreateTiledBox("ShopWindowFrame", root.transform,
-                new Vector3(frontX + frontSign * 0.05f, 1.62f, glassCenterZ),
-                new Vector3(0.14f, 2.18f, glassSpanZ + 0.18f),
-                Quaternion.identity, mats.SedanTrimDark, 2.0f, collider: false);
-            GameObject shopGlass = CreateTiledBox("ShopfrontGlass", root.transform,
-                new Vector3(frontX + frontSign * 0.08f, 1.64f, glassCenterZ),
-                new Vector3(0.08f, 1.98f, glassSpanZ),
-                Quaternion.identity, shopGlassMat, 2.0f, collider: false, staticBatch: !litShop);
-            if (litShop)
-            {
-                AttachWindowNightLight(shopGlass);
-            }
-
-            // 3D Framed Doorway with surround jambs, threshold step, panel & chrome handle
-            float doorZ = basePos.z + doorOffsetZ;
-            CreateTiledBox("ShopDoorSurround", root.transform,
-                new Vector3(frontX + frontSign * 0.06f, 1.24f, doorZ),
-                new Vector3(0.16f, 2.42f, 1.32f),
-                Quaternion.identity, mats.Concrete, 1.5f, collider: false);
-            CreateTiledBox("ShopDoorPanel", root.transform,
-                new Vector3(frontX + frontSign * 0.10f, 1.18f, doorZ),
-                new Vector3(0.08f, 2.24f, 1.10f),
-                Quaternion.identity, mats.TownDoorWood, 2.0f, collider: false);
-            CreateTiledBox("ShopDoorHandle", root.transform,
-                new Vector3(frontX + frontSign * 0.15f, 1.05f, doorZ + 0.38f),
-                new Vector3(0.04f, 0.24f, 0.04f),
-                Quaternion.identity, mats.SedanChrome, 1.0f, collider: false);
-
-            float awningAngle = facingEast ? -22f : 22f;
-            CreateTiledBox("Awning", root.transform,
-                new Vector3(frontX + frontSign * 0.68f, 3.05f, basePos.z),
-                new Vector3(1.38f, 0.11f, Mathf.Max(2.6f, widthZ - 0.9f)),
-                Quaternion.Euler(0f, 0f, awningAngle), awningMat, 2.0f, collider: false);
-
-            CreateTiledBox("SignBoard", root.transform,
-                new Vector3(frontX + frontSign * 0.12f, 3.55f, basePos.z),
-                new Vector3(0.14f, 0.56f, Mathf.Max(2.4f, widthZ - 1.6f)),
-                Quaternion.identity, mats.SedanTrimDark, 2.0f, collider: false);
-
-            int winCols = Mathf.Max(2, Mathf.FloorToInt((widthZ - 1.2f) / 2.2f));
-            float winStep = (widthZ - 1.6f) / Mathf.Max(1, winCols);
-            float winStartZ = basePos.z - (widthZ - 1.6f) * 0.5f + winStep * 0.5f;
-
-            for (int floor = 1; floor < storeys; floor++)
-            {
-                float wy = 1.9f + floor * 3.0f;
-                if (wy > height - 0.9f) break;
-
-                for (int c = 0; c < winCols; c++)
-                {
-                    float wz = winStartZ + c * winStep;
-                    bool litWin = rng.NextDouble() < 0.50;
-                    Material wMat = litWin ? mats.WindowLitWarm : mats.SedanGlass;
-                    GameObject wGo = CreateTiledBox($"Win_F{floor}_{c}", root.transform,
-                        new Vector3(frontX + frontSign * 0.05f, wy, wz),
-                        new Vector3(0.10f, 1.35f, 1.10f),
-                        Quaternion.identity, wMat, 2.0f, collider: false, staticBatch: !litWin);
-                    if (litWin)
-                    {
-                        AttachWindowNightLight(wGo);
-                    }
-                }
-
-                if (floor == 1 || floor == storeys - 1)
-                {
-                    for (int b = 0; b < 2; b++)
-                    {
-                        float bz = basePos.z + (b == 0 ? -widthZ * 0.24f : widthZ * 0.24f);
-                        bool litBack = rng.NextDouble() < 0.35;
-                        Material bwMat = litBack ? mats.WindowLitWarm : mats.SedanGlass;
-                        GameObject bwGo = CreateTiledBox($"BackWin_F{floor}_{b}", root.transform,
-                            new Vector3(backX - frontSign * 0.05f, wy, bz),
-                            new Vector3(0.10f, 1.20f, 1.05f),
-                            Quaternion.identity, bwMat, 2.0f, collider: false, staticBatch: !litBack);
-                        if (litBack)
-                        {
-                            AttachWindowNightLight(bwGo);
-                        }
-                    }
-                }
-            }
-
-            CreateTiledBox("Cornice", root.transform,
-                new Vector3(basePos.x, height + 0.24f, basePos.z),
-                new Vector3(depthX + 0.40f, 0.48f, widthZ + 0.20f),
-                Quaternion.identity, mats.PlasterTrim, 3.0f, collider: false);
-
-            if (pitchedRoof)
-            {
-                float slopeLen = depthX * 0.58f;
-                float roofPeakOffset = depthX * 0.25f;
-                float roofY = height + 0.45f + roofPeakOffset * 0.45f;
-
-                CreateTiledBox("RoofSlope_East", root.transform,
-                    new Vector3(basePos.x + depthX * 0.24f, roofY, basePos.z),
-                    new Vector3(slopeLen, 0.24f, widthZ + 0.30f),
-                    Quaternion.Euler(0f, 0f, -24f), mats.TownRoofTile, 1.5f, collider: false);
-                CreateTiledBox("RoofSlope_West", root.transform,
-                    new Vector3(basePos.x - depthX * 0.24f, roofY, basePos.z),
-                    new Vector3(slopeLen, 0.24f, widthZ + 0.30f),
-                    Quaternion.Euler(0f, 0f, 24f), mats.TownRoofTile, 1.5f, collider: false);
-            }
-        }
-
-        /// <summary>
-        /// E4: Coastal Gas Station on the empty corner lot along Coastal Main Road west side
-        /// just south of the Harbor Connector (x = 1..16.5, z = 216..237) — blocks zero roads!
-        /// </summary>
         private static void BuildGasStation(Transform parent, MaterialSet mats)
         {
-            GameObject station = new GameObject("Zone_CoastalGasStation");
+            // Drive-through Gas Station in North-East Block (x = +32..+64, z = +134..+166), open from both x=+24 and x=+72!
+            GameObject station = new GameObject("Zone_GasStation");
             station.transform.SetParent(parent, false);
 
-            // Concrete forecourt flush with sidewalk & road
             CreateTiledBox("Station_Forecourt", station.transform,
-                new Vector3(9.6f, 0.08f, 226.5f), new Vector3(15.2f, 0.16f, 20.4f),
-                Quaternion.identity, mats.HarborDock, 3.0f, collider: true);
+                new Vector3(48.0f, 0.015f, 150.0f), new Vector3(34.0f, 0.03f, 28.0f),
+                Quaternion.identity, mats.HarborDock, 3.0f, collider: false);
 
-            // Attendant Kiosk on west side of lot (x = 4.2)
+            // Attendant Kiosk on south side of forecourt (z = +139.5) so East-West drive-through is wide open
             GameObject kiosk = new GameObject("Station_Kiosk");
             kiosk.transform.SetParent(station.transform, false);
             CreateTiledBox("Kiosk_Body", kiosk.transform,
-                new Vector3(4.2f, 1.75f, 226.5f), new Vector3(4.2f, 3.5f, 7.6f),
+                new Vector3(48.0f, 1.75f, 138.8f), new Vector3(8.2f, 3.5f, 4.4f),
                 Quaternion.identity, mats.PlasterTrim, 2.5f, collider: true);
             CreateTiledBox("Kiosk_Roof", kiosk.transform,
-                new Vector3(4.2f, 3.65f, 226.5f), new Vector3(4.8f, 0.32f, 8.2f),
+                new Vector3(48.0f, 3.65f, 138.8f), new Vector3(8.8f, 0.32f, 5.0f),
                 Quaternion.identity, mats.SedanTrimDark, 2.0f, collider: false);
             GameObject kioskWin = CreateTiledBox("Kiosk_Window", kiosk.transform,
-                new Vector3(6.34f, 1.65f, 226.5f), new Vector3(0.08f, 1.85f, 4.8f),
+                new Vector3(48.0f, 1.65f, 141.05f), new Vector3(5.2f, 1.85f, 0.08f),
                 Quaternion.identity, mats.WindowLitWarm, 2.0f, collider: false, staticBatch: false);
             AttachWindowNightLight(kioskWin);
 
-            // Canopy over pump island (x = 11.8, clearance 4.2 m)
+            // Canopy over pump island (centered at x = 48, z = 152, clearance 4.3m)
             GameObject canopy = new GameObject("Station_Canopy");
             canopy.transform.SetParent(station.transform, false);
             CreateTiledBox("Canopy_RoofDeck", canopy.transform,
-                new Vector3(11.8f, 4.45f, 226.5f), new Vector3(6.6f, 0.46f, 12.8f),
+                new Vector3(48.0f, 4.45f, 152.0f), new Vector3(13.6f, 0.46f, 7.2f),
                 Quaternion.identity, mats.SedanTrimDark, 2.5f, collider: true);
             CreateTiledBox("Canopy_TealFascia", canopy.transform,
-                new Vector3(11.8f, 4.52f, 226.5f), new Vector3(6.72f, 0.24f, 12.92f),
+                new Vector3(48.0f, 4.52f, 152.0f), new Vector3(13.75f, 0.24f, 7.35f),
                 Quaternion.identity, mats.TownFabricTeal, 2.0f, collider: false);
 
             CreateWorldSignText(
                 "AKARYAKIT",
                 canopy.transform,
-                new Vector3(15.20f, 4.45f, 226.5f),
-                Quaternion.Euler(0f, -90f, 0f),
-                new Vector2(8.0f, 0.42f),
+                new Vector3(41.1f, 4.45f, 152.0f),
+                Quaternion.Euler(0f, 90f, 0f),
+                new Vector2(6.8f, 0.42f),
                 new Color(0.95f, 0.96f, 0.96f, 1f));
 
-            CreateTiledBox("Canopy_Pillar_S", canopy.transform,
-                new Vector3(11.8f, 2.25f, 222.0f), new Vector3(0.45f, 4.3f, 0.45f),
+            CreateTiledBox("Canopy_Pillar_W", canopy.transform,
+                new Vector3(43.2f, 2.25f, 152.0f), new Vector3(0.45f, 4.3f, 0.45f),
                 Quaternion.identity, mats.Concrete, 1.5f, collider: true);
-            CreateTiledBox("Canopy_Pillar_N", canopy.transform,
-                new Vector3(11.8f, 2.25f, 231.0f), new Vector3(0.45f, 4.3f, 0.45f),
-                Quaternion.identity, mats.Concrete, 1.5f, collider: true);
-
-            // Canopy night downlights
-            CreatePointLamp("Lamp_GasCanopy_S", canopy.transform, new Vector3(11.8f, 4.05f, 223.8f), new Color(0.95f, 0.96f, 1.0f), 18f, 2.6f);
-            CreatePointLamp("Lamp_GasCanopy_N", canopy.transform, new Vector3(11.8f, 4.05f, 229.2f), new Color(0.95f, 0.96f, 1.0f), 18f, 2.6f);
-
-            // Raised pump island curb (x = 11.8, cars pull into x ~ 14.8 east lane or x ~ 8.8 west lane)
-            CreateTiledBox("Pump_Island", station.transform,
-                new Vector3(11.8f, 0.21f, 226.5f), new Vector3(1.25f, 0.14f, 9.8f),
+            CreateTiledBox("Canopy_Pillar_E", canopy.transform,
+                new Vector3(52.8f, 2.25f, 152.0f), new Vector3(0.45f, 4.3f, 0.45f),
                 Quaternion.identity, mats.Concrete, 1.5f, collider: true);
 
-            // 2 Fuel Pumps
-            CreateFuelPump("FuelPump_01", "fuel_pump_01", station.transform, new Vector3(11.8f, 0.28f, 223.8f), mats);
-            CreateFuelPump("FuelPump_02", "fuel_pump_02", station.transform, new Vector3(11.8f, 0.28f, 229.2f), mats);
+            CreatePointLamp("Lamp_GasCanopy_W", canopy.transform, new Vector3(45.5f, 4.05f, 152.0f), new Color(0.95f, 0.96f, 1.0f), 18f, 2.6f);
+            CreatePointLamp("Lamp_GasCanopy_E", canopy.transform, new Vector3(50.5f, 4.05f, 152.0f), new Color(0.95f, 0.96f, 1.0f), 18f, 2.6f);
+
+            CreateFuelPump("FuelPump_01", "fuel_pump_01", station.transform, new Vector3(45.6f, 0.03f, 152.0f), mats);
+            CreateFuelPump("FuelPump_02", "fuel_pump_02", station.transform, new Vector3(50.4f, 0.03f, 152.0f), mats);
         }
 
         private static void CreateFuelPump(string name, string triggerId, Transform parent, Vector3 worldPos, MaterialSet mats)
@@ -600,37 +318,32 @@ namespace Gridroam.Editor
             pump.transform.position = worldPos;
 
             CreateStaticPart("PumpBody", PrimitiveType.Cube, pump.transform,
-                new Vector3(0f, 0.85f, 0f), Quaternion.identity, new Vector3(0.62f, 1.70f, 0.86f), mats.TownInteriorPaintPearl);
+                new Vector3(0f, 0.85f, 0f), Quaternion.identity, new Vector3(0.86f, 1.70f, 0.62f), mats.TownInteriorPaintPearl);
             CreateStaticPart("PumpHeader", PrimitiveType.Cube, pump.transform,
-                new Vector3(0f, 1.78f, 0f), Quaternion.identity, new Vector3(0.68f, 0.24f, 0.92f), mats.TownFabricTeal);
-            CreateStaticPart("MeterScreen_E", PrimitiveType.Cube, pump.transform,
-                new Vector3(0.32f, 1.24f, 0f), Quaternion.identity, new Vector3(0.03f, 0.28f, 0.46f), mats.SedanTrimDark);
-            CreateStaticPart("MeterScreen_W", PrimitiveType.Cube, pump.transform,
-                new Vector3(-0.32f, 1.24f, 0f), Quaternion.identity, new Vector3(0.03f, 0.28f, 0.46f), mats.SedanTrimDark);
-            CreateStaticPart("NozzleHose", PrimitiveType.Cylinder, pump.transform,
-                new Vector3(0f, 0.82f, 0.48f), Quaternion.Euler(14f, 0f, 0f), new Vector3(0.05f, 0.46f, 0.05f), mats.WheelRubber);
+                new Vector3(0f, 1.78f, 0f), Quaternion.identity, new Vector3(0.92f, 0.24f, 0.68f), mats.TownFabricTeal);
+            CreateStaticPart("MeterScreen_N", PrimitiveType.Cube, pump.transform,
+                new Vector3(0f, 1.24f, 0.32f), Quaternion.identity, new Vector3(0.46f, 0.28f, 0.03f), mats.SedanTrimDark);
+            CreateStaticPart("MeterScreen_S", PrimitiveType.Cube, pump.transform,
+                new Vector3(0f, 1.24f, -0.32f), Quaternion.identity, new Vector3(0.46f, 0.28f, 0.03f), mats.SedanTrimDark);
 
             BoxCollider col = pump.AddComponent<BoxCollider>();
             col.center = new Vector3(0f, 0.95f, 0f);
-            col.size = new Vector3(0.70f, 1.90f, 0.96f);
+            col.size = new Vector3(0.96f, 1.90f, 0.70f);
             MarkStaticEnvironment(pump);
 
             GameObject trigGo = new GameObject("FuelPumpTrigger");
             trigGo.transform.SetParent(pump.transform, false);
             trigGo.transform.localPosition = new Vector3(0f, 0.8f, 0f);
             InteractableTrigger trig = trigGo.AddComponent<InteractableTrigger>();
-            trig.Configure(InteractableKind.FuelPump, triggerId, "ui.btn.refuel", 4.6f);
+            trig.Configure(InteractableKind.FuelPump, triggerId, "ui.btn.refuel", 5.2f);
         }
 
-        /// <summary>
-        /// E3: Places the 4 Side-Job start points, each with a glowing ground ring + JobBoard trigger.
-        /// </summary>
         private static void BuildSideJobStartPoints(Transform parent, MaterialSet mats)
         {
             GameObject jobsRoot = new GameObject("Town_SideJobBoards");
             jobsRoot.transform.SetParent(parent, false);
 
-            // a) Pizza Delivery right outside the "PİZZA" shop on Main Street (z = 24.6)
+            // a) Pizza Delivery right outside PİZZA on Cumhuriyet Caddesi
             CreateJobStartRing(
                 "JobBoard_Pizza",
                 "job_board_pizza",
@@ -638,11 +351,11 @@ namespace Gridroam.Editor
                 "job.pizza.name",
                 "job.pizza.loc",
                 jobsRoot.transform,
-                new Vector3(16.6f, 0.16f, 24.6f),
+                new Vector3(16.8f, 0.03f, -6.5f),
                 radius: 4.6f,
                 mats.JobRingGlow);
 
-            // b) Taxi Rank at the NE edge of Town Square (z = 145.5) + Taxi Signpost
+            // b) Taxi Rank at NE edge of Town Square
             GameObject taxiBoard = CreateJobStartRing(
                 "JobBoard_Taxi",
                 "job_board_taxi",
@@ -650,7 +363,7 @@ namespace Gridroam.Editor
                 "job.taxi.name",
                 "job.taxi.loc",
                 jobsRoot.transform,
-                new Vector3(16.6f, 0.16f, 145.5f),
+                new Vector3(16.8f, 0.03f, 96.0f),
                 radius: 4.6f,
                 mats.JobRingGlow);
 
@@ -662,7 +375,7 @@ namespace Gridroam.Editor
                 new Vector3(-1.26f, 2.75f, 0f), Quaternion.Euler(0f, -90f, 0f),
                 new Vector2(1.05f, 0.36f), new Color(0.10f, 0.11f, 0.13f, 1f));
 
-            // c) Street Cleanup in front of the Clock Tower at Town Square (x = -11.2, z = 134)
+            // c) Street Cleanup in front of the Clock Tower at Town Square
             CreateJobStartRing(
                 "JobBoard_Cleanup",
                 "job_board_cleanup",
@@ -670,11 +383,11 @@ namespace Gridroam.Editor
                 "job.cleanup.name",
                 "job.cleanup.loc",
                 jobsRoot.transform,
-                new Vector3(-11.2f, 0.16f, 134.0f),
-                radius: 3.2f,
+                new Vector3(-9.5f, 0.03f, 80.0f),
+                radius: 3.4f,
                 mats.JobRingGlow);
 
-            // d) House Painting Job NPC + Ring at Residential Quarter / Park corner (x = -33.4, z = 118.2)
+            // d) House Painting Job NPC + Ring at Çınarlı Park
             GameObject paintBoard = CreateJobStartRing(
                 "JobBoard_HousePainting",
                 "job_board_painting",
@@ -682,8 +395,8 @@ namespace Gridroam.Editor
                 "job.paint.name",
                 "job.paint.loc",
                 jobsRoot.transform,
-                new Vector3(-33.4f, 0.12f, 118.2f),
-                radius: 3.5f,
+                new Vector3(-13.5f, 0.03f, 148.0f),
+                radius: 3.6f,
                 mats.JobRingGlow);
 
             GameObject painterNpc = new GameObject("NPC_HousePainterContractor");
@@ -724,8 +437,8 @@ namespace Gridroam.Editor
             GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             ring.name = "JobGlowRing";
             ring.transform.SetParent(root.transform, false);
-            ring.transform.localPosition = new Vector3(0f, 0.045f, 0f);
-            ring.transform.localScale = new Vector3(2.8f, 0.045f, 2.8f);
+            ring.transform.localPosition = new Vector3(0f, 0.035f, 0f);
+            ring.transform.localScale = new Vector3(2.8f, 0.035f, 2.8f);
             UnityEngine.Object.DestroyImmediate(ring.GetComponent<Collider>());
             if (glowMat != null)
             {
@@ -740,27 +453,24 @@ namespace Gridroam.Editor
             return root;
         }
 
-        /// <summary>
-        /// E6: Builds interactable Vending Machines (5 ₺, +8 energy) and Mailboxes for town life flavour.
-        /// </summary>
         private static void BuildVendingAndMailboxes(Transform parent, MaterialSet mats)
         {
             GameObject propsRoot = new GameObject("Town_VendingAndMailboxes");
             propsRoot.transform.SetParent(parent, false);
 
             CreateVendingMachine("Vending_Square", "vending_square", propsRoot.transform,
-                new Vector3(-12.2f, 0.16f, 128.8f), Quaternion.Euler(0f, 90f, 0f), mats);
-            CreateVendingMachine("Vending_Promenade", "vending_promenade", propsRoot.transform,
-                new Vector3(34.4f, 0.16f, 134.0f), Quaternion.Euler(0f, -90f, 0f), mats);
+                new Vector3(-13.8f, 0.03f, 72.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+            CreateVendingMachine("Vending_CafePatio", "vending_promenade", propsRoot.transform,
+                new Vector3(14.5f, 0.03f, 18.0f), Quaternion.Euler(0f, 90f, 0f), mats);
             CreateVendingMachine("Vending_GasStation", "vending_gasstation", propsRoot.transform,
-                new Vector3(6.6f, 0.16f, 231.5f), Quaternion.Euler(0f, 90f, 0f), mats);
+                new Vector3(53.2f, 0.03f, 139.2f), Quaternion.Euler(0f, 0f, 0f), mats);
 
             (Vector3 pos, float yaw)[] mailboxes =
             {
-                (new Vector3(13.95f, 0.16f, 34.5f), 90f),
-                (new Vector3(11.2f, 0.16f, 122.4f), 0f),
-                (new Vector3(13.95f, 0.16f, 196.0f), 90f),
-                (new Vector3(-34.2f, 0.10f, 100.5f), 90f)
+                (new Vector3(16.2f, 0.03f, 2.5f), 90f),
+                (new Vector3(14.5f, 0.03f, 64.0f), 90f),
+                (new Vector3(-30.5f, 0.03f, 56.0f), 90f),
+                (new Vector3(-30.5f, 0.03f, 128.0f), 90f)
             };
 
             for (int i = 0; i < mailboxes.Length; i++)
@@ -793,7 +503,7 @@ namespace Gridroam.Editor
             trigObj.transform.SetParent(vm.transform, false);
             trigObj.transform.localPosition = new Vector3(0f, 0.9f, 0.45f);
             InteractableTrigger trig = trigObj.AddComponent<InteractableTrigger>();
-            trig.Configure(InteractableKind.VendingMachine, id, "ui.btn.vending", 2.1f);
+            trig.Configure(InteractableKind.VendingMachine, id, "ui.btn.vending", 2.2f);
         }
 
         private static void CreateMailbox(string name, string id, Transform parent, Vector3 pos, Quaternion rot, MaterialSet mats)
@@ -818,7 +528,7 @@ namespace Gridroam.Editor
             trigObj.transform.SetParent(mb.transform, false);
             trigObj.transform.localPosition = new Vector3(0f, 1.0f, 0f);
             InteractableTrigger trig = trigObj.AddComponent<InteractableTrigger>();
-            trig.Configure(InteractableKind.InspectObject, id, "ui.btn.inspect", 1.85f);
+            trig.Configure(InteractableKind.InspectObject, id, "ui.btn.inspect", 1.9f);
         }
 
         private static void BuildTownSquare(
@@ -830,11 +540,12 @@ namespace Gridroam.Editor
             GameObject sqRoot = new GameObject("Town_Square");
             sqRoot.transform.SetParent(parent, false);
 
+            // Flush non-blocking Town Square paving (x = -16.5..+16.5, z = +52..+108, centered at (0, 0, 80))
             CreateTiledBox("Square_Paving", sqRoot.transform,
-                new Vector3(-2.5f, 0.08f, 134f), new Vector3(31f, 0.16f, 28f),
-                Quaternion.identity, mats.TownPaving, metersPerTile: 2.0f, collider: true);
+                new Vector3(0f, 0.014f, 80f), new Vector3(33f, 0.028f, 56f),
+                Quaternion.identity, mats.TownPaving, metersPerTile: 2.0f, collider: false);
 
-            Vector3 fountainCenter = new Vector3(-2.0f, 0.16f, 134.0f);
+            Vector3 fountainCenter = new Vector3(1.5f, 0.02f, 80.0f);
             GameObject fountain = new GameObject("Square_Fountain");
             fountain.transform.SetParent(sqRoot.transform, false);
 
@@ -851,7 +562,7 @@ namespace Gridroam.Editor
             }
 
             GameObject waterDisc = CreatePrimitiveChild("FountainWater", PrimitiveType.Cylinder, fountain.transform,
-                fountainCenter + new Vector3(0f, 0.50f, 0f), new Vector3(5.8f, 0.06f, 5.8f), mats.SeaWater, removeCollider: true);
+                fountainCenter + new Vector3(0f, 0.48f, 0f), new Vector3(5.8f, 0.06f, 5.8f), mats.SeaWater, removeCollider: true);
             MarkStaticEnvironment(waterDisc);
 
             CreateTiledBox("FountainPedestal", fountain.transform,
@@ -875,7 +586,7 @@ namespace Gridroam.Editor
             for (int i = 0; i < benchAngles.Length; i++)
             {
                 float rad = benchAngles[i] * Mathf.Deg2Rad;
-                Vector3 pos = fountainCenter + new Vector3(Mathf.Sin(rad) * 5.6f, 0f, Mathf.Cos(rad) * 5.6f);
+                Vector3 pos = fountainCenter + new Vector3(Mathf.Sin(rad) * 6.2f, 0f, Mathf.Cos(rad) * 6.2f);
                 Quaternion rot = Quaternion.Euler(0f, benchAngles[i] + 180f, 0f);
                 var (slotL, slotR) = CreateBench($"Square_Bench_{i + 1}", sqRoot.transform, pos, rot, mats);
                 if (i == 0)
@@ -899,50 +610,30 @@ namespace Gridroam.Editor
 
             Vector3[] sqTrees =
             {
-                new Vector3(9.5f, 0.16f, 123.5f),
-                new Vector3(9.5f, 0.16f, 144.5f),
-                new Vector3(-1.5f, 0.16f, 122.5f),
-                new Vector3(-1.5f, 0.16f, 145.5f),
-                new Vector3(-12.5f, 0.16f, 123.5f),
-                new Vector3(-12.5f, 0.16f, 144.5f)
+                new Vector3(12.5f, 0f, 58f),
+                new Vector3(12.5f, 0f, 102f),
+                new Vector3(-12.5f, 0f, 58f),
+                new Vector3(-12.5f, 0f, 102f)
             };
             for (int i = 0; i < sqTrees.Length; i++)
             {
-                CreateTownTree($"Square_Tree_{i + 1}", sqRoot.transform, sqTrees[i], mats, 1.0f + (i % 3) * 0.12f, i);
+                CreateTownTree($"Square_Tree_{i + 1}", sqRoot.transform, sqTrees[i], mats, 1.0f + (i % 2) * 0.14f, i);
             }
 
-            BuildClockTower(sqRoot.transform, new Vector3(-14.6f, 0.16f, 134.0f), mats);
+            BuildClockTower(sqRoot.transform, new Vector3(-13.8f, 0.02f, 80.0f), mats);
 
             Vector3[] lampPositions =
             {
-                new Vector3(8.5f, 0.16f, 127.0f),
-                new Vector3(8.5f, 0.16f, 141.0f),
-                new Vector3(-9.5f, 0.16f, 127.0f),
-                new Vector3(-9.5f, 0.16f, 141.0f)
+                new Vector3(11.5f, 0.02f, 68.0f),
+                new Vector3(11.5f, 0.02f, 92.0f),
+                new Vector3(-9.5f, 0.02f, 68.0f),
+                new Vector3(-9.5f, 0.02f, 92.0f)
             };
             for (int i = 0; i < lampPositions.Length; i++)
             {
                 PlacePrefabInstance(prefabs.StreetLamp, sqRoot.transform, lampPositions[i], Quaternion.Euler(0f, i * 90f, 0f));
                 CreatePointLamp($"Square_LampLight_{i + 1}", sqRoot.transform,
                     lampPositions[i] + Vector3.up * 5.1f, new Color(1.0f, 0.80f, 0.46f), 20f, 2.2f);
-            }
-
-            Vector3[] planterCenters =
-            {
-                new Vector3(11.4f, 0.16f, 128.0f),
-                new Vector3(11.4f, 0.16f, 140.0f),
-                new Vector3(-6.0f, 0.16f, 121.6f),
-                new Vector3(-6.0f, 0.16f, 146.4f)
-            };
-            for (int i = 0; i < planterCenters.Length; i++)
-            {
-                Vector3 size = i < 2 ? new Vector3(1.1f, 0.55f, 3.2f) : new Vector3(3.4f, 0.55f, 1.1f);
-                CreateTiledBox($"Square_Planter_{i + 1}", sqRoot.transform,
-                    planterCenters[i] + Vector3.up * 0.275f, size,
-                    Quaternion.identity, mats.GarageBrick, 1.5f, collider: true);
-                CreateTiledBox($"Square_PlanterHedge_{i + 1}", sqRoot.transform,
-                    planterCenters[i] + Vector3.up * 0.72f, new Vector3(size.x - 0.22f, 0.42f, size.z - 0.22f),
-                    Quaternion.identity, mats.TownHedge, 1.5f, collider: false);
             }
         }
 
@@ -952,33 +643,33 @@ namespace Gridroam.Editor
             tower.transform.SetParent(parent, false);
 
             CreateTiledBox("Tower_Base", tower.transform,
-                basePos + new Vector3(0f, 1.5f, 0f), new Vector3(4.4f, 3.0f, 4.4f),
+                basePos + new Vector3(0f, 1.5f, 0f), new Vector3(4.2f, 3.0f, 4.2f),
                 Quaternion.identity, mats.Concrete, 2.0f, collider: true);
 
             CreateTiledBox("Tower_Shaft", tower.transform,
-                basePos + new Vector3(0f, 7.25f, 0f), new Vector3(3.6f, 8.5f, 3.6f),
+                basePos + new Vector3(0f, 7.25f, 0f), new Vector3(3.4f, 8.5f, 3.4f),
                 Quaternion.identity, mats.PlasterTrim, 3.0f, collider: true);
 
             CreateTiledBox("Tower_ClockBox", tower.transform,
-                basePos + new Vector3(0f, 12.9f, 0f), new Vector3(3.9f, 2.8f, 3.9f),
+                basePos + new Vector3(0f, 12.9f, 0f), new Vector3(3.7f, 2.8f, 3.7f),
                 Quaternion.identity, mats.Concrete, 2.0f, collider: true);
 
             CreateTiledBox("Tower_Cornice", tower.transform,
-                basePos + new Vector3(0f, 14.45f, 0f), new Vector3(4.3f, 0.35f, 4.3f),
+                basePos + new Vector3(0f, 14.45f, 0f), new Vector3(4.1f, 0.35f, 4.1f),
                 Quaternion.identity, mats.PlasterTrim, 2.0f, collider: false);
             CreateTiledBox("Tower_CapLower", tower.transform,
-                basePos + new Vector3(0f, 15.05f, 0f), new Vector3(3.2f, 0.9f, 3.2f),
+                basePos + new Vector3(0f, 15.05f, 0f), new Vector3(3.0f, 0.9f, 3.0f),
                 Quaternion.identity, mats.TownRoofTile, 1.5f, collider: false);
             CreateTiledBox("Tower_CapUpper", tower.transform,
-                basePos + new Vector3(0f, 15.75f, 0f), new Vector3(1.6f, 0.7f, 1.6f),
+                basePos + new Vector3(0f, 15.75f, 0f), new Vector3(1.5f, 0.7f, 1.5f),
                 Quaternion.identity, mats.TownRoofTile, 1.5f, collider: false);
 
             Vector3[] faceOffsets =
             {
-                new Vector3(1.98f, 12.9f, 0f),
-                new Vector3(-1.98f, 12.9f, 0f),
-                new Vector3(0f, 12.9f, 1.98f),
-                new Vector3(0f, 12.9f, -1.98f)
+                new Vector3(1.88f, 12.9f, 0f),
+                new Vector3(-1.88f, 12.9f, 0f),
+                new Vector3(0f, 12.9f, 1.88f),
+                new Vector3(0f, 12.9f, -1.88f)
             };
             Quaternion[] faceRots =
             {
@@ -996,18 +687,18 @@ namespace Gridroam.Editor
                 faceRoot.transform.rotation = faceRots[i];
 
                 GameObject dial = CreatePrimitiveChild("Dial", PrimitiveType.Cylinder, faceRoot.transform,
-                    Vector3.zero, new Vector3(1.75f, 0.04f, 1.75f), mats.LampGlow, removeCollider: true);
+                    Vector3.zero, new Vector3(1.65f, 0.04f, 1.65f), mats.LampGlow, removeCollider: true);
                 dial.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 MarkStaticPaintable(dial);
                 NightLight dialNl = dial.AddComponent<NightLight>();
                 dialNl.Configure(null, new[] { dial.GetComponent<Renderer>() }, new Color(1.0f, 0.85f, 0.55f) * 2.5f);
 
                 GameObject hourHand = CreatePrimitiveChild("HourHand", PrimitiveType.Cube, faceRoot.transform,
-                    new Vector3(0f, 0.22f, 0.05f), new Vector3(0.09f, 0.50f, 0.04f), mats.SedanTrimDark, removeCollider: true);
+                    new Vector3(0f, 0.22f, 0.05f), new Vector3(0.09f, 0.48f, 0.04f), mats.SedanTrimDark, removeCollider: true);
                 MarkStaticEnvironment(hourHand);
 
                 GameObject minHand = CreatePrimitiveChild("MinuteHand", PrimitiveType.Cube, faceRoot.transform,
-                    new Vector3(0.24f, 0f, 0.05f), new Vector3(0.58f, 0.07f, 0.04f), mats.SedanTrimDark, removeCollider: true);
+                    new Vector3(0.22f, 0f, 0.05f), new Vector3(0.54f, 0.07f, 0.04f), mats.SedanTrimDark, removeCollider: true);
                 MarkStaticEnvironment(minHand);
             }
         }
@@ -1021,91 +712,102 @@ namespace Gridroam.Editor
             GameObject resRoot = new GameObject("Town_ResidentialQuarter");
             resRoot.transform.SetParent(parent, false);
 
-            Material[] wallPalette = { mats.PlasterTrim, mats.BuildingFacadeB, mats.TownBrickHouse };
+            Material[] wallPalette = { mats.PlasterTrim, mats.BuildingFacadeB, mats.TownBrickHouse, mats.BuildingFacadeA };
 
-            float[] houseZs =
+            // 9 West-side spacious enterable houses (x = -43.5, facing East onto Çınar Caddesi x = -24, 18.5m spacing!)
+            float[] westHouseZs =
             {
-                24f, 38f, 52f, 66f, 80f,
-                124f, 140f, 156f,
-                186f, 201f, 216f, 231f
+                -8.5f, 10.0f, 28.5f,
+                61.5f, 80.0f, 98.5f,
+                131.5f, 150.0f, 168.5f
             };
 
-            int houseIdx = 0;
-            foreach (float z in houseZs)
+            for (int i = 0; i < westHouseZs.Length; i++)
             {
-                Material wall1 = wallPalette[rng.Next(wallPalette.Length)];
+                Material wallMat = wallPalette[i % wallPalette.Length];
                 BuildEnterableResidentialHouse(
-                    $"House_R1_{houseIdx + 1:00}",
-                    $"house_r1_{houseIdx + 1:00}",
-                    $"Çınar Sokak No: {houseIdx + 1}",
+                    $"House_West_{i + 1:00}",
+                    $"house_w_{i + 1:00}",
+                    $"Çınar Caddesi No: {i + 1}",
                     resRoot.transform,
-                    new Vector3(-38.1f, 0f, z),
-                    depthX: 7.4f,
-                    widthZ: 8.8f + (float)(rng.NextDouble() * 0.7),
-                    wallMat: wall1,
-                    hasChimney: rng.Next(3) == 0,
-                    hasGardenTree: rng.Next(2) == 0,
+                    new Vector3(-43.5f, 0f, westHouseZs[i]),
+                    Quaternion.identity,
+                    depthX: 9.2f,
+                    widthZ: 10.6f,
+                    wallMat: wallMat,
+                    hasChimney: i % 2 == 0,
+                    hasGardenTree: i % 3 == 0,
                     mats: mats,
-                    houseSeed: 2000 + houseIdx * 37);
-
-                Material wall2 = wallPalette[rng.Next(wallPalette.Length)];
-                BuildEnterableResidentialHouse(
-                    $"House_R2_{houseIdx + 1:00}",
-                    $"house_r2_{houseIdx + 1:00}",
-                    $"Lale Sokak No: {houseIdx + 1}",
-                    resRoot.transform,
-                    new Vector3(-56.5f, 0f, z),
-                    depthX: 8.0f,
-                    widthZ: 9.0f + (float)(rng.NextDouble() * 0.7),
-                    wallMat: wall2,
-                    hasChimney: rng.Next(3) == 0,
-                    hasGardenTree: rng.Next(2) == 0,
-                    mats: mats,
-                    houseSeed: 3000 + houseIdx * 41);
-
-                houseIdx++;
+                    houseSeed: 2000 + i * 37);
             }
 
-            GameObject parkRoot = new GameObject("Town_NeighborhoodPark");
+            // 3 East-side spacious enterable houses (x = +43.5, facing West 180° onto Cumhuriyet Caddesi x = +24!)
+            float[] eastHouseZs = { 61.5f, 80.0f, 98.5f };
+            for (int i = 0; i < eastHouseZs.Length; i++)
+            {
+                Material wallMat = wallPalette[(i + 2) % wallPalette.Length];
+                BuildEnterableResidentialHouse(
+                    $"House_East_{i + 1:00}",
+                    $"house_e_{i + 1:00}",
+                    $"Cumhuriyet Caddesi No: {i + 10}",
+                    resRoot.transform,
+                    new Vector3(43.5f, 0f, eastHouseZs[i]),
+                    Quaternion.Euler(0f, 180f, 0f),
+                    depthX: 9.2f,
+                    widthZ: 10.6f,
+                    wallMat: wallMat,
+                    hasChimney: i % 2 == 1,
+                    hasGardenTree: i == 1,
+                    mats: mats,
+                    houseSeed: 3100 + i * 41);
+            }
+
+            // South-East Community Plaza & Parking Garden (x = +48, z = +10)
+            GameObject eastGarden = new GameObject("Town_EastCommunityGarden");
+            eastGarden.transform.SetParent(parent, false);
+            CreateTiledBox("EastGarden_WalkwayNS", eastGarden.transform,
+                new Vector3(48.0f, 0.014f, 10.0f), new Vector3(3.2f, 0.028f, 48.0f),
+                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
+            CreateTiledBox("EastGarden_WalkwayEW", eastGarden.transform,
+                new Vector3(48.0f, 0.014f, 10.0f), new Vector3(30.0f, 0.028f, 3.2f),
+                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
+            var egB1 = CreateBench("EastGarden_Bench_1", eastGarden.transform, new Vector3(44.5f, 0.02f, 6.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+            var egB2 = CreateBench("EastGarden_Bench_2", eastGarden.transform, new Vector3(51.5f, 0.02f, 14.0f), Quaternion.Euler(0f, -90f, 0f), mats);
+            benchSeatCollector.Add(egB1.leftSlot); benchSeatCollector.Add(egB1.rightSlot);
+            benchSeatCollector.Add(egB2.leftSlot); benchSeatCollector.Add(egB2.rightSlot);
+            CreateTownTree("EastGarden_Tree_1", eastGarden.transform, new Vector3(38.0f, 0f, -6.0f), mats, 1.05f, 41);
+            CreateTownTree("EastGarden_Tree_2", eastGarden.transform, new Vector3(58.0f, 0f, -6.0f), mats, 1.12f, 42);
+            CreateTownTree("EastGarden_Tree_3", eastGarden.transform, new Vector3(38.0f, 0f, 26.0f), mats, 0.98f, 43);
+            CreateTownTree("EastGarden_Tree_4", eastGarden.transform, new Vector3(58.0f, 0f, 26.0f), mats, 1.06f, 44);
+
+            // Central North Block: Çınarlı Park (x = -16..+16, z = +124..+176, centered at (0, 0, 150))
+            GameObject parkRoot = new GameObject("Town_CinarliPark");
             parkRoot.transform.SetParent(parent, false);
 
-            CreateTiledBox("Park_GrassWest", parkRoot.transform,
-                new Vector3(-59.25f, 0.02f, 106.65f), new Vector3(19.5f, 0.04f, 19.7f),
-                Quaternion.identity, mats.TownGrass, 4.0f, collider: false);
-
-            CreateTiledBox("Park_GrassEast", parkRoot.transform,
-                new Vector3(-38.0f, 0.02f, 106.65f), new Vector3(9.0f, 0.04f, 19.7f),
-                Quaternion.identity, mats.TownGrass, 4.0f, collider: false);
-
-            CreateTiledBox("Park_PathWest", parkRoot.transform,
-                new Vector3(-59.25f, 0.04f, 106.5f), new Vector3(19.5f, 0.04f, 2.4f),
+            CreateTiledBox("Park_PathNS", parkRoot.transform,
+                new Vector3(0f, 0.014f, 150f), new Vector3(3.2f, 0.028f, 52f),
                 Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
-            CreateTiledBox("Park_PathWestCross", parkRoot.transform,
-                new Vector3(-58.5f, 0.04f, 106.65f), new Vector3(2.2f, 0.04f, 19.2f),
-                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
-            CreateTiledBox("Park_PathEast", parkRoot.transform,
-                new Vector3(-38.0f, 0.04f, 106.5f), new Vector3(9.0f, 0.04f, 2.4f),
+            CreateTiledBox("Park_PathEW", parkRoot.transform,
+                new Vector3(0f, 0.014f, 150f), new Vector3(32f, 0.028f, 3.2f),
                 Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
 
             Vector3[] parkTrees =
             {
-                new Vector3(-65.5f, 0.04f, 100.5f),
-                new Vector3(-53.5f, 0.04f, 100.5f),
-                new Vector3(-65.5f, 0.04f, 112.5f),
-                new Vector3(-53.5f, 0.04f, 112.5f),
-                new Vector3(-62.0f, 0.04f, 114.2f),
-                new Vector3(-62.0f, 0.04f, 99.0f),
-                new Vector3(-37.5f, 0.04f, 101.2f),
-                new Vector3(-37.5f, 0.04f, 112.2f)
+                new Vector3(-11f, 0f, 134f),
+                new Vector3(11f, 0f, 134f),
+                new Vector3(-11f, 0f, 166f),
+                new Vector3(11f, 0f, 166f),
+                new Vector3(-8f, 0f, 156f),
+                new Vector3(8f, 0f, 142f)
             };
             for (int i = 0; i < parkTrees.Length; i++)
             {
-                CreateTownTree($"Park_Tree_{i + 1}", parkRoot.transform, parkTrees[i], mats, 0.95f + (i % 3) * 0.16f, i + 10);
+                CreateTownTree($"Park_Tree_{i + 1}", parkRoot.transform, parkTrees[i], mats, 1.0f + (i % 3) * 0.14f, i + 20);
             }
 
-            var pb1 = CreateBench("Park_Bench_1", parkRoot.transform, new Vector3(-63.0f, 0.06f, 104.6f), Quaternion.identity, mats);
-            var pb2 = CreateBench("Park_Bench_2", parkRoot.transform, new Vector3(-53.8f, 0.06f, 108.4f), Quaternion.Euler(0f, 180f, 0f), mats);
-            var pb3 = CreateBench("Park_Bench_3", parkRoot.transform, new Vector3(-38.0f, 0.06f, 104.6f), Quaternion.identity, mats);
+            var pb1 = CreateBench("Park_Bench_1", parkRoot.transform, new Vector3(-5.5f, 0.02f, 146.5f), Quaternion.identity, mats);
+            var pb2 = CreateBench("Park_Bench_2", parkRoot.transform, new Vector3(5.5f, 0.02f, 153.5f), Quaternion.Euler(0f, 180f, 0f), mats);
+            var pb3 = CreateBench("Park_Bench_3", parkRoot.transform, new Vector3(5.5f, 0.02f, 146.5f), Quaternion.identity, mats);
             benchSeatCollector.Add(pb1.leftSlot); benchSeatCollector.Add(pb1.rightSlot);
             benchSeatCollector.Add(pb2.leftSlot); benchSeatCollector.Add(pb2.rightSlot);
             benchSeatCollector.Add(pb3.leftSlot); benchSeatCollector.Add(pb3.rightSlot);
@@ -1121,88 +823,70 @@ namespace Gridroam.Editor
             GameObject furnRoot = new GameObject("Town_StreetFurniture");
             furnRoot.transform.SetParent(parent, false);
 
-            float[] crossZs = { 92f, 174f };
+            // Crosswalks & Traffic Lights at Cumhuriyet Caddesi (x = +24) intersections (z = 44 & z = 116)
+            float[] crossZs = { 44f, 116f };
             foreach (float cz in crossZs)
             {
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Coastal_{cz}_S", new Vector3(24f, 0.08f, cz - 6.2f), 10.5f, horizontalX: true, mats.RoadMarkingWhite);
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Coastal_{cz}_N", new Vector3(24f, 0.08f, cz + 6.2f), 10.5f, horizontalX: true, mats.RoadMarkingWhite);
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Coastal_{cz}_W", new Vector3(16.0f, 0.08f, cz), 7.5f, horizontalX: false, mats.RoadMarkingWhite);
+                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Main_{cz}_S", new Vector3(24f, 0.028f, cz - 7.0f), 9.5f, horizontalX: true, mats.RoadMarkingWhite);
+                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Main_{cz}_N", new Vector3(24f, 0.028f, cz + 7.0f), 9.5f, horizontalX: true, mats.RoadMarkingWhite);
+                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_West_{cz}_S", new Vector3(-24f, 0.028f, cz - 7.0f), 9.5f, horizontalX: true, mats.RoadMarkingWhite);
+                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_West_{cz}_N", new Vector3(-24f, 0.028f, cz + 7.0f), 9.5f, horizontalX: true, mats.RoadMarkingWhite);
 
-                // Painted white traffic Stop Lines before each Coastal Main crosswalk
-                CreateStaticBlock($"StopLine_Coastal_{cz}_NB", furnRoot.transform,
-                    new Vector3(27.0f, 0.082f, cz - 8.5f), new Vector3(5.2f, 0.02f, 0.45f), mats.RoadMarkingWhite, addCollider: false);
-                CreateStaticBlock($"StopLine_Coastal_{cz}_SB", furnRoot.transform,
-                    new Vector3(21.0f, 0.082f, cz + 8.5f), new Vector3(5.2f, 0.02f, 0.45f), mats.RoadMarkingWhite, addCollider: false);
-
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Alley_{cz}_S", new Vector3(-26f, 0.08f, cz - 6.2f), 7.5f, horizontalX: true, mats.RoadMarkingWhite);
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Alley_{cz}_N", new Vector3(-26f, 0.08f, cz + 6.2f), 7.5f, horizontalX: true, mats.RoadMarkingWhite);
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Alley_{cz}_E", new Vector3(-20.4f, 0.08f, cz), 7.5f, horizontalX: false, mats.RoadMarkingWhite);
-                CreateZebraCrosswalk(furnRoot.transform, $"Zebra_Alley_{cz}_W", new Vector3(-31.6f, 0.08f, cz), 7.5f, horizontalX: false, mats.RoadMarkingWhite);
+                CreateStaticBlock($"StopLine_Main_{cz}_NB", furnRoot.transform,
+                    new Vector3(26.6f, 0.03f, cz - 9.2f), new Vector3(4.6f, 0.01f, 0.40f), mats.RoadMarkingWhite, addCollider: false);
+                CreateStaticBlock($"StopLine_Main_{cz}_SB", furnRoot.transform,
+                    new Vector3(21.4f, 0.03f, cz + 9.2f), new Vector3(4.6f, 0.01f, 0.40f), mats.RoadMarkingWhite, addCollider: false);
             }
 
-            TrafficLightCycler southSW = CreateTrafficLightPole("TrafficLight_South_SW", furnRoot.transform, new Vector3(17.0f, 0.16f, 86.2f), Quaternion.Euler(0f, 0f, 0f), mats, phaseOffset: 0f);
-            TrafficLightCycler southNE = CreateTrafficLightPole("TrafficLight_South_NE", furnRoot.transform, new Vector3(31.2f, 0.16f, 97.8f), Quaternion.Euler(0f, 180f, 0f), mats, phaseOffset: 0f);
-            TrafficLightCycler northSW = CreateTrafficLightPole("TrafficLight_North_SW", furnRoot.transform, new Vector3(17.0f, 0.16f, 168.2f), Quaternion.Euler(0f, 0f, 0f), mats, phaseOffset: 8f);
-            TrafficLightCycler northNE = CreateTrafficLightPole("TrafficLight_North_NE", furnRoot.transform, new Vector3(31.2f, 0.16f, 179.8f), Quaternion.Euler(0f, 180f, 0f), mats, phaseOffset: 8f);
+            TrafficLightCycler southSW = CreateTrafficLightPole("TrafficLight_44_SW", furnRoot.transform, new Vector3(17.5f, 0.02f, 37.5f), Quaternion.identity, mats, phaseOffset: 0f);
+            TrafficLightCycler southNE = CreateTrafficLightPole("TrafficLight_44_NE", furnRoot.transform, new Vector3(30.5f, 0.02f, 50.5f), Quaternion.Euler(0f, 180f, 0f), mats, phaseOffset: 0f);
+            TrafficLightCycler northSW = CreateTrafficLightPole("TrafficLight_116_SW", furnRoot.transform, new Vector3(17.5f, 0.02f, 109.5f), Quaternion.identity, mats, phaseOffset: 8f);
+            TrafficLightCycler northNE = CreateTrafficLightPole("TrafficLight_116_NE", furnRoot.transform, new Vector3(30.5f, 0.02f, 122.5f), Quaternion.Euler(0f, 180f, 0f), mats, phaseOffset: 8f);
 
             List<TrafficStopLine> stopLines = new List<TrafficStopLine>
             {
-                new TrafficStopLine { stopPosition = new Vector3(27.0f, 0.1f, 83.5f), approachDirection = Vector3.forward, trafficLight = southSW },
-                new TrafficStopLine { stopPosition = new Vector3(21.0f, 0.1f, 100.5f), approachDirection = Vector3.back, trafficLight = southNE },
-                new TrafficStopLine { stopPosition = new Vector3(27.0f, 0.1f, 165.5f), approachDirection = Vector3.forward, trafficLight = northSW },
-                new TrafficStopLine { stopPosition = new Vector3(21.0f, 0.1f, 182.5f), approachDirection = Vector3.back, trafficLight = northNE }
+                new TrafficStopLine { stopPosition = new Vector3(26.6f, 0.05f, 34.8f), approachDirection = Vector3.forward, trafficLight = southSW },
+                new TrafficStopLine { stopPosition = new Vector3(21.4f, 0.05f, 53.2f), approachDirection = Vector3.back, trafficLight = southNE },
+                new TrafficStopLine { stopPosition = new Vector3(26.6f, 0.05f, 106.8f), approachDirection = Vector3.forward, trafficLight = northSW },
+                new TrafficStopLine { stopPosition = new Vector3(21.4f, 0.05f, 125.2f), approachDirection = Vector3.back, trafficLight = northNE }
             };
 
-            int propIdx = 0;
-            for (float z = 25f; z <= 228f; z += 25f)
+            // Street Props: Fire Hydrants & Trash Cans placed neatly off the road & off sidewalks
+            Vector3[] hydrants =
             {
-                if (IsNearCrossStreet(z, 7.5f)) continue;
-
-                // Keep Gas Station driveway (z = 214..239) completely open on MainWest
-                if (z < 214f)
-                {
-                    if (propIdx % 2 == 0)
-                    {
-                        PlacePrefabInstance(prefabs.FireHydrant, furnRoot.transform, new Vector3(16.6f, 0.16f, z), Quaternion.identity);
-                    }
-                    else
-                    {
-                        PlacePrefabInstance(prefabs.TrashCan, furnRoot.transform, new Vector3(16.5f, 0.16f, z), Quaternion.Euler(0f, propIdx * 30f, 0f));
-                    }
-
-                    if ((z < 118f || z > 150f) && propIdx % 2 == 1 && z + 5f < 212f)
-                    {
-                        var swBench = CreateBench($"MainSidewalk_Bench_{propIdx}", furnRoot.transform,
-                            new Vector3(14.35f, 0.16f, z + 5f), Quaternion.Euler(0f, 90f, 0f), mats);
-                        benchSeatCollector.Add(swBench.leftSlot);
-                        benchSeatCollector.Add(swBench.rightSlot);
-                    }
-                }
-
-                float alleyX = propIdx % 2 == 0 ? -20.6f : -31.6f;
-                if (propIdx % 3 == 0)
-                {
-                    PlacePrefabInstance(prefabs.FireHydrant, furnRoot.transform, new Vector3(alleyX, 0.16f, z + 3f), Quaternion.identity);
-                }
-                else
-                {
-                    PlacePrefabInstance(prefabs.TrashCan, furnRoot.transform, new Vector3(alleyX, 0.16f, z + 3f), Quaternion.Euler(0f, -20f * propIdx, 0f));
-                }
-
-                propIdx++;
+                new Vector3(17.2f, 0.02f, -14f),
+                new Vector3(17.2f, 0.02f, 58f),
+                new Vector3(-17.2f, 0.02f, 58f),
+                new Vector3(-30.8f, 0.02f, 2f)
+            };
+            for (int i = 0; i < hydrants.Length; i++)
+            {
+                PlacePrefabInstance(prefabs.FireHydrant, furnRoot.transform, hydrants[i], Quaternion.identity);
             }
 
-            // 8 Drivable Town Cars (6 neighborhood curb cars + 1 near Pizzeria + 1 near Taxi Rank), each with unique Save ID
+            Vector3[] trashCans =
+            {
+                new Vector3(15.2f, 0.02f, 2.0f),
+                new Vector3(15.2f, 0.02f, 19.5f),
+                new Vector3(-15.2f, 0.02f, 96.0f),
+                new Vector3(-30.8f, 0.02f, 88.0f)
+            };
+            for (int i = 0; i < trashCans.Length; i++)
+            {
+                PlacePrefabInstance(prefabs.TrashCan, furnRoot.transform, trashCans[i], Quaternion.Euler(0f, i * 45f, 0f));
+            }
+
+            // 8 Drivable Town Cars parked cleanly off active driving lanes
             (Vector3 pos, float yaw, int fixedVariant)[] parkedCars =
             {
-                (new Vector3(-23.1f, 0.28f, 36f), 0f, -1),
-                (new Vector3(-28.9f, 0.28f, 70f), 180f, -1),
-                (new Vector3(-23.1f, 0.28f, 134f), 0f, -1),
-                (new Vector3(-28.9f, 0.28f, 206f), 180f, -1),
-                (new Vector3(-44.1f, 0.28f, 106f), 0f, -1),
-                (new Vector3(-47.9f, 0.28f, 193f), 180f, -1),
-                (new Vector3(19.2f, 0.28f, 33.5f), 0f, 0),   // Red hatchback parked near Pizzeria
-                (new Vector3(19.2f, 0.28f, 152.5f), 0f, 2)   // Sedan parked near Taxi Rank
+                (new Vector3(19.6f, 0.28f, -12.0f), 0f, 0),    // Red Hatchback near Pizzeria
+                (new Vector3(19.6f, 0.28f, 102.0f), 0f, 2),    // Green Sedan near Taxi Rank
+                (new Vector3(-28.4f, 0.28f, 0.0f), 180f, 1),   // White Pickup on Çınar Caddesi
+                (new Vector3(-28.4f, 0.28f, 70.0f), 180f, 0),  // Hatchback in West Residential
+                (new Vector3(-28.4f, 0.28f, 140.0f), 180f, 2), // Sedan near Park
+                (new Vector3(28.4f, 0.28f, 70.0f), 0f, 1),     // Pickup in East Residential
+                (new Vector3(56.0f, 0.28f, 18.0f), 90f, 0),    // Hatchback at East Community Garden
+                (new Vector3(-67.6f, 0.28f, 80.0f), 0f, 1)     // Pickup on West Ring Street
             };
 
             GameObject[] drivableVariants =
@@ -1212,16 +896,9 @@ namespace Gridroam.Editor
                 prefabs.TownCarGreenSedan
             };
 
-            int[] variantOrder = { 0, 1, 2, 0, 1, 2 };
-            for (int i = variantOrder.Length - 1; i > 0; i--)
-            {
-                int swapIdx = rng.Next(i + 1);
-                (variantOrder[i], variantOrder[swapIdx]) = (variantOrder[swapIdx], variantOrder[i]);
-            }
-
             for (int i = 0; i < parkedCars.Length; i++)
             {
-                int vIdx = parkedCars[i].fixedVariant >= 0 ? parkedCars[i].fixedVariant : variantOrder[i % variantOrder.Length];
+                int vIdx = parkedCars[i].fixedVariant % drivableVariants.Length;
                 GameObject chosenPrefab = drivableVariants[vIdx] != null ? drivableVariants[vIdx] : prefabs.TrafficVehicle;
                 GameObject car = PlacePrefabInstance(chosenPrefab, furnRoot.transform,
                     parkedCars[i].pos, Quaternion.Euler(0f, parkedCars[i].yaw, 0f));
@@ -1234,23 +911,7 @@ namespace Gridroam.Editor
                 }
             }
 
-            int treeIdx = 0;
-            for (float z = 32f; z <= 210f; z += 16f)
-            {
-                if (IsNearCrossStreet(z, 9.0f)) continue;
-                if (z > 125f && z < 150f) continue; // Keep Town Square & Taxi Rank curb clear
-                float scale = 0.92f + (float)rng.NextDouble() * 0.24f;
-                CreateTownTree($"MainStreet_Tree_{treeIdx + 1:00}", furnRoot.transform,
-                    new Vector3(16.65f, 0.16f, z), mats, scale, treeIdx);
-                treeIdx++;
-            }
-
             return stopLines;
-        }
-
-        private static bool IsNearCrossStreet(float z, float halfMargin)
-        {
-            return Mathf.Abs(z - 92f) < halfMargin || Mathf.Abs(z - 174f) < halfMargin;
         }
 
         private static void CreateZebraCrosswalk(
@@ -1274,8 +935,8 @@ namespace Gridroam.Editor
                     ? center + new Vector3(offset, 0f, 0f)
                     : center + new Vector3(0f, 0f, offset);
                 Vector3 scale = horizontalX
-                    ? new Vector3(0.50f, 0.02f, 2.8f)
-                    : new Vector3(2.8f, 0.02f, 0.50f);
+                    ? new Vector3(0.48f, 0.01f, 2.6f)
+                    : new Vector3(2.6f, 0.01f, 0.48f);
 
                 CreateStaticBlock($"Stripe_{i}", cw.transform, pos, scale, whiteMat, addCollider: false);
             }
@@ -1321,8 +982,6 @@ namespace Gridroam.Editor
             return cycler;
         }
 
-        private static GameObject _activeBenchPrefab;
-
         private static (SeatInteractable leftSlot, SeatInteractable rightSlot) CreateBench(
             string name,
             Transform parent,
@@ -1347,11 +1006,6 @@ namespace Gridroam.Editor
                 GameObject back = CreatePrimitiveChild("Backrest", PrimitiveType.Cube, bench.transform,
                     new Vector3(0f, 0.78f, -0.22f), new Vector3(1.85f, 0.38f, 0.08f), mats.TownWood, removeCollider: true);
                 back.transform.localRotation = Quaternion.Euler(-12f, 0f, 0f);
-
-                CreatePrimitiveChild("LegL", PrimitiveType.Cube, bench.transform,
-                    new Vector3(-0.74f, 0.23f, 0f), new Vector3(0.10f, 0.46f, 0.46f), mats.SedanTrimDark, removeCollider: true);
-                CreatePrimitiveChild("LegR", PrimitiveType.Cube, bench.transform,
-                    new Vector3(0.74f, 0.23f, 0f), new Vector3(0.10f, 0.46f, 0.46f), mats.SedanTrimDark, removeCollider: true);
             }
 
             BoxCollider col = bench.AddComponent<BoxCollider>();
@@ -1401,10 +1055,6 @@ namespace Gridroam.Editor
                 hum.SetSitting(true, driving: false);
             }
         }
-
-        private static Mesh _cachedTreeTrunkMesh;
-        private static Mesh _cachedTreeCanopyMeshA;
-        private static Mesh _cachedTreeCanopyMeshB;
 
         private static void CreateTownTree(
             string name,
@@ -1519,7 +1169,6 @@ namespace Gridroam.Editor
                 }
             }
 
-            // Main tapered trunk + 3 natural forked upper limbs
             AddTaperedLimb(new Vector3(0f, 0f, 0f), new Vector3(0.04f, 1.35f, -0.02f), new Vector3(0.02f, 2.65f, 0.03f), 0.24f, 0.17f, 0.12f, 8);
             AddTaperedLimb(new Vector3(0.02f, 2.35f, 0.02f), new Vector3(0.45f, 2.95f, 0.25f), new Vector3(0.84f, 3.45f, 0.48f), 0.11f, 0.08f, 0.05f, 6);
             AddTaperedLimb(new Vector3(0.01f, 2.40f, 0.01f), new Vector3(-0.42f, 3.00f, -0.24f), new Vector3(-0.80f, 3.50f, -0.45f), 0.11f, 0.08f, 0.05f, 6);
@@ -1564,7 +1213,6 @@ namespace Gridroam.Editor
                     float lobe2 = Mathf.Sin(dir.y * 4.5f + dir.x * 2.7f + seedOffset * 1.4f);
                     float displacement = 1f + lobe1 * 0.18f + lobe2 * 0.11f;
 
-                    // Flatten the bottom slightly so foliage crowns look natural
                     float yFactor = dir.y < 0f ? 0.72f : 1.0f;
                     Vector3 pos = new Vector3(
                         dir.x * horizontalRadius * displacement,
@@ -1606,10 +1254,6 @@ namespace Gridroam.Editor
             return m;
         }
 
-        /// <summary>
-        /// E6: Spawns 14 scheduled pedestrians strolling between 3-4 sidewalk waypoints,
-        /// pausing 3-6 s, sitting on unoccupied benches, and yielding to player vehicles.
-        /// </summary>
         private static void BuildTownPedestrians(
             Transform parent,
             MaterialSet mats,
@@ -1630,25 +1274,26 @@ namespace Gridroam.Editor
 
             Vector3[][] schedules =
             {
-                // 1-4: Main Street West Sidewalk
-                new[] { new Vector3(15.35f, 0.16f, 22f), new Vector3(15.35f, 0.16f, 48f), new Vector3(15.35f, 0.16f, 78f) },
-                new[] { new Vector3(15.35f, 0.16f, 64f), new Vector3(15.35f, 0.16f, 84f), new Vector3(15.35f, 0.16f, 108f), new Vector3(15.35f, 0.16f, 124f) },
-                new[] { new Vector3(15.35f, 0.16f, 118f), new Vector3(15.35f, 0.16f, 138f), new Vector3(15.35f, 0.16f, 160f) },
-                new[] { new Vector3(15.35f, 0.16f, 184f), new Vector3(15.35f, 0.16f, 198f), new Vector3(15.35f, 0.16f, 212f) },
-                // 5-6: Coastal Promenade along Seawall
-                new[] { new Vector3(32.8f, 0.16f, 36f), new Vector3(32.8f, 0.16f, 78f), new Vector3(32.8f, 0.16f, 118f) },
-                new[] { new Vector3(32.8f, 0.16f, 130f), new Vector3(32.8f, 0.16f, 172f), new Vector3(32.8f, 0.16f, 214f) },
-                // 7-9: Town Square Plaza
-                new[] { new Vector3(-8.5f, 0.16f, 142.5f), new Vector3(0f, 0.16f, 143.0f), new Vector3(7.5f, 0.16f, 142.0f), new Vector3(7.8f, 0.16f, 128.0f) },
-                new[] { new Vector3(7.5f, 0.16f, 125.5f), new Vector3(-1.5f, 0.16f, 125.2f), new Vector3(-8.5f, 0.16f, 126.0f) },
-                new[] { new Vector3(-10.2f, 0.16f, 129.0f), new Vector3(-10.2f, 0.16f, 139.0f), new Vector3(-4.0f, 0.16f, 143.2f) },
-                // 10-12: Back Alley Sidewalks
-                new[] { new Vector3(-20.4f, 0.16f, 28f), new Vector3(-20.4f, 0.16f, 54f), new Vector3(-20.4f, 0.16f, 82f) },
-                new[] { new Vector3(-20.4f, 0.16f, 186f), new Vector3(-20.4f, 0.16f, 208f), new Vector3(-20.4f, 0.16f, 228f) },
-                new[] { new Vector3(-31.8f, 0.16f, 102f), new Vector3(-31.8f, 0.16f, 132f), new Vector3(-31.8f, 0.16f, 162f) },
-                // 13-14: Neighborhood Park & Residential Walk
-                new[] { new Vector3(-64.5f, 0.08f, 106.5f), new Vector3(-58.5f, 0.08f, 106.5f), new Vector3(-51.5f, 0.08f, 106.5f), new Vector3(-38.0f, 0.08f, 106.5f) },
-                new[] { new Vector3(-42.5f, 0.08f, 44f), new Vector3(-42.5f, 0.08f, 76f), new Vector3(-42.5f, 0.08f, 104f) }
+                // Commercial & Main Street Sidewalk
+                new[] { new Vector3(17.0f, 0.04f, -12f), new Vector3(17.0f, 0.04f, 10f), new Vector3(17.0f, 0.04f, 34f) },
+                new[] { new Vector3(17.0f, 0.04f, 54f), new Vector3(17.0f, 0.04f, 80f), new Vector3(17.0f, 0.04f, 106f) },
+                new[] { new Vector3(17.0f, 0.04f, 126f), new Vector3(17.0f, 0.04f, 150f), new Vector3(17.0f, 0.04f, 174f) },
+                // West Central Sidewalk
+                new[] { new Vector3(-17.0f, 0.04f, -12f), new Vector3(-17.0f, 0.04f, 12f), new Vector3(-17.0f, 0.04f, 34f) },
+                new[] { new Vector3(-17.0f, 0.04f, 54f), new Vector3(-17.0f, 0.04f, 80f), new Vector3(-17.0f, 0.04f, 106f) },
+                new[] { new Vector3(-17.0f, 0.04f, 126f), new Vector3(-17.0f, 0.04f, 150f), new Vector3(-17.0f, 0.04f, 174f) },
+                // Town Square Plaza
+                new[] { new Vector3(-8.5f, 0.04f, 64f), new Vector3(9.5f, 0.04f, 64f), new Vector3(9.5f, 0.04f, 96f), new Vector3(-8.5f, 0.04f, 96f) },
+                new[] { new Vector3(8.5f, 0.04f, 94f), new Vector3(-7.5f, 0.04f, 94f), new Vector3(-7.5f, 0.04f, 66f) },
+                // Çınarlı Park
+                new[] { new Vector3(-14f, 0.04f, 150f), new Vector3(0f, 0.04f, 150f), new Vector3(14f, 0.04f, 150f) },
+                new[] { new Vector3(0f, 0.04f, 128f), new Vector3(0f, 0.04f, 150f), new Vector3(0f, 0.04f, 172f) },
+                // West Residential Walkways
+                new[] { new Vector3(-31.5f, 0.04f, -8f), new Vector3(-31.5f, 0.04f, 10f), new Vector3(-31.5f, 0.04f, 28f) },
+                new[] { new Vector3(-31.5f, 0.04f, 62f), new Vector3(-31.5f, 0.04f, 80f), new Vector3(-31.5f, 0.04f, 98f) },
+                // East Residential & Community Garden
+                new[] { new Vector3(31.5f, 0.04f, 62f), new Vector3(31.5f, 0.04f, 80f), new Vector3(31.5f, 0.04f, 98f) },
+                new[] { new Vector3(48.0f, 0.04f, -10f), new Vector3(48.0f, 0.04f, 10f), new Vector3(48.0f, 0.04f, 30f) }
             };
 
             SeatInteractable[] seatArray = benchSeats != null ? benchSeats.ToArray() : Array.Empty<SeatInteractable>();
@@ -1676,7 +1321,6 @@ namespace Gridroam.Editor
                 rb.isKinematic = true;
                 rb.useGravity = false;
 
-                float height = 1.66f + (i % 4) * 0.05f;
                 ProceduralHumanoid hum = ProceduralHumanoid.Build(
                     pedObj.transform,
                     mats.CharSkin,
@@ -1684,10 +1328,10 @@ namespace Gridroam.Editor
                     mats.CharPants,
                     mats.CharShoes,
                     mats.CharHair,
-                    height);
+                    1.72f + (i % 3) * 0.03f);
 
                 TownPedestrian ped = pedObj.AddComponent<TownPedestrian>();
-                ped.ConfigureSchedule(route, seatArray, hum, speed: 1.22f + (i % 3) * 0.08f, startIndex: nextWp);
+                ped.ConfigureSchedule(route, seatArray, hum, 1.30f + (i % 4) * 0.12f, nextWp);
             }
         }
     }

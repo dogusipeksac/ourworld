@@ -20,7 +20,7 @@ namespace Gridroam.Core
     [Serializable]
     public class SaveData
     {
-        public int schemaVersion = 2;
+        public int schemaVersion = 3;
         public List<string> completedMissionIds = new List<string>();
         public string nextMissionId = "m01_get_the_keys";
         public bool hasVehicleKeys;
@@ -48,16 +48,16 @@ namespace Gridroam.Core
 
         // E8: Player position & active mode/vehicle state
         public bool hasSavedPlayerState;
-        public float playerPosX = -8.5f;
-        public float playerPosY = 0.14f;
-        public float playerPosZ = -6.0f;
-        public float playerRotY = 25f;
+        public float playerPosX = -3.0f;
+        public float playerPosY = 0.12f;
+        public float playerPosZ = -21.5f;
+        public float playerRotY = 180f;
         public bool savedInVehicle;
         public string savedVehicleId = string.Empty;
-        public float savedVehiclePosX = 3.5f;
+        public float savedVehiclePosX = 9.5f;
         public float savedVehiclePosY = 0.28f;
-        public float savedVehiclePosZ = 4.5f;
-        public float savedVehicleRotY = 90f;
+        public float savedVehiclePosZ = -32.5f;
+        public float savedVehicleRotY = 0f;
         public float savedVehicleFuel = 0.8f;
     }
 }

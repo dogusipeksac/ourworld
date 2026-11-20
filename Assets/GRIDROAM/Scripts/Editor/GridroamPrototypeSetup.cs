@@ -387,16 +387,17 @@ namespace Gridroam.Editor
             Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
             if (urpLit == null) urpLit = Shader.Find("Standard");
 
-            Shader skyPanoramic = Shader.Find("Skybox/Panoramic");
-            Material skyMat = CreateOrLoadMaterial("MAT_Skybox_EveningCoastal", skyPanoramic != null ? skyPanoramic : urpLit, Color.white, 0f);
-            Texture2D hdriTex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{HdriDir}/venice_sunset_2k.hdr");
-            if (hdriTex != null && skyPanoramic != null)
+            Shader skyProcedural = Shader.Find("Skybox/Procedural");
+            Material skyMat = CreateOrLoadMaterial("MAT_Skybox_EveningCoastal", skyProcedural != null ? skyProcedural : urpLit, Color.white, 0f);
+            if (skyProcedural != null)
             {
-                skyMat.SetTexture("_MainTex", hdriTex);
+                skyMat.SetFloat("_SunDisk", 2f);
+                skyMat.SetFloat("_SunSize", 0.04f);
+                skyMat.SetFloat("_SunSizeConvergence", 5f);
+                skyMat.SetFloat("_AtmosphereThickness", 1.0f);
+                skyMat.SetColor("_SkyTint", new Color(0.50f, 0.52f, 0.56f));
+                skyMat.SetColor("_GroundColor", new Color(0.34f, 0.38f, 0.30f));
                 skyMat.SetFloat("_Exposure", 1.10f);
-                skyMat.SetFloat("_Rotation", 108f);
-                skyMat.SetFloat("_Mapping", 1f);
-                skyMat.SetFloat("_ImageType", 0f);
                 EditorUtility.SetDirty(skyMat);
             }
 
@@ -404,7 +405,7 @@ namespace Gridroam.Editor
             {
                 EveningSkybox = skyMat,
                 RoadAsphaltMain = CreatePbrMaterial("MAT_Road_Asphalt012", urpLit, "Asphalt012", new Color(0.72f, 0.72f, 0.76f), 0.34f, 0f, new Vector2(2f, 36f), 0.9f),
-                RoadAsphaltCross = CreatePbrMaterial("MAT_Road_Asphalt012_Cross", urpLit, "Asphalt012", new Color(0.72f, 0.72f, 0.76f), 0.34f, 0f, new Vector2(9f, 2f), 0.9f),
+                RoadAsphaltCross = CreatePbrMaterial("MAT_Road_Asphalt012_Cross", urpLit, "Asphalt012", new Color(0.72f, 0.72f, 0.76f), 0.34f, 0f, new Vector2(26f, 2f), 0.9f),
                 RoadMarkingWhite = CreateOrLoadMaterial("MAT_Road_Marking_White", urpLit, new Color(0.88f, 0.88f, 0.86f), 0.18f),
                 RoadMarkingYellow = CreateOrLoadMaterial("MAT_Road_Marking_Yellow", urpLit, new Color(0.92f, 0.72f, 0.18f), 0.22f),
                 Ground = CreatePbrMaterial("MAT_Ground_Urban", urpLit, "Concrete034", new Color(0.55f, 0.55f, 0.57f), 0.14f, 0f, new Vector2(22f, 64f), 0.7f),
@@ -1596,163 +1597,137 @@ namespace Gridroam.Editor
             camData.renderPostProcessing = true;
             ThirdPersonCameraRig camRig = camObj.AddComponent<ThirdPersonCameraRig>();
 
-            // --- World Environment (Urban core slab + Natural grass terrain for residential & western hills) ---
+            // --- World Environment (Single 900m x 900m solid meadow foundation — zero fake sea, zero fake mountains, impossible to fall!) ---
             GameObject env = new GameObject("--- WORLD_ENVIRONMENT ---");
 
-            CreateStaticBlock("Ground_UrbanCore", env.transform, new Vector3(4.5f, -0.5f, 125f), new Vector3(66f, 1f, 340f), mats.Ground);
-            CreateStaticBlock("Ground_ResidentialAndCountryGrass", env.transform, new Vector3(-92f, -0.5f, 125f), new Vector3(128f, 1f, 355f), mats.TownGrass);
-            GameObject seaObj = CreateStaticBlock("Coastal_Sea", env.transform, new Vector3(155f, -1.6f, 125f), new Vector3(240f, 1f, 520f), mats.SeaWater, addCollider: false);
-            CreateStaticBlock("Coastal_Seawall", env.transform, new Vector3(36.8f, 0.35f, 125f), new Vector3(1.8f, 1.5f, 330f), mats.Concrete);
-            CreateStaticBlock("Coastal_Promenade", env.transform, new Vector3(33.2f, 0.08f, 122f), new Vector3(5.2f, 0.16f, 290f), mats.Sidewalk);
+            CreateTiledBox(
+                "Ground_SolidMeadowFoundation",
+                env.transform,
+                new Vector3(0f, -3.0f, 80f),
+                new Vector3(900f, 6.0f, 900f),
+                Quaternion.identity,
+                mats.TownGrass,
+                metersPerTile: 3.5f,
+                collider: true);
 
-            // E6: Procedural low-volume coastal wind & sea surf AudioSource near the seawall
-            GameObject seaAudioObj = new GameObject("Coastal_SeaWindAmbience");
-            seaAudioObj.transform.SetParent(env.transform, false);
-            seaAudioObj.transform.position = new Vector3(35.5f, 1.5f, 130f);
-            seaAudioObj.AddComponent<AudioSource>();
-            seaAudioObj.AddComponent<CoastalAmbientAudio>();
-
-            // --- ROADS (Full connected network across the entire map!) ---
-            CreateStaticBlock("Road_GarageConnector", env.transform, new Vector3(-42.5f, 0.02f, 0f), new Vector3(149f, 0.08f, 12f), mats.RoadAsphaltCross, addCollider: false);
-            CreateStaticBlock("Road_CoastalMain", env.transform, new Vector3(24f, 0.03f, 111f), new Vector3(13f, 0.08f, 278f), mats.RoadAsphaltMain, addCollider: false);
-            CreateStaticBlock("Road_BackAlleyRoute", env.transform, new Vector3(-26f, 0.03f, 111f), new Vector3(8.5f, 0.08f, 278f), mats.RoadAsphaltMain, addCollider: false);
-            CreateStaticBlock("Road_CrossStreet_South", env.transform, new Vector3(-1f, 0.025f, 92f), new Vector3(54f, 0.08f, 9f), mats.RoadAsphaltCross, addCollider: false);
-            CreateStaticBlock("Road_CrossStreet_North", env.transform, new Vector3(-1f, 0.025f, 174f), new Vector3(54f, 0.08f, 9f), mats.RoadAsphaltCross, addCollider: false);
-            CreateStaticBlock("Road_HarborConnector", env.transform, new Vector3(-42.5f, 0.025f, 246f), new Vector3(149f, 0.08f, 14f), mats.RoadAsphaltCross, addCollider: false);
-
-            CreateStaticBlock("Sidewalk_MainWest", env.transform, new Vector3(15.6f, 0.08f, 122f), new Vector3(3.4f, 0.16f, 240f), mats.Sidewalk);
-            CreateStaticBlock("Sidewalk_AlleyEast", env.transform, new Vector3(-20.4f, 0.08f, 122f), new Vector3(2.4f, 0.16f, 240f), mats.Sidewalk);
-            CreateStaticBlock("Sidewalk_AlleyWest", env.transform, new Vector3(-31.8f, 0.08f, 122f), new Vector3(2.8f, 0.16f, 240f), mats.Sidewalk);
-
-            GameObject markingsRoot = new GameObject("Road_Markings");
-            markingsRoot.transform.SetParent(env.transform, false);
-            CreateStaticBlock("Coastal_EdgeLine_East", markingsRoot.transform, new Vector3(29.8f, 0.08f, 122f), new Vector3(0.18f, 0.02f, 244f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("Coastal_EdgeLine_West", markingsRoot.transform, new Vector3(18.2f, 0.08f, 122f), new Vector3(0.18f, 0.02f, 244f), mats.RoadMarkingWhite, addCollider: false);
-            for (int z = 12; z <= 232; z += 11)
-            {
-                CreateStaticBlock($"CenterDash_{z}", markingsRoot.transform, new Vector3(24f, 0.08f, z), new Vector3(0.22f, 0.02f, 4.8f), mats.RoadMarkingWhite, addCollider: false);
-            }
-
-            CreateStaticBlock("DeliveryBay_North", markingsRoot.transform, new Vector3(11f, 0.14f, 253f), new Vector3(9.5f, 0.02f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("DeliveryBay_South", markingsRoot.transform, new Vector3(11f, 0.14f, 243f), new Vector3(9.5f, 0.02f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("DeliveryBay_West", markingsRoot.transform, new Vector3(6.2f, 0.14f, 248f), new Vector3(0.3f, 0.02f, 10.2f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("DeliveryBay_East", markingsRoot.transform, new Vector3(15.8f, 0.14f, 248f), new Vector3(0.3f, 0.02f, 10.2f), mats.RoadMarkingYellow, addCollider: false);
-
-            // --- REPAIR GARAGE (Tamirhane, z ~ 0) ---
+            // --- REPAIR GARAGE (Tamirhane, south of Güney Yolu z = -24, facing North +Z onto the street) ---
             GameObject garageRoot = new GameObject("Zone_RepairGarage");
             garageRoot.transform.SetParent(env.transform, false);
-            CreateStaticBlock("Garage_Pad", garageRoot.transform, new Vector3(-2f, 0.04f, 7f), new Vector3(26f, 0.12f, 19f), mats.HarborDock);
-            CreateStaticBlock("Garage_BackWall", garageRoot.transform, new Vector3(-10f, 3.0f, 14.5f), new Vector3(15f, 6f, 1f), mats.GarageBrick);
-            CreateStaticBlock("Garage_SideWallL", garageRoot.transform, new Vector3(-17f, 3.0f, 9.5f), new Vector3(1f, 6f, 11f), mats.GarageBrick);
-            CreateStaticBlock("Garage_SideWallR", garageRoot.transform, new Vector3(-2.8f, 3.0f, 11.8f), new Vector3(1f, 6f, 6.4f), mats.GarageBrick);
-            CreateStaticBlock("Garage_Roof", garageRoot.transform, new Vector3(-10f, 6.2f, 9.5f), new Vector3(16.2f, 0.6f, 12.2f), mats.GarageRoofMetal);
-            GameObject garageFascia = CreateStaticBlock("Garage_SignFascia", garageRoot.transform, new Vector3(-10f, 6.5f, 3.4f), new Vector3(12f, 0.8f, 0.35f), mats.LampGlow, addCollider: false);
+            CreateTiledBox("Garage_Pad", garageRoot.transform, new Vector3(1.0f, 0.014f, -35.0f), new Vector3(30f, 0.028f, 14f), Quaternion.identity, mats.HarborDock, 3.0f, collider: false);
+            CreateStaticBlock("Garage_BackWall", garageRoot.transform, new Vector3(-3.0f, 3.0f, -41.0f), new Vector3(15f, 6f, 1f), mats.GarageBrick);
+            CreateStaticBlock("Garage_SideWallL", garageRoot.transform, new Vector3(-10.0f, 3.0f, -36.0f), new Vector3(1f, 6f, 11f), mats.GarageBrick);
+            CreateStaticBlock("Garage_SideWallR", garageRoot.transform, new Vector3(4.0f, 3.0f, -38.0f), new Vector3(1f, 6f, 7f), mats.GarageBrick);
+            CreateStaticBlock("Garage_Roof", garageRoot.transform, new Vector3(-3.0f, 6.2f, -36.0f), new Vector3(16.0f, 0.6f, 12.0f), mats.GarageRoofMetal);
+
+            GameObject garageFascia = CreateStaticBlock("Garage_SignFascia", garageRoot.transform, new Vector3(-3.0f, 6.5f, -30.1f), new Vector3(12f, 0.8f, 0.35f), mats.SedanTrimDark, addCollider: false);
+            CreateWorldSignText(
+                "TAMİRHANE",
+                garageRoot.transform,
+                new Vector3(-3.0f, 6.5f, -29.88f),
+                Quaternion.Euler(0f, 180f, 0f),
+                new Vector2(10.5f, 0.65f),
+                new Color(1.0f, 0.86f, 0.48f, 1f));
             MarkStaticPaintable(garageFascia);
-            NightLight garageSignNl = garageFascia.AddComponent<NightLight>();
-            garageSignNl.Configure(null, new[] { garageFascia.GetComponent<Renderer>() }, new Color(1.0f, 0.80f, 0.42f) * 2.5f);
 
-            PlacePrefabInstance(prefabs.RollerShutterDoor, garageRoot.transform, new Vector3(-10.5f, 0.10f, 13.85f), Quaternion.Euler(0f, 180f, 0f));
-            PlacePrefabInstance(prefabs.ToolCart, garageRoot.transform, new Vector3(-7.4f, 0.10f, 8.2f), Quaternion.Euler(0f, 28f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-14.6f, 0.10f, 11.2f), Quaternion.Euler(0f, 20f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-13.6f, 0.10f, 11.8f), Quaternion.Euler(0f, 115f, 0f));
-            PlacePrefabInstance(prefabs.OldTyre, garageRoot.transform, new Vector3(-14.8f, 0.10f, 5.2f), Quaternion.identity);
-            PlacePrefabInstance(prefabs.OldTyre, garageRoot.transform, new Vector3(-14.8f, 0.38f, 5.2f), Quaternion.Euler(0f, 40f, 0f));
-            PlacePrefabInstance(prefabs.WoodenCrate, garageRoot.transform, new Vector3(-1.4f, 0.10f, 12.6f), Quaternion.Euler(0f, 12f, 0f));
-            PlacePrefabInstance(prefabs.FloodLights, garageRoot.transform, new Vector3(-1.5f, 0.10f, 9.2f), Quaternion.Euler(0f, -135f, 0f));
-            PlacePrefabInstance(prefabs.ConcreteBarrier, garageRoot.transform, new Vector3(-16.2f, 0.04f, -3.5f), Quaternion.Euler(0f, 90f, 0f));
-            PlacePrefabInstance(prefabs.ConcreteBarrier, garageRoot.transform, new Vector3(10.5f, 0.04f, 13.5f), Quaternion.identity);
-            CreatePointLamp("Lamp_GarageBay", garageRoot.transform, new Vector3(-6.5f, 5.2f, 7.5f), new Color(1f, 0.78f, 0.45f), 22f, 3.4f);
+            PlacePrefabInstance(prefabs.RollerShutterDoor, garageRoot.transform, new Vector3(-3.0f, 0.03f, -40.3f), Quaternion.identity);
+            PlacePrefabInstance(prefabs.ToolCart, garageRoot.transform, new Vector3(-6.8f, 0.03f, -35.5f), Quaternion.Euler(0f, 25f, 0f));
+            PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-8.6f, 0.03f, -38.8f), Quaternion.Euler(0f, 20f, 0f));
+            PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-7.6f, 0.03f, -39.2f), Quaternion.Euler(0f, 115f, 0f));
+            PlacePrefabInstance(prefabs.OldTyre, garageRoot.transform, new Vector3(-8.8f, 0.03f, -32.2f), Quaternion.identity);
+            PlacePrefabInstance(prefabs.OldTyre, garageRoot.transform, new Vector3(-8.8f, 0.31f, -32.2f), Quaternion.Euler(0f, 40f, 0f));
+            PlacePrefabInstance(prefabs.WoodenCrate, garageRoot.transform, new Vector3(2.8f, 0.03f, -39.2f), Quaternion.Euler(0f, 12f, 0f));
+            PlacePrefabInstance(prefabs.FloodLights, garageRoot.transform, new Vector3(4.6f, 0.03f, -34.0f), Quaternion.Euler(0f, -45f, 0f));
+            CreatePointLamp("Lamp_GarageBay", garageRoot.transform, new Vector3(-3.0f, 5.2f, -35.0f), new Color(1f, 0.78f, 0.45f), 22f, 3.4f);
 
-            // --- SMALL TOWN ("Liman Kasabası") & GENTLE WORLD BOUNDARY ---
+            // --- CLEAN WALKABLE SMALL TOWN ("Çınarlı Kasabası") & WOODEN COUNTRY FENCE ---
             List<TrafficStopLine> stopLines = BuildSmallTown(env.transform, mats, prefabs);
             BuildWorldBoundary(env.transform, mats);
 
-            // Street Lamps along Coastal Promenade & Back Alleys
-            for (int z = 20; z <= 220; z += 40)
+            // Street Lamps cleanly along Cumhuriyet Caddesi (x = +30.8) & Çınar Caddesi (x = -30.8)
+            float[] lampZs = { -8f, 26f, 62f, 98f, 136f, 170f };
+            for (int i = 0; i < lampZs.Length; i++)
             {
-                PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(32.8f, 0.16f, z), Quaternion.Euler(0f, -90f, 0f));
-                CreatePointLamp($"StreetLight_Coastal_{z}", env.transform, new Vector3(31.5f, 5.2f, z), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
+                float lz = lampZs[i];
+                PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(30.8f, 0.02f, lz), Quaternion.Euler(0f, -90f, 0f));
+                CreatePointLamp($"StreetLight_Main_{lz:0}", env.transform, new Vector3(29.4f, 5.2f, lz), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
+
+                if (i % 2 == 0)
+                {
+                    PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(-30.8f, 0.02f, lz), Quaternion.Euler(0f, 90f, 0f));
+                    CreatePointLamp($"StreetLight_West_{lz:0}", env.transform, new Vector3(-29.4f, 5.2f, lz), new Color(1.0f, 0.76f, 0.42f), 18f, 1.9f);
+                }
             }
-            for (int z = 45; z <= 205; z += 80)
-            {
-                PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(-31.6f, 0.16f, z), Quaternion.Euler(0f, 90f, 0f));
-                CreatePointLamp($"StreetLight_Alley_{z}", env.transform, new Vector3(-30.0f, 5.2f, z), new Color(1.0f, 0.76f, 0.42f), 18f, 1.9f);
-            }
 
-            // --- SMALL CARGO HARBOR (Yük Limanı, z ~ 242..276) ---
-            GameObject harborRoot = new GameObject("Zone_CargoHarbor");
-            harborRoot.transform.SetParent(env.transform, false);
-            CreateStaticBlock("Harbor_QuayDeck", harborRoot.transform, new Vector3(10f, 0.05f, 260f), new Vector3(58f, 0.18f, 36f), mats.HarborDock);
-            CreateStaticBlock("Harbor_Warehouse", harborRoot.transform, new Vector3(-12f, 4.0f, 268f), new Vector3(18f, 8f, 14f), mats.GarageBrick);
-            CreateStaticBlock("Harbor_WarehouseRoof", harborRoot.transform, new Vector3(-12f, 8.3f, 268f), new Vector3(19f, 0.7f, 15f), mats.GarageRoofMetal);
-            PlacePrefabInstance(prefabs.RollerShutterDoor, harborRoot.transform, new Vector3(-12f, 0.14f, 260.85f), Quaternion.Euler(0f, 180f, 0f));
+            // --- NORTH CARGO DEPOT (Kuzey Kargo Deposu, north of Kuzey Yolu z = +184, facing South -Z onto the street) ---
+            GameObject depotRoot = new GameObject("Zone_CargoDepot");
+            depotRoot.transform.SetParent(env.transform, false);
+            CreateTiledBox("Depot_ConcreteYard", depotRoot.transform, new Vector3(5.0f, 0.014f, 196.0f), new Vector3(52f, 0.028f, 15f), Quaternion.identity, mats.HarborDock, 3.0f, collider: false);
 
-            CreateStaticBlock("Harbor_Container_01", harborRoot.transform, new Vector3(24f, 1.6f, 266f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerRed);
-            CreateStaticBlock("Harbor_Container_02", harborRoot.transform, new Vector3(28f, 1.6f, 266f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerBlue);
-            CreateStaticBlock("Harbor_Container_03", harborRoot.transform, new Vector3(26f, 4.6f, 266f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerOchre);
-            CreateStaticBlock("Harbor_Container_04", harborRoot.transform, new Vector3(19f, 1.6f, 270f), new Vector3(3.2f, 3.0f, 9.5f), mats.ContainerBlue);
+            // Flush yellow delivery bay lines centered at (10.5, 0.03, 193.5)
+            CreateStaticBlock("DeliveryBay_North", depotRoot.transform, new Vector3(10.5f, 0.03f, 197.0f), new Vector3(9.5f, 0.015f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
+            CreateStaticBlock("DeliveryBay_South", depotRoot.transform, new Vector3(10.5f, 0.03f, 190.0f), new Vector3(9.5f, 0.015f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
+            CreateStaticBlock("DeliveryBay_West", depotRoot.transform, new Vector3(5.75f, 0.03f, 193.5f), new Vector3(0.3f, 0.015f, 7.3f), mats.RoadMarkingYellow, addCollider: false);
+            CreateStaticBlock("DeliveryBay_East", depotRoot.transform, new Vector3(15.25f, 0.03f, 193.5f), new Vector3(0.3f, 0.015f, 7.3f), mats.RoadMarkingYellow, addCollider: false);
 
-            GameObject crane = new GameObject("Harbor_GantryCrane");
-            crane.transform.SetParent(harborRoot.transform, false);
-            CreateStaticBlock("Crane_Leg_FL", crane.transform, new Vector3(31f, 8.5f, 250f), new Vector3(1.1f, 17f, 1.1f), mats.GantrySteel);
-            CreateStaticBlock("Crane_Leg_FR", crane.transform, new Vector3(31f, 8.5f, 260f), new Vector3(1.1f, 17f, 1.1f), mats.GantrySteel);
-            CreateStaticBlock("Crane_Leg_BL", crane.transform, new Vector3(21f, 8.5f, 250f), new Vector3(1.1f, 17f, 1.1f), mats.GantrySteel);
-            CreateStaticBlock("Crane_Leg_BR", crane.transform, new Vector3(21f, 8.5f, 260f), new Vector3(1.1f, 17f, 1.1f), mats.GantrySteel);
-            CreateStaticBlock("Crane_Boom", crane.transform, new Vector3(36f, 17.4f, 255f), new Vector3(38f, 1.5f, 3.2f), mats.GantrySteel, addCollider: false);
-            CreateStaticBlock("Crane_Cab", crane.transform, new Vector3(26f, 15.2f, 255f), new Vector3(4.2f, 2.8f, 3.6f), mats.SedanGlass, addCollider: false);
-            CreateStaticBlock("Crane_TopBeacon", crane.transform, new Vector3(31f, 18.7f, 255f), new Vector3(0.6f, 0.6f, 0.6f), mats.RedBeaconGlow, addCollider: false);
+            CreateStaticBlock("Depot_Warehouse", depotRoot.transform, new Vector3(-10.5f, 3.8f, 198.5f), new Vector3(15f, 7.6f, 8.0f), mats.GarageBrick);
+            CreateStaticBlock("Depot_WarehouseRoof", depotRoot.transform, new Vector3(-10.5f, 7.9f, 198.5f), new Vector3(16f, 0.6f, 8.8f), mats.GarageRoofMetal);
+            PlacePrefabInstance(prefabs.RollerShutterDoor, depotRoot.transform, new Vector3(-10.5f, 0.03f, 194.35f), Quaternion.Euler(0f, 180f, 0f));
 
-            PlacePrefabInstance(prefabs.WoodenCrate, harborRoot.transform, new Vector3(5.2f, 0.14f, 254.2f), Quaternion.Euler(0f, 14f, 0f));
-            PlacePrefabInstance(prefabs.WoodenCrate, harborRoot.transform, new Vector3(6.6f, 0.14f, 254.6f), Quaternion.Euler(0f, -8f, 0f));
-            PlacePrefabInstance(prefabs.WoodenCrate, harborRoot.transform, new Vector3(5.8f, 1.18f, 254.4f), Quaternion.Euler(0f, 32f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, harborRoot.transform, new Vector3(-2.5f, 0.14f, 257.5f), Quaternion.Euler(0f, 45f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, harborRoot.transform, new Vector3(-1.4f, 0.14f, 258.1f), Quaternion.Euler(0f, 120f, 0f));
-            PlacePrefabInstance(prefabs.FloodLights, harborRoot.transform, new Vector3(17.2f, 0.14f, 256.5f), Quaternion.Euler(0f, -145f, 0f));
-            PlacePrefabInstance(prefabs.ConcreteBarrier, harborRoot.transform, new Vector3(35.5f, 0.14f, 250f), Quaternion.Euler(0f, 90f, 0f));
-            PlacePrefabInstance(prefabs.ConcreteBarrier, harborRoot.transform, new Vector3(35.5f, 0.14f, 256f), Quaternion.Euler(0f, 90f, 0f));
-            PlacePrefabInstance(prefabs.ConcreteBarrier, harborRoot.transform, new Vector3(35.5f, 0.14f, 262f), Quaternion.Euler(0f, 90f, 0f));
-            CreatePointLamp("Lamp_HarborDock", harborRoot.transform, new Vector3(11f, 8.2f, 251f), new Color(1f, 0.82f, 0.50f), 32f, 4.2f);
+            CreateStaticBlock("Depot_SignFascia", depotRoot.transform, new Vector3(-10.5f, 6.6f, 194.3f), new Vector3(12f, 0.8f, 0.30f), mats.SedanTrimDark, addCollider: false);
+            CreateWorldSignText(
+                "KARGO DEPOSU",
+                depotRoot.transform,
+                new Vector3(-10.5f, 6.6f, 194.10f),
+                Quaternion.identity,
+                new Vector2(11.0f, 0.62f),
+                new Color(0.96f, 0.96f, 0.94f, 1f));
 
-            GameObject buoy1 = PlacePrefabInstance(prefabs.OceanBuoy, env.transform, new Vector3(52f, -1.35f, 115f), Quaternion.identity);
-            GameObject buoy2 = PlacePrefabInstance(prefabs.OceanBuoy, env.transform, new Vector3(56f, -1.35f, 245f), Quaternion.Euler(0f, 65f, 0f));
-            SeaWaveAnimator waveAnim = seaObj.AddComponent<SeaWaveAnimator>();
-            waveAnim.Configure(seaObj.GetComponent<Renderer>(), new[] { buoy1.transform, buoy2.transform });
+            CreateStaticBlock("Depot_Container_01", depotRoot.transform, new Vector3(21.0f, 1.5f, 198.5f), new Vector3(3.2f, 3.0f, 8.5f), mats.ContainerRed);
+            CreateStaticBlock("Depot_Container_02", depotRoot.transform, new Vector3(25.0f, 1.5f, 198.5f), new Vector3(3.2f, 3.0f, 8.5f), mats.ContainerBlue);
+            CreateStaticBlock("Depot_Container_03", depotRoot.transform, new Vector3(23.0f, 4.5f, 198.5f), new Vector3(3.2f, 3.0f, 8.5f), mats.ContainerOchre);
+
+            PlacePrefabInstance(prefabs.WoodenCrate, depotRoot.transform, new Vector3(3.8f, 0.03f, 196.2f), Quaternion.Euler(0f, 14f, 0f));
+            PlacePrefabInstance(prefabs.WoodenCrate, depotRoot.transform, new Vector3(5.0f, 0.03f, 196.5f), Quaternion.Euler(0f, -8f, 0f));
+            PlacePrefabInstance(prefabs.OilBarrel, depotRoot.transform, new Vector3(-1.8f, 0.03f, 197.6f), Quaternion.Euler(0f, 45f, 0f));
+            PlacePrefabInstance(prefabs.OilBarrel, depotRoot.transform, new Vector3(-0.8f, 0.03f, 198.0f), Quaternion.Euler(0f, 120f, 0f));
+            PlacePrefabInstance(prefabs.FloodLights, depotRoot.transform, new Vector3(17.2f, 0.03f, 196.5f), Quaternion.Euler(0f, 145f, 0f));
+            CreatePointLamp("Lamp_CargoDepot", depotRoot.transform, new Vector3(10.5f, 7.6f, 193.5f), new Color(1f, 0.82f, 0.50f), 30f, 3.8f);
 
             // Render top-down orthographic TownMap.png from the completed environment before adding dynamic actors
             Texture2D townMapTexture = RenderAndSaveTownMapTexture(sun);
 
             // --- WORLD ANCHORS & SPAWNS (Missions 1-5) ---
             GameObject anchorsRoot = new GameObject("--- WORLD_ANCHORS ---");
-            CreateWorldAnchor("Spawn_GarageFoot", "spawn_garage_foot", anchorsRoot.transform, new Vector3(-8.5f, 0.14f, -6.0f), Quaternion.Euler(0f, 25f, 0f), 2f);
-            CreateWorldAnchor("Spawn_GarageSedan", "spawn_garage_sedan", anchorsRoot.transform, new Vector3(3.5f, 0.28f, 4.5f), Quaternion.Euler(0f, 90f, 0f), 3.5f);
-            CreateWorldAnchor("Harbor_DeliveryZone", "harbor_delivery_zone", anchorsRoot.transform, new Vector3(11f, 0.18f, 248f), Quaternion.identity, 7.5f);
-            CreateWorldAnchor("MissingCar_SearchZone", "missing_car_zone", anchorsRoot.transform, new Vector3(-24.5f, 0.14f, 64f), Quaternion.identity, 14f);
-            CreateWorldAnchor("Tail_StartLookoutZone", "tail_start_zone", anchorsRoot.transform, new Vector3(21f, 0.14f, 224f), Quaternion.Euler(0f, 180f, 0f), 11f);
-            CreateWorldAnchor("Spawn_HarborTailStart", "spawn_harbor_tail_start", anchorsRoot.transform, new Vector3(21f, 0.28f, 232f), Quaternion.Euler(0f, 180f, 0f), 4f);
-            CreateWorldAnchor("Neighborhood_ReturnZone", "neighborhood_return_zone", anchorsRoot.transform, new Vector3(-1f, 0.14f, 92f), Quaternion.identity, 15f);
+            CreateWorldAnchor("Spawn_GarageFoot", "spawn_garage_foot", anchorsRoot.transform, new Vector3(-3.0f, 0.12f, -21.5f), Quaternion.Euler(0f, 180f, 0f), 2f);
+            CreateWorldAnchor("Spawn_GarageSedan", "spawn_garage_sedan", anchorsRoot.transform, new Vector3(9.5f, 0.28f, -32.5f), Quaternion.identity, 3.5f);
+            CreateWorldAnchor("Harbor_DeliveryZone", "harbor_delivery_zone", anchorsRoot.transform, new Vector3(10.5f, 0.10f, 193.5f), Quaternion.identity, 7.5f);
+            CreateWorldAnchor("MissingCar_SearchZone", "missing_car_zone", anchorsRoot.transform, new Vector3(-35.5f, 0.10f, 19.25f), Quaternion.identity, 14f);
+            CreateWorldAnchor("Tail_StartLookoutZone", "tail_start_zone", anchorsRoot.transform, new Vector3(21.4f, 0.10f, 173.0f), Quaternion.Euler(0f, 180f, 0f), 11f);
+            CreateWorldAnchor("Spawn_HarborTailStart", "spawn_harbor_tail_start", anchorsRoot.transform, new Vector3(21.4f, 0.28f, 177.5f), Quaternion.Euler(0f, 180f, 0f), 4f);
+            CreateWorldAnchor("Neighborhood_ReturnZone", "neighborhood_return_zone", anchorsRoot.transform, new Vector3(0f, 0.10f, 44.0f), Quaternion.identity, 16f);
 
             // --- ACTORS (Player, Sedan, Story NPCs, Mission 3-5 Actors, Taxi Passenger) ---
             GameObject actorsRoot = new GameObject("--- ACTORS ---");
-            GameObject playerObj = PlacePrefabInstance(prefabs.Player, actorsRoot.transform, new Vector3(-8.5f, 0.14f, -6.0f), Quaternion.Euler(0f, 25f, 0f));
-            GameObject sedanObj = PlacePrefabInstance(prefabs.PlayerSedan, actorsRoot.transform, new Vector3(3.5f, 0.28f, 4.5f), Quaternion.Euler(0f, 90f, 0f));
-            PlacePrefabInstance(prefabs.NpcMechanic, actorsRoot.transform, new Vector3(-4.5f, 0.10f, 6.2f), Quaternion.Euler(0f, 165f, 0f));
-            PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(2.2f, 0.16f, 255.5f), Quaternion.Euler(0f, 160f, 0f));
+            GameObject playerObj = PlacePrefabInstance(prefabs.Player, actorsRoot.transform, new Vector3(-3.0f, 0.12f, -21.5f), Quaternion.Euler(0f, 180f, 0f));
+            GameObject sedanObj = PlacePrefabInstance(prefabs.PlayerSedan, actorsRoot.transform, new Vector3(9.5f, 0.28f, -32.5f), Quaternion.identity);
+            PlacePrefabInstance(prefabs.NpcMechanic, actorsRoot.transform, new Vector3(-2.5f, 0.04f, -32.2f), Quaternion.identity);
+            PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(1.5f, 0.04f, 194.2f), Quaternion.Euler(0f, 155f, 0f));
 
-            // Mission 3: Missing Dark Sedan parked in back-alley courtyard with manifest clue
-            GameObject missingCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(-21.2f, 0.04f, 64.0f), Quaternion.Euler(0f, 14f, 0f));
+            // Mission 3: Missing Dark Sedan parked in open residential courtyard lane with manifest clue
+            GameObject missingCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(-35.5f, 0.04f, 19.25f), Quaternion.Euler(0f, 85f, 0f));
             missingCarObj.name = "Mission03_MissingDarkSedan";
             WorldAnchor missingCarAnchor = missingCarObj.AddComponent<WorldAnchor>();
             missingCarAnchor.Configure("missing_car_clue", 4.2f, new Vector3(0f, 2.2f, 0f));
             InteractableTrigger missingCarTrig = missingCarObj.AddComponent<InteractableTrigger>();
             missingCarTrig.Configure(InteractableKind.InspectObject, "missing_car_clue", "ui.btn.inspect", 4.2f);
 
-            // Mission 4: Harbor Courier Tail Vehicle + Dropped Package in North Back Alley
-            GameObject tailCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(21.0f, 0.04f, 212.0f), Quaternion.Euler(0f, 180f, 0f));
+            // Mission 4: Courier Tail Vehicle + Dropped Package on West Street
+            GameObject tailCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(21.4f, 0.04f, 156.0f), Quaternion.Euler(0f, 180f, 0f));
             tailCarObj.name = "Mission04_TailCourierCar";
             WorldAnchor tailCarAnchor = tailCarObj.AddComponent<WorldAnchor>();
             tailCarAnchor.Configure("tail_target_car", 5.0f, new Vector3(0f, 2.4f, 0f));
 
-            GameObject droppedPkgObj = PlacePrefabInstance(prefabs.WoodenCrate, actorsRoot.transform, new Vector3(-23.6f, 0.14f, 158.0f), Quaternion.Euler(0f, 25f, 0f));
+            GameObject droppedPkgObj = PlacePrefabInstance(prefabs.WoodenCrate, actorsRoot.transform, new Vector3(-62.5f, 0.06f, 121.5f), Quaternion.Euler(0f, 25f, 0f));
             droppedPkgObj.name = "Mission04_DroppedPackage";
             droppedPkgObj.transform.localScale = new Vector3(0.65f, 0.65f, 0.65f);
             GameObjectUtility.SetStaticEditorFlags(droppedPkgObj, 0);
@@ -1764,16 +1739,17 @@ namespace Gridroam.Editor
             TailTargetVehicleController tailCtrl = tailCarObj.AddComponent<TailTargetVehicleController>();
             List<Vector3> tailRoute = new List<Vector3>
             {
-                new Vector3(21.0f, 0.04f, 212.0f),
-                new Vector3(21.0f, 0.04f, 174.0f),
-                new Vector3(21.0f, 0.04f, 92.0f),
-                new Vector3(-26.0f, 0.04f, 92.0f),
-                new Vector3(-26.0f, 0.04f, 158.0f)
+                new Vector3(21.4f, 0.04f, 156.0f),
+                new Vector3(21.4f, 0.04f, 116.0f),
+                new Vector3(21.4f, 0.04f, 44.0f),
+                new Vector3(-24.0f, 0.04f, 44.0f),
+                new Vector3(-24.0f, 0.04f, 116.0f),
+                new Vector3(-64.0f, 0.04f, 116.0f)
             };
             tailCtrl.Configure(tailRoute, droppedPkgObj);
 
             // Mission 5: Elena also waits at the Town Square fountain so player can choose Marco (Garage) OR Elena (Square)
-            GameObject elenaSquareObj = PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(4.8f, 0.12f, 131.5f), Quaternion.Euler(0f, -110f, 0f));
+            GameObject elenaSquareObj = PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(6.8f, 0.04f, 77.5f), Quaternion.Euler(0f, -110f, 0f));
             elenaSquareObj.name = "NPC_Elena_TownSquare";
             WorldAnchor elenaSqAnchor = elenaSquareObj.GetComponent<WorldAnchor>();
             if (elenaSqAnchor != null) elenaSqAnchor.Configure("npc_elena_neighborhood", 3.6f, new Vector3(0f, 2.3f, 0f));
@@ -1810,20 +1786,20 @@ namespace Gridroam.Editor
             jobBeacon.SetVisible(false);
             jobManager.Configure(jobBeacon, taxiPassengerObj, taxiHum, mats.ContainerOchre, mats.TownFabricTeal);
 
-            // --- Pooled Ambient Traffic along Coastal Loop (stops at red lights & yields via SphereCast) ---
+            // --- Pooled Ambient Traffic along Cumhuriyet Caddesi (stops at red lights & yields via SphereCast) ---
             GameObject trafficRoot = new GameObject("AmbientTrafficManager");
             AmbientTrafficManager trafficMgr = trafficRoot.AddComponent<AmbientTrafficManager>();
             List<Transform> waypoints = new List<Transform>();
             Vector3[] wpCoords =
             {
-                new Vector3(27f, 0.1f, 15f),
-                new Vector3(27f, 0.1f, 92f),
-                new Vector3(27f, 0.1f, 174f),
-                new Vector3(27f, 0.1f, 232f),
-                new Vector3(21f, 0.1f, 232f),
-                new Vector3(21f, 0.1f, 174f),
-                new Vector3(21f, 0.1f, 92f),
-                new Vector3(21f, 0.1f, 15f)
+                new Vector3(26.6f, 0.05f, -18f),
+                new Vector3(26.6f, 0.05f, 44f),
+                new Vector3(26.6f, 0.05f, 116f),
+                new Vector3(26.6f, 0.05f, 178f),
+                new Vector3(21.4f, 0.05f, 178f),
+                new Vector3(21.4f, 0.05f, 116f),
+                new Vector3(21.4f, 0.05f, 44f),
+                new Vector3(21.4f, 0.05f, -18f)
             };
             for (int i = 0; i < wpCoords.Length; i++)
             {

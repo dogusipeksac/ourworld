@@ -55,14 +55,14 @@ namespace Gridroam.Jobs
 
         private static readonly Vector3[] TaxiPickupSpots =
         {
-            new Vector3(16.2f, 0.16f, 44f),
-            new Vector3(16.2f, 0.16f, 112f),
-            new Vector3(16.2f, 0.16f, 198f),
-            new Vector3(-20.4f, 0.16f, 56f),
-            new Vector3(-31.8f, 0.16f, 148f),
-            new Vector3(-43.0f, 0.12f, 84f),
-            new Vector3(-43.0f, 0.12f, 188f),
-            new Vector3(4.5f, 0.14f, 240f)
+            new Vector3(17.5f, 0.08f, 14f),
+            new Vector3(17.5f, 0.08f, 72f),
+            new Vector3(17.5f, 0.08f, 142f),
+            new Vector3(-17.5f, 0.08f, 18f),
+            new Vector3(-17.5f, 0.08f, 88f),
+            new Vector3(-30.5f, 0.08f, 64f),
+            new Vector3(-30.5f, 0.08f, 150f),
+            new Vector3(30.5f, 0.08f, 82f)
         };
 
         private struct TaxiDestination
@@ -74,25 +74,25 @@ namespace Gridroam.Jobs
 
         private static readonly TaxiDestination[] TaxiDestinations =
         {
-            new TaxiDestination { NameKey = "job.taxi.dest.square", FallbackTr = "Kasaba Meydanı", WorldPos = new Vector3(18.2f, 0.10f, 134f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.harbor", FallbackTr = "Liman Kapısı", WorldPos = new Vector3(11.0f, 0.14f, 242f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.garage", FallbackTr = "Tamirhane", WorldPos = new Vector3(6.5f, 0.10f, 2.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.park", FallbackTr = "Mahalle Parkı", WorldPos = new Vector3(-45.5f, 0.10f, 106.5f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.north", FallbackTr = "Kuzey Çarşı", WorldPos = new Vector3(18.2f, 0.10f, 206f) }
+            new TaxiDestination { NameKey = "job.taxi.dest.square", FallbackTr = "Kasaba Meydanı", WorldPos = new Vector3(16.0f, 0.08f, 80f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.harbor", FallbackTr = "Kuzey Kargo Deposu", WorldPos = new Vector3(8.0f, 0.08f, 184f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.garage", FallbackTr = "Tamirhane", WorldPos = new Vector3(0.0f, 0.08f, -24f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.park", FallbackTr = "Çınarlı Parkı", WorldPos = new Vector3(0.0f, 0.08f, 148f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.north", FallbackTr = "Akaryakıt İstasyonu", WorldPos = new Vector3(46.0f, 0.08f, 150f) }
         };
 
         private static readonly Vector3[] LitterSpawnPoints =
         {
-            new Vector3(5.5f, 0.16f, 128.5f),
-            new Vector3(-8.5f, 0.16f, 127.5f),
-            new Vector3(-7.0f, 0.16f, 141.5f),
-            new Vector3(6.5f, 0.16f, 140.5f),
-            new Vector3(-1.8f, 0.16f, 123.5f),
-            new Vector3(15.2f, 0.16f, 114.0f),
-            new Vector3(15.2f, 0.16f, 154.0f),
-            new Vector3(15.2f, 0.16f, 74.0f),
-            new Vector3(15.2f, 0.16f, 52.0f),
-            new Vector3(15.2f, 0.16f, 192.0f)
+            new Vector3(7.5f, 0.08f, 72.0f),
+            new Vector3(-7.5f, 0.08f, 74.0f),
+            new Vector3(-6.5f, 0.08f, 92.0f),
+            new Vector3(8.5f, 0.08f, 90.0f),
+            new Vector3(0.0f, 0.08f, 64.0f),
+            new Vector3(16.2f, 0.08f, 24.0f),
+            new Vector3(16.2f, 0.08f, 102.0f),
+            new Vector3(-16.2f, 0.08f, 80.0f),
+            new Vector3(0.0f, 0.08f, 136.0f),
+            new Vector3(5.5f, 0.08f, 156.0f)
         };
 
         private JobType _activeJob = JobType.None;

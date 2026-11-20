@@ -23,9 +23,9 @@ namespace Gridroam.UI
     {
         public static PhonePanelController Instance { get; private set; }
 
-        public const float ViewWorldMinX = -148f;
-        public const float ViewWorldMinZ = -42f;
-        public const float ViewWorldSpan = 310f;
+        public const float ViewWorldMinX = -112f;
+        public const float ViewWorldMinZ = -44f;
+        public const float ViewWorldSpan = 248f;
 
         [Header("Root & Tabs")]
         [SerializeField] private GameObject panelRoot;
@@ -74,7 +74,7 @@ namespace Gridroam.UI
 
         private static readonly Color ActiveTabColor = new Color(0.31f, 0.70f, 0.66f, 0.90f);
         private static readonly Color InactiveTabColor = new Color(0.11f, 0.14f, 0.19f, 0.75f);
-        private static readonly Vector3 GasStationWorldPos = new Vector3(11.8f, 0.2f, 226.5f);
+        private static readonly Vector3 GasStationWorldPos = new Vector3(46.0f, 0.2f, 150.0f);
 
         private SedanVehicleController[] _cachedVehicles;
         private int _activeTabIndex;

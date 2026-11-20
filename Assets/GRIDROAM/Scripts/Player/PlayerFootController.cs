@@ -242,6 +242,17 @@ namespace Gridroam.Player
                 return;
             }
 
+            // Safety net: never allow falling below ground level
+            if (transform.position.y < -2.0f)
+            {
+                Vector3 safePos = new Vector3(
+                    Mathf.Clamp(transform.position.x, -95f, 95f),
+                    0.25f,
+                    Mathf.Clamp(transform.position.z, -36f, 194f));
+                TeleportTo(safePos, transform.rotation);
+                return;
+            }
+
             if (_cameraRig == null)
             {
                 _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();

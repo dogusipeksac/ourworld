@@ -14,7 +14,7 @@ namespace Gridroam.Editor
     public static class GridroamAutoSetup
     {
         private const string VersionKey = "GRIDROAM_SceneBuildVersion";
-        private const string CurrentBuildVersion = "v7_open_reachable_terrain";
+        private const string CurrentBuildVersion = "v8_clean_walkable_town";
 
         static GridroamAutoSetup()
         {
@@ -37,7 +37,7 @@ namespace Gridroam.Editor
             if (needsRebuild)
             {
                 EditorPrefs.SetString(VersionKey, CurrentBuildVersion);
-                Debug.Log($"[GRIDROAM] Upgrading scene to {CurrentBuildVersion} (open-world side jobs, economy, day/night cycle, shops & gas station, phone map & minimap, Turkish localization, calm modern HUD)...");
+                Debug.Log($"[GRIDROAM] Upgrading scene to {CurrentBuildVersion} (100% walkable Çınarlı Kasabası 4x4 town grid, procedural 3D skybox, zero fake sea/backdrops, solid 900x900 ground)...");
                 GridroamPrototypeSetup.BuildFullPrototype(showDialog: false);
                 return;
             }

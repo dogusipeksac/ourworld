@@ -266,9 +266,9 @@ namespace Gridroam.Player
                 if (targetCar != null && (targetCar != playerSedan || HasVehicleKeys))
                 {
                     Vector3 vPos = new Vector3(
-                        Mathf.Clamp(data.savedVehiclePosX, -172f, 44f),
-                        Mathf.Max(0.22f, data.savedVehiclePosY),
-                        Mathf.Clamp(data.savedVehiclePosZ, -48f, 294f));
+                        Mathf.Clamp(data.savedVehiclePosX, -95f, 95f),
+                        Mathf.Max(0.24f, data.savedVehiclePosY),
+                        Mathf.Clamp(data.savedVehiclePosZ, -36f, 194f));
                     Quaternion vRot = Quaternion.Euler(0f, data.savedVehicleRotY, 0f);
                     targetCar.TeleportAndReset(vPos, vRot);
                     targetCar.SetFuel(data.savedVehicleFuel);
@@ -280,9 +280,9 @@ namespace Gridroam.Player
             if (footController != null)
             {
                 Vector3 fPos = new Vector3(
-                    Mathf.Clamp(data.playerPosX, -172f, 44f),
+                    Mathf.Clamp(data.playerPosX, -95f, 95f),
                     Mathf.Max(0.10f, data.playerPosY),
-                    Mathf.Clamp(data.playerPosZ, -48f, 294f));
+                    Mathf.Clamp(data.playerPosZ, -36f, 194f));
                 Quaternion fRot = Quaternion.Euler(0f, data.playerRotY, 0f);
                 footController.TeleportTo(fPos, fRot);
             }

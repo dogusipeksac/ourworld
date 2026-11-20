@@ -282,7 +282,7 @@ namespace Gridroam.Editor
             trigger.Configure(InteractableKind.Door, doorId, "ui.btn.door", 2.0f);
 
             DoorInteractable doorComp = doorRoot.AddComponent<DoorInteractable>();
-            doorComp.Configure(pivotObj.transform, panelObj.transform, 95f, 0.4f);
+            doorComp.Configure(pivotObj.transform, panelObj.transform, 106f, 0.36f);
         }
 
         private static void CreateInteriorZoneAndLight(
@@ -328,6 +328,7 @@ namespace Gridroam.Editor
             string displayAddress,
             Transform parent,
             Vector3 basePos,
+            Quaternion houseRot,
             float depthX,
             float widthZ,
             Material wallMat,
@@ -341,20 +342,20 @@ namespace Gridroam.Editor
             GameObject root = new GameObject(houseName);
             root.transform.SetParent(parent, false);
             root.transform.position = basePos;
-            root.transform.rotation = Quaternion.identity;
+            root.transform.rotation = houseRot;
 
-            depthX = Mathf.Max(7.4f, depthX);
-            widthZ = Mathf.Max(8.8f, widthZ);
+            depthX = Mathf.Max(9.0f, depthX);
+            widthZ = Mathf.Max(10.4f, widthZ);
 
-            float height = 5.95f + (float)(houseRng.NextDouble() * 0.45);
+            float height = 5.95f + (float)(houseRng.NextDouble() * 0.35);
             float tileMeters = wallMat == mats.TownBrickHouse ? 1.5f : 3.0f;
             float hx = depthX * 0.5f;
             float hz = widthZ * 0.5f;
 
-            float floorTopY = 0.08f;
-            float ceilBottomY = 3.12f;
-            float doorWidth = 1.10f;
-            float doorHeight = 2.20f;
+            float floorTopY = 0.04f;
+            float ceilBottomY = 3.25f;
+            float doorWidth = 1.55f;
+            float doorHeight = 2.30f;
             float doorCenterZ = 0f;
             float doorTopY = floorTopY + doorHeight;
 
@@ -494,16 +495,17 @@ namespace Gridroam.Editor
                 Quaternion.identity, mats.TownHedge, 1.5f, collider: true);
 
             CreateLocalTiledBox("Doorstep_Walkway", roofAndTrim.transform,
-                new Vector3(hx + 0.72f, 0.03f, doorCenterZ),
-                new Vector3(1.50f, 0.06f, 1.45f),
-                Quaternion.identity, mats.TownPaving, 1.5f, collider: true);
+                new Vector3(hx + 1.10f, 0.015f, doorCenterZ),
+                new Vector3(2.30f, 0.03f, 2.10f),
+                Quaternion.identity, mats.TownPaving, 1.5f, collider: false);
 
             if (hasGardenTree)
             {
-                float treeOffsetZ = houseRng.Next(2) == 0 ? -(widthZ * 0.5f + 1.25f) : (widthZ * 0.5f + 1.25f);
+                float treeLocalZ = houseRng.Next(2) == 0 ? -(widthZ * 0.5f + 2.2f) : (widthZ * 0.5f + 2.2f);
+                Vector3 treeWorldPos = root.transform.TransformPoint(new Vector3(depthX * 0.28f, 0f, treeLocalZ));
                 CreateTownTree("GardenTree", root.transform,
-                    basePos + new Vector3(depthX * 0.35f, 0f, treeOffsetZ),
-                    mats, 0.85f + (float)houseRng.NextDouble() * 0.25f, houseRng.Next(100));
+                    treeWorldPos,
+                    mats, 0.85f + (float)houseRng.NextDouble() * 0.20f, houseRng.Next(100));
             }
 
             PaintableHouse paintable = root.AddComponent<PaintableHouse>();
@@ -551,10 +553,10 @@ namespace Gridroam.Editor
             float hx = depthX * 0.5f;
             float hz = widthZ * 0.5f;
 
-            float floorTopY = 0.16f;
-            float ceilBottomY = 3.16f;
-            float doorWidth = 1.15f;
-            float doorHeight = 2.20f;
+            float floorTopY = 0.04f;
+            float ceilBottomY = 3.30f;
+            float doorWidth = 1.60f;
+            float doorHeight = 2.35f;
             float doorCenterZ = 0f;
             float doorTopY = floorTopY + doorHeight;
 
@@ -599,9 +601,9 @@ namespace Gridroam.Editor
                 Quaternion.identity, facadeMat, metersPerTile, collider: true);
 
             CreateLocalTiledBox("EntranceApron", extGroup.transform,
-                new Vector3(hx + 0.35f, floorTopY * 0.5f, 0f),
-                new Vector3(0.75f, floorTopY, widthZ),
-                Quaternion.identity, mats.Sidewalk, 2.0f, collider: true);
+                new Vector3(hx + 0.65f, 0.015f, 0f),
+                new Vector3(1.35f, 0.03f, widthZ),
+                Quaternion.identity, mats.Sidewalk, 2.0f, collider: false);
 
             float glassSpan = Mathf.Max(1.4f, leftSpanZ - 1.0f);
             GameObject glassL = CreateLocalTiledBox("ShopGlass_Left", extGroup.transform,
@@ -938,11 +940,11 @@ namespace Gridroam.Editor
             Vector3 PlacePos(float lx, float ly, float lz) => new Vector3(lx, ly, lz * zSign);
             Quaternion PlaceYaw(float deg) => Quaternion.Euler(0f, zSign > 0f ? deg : (180f - deg), 0f);
 
-            float partZ = 1.35f * zSign;
+            float partZ = 1.45f * zSign;
             const float partThick = 0.14f;
-            const float partDoorWidth = 1.0f;
-            const float partDoorCenterX = 0.20f;
-            const float partDoorH = 2.20f;
+            const float partDoorWidth = 1.50f;
+            const float partDoorCenterX = 0.30f;
+            const float partDoorH = 2.30f;
 
             float innerHalfX = hx - wallTotalT;
             float segBackLen = (partDoorCenterX - partDoorWidth * 0.5f) - (-innerHalfX);
@@ -1021,15 +1023,8 @@ namespace Gridroam.Editor
                 mats);
 
             CreateArmchair($"{buildingId}_armchair_1", furnRoot.transform,
-                PlacePos(livingCenterX - 1.35f, floorTopY, sofaZ + 1.32f),
-                PlaceYaw(68f), accentFabric, mats.TownFurnitureWood);
-
-            if (rng.Next(2) == 0)
-            {
-                CreateArmchair($"{buildingId}_armchair_2", furnRoot.transform,
-                    PlacePos(innerFrontX - 0.48f, floorTopY, sofaZ + 1.54f),
-                    PlaceYaw(-90f), accentFabric, mats.TownFurnitureWood);
-            }
+                PlacePos(livingCenterX - 1.55f, floorTopY, sofaZ + 0.55f),
+                PlaceYaw(45f), accentFabric, mats.TownFurnitureWood);
 
             CreateKitchenCounter("Kitchen_Counter", furnRoot.transform,
                 PlacePos(innerBackX + 0.34f, floorTopY, innerSouthZ + 1.35f),
@@ -1521,152 +1516,77 @@ namespace Gridroam.Editor
 
         private static void BuildWorldBoundary(Transform envParent, MaterialSet mats)
         {
-            GameObject boundaryRoot = new GameObject("World_BoundaryAndHills");
+            GameObject boundaryRoot = new GameObject("World_CountryFencePerimeter");
             boundaryRoot.transform.SetParent(envParent, false);
 
-            // Extend coastal seawall cleanly along the expanded southern and northern coastline
-            CreateStaticBlock("Coastal_Seawall_SouthCap", boundaryRoot.transform,
-                new Vector3(36.8f, 0.35f, -44f), new Vector3(1.8f, 1.5f, 12f), mats.Concrete);
-            CreateStaticBlock("Coastal_Seawall_NorthCap", boundaryRoot.transform,
-                new Vector3(36.8f, 0.35f, 294f), new Vector3(1.8f, 1.5f, 12f), mats.Concrete);
+            // Clean wooden post-and-rail country fence enclosing the walkable 204m x 250m town
+            // (Resting on a massive 900m x 900m solid ground collider — zero fake backdrops, zero abyss!)
+            const float minX = -102f;
+            const float maxX = 102f;
+            const float minZ = -44f;
+            const float maxZ = 206f;
 
-            // Build a continuous, organic 3D coastal terrain ridge mesh outside the playable ring road
-            // (NO mid-map concrete walls at x=-78 and NO primitive sphere hills!)
-            BuildContinuousCoastalHillsMesh(
-                "CoastalTerrain_WestRange",
-                boundaryRoot.transform,
-                minX: -182f, maxX: -131f,
-                minZ: -58f, maxZ: 304f,
-                gridX: 22, gridZ: 64,
-                riseDirection: new Vector2(-1f, 0f),
-                maxElevation: 26f,
-                mats.CountryEarth);
+            BuildWoodenFenceRun("Fence_West", boundaryRoot.transform, new Vector3(minX, 0f, minZ), new Vector3(minX, 0f, maxZ), mats);
+            BuildWoodenFenceRun("Fence_East", boundaryRoot.transform, new Vector3(maxX, 0f, minZ), new Vector3(maxX, 0f, maxZ), mats);
+            BuildWoodenFenceRun("Fence_South", boundaryRoot.transform, new Vector3(minX, 0f, minZ), new Vector3(maxX, 0f, minZ), mats);
+            BuildWoodenFenceRun("Fence_North", boundaryRoot.transform, new Vector3(minX, 0f, maxZ), new Vector3(maxX, 0f, maxZ), mats);
 
-            BuildContinuousCoastalHillsMesh(
-                "CoastalTerrain_SouthHeadland",
-                boundaryRoot.transform,
-                minX: -134f, maxX: 35f,
-                minZ: -62f, maxZ: -32f,
-                gridX: 38, gridZ: 14,
-                riseDirection: new Vector2(0f, -1f),
-                maxElevation: 16f,
-                mats.CoastalCliffRock);
-
-            BuildContinuousCoastalHillsMesh(
-                "CoastalTerrain_NorthHeadland",
-                boundaryRoot.transform,
-                minX: -134f, maxX: 35f,
-                minZ: 279f, maxZ: 308f,
-                gridX: 38, gridZ: 14,
-                riseDirection: new Vector2(0f, 1f),
-                maxElevation: 18f,
-                mats.CoastalCliffRock);
+            // Natural grove trees along the outside of the wooden fence
+            int treeIdx = 0;
+            for (float z = minZ - 4f; z <= maxZ + 4f; z += 26f)
+            {
+                CreateTownTree($"PerimeterTree_W_{treeIdx}", boundaryRoot.transform,
+                    new Vector3(minX - 6.5f - (treeIdx % 3) * 2.5f, 0f, z), mats, 1.05f + (treeIdx % 3) * 0.15f, treeIdx + 60);
+                CreateTownTree($"PerimeterTree_E_{treeIdx}", boundaryRoot.transform,
+                    new Vector3(maxX + 6.5f + ((treeIdx + 1) % 3) * 2.5f, 0f, z + 8f), mats, 1.05f + ((treeIdx + 1) % 3) * 0.15f, treeIdx + 90);
+                treeIdx++;
+            }
+            for (float x = minX + 14f; x <= maxX - 14f; x += 28f)
+            {
+                CreateTownTree($"PerimeterTree_S_{treeIdx}", boundaryRoot.transform,
+                    new Vector3(x, 0f, minZ - 6.5f - (treeIdx % 2) * 3f), mats, 1.05f + (treeIdx % 3) * 0.14f, treeIdx + 120);
+                CreateTownTree($"PerimeterTree_N_{treeIdx}", boundaryRoot.transform,
+                    new Vector3(x + 6f, 0f, maxZ + 6.5f + ((treeIdx + 1) % 2) * 3f), mats, 1.05f + ((treeIdx + 1) % 3) * 0.14f, treeIdx + 150);
+                treeIdx++;
+            }
         }
 
-        private static void BuildContinuousCoastalHillsMesh(
+        private static void BuildWoodenFenceRun(
             string name,
             Transform parent,
-            float minX,
-            float maxX,
-            float minZ,
-            float maxZ,
-            int gridX,
-            int gridZ,
-            Vector2 riseDirection,
-            float maxElevation,
-            Material terrainMat)
+            Vector3 startPos,
+            Vector3 endPos,
+            MaterialSet mats)
         {
-            GameObject go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            go.transform.position = Vector3.zero;
+            GameObject run = new GameObject(name);
+            run.transform.SetParent(parent, false);
 
-            int cols = Mathf.Max(2, gridX);
-            int rows = Mathf.Max(2, gridZ);
-            int vertCount = (cols + 1) * (rows + 1);
+            Vector3 delta = endPos - startPos;
+            float totalLen = delta.magnitude;
+            Vector3 dir = delta / Mathf.Max(0.01f, totalLen);
+            Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
+            Vector3 mid = (startPos + endPos) * 0.5f;
 
-            Vector3[] verts = new Vector3[vertCount];
-            Vector2[] uvs = new Vector2[vertCount];
-            int[] tris = new int[cols * rows * 6];
+            // Single clean BoxCollider along the fence run so cars and players never leave the town bounds
+            GameObject colGo = new GameObject("FenceCollider");
+            colGo.transform.SetParent(run.transform, false);
+            colGo.transform.SetPositionAndRotation(mid + Vector3.up * 0.75f, rot);
+            BoxCollider bc = colGo.AddComponent<BoxCollider>();
+            bc.size = new Vector3(0.35f, 1.50f, totalLen);
 
-            float spanX = maxX - minX;
-            float spanZ = maxZ - minZ;
+            // Top and bottom horizontal wooden rails
+            CreateTiledBox("Rail_Upper", run.transform, mid + Vector3.up * 0.96f, new Vector3(0.09f, 0.11f, totalLen), rot, mats.TownFurnitureWood, 2.0f, collider: false);
+            CreateTiledBox("Rail_Lower", run.transform, mid + Vector3.up * 0.48f, new Vector3(0.09f, 0.11f, totalLen), rot, mats.TownFurnitureWood, 2.0f, collider: false);
 
-            int vIdx = 0;
-            for (int r = 0; r <= rows; r++)
+            // Wooden posts every 4.5 meters
+            int postCount = Mathf.Max(2, Mathf.RoundToInt(totalLen / 4.5f));
+            for (int i = 0; i <= postCount; i++)
             {
-                float tz = r / (float)rows;
-                float wz = Mathf.Lerp(minZ, maxZ, tz);
-
-                for (int c = 0; c <= cols; c++)
-                {
-                    float tx = c / (float)cols;
-                    float wx = Mathf.Lerp(minX, maxX, tx);
-
-                    float distT;
-                    if (Mathf.Abs(riseDirection.x) > 0.5f)
-                    {
-                        distT = riseDirection.x < 0f ? (1f - tx) : tx;
-                    }
-                    else
-                    {
-                        distT = riseDirection.y < 0f ? (1f - tz) : tz;
-                    }
-
-                    // Smoothly blend from y = -0.15 at the inner playable edge up into organic multi-octave ridges
-                    float smoothRise = distT * distT * (3f - 2f * distT);
-                    float n1 = Mathf.PerlinNoise(wx * 0.025f + 13.7f, wz * 0.025f + 29.1f);
-                    float n2 = Mathf.PerlinNoise(wx * 0.065f + 51.3f, wz * 0.065f + 17.4f) * 0.42f;
-                    float ridge = (n1 + n2) * 0.72f;
-
-                    float y = -0.15f + smoothRise * maxElevation * (0.45f + ridge);
-                    verts[vIdx] = new Vector3(wx, y, wz);
-                    uvs[vIdx] = new Vector2(tx * (spanX / 12f), tz * (spanZ / 12f));
-                    vIdx++;
-                }
+                Vector3 p = Vector3.Lerp(startPos, endPos, i / (float)postCount);
+                CreateTiledBox($"Post_{i}", run.transform, p + Vector3.up * 0.58f, new Vector3(0.16f, 1.16f, 0.16f), rot, mats.TownWood, 1.5f, collider: false);
             }
 
-            int tIdx = 0;
-            int stride = cols + 1;
-            for (int r = 0; r < rows; r++)
-            {
-                int row0 = r * stride;
-                int row1 = row0 + stride;
-                for (int c = 0; c < cols; c++)
-                {
-                    tris[tIdx++] = row0 + c;
-                    tris[tIdx++] = row1 + c;
-                    tris[tIdx++] = row1 + c + 1;
-
-                    tris[tIdx++] = row0 + c;
-                    tris[tIdx++] = row1 + c + 1;
-                    tris[tIdx++] = row0 + c + 1;
-                }
-            }
-
-            Mesh mesh = new Mesh
-            {
-                name = name + "_Mesh",
-                vertices = verts,
-                uv = uvs,
-                triangles = tris
-            };
-            mesh.RecalculateNormals();
-            mesh.RecalculateTangents();
-            mesh.RecalculateBounds();
-
-            MeshFilter mf = go.AddComponent<MeshFilter>();
-            mf.sharedMesh = mesh;
-
-            MeshRenderer mr = go.AddComponent<MeshRenderer>();
-            if (terrainMat != null)
-            {
-                mr.sharedMaterial = terrainMat;
-            }
-
-            MeshCollider mc = go.AddComponent<MeshCollider>();
-            mc.sharedMesh = mesh;
-
-            MarkStaticEnvironment(go);
+            MarkStaticEnvironment(run);
         }
     }
 }
