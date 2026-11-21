@@ -125,6 +125,74 @@ namespace Gridroam.Player
             return hum;
         }
 
+        /// <summary>
+        /// Builds the exact 14-pivot ProceduralHumanoid skeleton and mounts externally sculpted
+        /// body-part meshes (e.g. Blender FBX parts centered at each joint origin) onto every pivot.
+        /// </summary>
+        public static ProceduralHumanoid BuildWithCustomParts(
+            Transform parent,
+            Func<string, Transform, Transform> mountPart,
+            float height = 1.78f,
+            float shoulderX = 0.198f,
+            float hipX = 0.102f,
+            float shoulderY = 0.382f)
+        {
+            GameObject root = new GameObject("ProceduralHumanoid");
+            if (parent != null)
+            {
+                root.transform.SetParent(parent, false);
+            }
+
+            float uniformScale = Mathf.Max(0.25f, height / 1.78f);
+            root.transform.localScale = Vector3.one * uniformScale;
+
+            ProceduralHumanoid hum = root.AddComponent<ProceduralHumanoid>();
+            hum.hipsBaseY = 0.95f;
+
+            hum.hips = CreatePivot("Hips", root.transform, new Vector3(0f, 0.95f, 0f));
+            mountPart?.Invoke("Part_Pelvis", hum.hips);
+
+            hum.spine = CreatePivot("Spine", hum.hips, new Vector3(0f, 0.06f, 0f));
+            Transform chestMounted = mountPart?.Invoke("Part_Chest", hum.spine);
+            if (chestMounted != null)
+            {
+                hum.chestVisual = chestMounted;
+                hum._chestBaseScale = chestMounted.localScale;
+            }
+
+            hum.neck = CreatePivot("Neck", hum.spine, new Vector3(0f, 0.46f, 0f));
+            mountPart?.Invoke("Part_Neck", hum.neck);
+
+            hum.head = CreatePivot("Head", hum.neck, new Vector3(0f, 0.09f, 0f));
+            mountPart?.Invoke("Part_Head", hum.head);
+
+            hum.lShoulder = CreatePivot("L_Shoulder", hum.spine, new Vector3(-shoulderX, shoulderY, 0f));
+            mountPart?.Invoke("Part_L_UpperArm", hum.lShoulder);
+            hum.lElbow = CreatePivot("L_Elbow", hum.lShoulder, new Vector3(0f, -0.295f, 0f));
+            mountPart?.Invoke("Part_L_Forearm", hum.lElbow);
+
+            hum.rShoulder = CreatePivot("R_Shoulder", hum.spine, new Vector3(shoulderX, shoulderY, 0f));
+            mountPart?.Invoke("Part_R_UpperArm", hum.rShoulder);
+            hum.rElbow = CreatePivot("R_Elbow", hum.rShoulder, new Vector3(0f, -0.295f, 0f));
+            mountPart?.Invoke("Part_R_Forearm", hum.rElbow);
+
+            hum.lHip = CreatePivot("L_Hip", hum.hips, new Vector3(-hipX, -0.02f, 0f));
+            mountPart?.Invoke("Part_L_Thigh", hum.lHip);
+            hum.lKnee = CreatePivot("L_Knee", hum.lHip, new Vector3(0f, -0.43f, 0f));
+            mountPart?.Invoke("Part_L_Shin", hum.lKnee);
+            hum.lAnkle = CreatePivot("L_Ankle", hum.lKnee, new Vector3(0f, -0.42f, 0f));
+            mountPart?.Invoke("Part_L_Foot", hum.lAnkle);
+
+            hum.rHip = CreatePivot("R_Hip", hum.hips, new Vector3(hipX, -0.02f, 0f));
+            mountPart?.Invoke("Part_R_Thigh", hum.rHip);
+            hum.rKnee = CreatePivot("R_Knee", hum.rHip, new Vector3(0f, -0.43f, 0f));
+            mountPart?.Invoke("Part_R_Shin", hum.rKnee);
+            hum.rAnkle = CreatePivot("R_Ankle", hum.rKnee, new Vector3(0f, -0.42f, 0f));
+            mountPart?.Invoke("Part_R_Foot", hum.rAnkle);
+
+            return hum;
+        }
+
         private static void BuildArm(
             string side,
             float xSign,

@@ -831,7 +831,18 @@ namespace Gridroam.Editor
             Material clerkShirt = shopKind == EnterableShopKind.Pizzeria
                 ? mats.PedShirtRed
                 : (shopKind == EnterableShopKind.Cafe ? mats.PedShirtTeal : mats.CharShirt);
-            ProceduralHumanoid.Build(clerkGo.transform, mats.CharSkin, clerkShirt, mats.CharPants, mats.CharShoes, mats.CharHair, 1.75f);
+            BlenderCharacterVariant clerkVariant = shopKind == EnterableShopKind.Cafe
+                ? BlenderCharacterVariant.CasualFemale
+                : (shopKind == EnterableShopKind.Pizzeria ? BlenderCharacterVariant.Worker : BlenderCharacterVariant.CasualMale);
+            BuildBlenderHumanoid(
+                clerkGo.transform,
+                mats,
+                clerkVariant,
+                clerkShirt,
+                mats.CharPants,
+                shopKind == EnterableShopKind.Pizzeria ? mats.CharSkinMedium : mats.CharSkin,
+                shopKind == EnterableShopKind.Cafe ? mats.CharHairBrown : mats.CharHair,
+                clerkVariant == BlenderCharacterVariant.CasualFemale ? 1.71f : 1.76f);
 
             // Role-specific interior decor & seating
             if (shopKind == EnterableShopKind.Cafe || shopKind == EnterableShopKind.Pizzeria)

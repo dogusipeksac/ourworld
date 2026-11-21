@@ -387,6 +387,25 @@ namespace Gridroam.Editor
             public Material CanBlue;
             public Material CanGreen;
             public Material CanOrange;
+            public Material CharUndershirt;
+            public Material CharBelt;
+            public Material CharShoeSole;
+            public Material CharEyeWhite;
+            public Material CharEyeIris;
+            public Material CharLips;
+            public Material CharSkinMedium;
+            public Material CharSkinWarm;
+            public Material CharHairBrown;
+            public Material CharHairBlonde;
+            public Material CharPantsDenim;
+            public Material CharPantsKhaki;
+        }
+
+        private enum BlenderCharacterVariant
+        {
+            CasualMale,
+            CasualFemale,
+            Worker
         }
 
         private static MaterialSet CreateMaterials()
@@ -490,7 +509,19 @@ namespace Gridroam.Editor
                 CanRed = CreateOrLoadMaterial("MAT_Can_Red", urpLit, new Color(0.78f, 0.14f, 0.14f), 0.72f, 0.55f),
                 CanBlue = CreateOrLoadMaterial("MAT_Can_Blue", urpLit, new Color(0.14f, 0.38f, 0.76f), 0.72f, 0.55f),
                 CanGreen = CreateOrLoadMaterial("MAT_Can_Green", urpLit, new Color(0.14f, 0.56f, 0.28f), 0.72f, 0.55f),
-                CanOrange = CreateOrLoadMaterial("MAT_Can_Orange", urpLit, new Color(0.90f, 0.46f, 0.10f), 0.72f, 0.55f)
+                CanOrange = CreateOrLoadMaterial("MAT_Can_Orange", urpLit, new Color(0.90f, 0.46f, 0.10f), 0.72f, 0.55f),
+                CharUndershirt = CreateOrLoadMaterial("MAT_Char_Undershirt", urpLit, new Color(0.91f, 0.90f, 0.87f), 0.16f),
+                CharBelt = CreateOrLoadMaterial("MAT_Char_Belt", urpLit, new Color(0.18f, 0.11f, 0.07f), 0.42f),
+                CharShoeSole = CreateOrLoadMaterial("MAT_Char_ShoeSole", urpLit, new Color(0.92f, 0.91f, 0.88f), 0.24f),
+                CharEyeWhite = CreateOrLoadMaterial("MAT_Char_EyeWhite", urpLit, new Color(0.96f, 0.96f, 0.95f), 0.65f),
+                CharEyeIris = CreateOrLoadMaterial("MAT_Char_EyeIris", urpLit, new Color(0.08f, 0.07f, 0.06f), 0.82f),
+                CharLips = CreateOrLoadMaterial("MAT_Char_Lips", urpLit, new Color(0.70f, 0.44f, 0.40f), 0.40f),
+                CharSkinMedium = CreateOrLoadMaterial("MAT_Char_SkinMedium", urpLit, new Color(0.76f, 0.56f, 0.42f), 0.34f),
+                CharSkinWarm = CreateOrLoadMaterial("MAT_Char_SkinWarm", urpLit, new Color(0.62f, 0.43f, 0.31f), 0.34f),
+                CharHairBrown = CreateOrLoadMaterial("MAT_Char_HairBrown", urpLit, new Color(0.24f, 0.15f, 0.09f), 0.30f),
+                CharHairBlonde = CreateOrLoadMaterial("MAT_Char_HairBlonde", urpLit, new Color(0.62f, 0.49f, 0.28f), 0.30f),
+                CharPantsDenim = CreateOrLoadMaterial("MAT_Char_PantsDenim", urpLit, new Color(0.17f, 0.24f, 0.34f), 0.14f),
+                CharPantsKhaki = CreateOrLoadMaterial("MAT_Char_PantsKhaki", urpLit, new Color(0.46f, 0.41f, 0.32f), 0.14f)
             };
 
             Texture2D waterNormal = FindTextureBySuffix($"{TexturesDir}/Plaster003", "_NormalGL.jpg");
@@ -630,8 +661,8 @@ namespace Gridroam.Editor
                 TownCarRedHatchback = BuildVehicleVariantPrefab("Vehicle_TownHatchback_Red", string.Empty, mats.CarRed, InteractableKind.TownVehicle, VehicleBodyVariant.Hatchback, mats),
                 TownCarWhitePickup = BuildVehicleVariantPrefab("Vehicle_TownPickup_White", string.Empty, mats.CarWhite, InteractableKind.TownVehicle, VehicleBodyVariant.Pickup, mats),
                 TownCarGreenSedan = BuildSedanPrefab("Vehicle_TownSedan_Green", string.Empty, mats.CarDarkGreen, InteractableKind.TownVehicle),
-                NpcMechanic = BuildNpcPrefab("NPC_Mechanic", "npc_mechanic", mats, mats.MechanicSuit, mats.MechanicSuit),
-                NpcHarborReceiver = BuildNpcPrefab("NPC_HarborReceiver", "npc_harbor_receiver", mats, mats.ReceiverSuit, mats.CharPants),
+                NpcMechanic = BuildNpcPrefab("NPC_Mechanic", "npc_mechanic", mats, mats.MechanicSuit, mats.CharPantsDenim, BlenderCharacterVariant.Worker, mats.CharSkinMedium, mats.CharHair),
+                NpcHarborReceiver = BuildNpcPrefab("NPC_HarborReceiver", "npc_harbor_receiver", mats, mats.ReceiverSuit, mats.CharPants, BlenderCharacterVariant.CasualFemale, mats.CharSkin, mats.CharHairBrown),
                 ApartmentBuilding = BuildApartmentPrefab(mats),
                 TrafficVehicle = BuildTrafficPlaceholderPrefab(mats),
                 ConcreteBarrier = BuildFbxPropPrefab("concrete_road_barrier", "Prop_ConcreteBarrier_Placeholder", 1.05f, addCollider: true, isStatic: true, fallbackMat: mats.Concrete),
@@ -922,6 +953,107 @@ namespace Gridroam.Editor
             MarkStaticEnvironment(root);
         }
 
+        private static ProceduralHumanoid BuildBlenderHumanoid(
+            Transform parent,
+            MaterialSet mats,
+            BlenderCharacterVariant variant,
+            Material shirtMat,
+            Material pantsMat = null,
+            Material skinMat = null,
+            Material hairMat = null,
+            float height = 1.78f)
+        {
+            Material useSkin = skinMat != null ? skinMat : mats.CharSkin;
+            Material useShirt = shirtMat != null ? shirtMat : mats.CharShirt;
+            Material usePants = pantsMat != null ? pantsMat : mats.CharPants;
+            Material useHair = hairMat != null ? hairMat : mats.CharHair;
+
+            string fbxName = variant == BlenderCharacterVariant.CasualFemale
+                ? "Character_CasualFemale.fbx"
+                : (variant == BlenderCharacterVariant.Worker ? "Character_Worker.fbx" : "Character_CasualMale.fbx");
+
+            string fbxPath = $"{BlenderModelsDir}/{fbxName}";
+            GameObject fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
+            if (fbxAsset == null)
+            {
+                Debug.LogWarning($"[GRIDROAM] Character FBX not found at '{fbxPath}' — falling back to primitive humanoid.");
+                return ProceduralHumanoid.Build(parent, useSkin, useShirt, usePants, mats.CharShoes, useHair, height);
+            }
+
+            // Cache child sub-part templates by exact name inside the flat FBX asset
+            Dictionary<string, Transform> partTemplates = new Dictionary<string, Transform>();
+            foreach (Transform child in fbxAsset.transform)
+            {
+                partTemplates[child.name] = child;
+            }
+
+            bool isFemale = variant == BlenderCharacterVariant.CasualFemale;
+            float shldrX = isFemale ? 0.172f : 0.198f;
+            float hipX = isFemale ? 0.098f : 0.102f;
+
+            return ProceduralHumanoid.BuildWithCustomParts(
+                parent,
+                (partName, pivot) =>
+                {
+                    if (!partTemplates.TryGetValue(partName, out Transform srcPart) || srcPart == null)
+                    {
+                        return null;
+                    }
+
+                    GameObject partInst = Object.Instantiate(srcPart.gameObject, pivot, false);
+                    partInst.name = partName;
+                    partInst.transform.localPosition = Vector3.zero;
+                    partInst.transform.localRotation = Quaternion.identity;
+                    partInst.transform.localScale = Vector3.one;
+
+                    foreach (Collider c in partInst.GetComponentsInChildren<Collider>(true))
+                    {
+                        Object.DestroyImmediate(c);
+                    }
+
+                    foreach (Renderer r in partInst.GetComponentsInChildren<Renderer>(true))
+                    {
+                        Material[] srcMats = r.sharedMaterials;
+                        Material[] mapped = new Material[srcMats.Length];
+                        for (int i = 0; i < srcMats.Length; i++)
+                        {
+                            string slot = srcMats[i] != null ? srcMats[i].name : string.Empty;
+                            mapped[i] = ResolveCharacterUrpMaterial(slot, mats, useSkin, useShirt, usePants, useHair);
+                        }
+                        r.sharedMaterials = mapped;
+                    }
+
+                    return partInst.transform;
+                },
+                height: height,
+                shoulderX: shldrX,
+                hipX: hipX,
+                shoulderY: 0.382f);
+        }
+
+        private static Material ResolveCharacterUrpMaterial(
+            string slot,
+            MaterialSet mats,
+            Material skin,
+            Material shirt,
+            Material pants,
+            Material hair)
+        {
+            if (slot.StartsWith("CharSkin")) return skin;
+            if (slot.StartsWith("CharShirt")) return shirt;
+            if (slot.StartsWith("CharUndershirt")) return mats.CharUndershirt;
+            if (slot.StartsWith("CharPants")) return pants;
+            if (slot.StartsWith("CharBelt")) return mats.CharBelt;
+            if (slot.StartsWith("CharBuckle")) return mats.SedanChrome;
+            if (slot.StartsWith("CharShoeSole")) return mats.CharShoeSole;
+            if (slot.StartsWith("CharShoes")) return mats.CharShoes;
+            if (slot.StartsWith("CharHair")) return hair;
+            if (slot.StartsWith("CharEyeWhite")) return mats.CharEyeWhite;
+            if (slot.StartsWith("CharEyeIris")) return mats.CharEyeIris;
+            if (slot.StartsWith("CharLips")) return mats.CharLips;
+            return shirt;
+        }
+
         private static GameObject BuildPlayerPrefab(MaterialSet mats)
         {
             GameObject root = new GameObject("Player_GRIDROAM");
@@ -937,12 +1069,13 @@ namespace Gridroam.Editor
             GameObject visualRoot = new GameObject("VisualRoot");
             visualRoot.transform.SetParent(root.transform, false);
 
-            ProceduralHumanoid humanoid = ProceduralHumanoid.Build(
+            ProceduralHumanoid humanoid = BuildBlenderHumanoid(
                 visualRoot.transform,
-                mats.CharSkin,
+                mats,
+                BlenderCharacterVariant.CasualMale,
                 mats.CharShirt,
-                mats.CharPants,
-                mats.CharShoes,
+                mats.CharPantsDenim,
+                mats.CharSkin,
                 mats.CharHair,
                 1.78f);
 
@@ -1032,12 +1165,13 @@ namespace Gridroam.Editor
             GameObject seatedDriverRoot = new GameObject("SeatedDriverRoot");
             seatedDriverRoot.transform.SetParent(visualRoot.transform, false);
             seatedDriverRoot.transform.localPosition = new Vector3(-0.38f, isPickup ? 0.52f : 0.45f, isPickup ? 0.12f : -0.25f);
-            ProceduralHumanoid seatedDriver = ProceduralHumanoid.Build(
+            ProceduralHumanoid seatedDriver = BuildBlenderHumanoid(
                 seatedDriverRoot.transform,
-                mats.CharSkin,
+                mats,
+                BlenderCharacterVariant.CasualMale,
                 mats.CharShirt,
-                mats.CharPants,
-                mats.CharShoes,
+                mats.CharPantsDenim,
+                mats.CharSkin,
                 mats.CharHair,
                 1.78f);
             seatedDriver.SetSitting(true, driving: true);
@@ -1194,7 +1328,15 @@ namespace Gridroam.Editor
             return pivot.transform;
         }
 
-        private static GameObject BuildNpcPrefab(string prefabName, string anchorId, MaterialSet mats, Material shirtMat, Material pantsMat)
+        private static GameObject BuildNpcPrefab(
+            string prefabName,
+            string anchorId,
+            MaterialSet mats,
+            Material shirtMat,
+            Material pantsMat,
+            BlenderCharacterVariant variant = BlenderCharacterVariant.CasualMale,
+            Material skinMat = null,
+            Material hairMat = null)
         {
             GameObject root = new GameObject(prefabName);
 
@@ -1212,14 +1354,15 @@ namespace Gridroam.Editor
             GameObject visualRoot = new GameObject("VisualRoot");
             visualRoot.transform.SetParent(root.transform, false);
 
-            ProceduralHumanoid humanoid = ProceduralHumanoid.Build(
+            ProceduralHumanoid humanoid = BuildBlenderHumanoid(
                 visualRoot.transform,
-                mats.CharSkin,
+                mats,
+                variant,
                 shirtMat,
                 pantsMat,
-                mats.CharShoes,
-                mats.CharHair,
-                1.78f);
+                skinMat,
+                hairMat,
+                variant == BlenderCharacterVariant.CasualFemale ? 1.72f : 1.78f);
             humanoid.SetAutoRandomWave(true);
 
             return SaveAsPrefab(root, $"{PrefabDir}/{prefabName}.prefab");
@@ -1799,14 +1942,15 @@ namespace Gridroam.Editor
             taxiCol.center = new Vector3(0f, 0.9f, 0f);
             taxiCol.radius = 0.34f;
             taxiCol.height = 1.76f;
-            ProceduralHumanoid taxiHum = ProceduralHumanoid.Build(
+            ProceduralHumanoid taxiHum = BuildBlenderHumanoid(
                 taxiPassengerObj.transform,
-                mats.CharSkin,
+                mats,
+                BlenderCharacterVariant.CasualFemale,
                 mats.PedShirtTeal,
-                mats.CharPants,
-                mats.CharShoes,
-                mats.CharHair,
-                1.74f);
+                mats.CharPantsDenim,
+                mats.CharSkin,
+                mats.CharHairBrown,
+                1.72f);
             taxiPassengerObj.SetActive(false);
 
             modeController.ConfigureReferences(

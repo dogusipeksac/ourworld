@@ -408,13 +408,14 @@ namespace Gridroam.Editor
             npcCol.radius = 0.36f;
             npcCol.height = 1.78f;
 
-            ProceduralHumanoid painterHum = ProceduralHumanoid.Build(
+            ProceduralHumanoid painterHum = BuildBlenderHumanoid(
                 painterNpc.transform,
-                mats.CharSkin,
+                mats,
+                BlenderCharacterVariant.Worker,
                 mats.PedShirtMustard,
-                mats.CharPants,
-                mats.CharShoes,
-                mats.CharHair,
+                mats.CharPantsKhaki,
+                mats.CharSkinMedium,
+                mats.CharHairBrown,
                 1.76f);
             painterHum.SetAutoRandomWave(true);
         }
@@ -1057,14 +1058,16 @@ namespace Gridroam.Editor
                 col.radius = 0.30f;
                 col.height = 1.15f;
 
-                ProceduralHumanoid hum = ProceduralHumanoid.Build(
+                BlenderCharacterVariant seatVar = (i % 2 == 0) ? BlenderCharacterVariant.CasualFemale : BlenderCharacterVariant.CasualMale;
+                ProceduralHumanoid hum = BuildBlenderHumanoid(
                     npcObj.transform,
-                    mats.CharSkin,
+                    mats,
+                    seatVar,
                     shirts[i % shirts.Length],
-                    mats.CharPants,
-                    mats.CharShoes,
-                    mats.CharHair,
-                    1.74f);
+                    i % 2 == 0 ? mats.CharPantsDenim : mats.CharPantsKhaki,
+                    i % 2 == 0 ? mats.CharSkin : mats.CharSkinMedium,
+                    i % 2 == 0 ? mats.CharHairBlonde : mats.CharHair,
+                    seatVar == BlenderCharacterVariant.CasualFemale ? 1.70f : 1.76f);
                 hum.SetSitting(true, driving: false);
             }
         }
@@ -1321,14 +1324,22 @@ namespace Gridroam.Editor
                 rb.isKinematic = true;
                 rb.useGravity = false;
 
-                ProceduralHumanoid hum = ProceduralHumanoid.Build(
+                Material[] pedSkins = { mats.CharSkin, mats.CharSkinMedium, mats.CharSkinWarm };
+                Material[] pedHairs = { mats.CharHair, mats.CharHairBrown, mats.CharHairBlonde };
+                Material[] pedPants = { mats.CharPants, mats.CharPantsDenim, mats.CharPantsKhaki };
+                BlenderCharacterVariant pedVar = (i % 5 == 4)
+                    ? BlenderCharacterVariant.Worker
+                    : ((i % 2 == 0) ? BlenderCharacterVariant.CasualMale : BlenderCharacterVariant.CasualFemale);
+
+                ProceduralHumanoid hum = BuildBlenderHumanoid(
                     pedObj.transform,
-                    mats.CharSkin,
+                    mats,
+                    pedVar,
                     pedShirts[i % pedShirts.Length],
-                    mats.CharPants,
-                    mats.CharShoes,
-                    mats.CharHair,
-                    1.72f + (i % 3) * 0.03f);
+                    pedPants[i % pedPants.Length],
+                    pedSkins[i % pedSkins.Length],
+                    pedHairs[(i + 1) % pedHairs.Length],
+                    pedVar == BlenderCharacterVariant.CasualFemale ? (1.68f + (i % 3) * 0.025f) : (1.74f + (i % 3) * 0.03f));
 
                 TownPedestrian ped = pedObj.AddComponent<TownPedestrian>();
                 ped.ConfigureSchedule(route, seatArray, hum, 1.30f + (i % 4) * 0.12f, nextWp);
