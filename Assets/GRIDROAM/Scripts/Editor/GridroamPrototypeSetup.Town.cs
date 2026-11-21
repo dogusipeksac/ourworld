@@ -317,18 +317,18 @@ namespace Gridroam.Editor
             pump.transform.SetParent(parent, false);
             pump.transform.position = worldPos;
 
-            CreateStaticPart("PumpBody", PrimitiveType.Cube, pump.transform,
-                new Vector3(0f, 0.85f, 0f), Quaternion.identity, new Vector3(0.86f, 1.70f, 0.62f), mats.TownInteriorPaintPearl);
-            CreateStaticPart("PumpHeader", PrimitiveType.Cube, pump.transform,
-                new Vector3(0f, 1.78f, 0f), Quaternion.identity, new Vector3(0.92f, 0.24f, 0.68f), mats.TownFabricTeal);
-            CreateStaticPart("MeterScreen_N", PrimitiveType.Cube, pump.transform,
-                new Vector3(0f, 1.24f, 0.32f), Quaternion.identity, new Vector3(0.46f, 0.28f, 0.03f), mats.SedanTrimDark);
-            CreateStaticPart("MeterScreen_S", PrimitiveType.Cube, pump.transform,
-                new Vector3(0f, 1.24f, -0.32f), Quaternion.identity, new Vector3(0.46f, 0.28f, 0.03f), mats.SedanTrimDark);
+            GameObject mesh = InstantiateBlenderModel("Gas_FuelPump.fbx", "FuelPumpMesh", pump.transform, mats);
+            if (mesh == null)
+            {
+                CreateStaticPart("PumpBody", PrimitiveType.Cube, pump.transform,
+                    new Vector3(0f, 0.85f, 0f), Quaternion.identity, new Vector3(0.86f, 1.70f, 0.62f), mats.TownInteriorPaintPearl);
+                CreateStaticPart("PumpHeader", PrimitiveType.Cube, pump.transform,
+                    new Vector3(0f, 1.78f, 0f), Quaternion.identity, new Vector3(0.92f, 0.24f, 0.68f), mats.TownFabricTeal);
+            }
 
             BoxCollider col = pump.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, 0.95f, 0f);
-            col.size = new Vector3(0.96f, 1.90f, 0.70f);
+            col.center = new Vector3(0f, 1.05f, 0f);
+            col.size = new Vector3(1.18f, 2.10f, 0.72f);
             MarkStaticEnvironment(pump);
 
             GameObject trigGo = new GameObject("FuelPumpTrigger");
@@ -486,22 +486,21 @@ namespace Gridroam.Editor
             vm.transform.SetParent(parent, false);
             vm.transform.SetPositionAndRotation(pos, rot);
 
-            CreateStaticPart("Cabinet", PrimitiveType.Cube, vm.transform,
-                new Vector3(0f, 0.98f, 0f), Quaternion.identity, new Vector3(0.95f, 1.96f, 0.78f), mats.TownFabricTeal);
-            GameObject frontPanel = CreateStaticPart("LitDisplay", PrimitiveType.Cube, vm.transform,
-                new Vector3(0f, 1.15f, 0.40f), Quaternion.identity, new Vector3(0.76f, 1.18f, 0.04f), mats.WindowLitWarm);
-            CreateStaticPart("PickupSlot", PrimitiveType.Cube, vm.transform,
-                new Vector3(0f, 0.34f, 0.40f), Quaternion.identity, new Vector3(0.62f, 0.24f, 0.05f), mats.SedanTrimDark);
+            GameObject mesh = InstantiateBlenderModel("Town_VendingMachine.fbx", "VendingMachineMesh", vm.transform, mats);
+            if (mesh == null)
+            {
+                CreateStaticPart("Cabinet", PrimitiveType.Cube, vm.transform,
+                    new Vector3(0f, 0.98f, 0f), Quaternion.identity, new Vector3(0.95f, 1.96f, 0.78f), mats.TownFabricTeal);
+            }
 
             BoxCollider col = vm.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, 0.98f, 0f);
-            col.size = new Vector3(0.98f, 1.96f, 0.82f);
+            col.center = new Vector3(0f, 0.99f, 0f);
+            col.size = new Vector3(1.02f, 1.98f, 0.82f);
             MarkStaticEnvironment(vm);
-            AttachWindowNightLight(frontPanel);
 
             GameObject trigObj = new GameObject("VendingTrigger");
             trigObj.transform.SetParent(vm.transform, false);
-            trigObj.transform.localPosition = new Vector3(0f, 0.9f, 0.45f);
+            trigObj.transform.localPosition = new Vector3(0f, 0.9f, 0.48f);
             InteractableTrigger trig = trigObj.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.VendingMachine, id, "ui.btn.vending", 2.2f);
         }
@@ -512,16 +511,18 @@ namespace Gridroam.Editor
             mb.transform.SetParent(parent, false);
             mb.transform.SetPositionAndRotation(pos, rot);
 
-            CreateStaticPart("Post", PrimitiveType.Cylinder, mb.transform,
-                new Vector3(0f, 0.52f, 0f), Quaternion.identity, new Vector3(0.12f, 0.52f, 0.12f), mats.SedanTrimDark);
-            CreateStaticPart("BoxBody", PrimitiveType.Cube, mb.transform,
-                new Vector3(0f, 1.15f, 0f), Quaternion.identity, new Vector3(0.46f, 0.52f, 0.38f), mats.ContainerBlue);
-            CreateStaticPart("BoxCap", PrimitiveType.Cylinder, mb.transform,
-                new Vector3(0f, 1.40f, 0f), Quaternion.Euler(0f, 0f, 90f), new Vector3(0.38f, 0.23f, 0.38f), mats.ContainerBlue);
+            GameObject mesh = InstantiateBlenderModel("Town_Mailbox.fbx", "MailboxMesh", mb.transform, mats);
+            if (mesh == null)
+            {
+                CreateStaticPart("Post", PrimitiveType.Cylinder, mb.transform,
+                    new Vector3(0f, 0.52f, 0f), Quaternion.identity, new Vector3(0.12f, 0.52f, 0.12f), mats.SedanTrimDark);
+                CreateStaticPart("BoxBody", PrimitiveType.Cube, mb.transform,
+                    new Vector3(0f, 1.15f, 0f), Quaternion.identity, new Vector3(0.46f, 0.52f, 0.38f), mats.ContainerBlue);
+            }
 
             BoxCollider col = mb.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, 0.78f, 0f);
-            col.size = new Vector3(0.48f, 1.56f, 0.42f);
+            col.center = new Vector3(0f, 0.76f, 0f);
+            col.size = new Vector3(0.48f, 1.52f, 0.44f);
             MarkStaticEnvironment(mb);
 
             GameObject trigObj = new GameObject("MailboxTrigger");
@@ -548,38 +549,40 @@ namespace Gridroam.Editor
             Vector3 fountainCenter = new Vector3(1.5f, 0.02f, 80.0f);
             GameObject fountain = new GameObject("Square_Fountain");
             fountain.transform.SetParent(sqRoot.transform, false);
+            fountain.transform.position = fountainCenter;
 
-            float basinRadius = 3.1f;
-            float sideLength = 2f * basinRadius * Mathf.Tan(Mathf.PI / 8f) + 0.18f;
-            for (int i = 0; i < 8; i++)
+            GameObject blenderFountain = InstantiateBlenderModel("Town_Fountain.fbx", "BlenderFountainMesh", fountain.transform, mats);
+            if (blenderFountain != null)
             {
-                float angleDeg = i * 45f;
-                float rad = angleDeg * Mathf.Deg2Rad;
-                Vector3 segPos = fountainCenter + new Vector3(Mathf.Sin(rad) * basinRadius, 0.34f, Mathf.Cos(rad) * basinRadius);
-                CreateTiledBox($"FountainRim_{i}", fountain.transform,
-                    segPos, new Vector3(sideLength, 0.68f, 0.44f),
-                    Quaternion.Euler(0f, angleDeg, 0f), mats.PlasterTrim, 1.5f, collider: true);
+                // Clean octagonal-footprint capsule/box collider for the fountain basin + central column
+                CapsuleCollider basinCol = fountain.AddComponent<CapsuleCollider>();
+                basinCol.center = new Vector3(0f, 0.38f, 0f);
+                basinCol.radius = 3.12f;
+                basinCol.height = 0.78f;
+
+                GameObject centerColGo = new GameObject("FountainCenterCollider");
+                centerColGo.transform.SetParent(fountain.transform, false);
+                CapsuleCollider pedCol = centerColGo.AddComponent<CapsuleCollider>();
+                pedCol.center = new Vector3(0f, 1.65f, 0f);
+                pedCol.radius = 0.95f;
+                pedCol.height = 3.30f;
+
+                MarkStaticEnvironment(fountain);
             }
-
-            GameObject waterDisc = CreatePrimitiveChild("FountainWater", PrimitiveType.Cylinder, fountain.transform,
-                fountainCenter + new Vector3(0f, 0.48f, 0f), new Vector3(5.8f, 0.06f, 5.8f), mats.SeaWater, removeCollider: true);
-            MarkStaticEnvironment(waterDisc);
-
-            CreateTiledBox("FountainPedestal", fountain.transform,
-                fountainCenter + new Vector3(0f, 0.85f, 0f), new Vector3(1.4f, 1.7f, 1.4f),
-                Quaternion.identity, mats.Concrete, 1.5f, collider: true);
-            GameObject lowerBowl = CreatePrimitiveChild("FountainBowl_Lower", PrimitiveType.Cylinder, fountain.transform,
-                fountainCenter + new Vector3(0f, 1.75f, 0f), new Vector3(2.2f, 0.16f, 2.2f), mats.PlasterTrim, removeCollider: true);
-            MarkStaticEnvironment(lowerBowl);
-            CreateTiledBox("FountainShaft_Upper", fountain.transform,
-                fountainCenter + new Vector3(0f, 2.35f, 0f), new Vector3(0.75f, 1.15f, 0.75f),
-                Quaternion.identity, mats.Concrete, 1.5f, collider: false);
-            GameObject upperBowl = CreatePrimitiveChild("FountainBowl_Upper", PrimitiveType.Cylinder, fountain.transform,
-                fountainCenter + new Vector3(0f, 2.95f, 0f), new Vector3(1.25f, 0.12f, 1.25f), mats.PlasterTrim, removeCollider: true);
-            MarkStaticEnvironment(upperBowl);
-            GameObject finial = CreatePrimitiveChild("FountainFinial", PrimitiveType.Sphere, fountain.transform,
-                fountainCenter + new Vector3(0f, 3.25f, 0f), new Vector3(0.42f, 0.52f, 0.42f), mats.PlasterTrim, removeCollider: true);
-            MarkStaticEnvironment(finial);
+            else
+            {
+                float basinRadius = 3.1f;
+                float sideLength = 2f * basinRadius * Mathf.Tan(Mathf.PI / 8f) + 0.18f;
+                for (int i = 0; i < 8; i++)
+                {
+                    float angleDeg = i * 45f;
+                    float rad = angleDeg * Mathf.Deg2Rad;
+                    Vector3 segPos = fountainCenter + new Vector3(Mathf.Sin(rad) * basinRadius, 0.34f, Mathf.Cos(rad) * basinRadius);
+                    CreateTiledBox($"FountainRim_{i}", fountain.transform,
+                        segPos, new Vector3(sideLength, 0.68f, 0.44f),
+                        Quaternion.Euler(0f, angleDeg, 0f), mats.PlasterTrim, 1.5f, collider: true);
+                }
+            }
 
             float[] benchAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
             SeatInteractable[] npcBenchSlots = new SeatInteractable[2];
@@ -954,24 +957,34 @@ namespace Gridroam.Editor
             root.transform.SetParent(parent, false);
             root.transform.SetPositionAndRotation(basePos, rot);
 
-            GameObject pole = CreatePrimitiveChild("Pole", PrimitiveType.Cylinder, root.transform,
-                new Vector3(0f, 2.7f, 0f), new Vector3(0.16f, 2.7f, 0.16f), mats.SedanTrimDark, removeCollider: false);
-            MarkStaticEnvironment(pole);
-
-            GameObject arm = CreatePrimitiveChild("Arm", PrimitiveType.Cube, root.transform,
-                new Vector3(0.55f, 5.15f, 0f), new Vector3(1.2f, 0.12f, 0.12f), mats.SedanTrimDark, removeCollider: true);
-            MarkStaticEnvironment(arm);
-
-            GameObject head = CreatePrimitiveChild("SignalHead", PrimitiveType.Cube, root.transform,
-                new Vector3(1.05f, 4.75f, 0f), new Vector3(0.36f, 1.02f, 0.36f), mats.SedanTrimDark, removeCollider: true);
-            MarkStaticEnvironment(head);
+            GameObject blenderPole = InstantiateBlenderModel("Traffic_Light_Pole.fbx", "TrafficLightPoleMesh", root.transform, mats);
+            if (blenderPole != null)
+            {
+                CapsuleCollider poleCol = root.AddComponent<CapsuleCollider>();
+                poleCol.center = new Vector3(0f, 2.7f, 0f);
+                poleCol.radius = 0.16f;
+                poleCol.height = 5.4f;
+                MarkStaticEnvironment(blenderPole);
+            }
+            else
+            {
+                GameObject pole = CreatePrimitiveChild("Pole", PrimitiveType.Cylinder, root.transform,
+                    new Vector3(0f, 2.7f, 0f), new Vector3(0.16f, 2.7f, 0.16f), mats.SedanTrimDark, removeCollider: false);
+                MarkStaticEnvironment(pole);
+                GameObject arm = CreatePrimitiveChild("Arm", PrimitiveType.Cube, root.transform,
+                    new Vector3(0.55f, 5.15f, 0f), new Vector3(1.2f, 0.12f, 0.12f), mats.SedanTrimDark, removeCollider: true);
+                MarkStaticEnvironment(arm);
+                GameObject head = CreatePrimitiveChild("SignalHead", PrimitiveType.Cube, root.transform,
+                    new Vector3(1.05f, 4.75f, 0f), new Vector3(0.36f, 1.02f, 0.36f), mats.SedanTrimDark, removeCollider: true);
+                MarkStaticEnvironment(head);
+            }
 
             GameObject redBulb = CreatePrimitiveChild("Bulb_Red", PrimitiveType.Sphere, root.transform,
-                new Vector3(1.05f, 5.05f, -0.17f), new Vector3(0.22f, 0.22f, 0.12f), mats.TrafficLightBulb, removeCollider: true);
+                new Vector3(1.05f, 5.05f, -0.15f), new Vector3(0.21f, 0.21f, 0.12f), mats.TrafficLightBulb, removeCollider: true);
             GameObject amberBulb = CreatePrimitiveChild("Bulb_Amber", PrimitiveType.Sphere, root.transform,
-                new Vector3(1.05f, 4.75f, -0.17f), new Vector3(0.22f, 0.22f, 0.12f), mats.TrafficLightBulb, removeCollider: true);
+                new Vector3(1.05f, 4.75f, -0.15f), new Vector3(0.21f, 0.21f, 0.12f), mats.TrafficLightBulb, removeCollider: true);
             GameObject greenBulb = CreatePrimitiveChild("Bulb_Green", PrimitiveType.Sphere, root.transform,
-                new Vector3(1.05f, 4.45f, -0.17f), new Vector3(0.22f, 0.22f, 0.12f), mats.TrafficLightBulb, removeCollider: true);
+                new Vector3(1.05f, 4.45f, -0.15f), new Vector3(0.21f, 0.21f, 0.12f), mats.TrafficLightBulb, removeCollider: true);
 
             TrafficLightCycler cycler = root.AddComponent<TrafficLightCycler>();
             cycler.Configure(
@@ -1070,51 +1083,38 @@ namespace Gridroam.Editor
             tree.transform.localRotation = Quaternion.Euler(0f, (variantSeed * 67f) % 360f, 0f);
             tree.transform.localScale = Vector3.one * scale;
 
-            if (_cachedTreeTrunkMesh == null)
-            {
-                _cachedTreeTrunkMesh = BuildOrganicTreeTrunkMesh();
-            }
-            if (_cachedTreeCanopyMeshA == null)
-            {
-                _cachedTreeCanopyMeshA = BuildOrganicTreeCanopyMesh(seed: 101, horizontalRadius: 1.55f, verticalRadius: 1.28f);
-            }
-            if (_cachedTreeCanopyMeshB == null)
-            {
-                _cachedTreeCanopyMeshB = BuildOrganicTreeCanopyMesh(seed: 209, horizontalRadius: 1.22f, verticalRadius: 0.98f);
-            }
-
-            GameObject trunkObj = new GameObject("OrganicTrunk");
-            trunkObj.transform.SetParent(tree.transform, false);
-            trunkObj.AddComponent<MeshFilter>().sharedMesh = _cachedTreeTrunkMesh;
-            trunkObj.AddComponent<MeshRenderer>().sharedMaterial = mats.TownBark;
-
-            CapsuleCollider trunkCol = tree.AddComponent<CapsuleCollider>();
-            trunkCol.center = new Vector3(0f, 1.55f, 0f);
-            trunkCol.radius = 0.24f;
-            trunkCol.height = 3.1f;
-
             Material folA = (variantSeed % 2 == 0) ? mats.TownFoliageA : mats.TownFoliageB;
             Material folB = (variantSeed % 2 == 0) ? mats.TownFoliageB : mats.TownFoliageA;
 
-            (Vector3 pos, Quaternion rot, Vector3 sc, Mesh mesh, Material mat)[] clusters =
-            {
-                (new Vector3(0.0f, 3.85f, 0.0f), Quaternion.Euler(4f, 20f, -3f), new Vector3(1.12f, 1.02f, 1.08f), _cachedTreeCanopyMeshA, folA),
-                (new Vector3(0.82f, 3.35f, 0.48f), Quaternion.Euler(-8f, 110f, 6f), new Vector3(0.88f, 0.84f, 0.90f), _cachedTreeCanopyMeshB, folB),
-                (new Vector3(-0.78f, 3.45f, -0.44f), Quaternion.Euler(6f, 225f, -5f), new Vector3(0.92f, 0.86f, 0.88f), _cachedTreeCanopyMeshB, folA),
-                (new Vector3(-0.36f, 3.25f, 0.78f), Quaternion.Euler(-5f, 305f, 4f), new Vector3(0.80f, 0.76f, 0.82f), _cachedTreeCanopyMeshB, folB),
-                (new Vector3(0.45f, 4.35f, -0.35f), Quaternion.Euler(3f, 55f, 5f), new Vector3(0.76f, 0.72f, 0.78f), _cachedTreeCanopyMeshB, folA)
-            };
+            GameObject blenderTree = InstantiateBlenderModel(
+                "Tree_PlaneTree.fbx",
+                "BlenderPlaneTreeMesh",
+                tree.transform,
+                mats,
+                foliageAOverride: folA,
+                foliageBOverride: folB);
 
-            for (int i = 0; i < clusters.Length; i++)
+            if (blenderTree == null)
             {
-                GameObject cGo = new GameObject($"FoliageCluster_{i}");
-                cGo.transform.SetParent(tree.transform, false);
-                cGo.transform.localPosition = clusters[i].pos;
-                cGo.transform.localRotation = clusters[i].rot;
-                cGo.transform.localScale = clusters[i].sc;
-                cGo.AddComponent<MeshFilter>().sharedMesh = clusters[i].mesh;
-                cGo.AddComponent<MeshRenderer>().sharedMaterial = clusters[i].mat;
+                if (_cachedTreeTrunkMesh == null) _cachedTreeTrunkMesh = BuildOrganicTreeTrunkMesh();
+                if (_cachedTreeCanopyMeshA == null) _cachedTreeCanopyMeshA = BuildOrganicTreeCanopyMesh(seed: 101, horizontalRadius: 1.55f, verticalRadius: 1.28f);
+
+                GameObject trunkObj = new GameObject("OrganicTrunk");
+                trunkObj.transform.SetParent(tree.transform, false);
+                trunkObj.AddComponent<MeshFilter>().sharedMesh = _cachedTreeTrunkMesh;
+                trunkObj.AddComponent<MeshRenderer>().sharedMaterial = mats.TownBark;
+
+                GameObject canopyObj = new GameObject("FoliageCluster_Fallback");
+                canopyObj.transform.SetParent(tree.transform, false);
+                canopyObj.transform.localPosition = new Vector3(0f, 3.85f, 0f);
+                canopyObj.AddComponent<MeshFilter>().sharedMesh = _cachedTreeCanopyMeshA;
+                canopyObj.AddComponent<MeshRenderer>().sharedMaterial = folA;
             }
+
+            CapsuleCollider trunkCol = tree.AddComponent<CapsuleCollider>();
+            trunkCol.center = new Vector3(0f, 1.55f, 0f);
+            trunkCol.radius = 0.28f;
+            trunkCol.height = 3.1f;
 
             MarkStaticEnvironment(tree);
         }

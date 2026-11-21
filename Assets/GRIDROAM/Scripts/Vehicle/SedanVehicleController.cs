@@ -252,11 +252,11 @@ namespace Gridroam.Vehicle
                 foreach (Renderer r in renderers)
                 {
                     string objName = r.gameObject.name;
-                    if (objName == "Placeholder_HeadlightL" || objName == "Placeholder_HeadlightR")
+                    if (objName == "Placeholder_HeadlightL" || objName == "Placeholder_HeadlightR" || objName == "Car_Headlights")
                     {
                         _headlightRenderers.Add(r);
                     }
-                    else if (objName == "Placeholder_TaillightL" || objName == "Placeholder_TaillightR")
+                    else if (objName == "Placeholder_TaillightL" || objName == "Placeholder_TaillightR" || objName == "Car_Taillights")
                     {
                         _taillightRenderers.Add(r);
                         Color baseEm = new Color(1.0f, 0.12f, 0.08f) * 2.6f;
@@ -266,7 +266,7 @@ namespace Gridroam.Vehicle
                         }
                         _taillightBaseEmissions.Add(baseEm);
                     }
-                    else if (objName == "Placeholder_ReverseL" || objName == "Placeholder_ReverseR")
+                    else if (objName == "Placeholder_ReverseL" || objName == "Placeholder_ReverseR" || objName == "Car_ReverseLights")
                     {
                         _reverseRenderers.Add(r);
                     }

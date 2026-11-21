@@ -14,7 +14,7 @@ namespace Gridroam.Editor
     public static class GridroamAutoSetup
     {
         private const string VersionKey = "GRIDROAM_SceneBuildVersion";
-        private const string CurrentBuildVersion = "v8_clean_walkable_town";
+        private const string CurrentBuildVersion = "v9_blender_realistic_models";
 
         static GridroamAutoSetup()
         {

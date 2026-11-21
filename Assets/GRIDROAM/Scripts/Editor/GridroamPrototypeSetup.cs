@@ -35,6 +35,7 @@ namespace Gridroam.Editor
         private const string ArtMatDir = ArtDir + "/Materials";
         private const string TexturesDir = ArtDir + "/Textures";
         private const string ModelsDir = ArtDir + "/Models";
+        private const string BlenderModelsDir = ModelsDir + "/Blender";
         private const string HdriDir = ArtDir + "/HDRI";
         private const string PrefabDir = RootDir + "/Prefabs";
         private const string DataDir = RootDir + "/Data";
@@ -53,6 +54,7 @@ namespace Gridroam.Editor
         public static void BuildFullPrototype(bool showDialog)
         {
             EnsureDirectories();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             ConfigureCrossPlatformMobileSettings();
             ConfigureAllImportedTextures();
 
@@ -380,6 +382,11 @@ namespace Gridroam.Editor
             public Material CarRed;
             public Material CarWhite;
             public Material CarDarkGreen;
+            public Material BrakeCaliper;
+            public Material CanRed;
+            public Material CanBlue;
+            public Material CanGreen;
+            public Material CanOrange;
         }
 
         private static MaterialSet CreateMaterials()
@@ -478,7 +485,12 @@ namespace Gridroam.Editor
                 TownPaintCan = CreateOrLoadMaterial("MAT_Town_PaintCan", urpLit, new Color(0.80f, 0.83f, 0.87f), 0.68f, 0.55f),
                 CarRed = CreateOrLoadMaterial("MAT_Car_Red", urpLit, new Color(0.55f, 0.06f, 0.05f), 0.75f, 0.40f),
                 CarWhite = CreateOrLoadMaterial("MAT_Car_White", urpLit, new Color(0.92f, 0.92f, 0.90f), 0.78f, 0.32f),
-                CarDarkGreen = CreateOrLoadMaterial("MAT_Car_DarkGreen", urpLit, new Color(0.07f, 0.23f, 0.15f), 0.76f, 0.42f)
+                CarDarkGreen = CreateOrLoadMaterial("MAT_Car_DarkGreen", urpLit, new Color(0.07f, 0.23f, 0.15f), 0.76f, 0.42f),
+                BrakeCaliper = CreateOrLoadMaterial("MAT_Brake_Caliper", urpLit, new Color(0.76f, 0.11f, 0.09f), 0.65f, 0.35f),
+                CanRed = CreateOrLoadMaterial("MAT_Can_Red", urpLit, new Color(0.78f, 0.14f, 0.14f), 0.72f, 0.55f),
+                CanBlue = CreateOrLoadMaterial("MAT_Can_Blue", urpLit, new Color(0.14f, 0.38f, 0.76f), 0.72f, 0.55f),
+                CanGreen = CreateOrLoadMaterial("MAT_Can_Green", urpLit, new Color(0.14f, 0.56f, 0.28f), 0.72f, 0.55f),
+                CanOrange = CreateOrLoadMaterial("MAT_Can_Orange", urpLit, new Color(0.90f, 0.46f, 0.10f), 0.72f, 0.55f)
             };
 
             Texture2D waterNormal = FindTextureBySuffix($"{TexturesDir}/Plaster003", "_NormalGL.jpg");
@@ -795,6 +807,121 @@ namespace Gridroam.Editor
             return null;
         }
 
+        private static GameObject InstantiateBlenderModel(
+            string fbxFileName,
+            string instanceName,
+            Transform parent,
+            MaterialSet mats,
+            Material bodyPaintOverride = null,
+            Material foliageAOverride = null,
+            Material foliageBOverride = null)
+        {
+            string fbxPath = $"{BlenderModelsDir}/{fbxFileName}";
+            GameObject fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
+            if (fbxAsset == null)
+            {
+                Debug.LogWarning($"[GRIDROAM] Blender FBX not found at '{fbxPath}' — falling back to procedural placeholder.");
+                return null;
+            }
+
+            GameObject inst = (GameObject)PrefabUtility.InstantiatePrefab(fbxAsset, parent);
+            if (inst == null)
+            {
+                inst = Object.Instantiate(fbxAsset, parent);
+            }
+            else
+            {
+                PrefabUtility.UnpackPrefabInstance(inst, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            }
+
+            inst.name = instanceName;
+            inst.transform.localPosition = Vector3.zero;
+            inst.transform.localRotation = Quaternion.identity;
+            inst.transform.localScale = Vector3.one;
+
+            // Strip any imported MeshColliders (we use clean fast primitive colliders for 30+ FPS mobile)
+            foreach (Collider col in inst.GetComponentsInChildren<Collider>(true))
+            {
+                Object.DestroyImmediate(col);
+            }
+
+            // Remap Blender material slots cleanly to our URP Lit PBR MaterialSet (zero Standard/pink materials!)
+            foreach (Renderer r in inst.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] srcMats = r.sharedMaterials;
+                Material[] mapped = new Material[srcMats.Length];
+                for (int i = 0; i < srcMats.Length; i++)
+                {
+                    string slotName = srcMats[i] != null ? srcMats[i].name : string.Empty;
+                    mapped[i] = ResolveBlenderUrpMaterial(slotName, mats, bodyPaintOverride, foliageAOverride, foliageBOverride);
+                }
+                r.sharedMaterials = mapped;
+            }
+
+            return inst;
+        }
+
+        private static Material ResolveBlenderUrpMaterial(
+            string slotName,
+            MaterialSet mats,
+            Material bodyPaintOverride,
+            Material foliageAOverride,
+            Material foliageBOverride)
+        {
+            if (string.IsNullOrEmpty(slotName)) return mats.Concrete;
+
+            if (slotName.StartsWith("BodyPaint")) return bodyPaintOverride != null ? bodyPaintOverride : mats.SedanBody;
+            if (slotName.StartsWith("ContainerPaint")) return bodyPaintOverride != null ? bodyPaintOverride : mats.ContainerRed;
+            if (slotName.StartsWith("TrimDark") || slotName.StartsWith("InteriorDark")) return mats.SedanTrimDark;
+            if (slotName.StartsWith("Chrome")) return mats.SedanChrome;
+            if (slotName.StartsWith("Glass")) return mats.SedanGlass;
+            if (slotName.StartsWith("Headlight")) return mats.LampGlow;
+            if (slotName.StartsWith("Taillight")) return mats.TaillightGlow;
+            if (slotName.StartsWith("ReverseLight")) return mats.ReverseLightOff;
+            if (slotName.StartsWith("WheelRubber")) return mats.WheelRubber;
+            if (slotName.StartsWith("BrakeCaliper")) return mats.BrakeCaliper;
+            if (slotName.StartsWith("Bark")) return mats.TownBark;
+            if (slotName.StartsWith("FoliageA")) return foliageAOverride != null ? foliageAOverride : mats.TownFoliageA;
+            if (slotName.StartsWith("FoliageB")) return foliageBOverride != null ? foliageBOverride : mats.TownFoliageB;
+            if (slotName.StartsWith("StoneTrim")) return mats.PlasterTrim;
+            if (slotName.StartsWith("Concrete")) return mats.Concrete;
+            if (slotName.StartsWith("Water")) return mats.SeaWater;
+            if (slotName.StartsWith("AccentTeal")) return mats.TownFabricTeal;
+            if (slotName.StartsWith("AccentMustard")) return mats.TownFabricMustard;
+            if (slotName.StartsWith("AccentBlue")) return mats.ContainerBlue;
+            if (slotName.StartsWith("LitScreen")) return mats.WindowLitWarm;
+            if (slotName.StartsWith("CanRed")) return mats.CanRed;
+            if (slotName.StartsWith("CanBlue")) return mats.CanBlue;
+            if (slotName.StartsWith("CanGreen")) return mats.CanGreen;
+            if (slotName.StartsWith("CanOrange")) return mats.CanOrange;
+
+            return mats.Concrete;
+        }
+
+        private static void CreateBlenderShippingContainer(
+            string name,
+            Transform parent,
+            Vector3 basePos,
+            Quaternion rot,
+            Material containerMat,
+            MaterialSet mats)
+        {
+            GameObject root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            root.transform.SetPositionAndRotation(basePos, rot);
+
+            GameObject mesh = InstantiateBlenderModel("Shipping_Container.fbx", "ContainerMesh", root.transform, mats, bodyPaintOverride: containerMat);
+            if (mesh == null)
+            {
+                CreateStaticBlock("FallbackBox", root.transform, basePos + Vector3.up * 1.5f, new Vector3(3.2f, 3.0f, 8.5f), containerMat, addCollider: false);
+            }
+
+            BoxCollider col = root.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 1.5f, 0f);
+            col.size = new Vector3(3.2f, 3.0f, 8.5f);
+            MarkStaticEnvironment(root);
+        }
+
         private static GameObject BuildPlayerPrefab(MaterialSet mats)
         {
             GameObject root = new GameObject("Player_GRIDROAM");
@@ -880,124 +1007,18 @@ namespace Gridroam.Editor
             float frontAxleZ = isHatchback ? 1.22f : (isPickup ? 1.56f : 1.38f);
             float rearAxleZ = isHatchback ? -1.22f : (isPickup ? -1.56f : -1.32f);
             float wheelX = isHatchback ? 0.80f : (isPickup ? 0.87f : 0.84f);
-
-            if (isPickup)
-            {
-                CreatePrimitiveChild("Placeholder_LowerBodyCab", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.66f, 0.96f), new Vector3(bodyWidth, 0.58f, 3.04f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.96f, 1.70f), new Vector3(bodyWidth - 0.12f, 0.16f, 1.52f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.44f, 0.36f), new Vector3(1.62f, 0.36f, 1.30f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.26f, 0.36f), new Vector3(1.66f, 0.38f, 1.26f), mats.SedanGlass, removeCollider: true);
-
-                GameObject ws = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.24f, 1.04f), new Vector3(1.60f, 0.56f, 0.08f), mats.SedanGlass, removeCollider: true);
-                ws.transform.localRotation = Quaternion.Euler(34f, 0f, 0f);
-
-                CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.25f, -0.30f), new Vector3(1.56f, 0.40f, 0.06f), mats.SedanGlass, removeCollider: true);
-
-                CreatePrimitiveChild("Pickup_BedFloor", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.54f, -1.52f), new Vector3(bodyWidth - 0.06f, 0.24f, 1.94f), mats.SedanTrimDark, removeCollider: true);
-                CreatePrimitiveChild("Pickup_BedWallL", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(-halfWid + 0.05f, 0.84f, -1.52f), new Vector3(0.10f, 0.48f, 1.94f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Pickup_BedWallR", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(halfWid - 0.05f, 0.84f, -1.52f), new Vector3(0.10f, 0.48f, 1.94f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Pickup_Tailgate", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.82f, -halfLen + 0.05f), new Vector3(bodyWidth - 0.06f, 0.46f, 0.10f), bodyMat, removeCollider: true);
-            }
-            else if (isHatchback)
-            {
-                CreatePrimitiveChild("Placeholder_LowerBody", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.60f, 0f), new Vector3(bodyWidth, 0.54f, bodyLength - 0.04f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.84f, 1.20f), new Vector3(bodyWidth - 0.12f, 0.13f, 1.24f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.28f, -0.34f), new Vector3(1.48f, 0.34f, 2.04f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.12f, -0.34f), new Vector3(1.52f, 0.36f, 2.00f), mats.SedanGlass, removeCollider: true);
-
-                GameObject ws = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.14f, 0.72f), new Vector3(1.48f, 0.54f, 0.08f), mats.SedanGlass, removeCollider: true);
-                ws.transform.localRotation = Quaternion.Euler(36f, 0f, 0f);
-
-                GameObject rg = CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.12f, -1.46f), new Vector3(1.44f, 0.50f, 0.08f), mats.SedanGlass, removeCollider: true);
-                rg.transform.localRotation = Quaternion.Euler(-22f, 0f, 0f);
-            }
-            else
-            {
-                CreatePrimitiveChild("Placeholder_LowerBody", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.62f, 0f), new Vector3(1.88f, 0.56f, 4.42f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_Hood", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 0.86f, 1.38f), new Vector3(1.74f, 0.14f, 1.48f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.30f, -0.22f), new Vector3(1.54f, 0.34f, 1.76f), bodyMat, removeCollider: true);
-                CreatePrimitiveChild("Placeholder_GlassBelt", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.14f, -0.22f), new Vector3(1.58f, 0.36f, 1.72f), mats.SedanGlass, removeCollider: true);
-
-                GameObject windscreen = CreatePrimitiveChild("Placeholder_Windscreen", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.16f, 0.80f), new Vector3(1.54f, 0.56f, 0.08f), mats.SedanGlass, removeCollider: true);
-                windscreen.transform.localRotation = Quaternion.Euler(36f, 0f, 0f);
-
-                GameObject rearGlass = CreatePrimitiveChild("Placeholder_RearGlass", PrimitiveType.Cube, visualRoot.transform,
-                    new Vector3(0f, 1.17f, -1.24f), new Vector3(1.52f, 0.54f, 0.08f), mats.SedanGlass, removeCollider: true);
-                rearGlass.transform.localRotation = Quaternion.Euler(-34f, 0f, 0f);
-            }
-
-            float mirrorZ = isPickup ? 0.88f : 0.56f;
-            float mirrorY = isPickup ? 1.04f : 0.95f;
-            CreatePrimitiveChild("Placeholder_MirrorStemL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-halfWid + 0.02f, mirrorY - 0.02f, mirrorZ), new Vector3(0.14f, 0.05f, 0.06f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_MirrorL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-halfWid - 0.10f, mirrorY, mirrorZ - 0.01f), new Vector3(0.16f, 0.11f, 0.13f), bodyMat, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_MirrorStemR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(halfWid - 0.02f, mirrorY - 0.02f, mirrorZ), new Vector3(0.14f, 0.05f, 0.06f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_MirrorR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(halfWid + 0.10f, mirrorY, mirrorZ - 0.01f), new Vector3(0.16f, 0.11f, 0.13f), bodyMat, removeCollider: true);
-
-            CreatePrimitiveChild("Placeholder_DoorSeamL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-halfWid - 0.005f, 0.64f, isPickup ? 0.20f : -0.08f), new Vector3(0.02f, 0.50f, 0.03f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_DoorSeamR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(halfWid + 0.005f, 0.64f, isPickup ? 0.20f : -0.08f), new Vector3(0.02f, 0.50f, 0.03f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_DoorSillL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-halfWid - 0.005f, 0.54f, 0f), new Vector3(0.025f, 0.04f, bodyLength * 0.42f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_DoorSillR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(halfWid + 0.005f, 0.54f, 0f), new Vector3(0.025f, 0.04f, bodyLength * 0.42f), mats.SedanTrimDark, removeCollider: true);
-
-            CreatePrimitiveChild("Placeholder_WheelArchFL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-halfWid, 0.78f, frontAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_WheelArchFR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(halfWid, 0.78f, frontAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_WheelArchRL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-halfWid, 0.78f, rearAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_WheelArchRR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(halfWid, 0.78f, rearAxleZ), new Vector3(0.07f, 0.14f, 0.80f), mats.SedanTrimDark, removeCollider: true);
-
             float frontZ = halfLen + 0.02f;
-            float rearZ = -halfLen - 0.02f;
-            float lightX = halfWid - 0.28f;
 
-            CreatePrimitiveChild("Placeholder_FrontBumper", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.44f, frontZ), new Vector3(bodyWidth + 0.04f, 0.24f, 0.18f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_RearBumper", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.44f, rearZ), new Vector3(bodyWidth + 0.04f, 0.24f, 0.18f), mats.SedanTrimDark, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_Grille", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, isPickup ? 0.72f : 0.64f, frontZ - 0.02f), new Vector3(0.78f, isPickup ? 0.26f : 0.20f, 0.08f), mats.SedanChrome, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_HeadlightL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-lightX, isPickup ? 0.76f : 0.68f, frontZ - 0.02f), new Vector3(0.38f, 0.15f, 0.08f), mats.LampGlow, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_HeadlightR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(lightX, isPickup ? 0.76f : 0.68f, frontZ - 0.02f), new Vector3(0.38f, 0.15f, 0.08f), mats.LampGlow, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_TaillightL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-lightX, 0.70f, rearZ + 0.02f), new Vector3(0.40f, 0.15f, 0.08f), mats.TaillightGlow, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_TaillightR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(lightX, 0.70f, rearZ + 0.02f), new Vector3(0.40f, 0.15f, 0.08f), mats.TaillightGlow, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_ReverseL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-lightX + 0.28f, 0.70f, rearZ + 0.02f), new Vector3(0.14f, 0.13f, 0.08f), mats.ReverseLightOff, removeCollider: true);
-            CreatePrimitiveChild("Placeholder_ReverseR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(lightX - 0.28f, 0.70f, rearZ + 0.02f), new Vector3(0.14f, 0.13f, 0.08f), mats.ReverseLightOff, removeCollider: true);
+            string carFbx = isPickup ? "Car_Pickup.fbx" : (isHatchback ? "Car_Hatchback.fbx" : "Car_Sedan.fbx");
+            GameObject blenderCar = InstantiateBlenderModel(carFbx, "BlenderCarMesh", visualRoot.transform, mats, bodyPaintOverride: bodyMat);
+            if (blenderCar == null)
+            {
+                // Fallback primitive body if FBX hasn't imported yet
+                CreatePrimitiveChild("Placeholder_LowerBody", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.62f, 0f), new Vector3(bodyWidth, 0.56f, bodyLength), bodyMat, removeCollider: true);
+                CreatePrimitiveChild("Placeholder_CabinRoof", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 1.28f, -0.20f), new Vector3(bodyWidth * 0.82f, 0.42f, bodyLength * 0.42f), mats.SedanGlass, removeCollider: true);
+            }
 
             GameObject steeringWheel = new GameObject("SteeringWheel");
             steeringWheel.transform.SetParent(visualRoot.transform, false);
@@ -1052,10 +1073,10 @@ namespace Gridroam.Editor
             WheelCollider rl = CreateWheelCollider("WheelRL", wcParent.transform, new Vector3(-wheelX, wheelY, rearAxleZ), wheelRadius, suspDist, springRate, damperRate);
             WheelCollider rr = CreateWheelCollider("WheelRR", wcParent.transform, new Vector3(wheelX, wheelY, rearAxleZ), wheelRadius, suspDist, springRate, damperRate);
 
-            Transform vfl = CreateWheelVisual("WheelVisual_FL", wvParent.transform, fl.transform.localPosition, mats.WheelRubber, mats.SedanChrome);
-            Transform vfr = CreateWheelVisual("WheelVisual_FR", wvParent.transform, fr.transform.localPosition, mats.WheelRubber, mats.SedanChrome);
-            Transform vrl = CreateWheelVisual("WheelVisual_RL", wvParent.transform, rl.transform.localPosition, mats.WheelRubber, mats.SedanChrome);
-            Transform vrr = CreateWheelVisual("WheelVisual_RR", wvParent.transform, rr.transform.localPosition, mats.WheelRubber, mats.SedanChrome);
+            Transform vfl = CreateWheelVisual("WheelVisual_FL", wvParent.transform, fl.transform.localPosition, mats, wheelRadius);
+            Transform vfr = CreateWheelVisual("WheelVisual_FR", wvParent.transform, fr.transform.localPosition, mats, wheelRadius);
+            Transform vrl = CreateWheelVisual("WheelVisual_RL", wvParent.transform, rl.transform.localPosition, mats, wheelRadius);
+            Transform vrr = CreateWheelVisual("WheelVisual_RR", wvParent.transform, rr.transform.localPosition, mats, wheelRadius);
 
             GameObject exitL = new GameObject("ExitLeft");
             exitL.transform.SetParent(root.transform, false);
@@ -1147,27 +1168,28 @@ namespace Gridroam.Editor
             return wc;
         }
 
-        private static Transform CreateWheelVisual(string visualName, Transform parent, Vector3 localPos, Material tireMat, Material rimMat)
+        private static Transform CreateWheelVisual(string visualName, Transform parent, Vector3 localPos, MaterialSet mats, float wheelRadius = 0.34f)
         {
             GameObject pivot = new GameObject(visualName);
             pivot.transform.SetParent(parent, false);
             pivot.transform.localPosition = localPos;
 
-            GameObject cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            cyl.name = "Placeholder_TireMesh";
-            cyl.transform.SetParent(pivot.transform, false);
-            cyl.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            cyl.transform.localScale = new Vector3(0.68f, 0.14f, 0.68f);
-            Object.DestroyImmediate(cyl.GetComponent<Collider>());
-            cyl.GetComponent<Renderer>().sharedMaterial = tireMat;
-
-            GameObject rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            rim.name = "Placeholder_Rim";
-            rim.transform.SetParent(pivot.transform, false);
-            rim.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            rim.transform.localScale = new Vector3(0.40f, 0.155f, 0.40f);
-            Object.DestroyImmediate(rim.GetComponent<Collider>());
-            rim.GetComponent<Renderer>().sharedMaterial = rimMat;
+            GameObject blenderWheel = InstantiateBlenderModel("Car_Wheel.fbx", "BlenderWheelMesh", pivot.transform, mats);
+            if (blenderWheel != null)
+            {
+                float s = wheelRadius / 0.34f;
+                blenderWheel.transform.localScale = Vector3.one * s;
+            }
+            else
+            {
+                GameObject cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                cyl.name = "Placeholder_TireMesh";
+                cyl.transform.SetParent(pivot.transform, false);
+                cyl.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                cyl.transform.localScale = new Vector3(wheelRadius * 2f, 0.14f, wheelRadius * 2f);
+                Object.DestroyImmediate(cyl.GetComponent<Collider>());
+                cyl.GetComponent<Renderer>().sharedMaterial = mats.WheelRubber;
+            }
 
             return pivot.transform;
         }
@@ -1264,29 +1286,43 @@ namespace Gridroam.Editor
             GameObject root = new GameObject("Vehicle_Traffic_Placeholder");
             BoxCollider col = root.AddComponent<BoxCollider>();
             col.center = new Vector3(0f, 0.72f, 0f);
-            col.size = new Vector3(1.85f, 1.35f, 4.15f);
+            col.size = new Vector3(1.88f, 1.38f, 4.42f);
 
             GameObject visualRoot = new GameObject("VisualRoot");
             visualRoot.transform.SetParent(root.transform, false);
 
-            CreatePrimitiveChild("Body", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 0.58f, 0f), new Vector3(1.82f, 0.56f, 4.10f), mats.TrafficBody, removeCollider: true);
-            CreatePrimitiveChild("Roof", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0f, 1.12f, -0.15f), new Vector3(1.50f, 0.48f, 1.95f), mats.SedanGlass, removeCollider: true);
-            GameObject headL = CreatePrimitiveChild("HeadL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.62f, 0.62f, 2.06f), new Vector3(0.32f, 0.14f, 0.06f), mats.LampGlow, removeCollider: true);
-            GameObject headR = CreatePrimitiveChild("HeadR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.62f, 0.62f, 2.06f), new Vector3(0.32f, 0.14f, 0.06f), mats.LampGlow, removeCollider: true);
-            CreatePrimitiveChild("TailL", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(-0.62f, 0.64f, -2.06f), new Vector3(0.34f, 0.14f, 0.06f), mats.TaillightGlow, removeCollider: true);
-            CreatePrimitiveChild("TailR", PrimitiveType.Cube, visualRoot.transform,
-                new Vector3(0.62f, 0.64f, -2.06f), new Vector3(0.34f, 0.14f, 0.06f), mats.TaillightGlow, removeCollider: true);
+            List<Renderer> headlightRenderers = new List<Renderer>();
+            GameObject blenderCar = InstantiateBlenderModel("Car_Sedan.fbx", "BlenderTrafficSedan", visualRoot.transform, mats, bodyPaintOverride: mats.TrafficBody);
+            if (blenderCar != null)
+            {
+                // Add all 4 sculpted Blender alloy wheels
+                CreateWheelVisual("TrafficWheel_FL", visualRoot.transform, new Vector3(-0.84f, 0.34f, 1.38f), mats, 0.34f);
+                CreateWheelVisual("TrafficWheel_FR", visualRoot.transform, new Vector3(0.84f, 0.34f, 1.38f), mats, 0.34f);
+                CreateWheelVisual("TrafficWheel_RL", visualRoot.transform, new Vector3(-0.84f, 0.34f, -1.32f), mats, 0.34f);
+                CreateWheelVisual("TrafficWheel_RR", visualRoot.transform, new Vector3(0.84f, 0.34f, -1.32f), mats, 0.34f);
+
+                foreach (Renderer r in blenderCar.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (r.gameObject.name == "Car_Headlights")
+                    {
+                        headlightRenderers.Add(r);
+                    }
+                }
+            }
+            else
+            {
+                CreatePrimitiveChild("Body", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, 0.58f, 0f), new Vector3(1.82f, 0.56f, 4.10f), mats.TrafficBody, removeCollider: true);
+                GameObject headL = CreatePrimitiveChild("HeadL", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(-0.62f, 0.62f, 2.06f), new Vector3(0.32f, 0.14f, 0.06f), mats.LampGlow, removeCollider: true);
+                headlightRenderers.Add(headL.GetComponent<Renderer>());
+            }
 
             // E2: Traffic vehicle headlights glow at night (20:00-06:00) and turn off during day
             NightLight trafficHeadlights = root.AddComponent<NightLight>();
             trafficHeadlights.Configure(
                 null,
-                new[] { headL.GetComponent<Renderer>(), headR.GetComponent<Renderer>() },
+                headlightRenderers.ToArray(),
                 new Color(1.0f, 0.88f, 0.62f) * 2.8f);
 
             return SaveAsPrefab(root, $"{PrefabDir}/Vehicle_Traffic_Placeholder.prefab");
@@ -1682,9 +1718,9 @@ namespace Gridroam.Editor
                 new Vector2(11.0f, 0.62f),
                 new Color(0.96f, 0.96f, 0.94f, 1f));
 
-            CreateStaticBlock("Depot_Container_01", depotRoot.transform, new Vector3(21.0f, 1.5f, 198.5f), new Vector3(3.2f, 3.0f, 8.5f), mats.ContainerRed);
-            CreateStaticBlock("Depot_Container_02", depotRoot.transform, new Vector3(25.0f, 1.5f, 198.5f), new Vector3(3.2f, 3.0f, 8.5f), mats.ContainerBlue);
-            CreateStaticBlock("Depot_Container_03", depotRoot.transform, new Vector3(23.0f, 4.5f, 198.5f), new Vector3(3.2f, 3.0f, 8.5f), mats.ContainerOchre);
+            CreateBlenderShippingContainer("Depot_Container_01", depotRoot.transform, new Vector3(21.0f, 0.03f, 198.5f), Quaternion.Euler(0f, 180f, 0f), mats.ContainerRed, mats);
+            CreateBlenderShippingContainer("Depot_Container_02", depotRoot.transform, new Vector3(25.0f, 0.03f, 198.5f), Quaternion.Euler(0f, 180f, 0f), mats.ContainerBlue, mats);
+            CreateBlenderShippingContainer("Depot_Container_03", depotRoot.transform, new Vector3(23.0f, 3.03f, 198.5f), Quaternion.Euler(0f, 180f, 0f), mats.ContainerOchre, mats);
 
             PlacePrefabInstance(prefabs.WoodenCrate, depotRoot.transform, new Vector3(3.8f, 0.03f, 196.2f), Quaternion.Euler(0f, 14f, 0f));
             PlacePrefabInstance(prefabs.WoodenCrate, depotRoot.transform, new Vector3(5.0f, 0.03f, 196.5f), Quaternion.Euler(0f, -8f, 0f));
