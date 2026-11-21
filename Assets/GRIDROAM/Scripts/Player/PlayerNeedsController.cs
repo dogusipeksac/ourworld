@@ -153,6 +153,12 @@ namespace Gridroam.Player
             SetEnergy(_energy + amount);
         }
 
+        public void ConsumeEnergy(float amount)
+        {
+            if (amount <= 0f) return;
+            SetEnergy(_energy - amount);
+        }
+
         public void TryBuyVendingDrink()
         {
             if (_isBusy || SaveManager.Instance == null) return;

@@ -1,13 +1,16 @@
+using Gridroam.Core;
+using Gridroam.Missions;
 using Gridroam.Player;
+using Gridroam.UI;
 using Gridroam.Vehicle;
 using UnityEngine;
 
 namespace Gridroam.World
 {
     /// <summary>
-    /// Town pedestrian with a 3-4 point sidewalk schedule, occasional 3-6 s idle stops,
-    /// bench sitting breaks using SeatInteractable, car yield/step-aside within 4 m,
-    /// and a harmless startled stumble (arms up) when a car passes fast (>15 km/h) nearby.
+    /// Living interactive town citizen with sidewalk schedules, bench sitting breaks,
+    /// natural street conversations, optional vendor shop trading, car avoidance,
+    /// and realistic hit-stagger / flee / pushback reactions when punched by the player.
     /// </summary>
     [RequireComponent(typeof(CapsuleCollider))]
     [RequireComponent(typeof(Rigidbody))]
@@ -19,8 +22,35 @@ namespace Gridroam.World
         [SerializeField] private float turnSpeed = 6.5f;
         [SerializeField] private ProceduralHumanoid humanoid;
 
+        [Header("Citizen Identity & Social Interaction")]
+        [SerializeField] private string citizenName = "Mahalleli";
+        [SerializeField] private string citizenRole = "Çınarlı Sakini";
+        [SerializeField] private string vendorShopId = string.Empty;
+        [SerializeField] private bool isBrave;
+        [SerializeField] private string[] chatLines;
+
+        private static readonly string[] DefaultChatLinesTr =
+        {
+            "Merhaba! Bugün Çınarlı Kasabası oldukça sakin, değil mi?",
+            "Tamirhanedeki Marco işinin ehlidir, aracınla bir derdin olursa ona uğra.",
+            "Meydandaki Kerem'in tezgâhında iyi koşu ayakkabıları ve ceketler var.",
+            "Kuzey Kargo Deposu akşamüstü çok yoğun oluyor, dikkatli sür.",
+            "Çınar Kafe'nin kahvesi yorgunluğu hemen alıyor, tavsiye ederim.",
+            "Geçen gece batı sokaklarda garip koyu renkli bir sedan dolaşıyordu."
+        };
+
+        private static readonly string[] HitReactionsTr =
+        {
+            "{0}: Hey! Ne yapıyorsun sen?!",
+            "{0}: Delirdin mi, çekil başımdan!",
+            "{0}: İmdat! Biri yardım etsin!",
+            "{0}: Ne derdin var senin?! Polis çağıracağım!",
+            "{0}: Dokunma bana! Uzak dur!"
+        };
+
         private int _waypointIndex;
         private int _waypointStep = 1;
+        private int _chatCursor;
         private float _idleTimer;
         private float _midWalkIdleCooldown = 12f;
         private float _currentSpeed;
@@ -31,9 +61,122 @@ namespace Gridroam.World
         private Quaternion _preSitRotation = Quaternion.identity;
         private float _sitTimer;
 
-        // Startled / car avoidance state
+        // Startled / combat reaction state
         private float _startledCooldown;
+        private float _hitCooldown;
+        private float _fleeTimer;
+        private Vector3 _fleeDirection = Vector3.forward;
         private Vector3 _stumbleVelocity;
+        private bool _droppedPocketMoney;
+
+        public void ConfigureCitizen(string displayName, string role, string[] lines, bool brave = false, string shopId = "")
+        {
+            citizenName = string.IsNullOrEmpty(displayName) ? "Mahalleli" : displayName;
+            citizenRole = string.IsNullOrEmpty(role) ? "Çınarlı Sakini" : role;
+            chatLines = lines;
+            isBrave = brave;
+            vendorShopId = shopId ?? string.Empty;
+        }
+
+        public void TalkToPlayer(Vector3 playerWorldPos)
+        {
+            // Stop walking and face the player cleanly
+            _fleeTimer = 0f;
+            _idleTimer = Mathf.Max(_idleTimer, 3.2f);
+            Vector3 toPlayer = playerWorldPos - transform.position;
+            toPlayer.y = 0f;
+            if (toPlayer.sqrMagnitude > 0.01f && _occupiedSeat == null)
+            {
+                transform.rotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+            }
+
+            if (humanoid != null)
+            {
+                humanoid.PlayWave();
+            }
+
+            if (!string.IsNullOrEmpty(vendorShopId) && ShopMenuPanel.Instance != null)
+            {
+                ShopMenuPanel.Instance.Open(vendorShopId);
+                return;
+            }
+
+            string[] pool = (chatLines != null && chatLines.Length > 0) ? chatLines : DefaultChatLinesTr;
+            string line = pool[_chatCursor % pool.Length];
+            _chatCursor++;
+
+            string speakerHeader = string.IsNullOrEmpty(citizenRole)
+                ? citizenName
+                : $"{citizenName} ({citizenRole})";
+
+            if (MissionManager.Instance != null && !MissionManager.Instance.IsDialoguePlaying)
+            {
+                MissionManager.Instance.ShowQuickNpcDialogue(speakerHeader, line);
+            }
+            else if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.RaiseStatusMessage($"{citizenName}: {line}");
+            }
+        }
+
+        public void OnPunchedByPlayer(Vector3 attackerPos, Vector3 punchDir)
+        {
+            if (_hitCooldown > 0f) return;
+            _hitCooldown = 0.65f;
+
+            ReleaseBenchIfSeated();
+
+            Vector3 knockDir = punchDir;
+            knockDir.y = 0f;
+            if (knockDir.sqrMagnitude < 0.01f)
+            {
+                knockDir = transform.position - attackerPos;
+                knockDir.y = 0f;
+            }
+            knockDir = knockDir.sqrMagnitude > 0.001f ? knockDir.normalized : Vector3.forward;
+
+            _stumbleVelocity = knockDir * 5.6f;
+            _idleTimer = 0f;
+
+            if (humanoid != null)
+            {
+                humanoid.PlayHitReact();
+            }
+
+            string react = string.Format(HitReactionsTr[Random.Range(0, HitReactionsTr.Length)], citizenName);
+
+            // Occasionally drop loose pocket change once per citizen
+            if (!_droppedPocketMoney && string.IsNullOrEmpty(vendorShopId) && Random.value < 0.45f && SaveManager.Instance != null)
+            {
+                _droppedPocketMoney = true;
+                int coins = Random.Range(10, 21);
+                SaveManager.Instance.AddMoney(coins);
+                react += $" (+{coins} ₺ düştü)";
+            }
+
+            if (isBrave)
+            {
+                // Brave citizen turns and shoves back briefly!
+                transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+                _idleTimer = 1.6f;
+                if (PlayerNeedsController.Instance != null)
+                {
+                    PlayerNeedsController.Instance.ConsumeEnergy(6f);
+                }
+                react = $"{citizenName}: Bana mı vurdun?! Al sana! (-6 Enerji)";
+            }
+            else
+            {
+                // Non-brave citizen panics and sprints away from the player
+                _fleeTimer = 6.5f;
+                _fleeDirection = knockDir;
+            }
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.RaiseStatusMessage(react);
+            }
+        }
 
         public void Configure(Vector3 a, Vector3 b, ProceduralHumanoid hum, float speed = 1.3f, bool startHeadingToB = true)
         {
@@ -102,6 +245,10 @@ namespace Gridroam.World
             {
                 _startledCooldown -= dt;
             }
+            if (_hitCooldown > 0f)
+            {
+                _hitCooldown -= dt;
+            }
 
             // Seated bench break
             if (_occupiedSeat != null)
@@ -121,11 +268,34 @@ namespace Gridroam.World
                 return;
             }
 
-            // Apply gentle stumble displacement if startled
+            // Apply knockback / stumble displacement (clamped cleanly inside town bounds)
             if (_stumbleVelocity.sqrMagnitude > 0.01f)
             {
-                transform.position += _stumbleVelocity * dt;
-                _stumbleVelocity = Vector3.MoveTowards(_stumbleVelocity, Vector3.zero, 9f * dt);
+                Vector3 nextPos = transform.position + _stumbleVelocity * dt;
+                nextPos.x = Mathf.Clamp(nextPos.x, -96f, 96f);
+                nextPos.z = Mathf.Clamp(nextPos.z, -38f, 198f);
+                transform.position = nextPos;
+                _stumbleVelocity = Vector3.MoveTowards(_stumbleVelocity, Vector3.zero, 11f * dt);
+            }
+
+            // Panic flee sprint when punched
+            if (_fleeTimer > 0f)
+            {
+                _fleeTimer -= dt;
+                if (_fleeDirection.sqrMagnitude > 0.01f)
+                {
+                    Quaternion fleeRot = Quaternion.LookRotation(_fleeDirection, Vector3.up);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, fleeRot, 1f - Mathf.Exp(-10f * dt));
+                    Vector3 fleeNext = transform.position + transform.forward * (4.6f * dt);
+                    fleeNext.x = Mathf.Clamp(fleeNext.x, -96f, 96f);
+                    fleeNext.z = Mathf.Clamp(fleeNext.z, -38f, 198f);
+                    transform.position = fleeNext;
+                }
+                if (humanoid != null)
+                {
+                    humanoid.SetLocomotion(4.6f, grounded: true, verticalVelocity: 0f);
+                }
+                return;
             }
 
             // Check approaching player vehicle for yield / startled pose

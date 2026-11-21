@@ -9,6 +9,7 @@ namespace Gridroam.Missions
     {
         [SerializeField] private Transform floatingMarker;
         [SerializeField] private Transform groundRing;
+        [SerializeField] private bool showWorldBeacon;
         [SerializeField] private float bobAmplitude = 0.35f;
         [SerializeField] private float bobSpeed = 2.6f;
         [SerializeField] private float spinSpeed = 75f;
@@ -48,8 +49,8 @@ namespace Gridroam.Missions
 
         public void SetVisible(bool visible)
         {
-            _visible = visible;
-            gameObject.SetActive(visible);
+            _visible = visible && showWorldBeacon;
+            gameObject.SetActive(_visible);
         }
 
         private void Update()

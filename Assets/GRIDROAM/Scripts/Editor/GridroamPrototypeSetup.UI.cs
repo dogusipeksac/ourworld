@@ -474,6 +474,11 @@ namespace Gridroam.Editor
                 new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
                 new Vector2(-48f, 52f), new Vector2(132f, 132f), UiButtonDark, 24, sliced: false);
 
+            var (attackBtn, _) = CreateStyledButton("Btn_Attack", onFootRoot.transform, uiSprites.Circle, uiFont, "Vur",
+                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-196f, 52f), new Vector2(114f, 114f), new Color(0.58f, 0.20f, 0.18f, 0.88f), 22, sliced: false);
+            attackBtn.gameObject.AddComponent<TouchAttackButtonBinder>();
+
             // =================================================================
             // 5. DRIVING CONTROLS (◀ ▶ Steer, GAZ/FREN/El Freni, Circular Speedometer)
             // =================================================================
@@ -724,29 +729,31 @@ namespace Gridroam.Editor
         {
             GameObject shopPanel = CreateStyledPanel("ShopCounterPanel", safeRoot, uiSprites.RoundedRect,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(640f, 430f), UiPanelModal);
+                Vector2.zero, new Vector2(680f, 576f), UiPanelModal);
             CanvasGroup shopGroup = shopPanel.AddComponent<CanvasGroup>();
 
-            Text shopTitle = CreateUiText("ShopTitle", shopPanel.transform, uiFont, "Sahil Kafe", 34, TextAnchor.MiddleCenter,
-                UiOffWhite, new Vector2(0f, -20f), new Vector2(640f, 44f), FontStyle.Bold);
+            Text shopTitle = CreateUiText("ShopTitle", shopPanel.transform, uiFont, "Çınar Kafe", 32, TextAnchor.MiddleCenter,
+                UiOffWhite, new Vector2(0f, -18f), new Vector2(680f, 42f), FontStyle.Bold);
             Text shopSub = CreateUiText("ShopBalanceStatus", shopPanel.transform, uiFont, "Bakiye: ₺ 250   ·   Enerji: %80", 20, TextAnchor.MiddleCenter,
-                UiAccentTeal, new Vector2(0f, -66f), new Vector2(640f, 30f), FontStyle.Bold);
+                UiAccentTeal, new Vector2(0f, -62f), new Vector2(680f, 28f), FontStyle.Bold);
 
-            Button[] itemBtns = new Button[3];
-            Text[] itemLbls = new Text[3];
+            Button[] itemBtns = new Button[5];
+            Text[] itemLbls = new Text[5];
             string[] defaults =
             {
-                "Taze Kahve · 15 ₺ (+25 Enerji)",
-                "Sahil Sandviçi · 22 ₺ (+35 Enerji)",
-                "Sıcak Yemek · 30 ₺ (+50 Enerji)"
+                "Türk Kahvesi · 15 ₺ (+25 Enerji)",
+                "Kaşarlı Tost · 25 ₺ (+40 Enerji)",
+                "Sıcak Yemek · 40 ₺ (+65 Enerji)",
+                "Enerji İçeceği · 55 ₺ (%100 Enerji)",
+                "Yol Kumanyası · 75 ₺ (Enerji + Yakıt)"
             };
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 5; i++)
             {
-                float yOffset = 68f - i * 74f;
+                float yOffset = 148f - i * 68f;
                 var (iBtn, iLbl) = CreateStyledButton($"Btn_ShopItem_{i + 1}", shopPanel.transform, uiSprites.RoundedRect, uiFont, defaults[i],
                     new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    new Vector2(0f, yOffset), new Vector2(540f, 60f), new Color(0.13f, 0.17f, 0.23f, 0.90f), 22);
+                    new Vector2(0f, yOffset), new Vector2(588f, 56f), new Color(0.13f, 0.17f, 0.23f, 0.92f), 21);
                 itemBtns[i] = iBtn;
                 itemLbls[i] = iLbl;
             }

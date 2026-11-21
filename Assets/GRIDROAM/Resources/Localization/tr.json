@@ -29,6 +29,9 @@
     { "key": "ui.btn.drive", "value": "Sür" },
     { "key": "ui.btn.job_board", "value": "İşe Başla" },
     { "key": "ui.btn.shop", "value": "Satın Al" },
+    { "key": "ui.btn.vendor", "value": "Alışveriş" },
+    { "key": "ui.btn.chat", "value": "Sohbet" },
+    { "key": "ui.btn.punch", "value": "Vur" },
     { "key": "ui.btn.sleep", "value": "Uyu (8 Saat)" },
     { "key": "ui.btn.refuel", "value": "Yakıt Al" },
     { "key": "ui.btn.vending", "value": "İçecek Al (5 ₺)" },
@@ -60,7 +63,7 @@
     { "key": "ui.fail.timeout", "value": "Teslimat tamamlanmadan süre doldu." },
     { "key": "ui.fail.lost_target", "value": "Takip edilen aracı gözden kaybettin." },
     { "key": "ui.fail.spotted", "value": "Fazla yaklaştın ve sürücüyü şüphelendirdin." },
-    { "key": "ui.hint.controls_foot", "value": "WASD Hareket · Shift Koş · Sağ Tık Kamera · E Etkileş · M Rehber" },
+    { "key": "ui.hint.controls_foot", "value": "WASD Hareket · Shift Koş · Sol Tık/V Vur · Sağ Tık Kamera · E Konuş · M Harita" },
     { "key": "ui.hint.controls_drive", "value": "W/S Gaz & Fren · A/D Direksiyon · Space El Freni · F/E İn · M Rehber" },
 
     { "key": "ui.needs.tired_badge", "value": "Yorgun" },

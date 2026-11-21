@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace Gridroam.Input
@@ -30,6 +31,7 @@ namespace Gridroam.Input
         private bool _touchExitVehicleQueued;
         private bool _touchContinueDialogueQueued;
         private bool _touchPhoneQueued;
+        private bool _touchAttackQueued;
 
         public Vector2 MoveInput { get; private set; }
         public bool SprintHeld { get; private set; }
@@ -41,6 +43,7 @@ namespace Gridroam.Input
         public bool IsLookingManually { get; private set; }
 
         public event Action OnInteractPressed;
+        public event Action OnAttackPressed;
         public event Action OnExitVehiclePressed;
         public event Action OnContinueDialoguePressed;
         public event Action OnRetryPressed;
@@ -141,10 +144,15 @@ namespace Gridroam.Input
             bool continueDlg = _touchContinueDialogueQueued || (kb != null && (kb.spaceKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame || kb.eKey.wasPressedThisFrame));
             bool togglePhone = _touchPhoneQueued || (kb != null && kb.mKey.wasPressedThisFrame);
 
+            bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            bool lmbAttack = mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverUi;
+            bool attack = _touchAttackQueued || (kb != null && kb.vKey.wasPressedThisFrame) || lmbAttack;
+
             _touchInteractQueued = false;
             _touchExitVehicleQueued = false;
             _touchContinueDialogueQueued = false;
             _touchPhoneQueued = false;
+            _touchAttackQueued = false;
 
             if (togglePhone)
             {
@@ -159,6 +167,11 @@ namespace Gridroam.Input
             if (interact)
             {
                 OnInteractPressed?.Invoke();
+            }
+
+            if (attack)
+            {
+                OnAttackPressed?.Invoke();
             }
 
             if (exitVehicle)
@@ -209,6 +222,7 @@ namespace Gridroam.Input
         public void SetTouchHandbrake(bool pressed) => _touchHandbrake = pressed;
         public void SetTouchSprint(bool pressed) => _touchSprint = pressed;
         public void TriggerTouchInteract() => _touchInteractQueued = true;
+        public void TriggerTouchAttack() => _touchAttackQueued = true;
         public void TriggerTouchExitVehicle() => _touchExitVehicleQueued = true;
         public void TriggerTouchContinueDialogue() => _touchContinueDialogueQueued = true;
         public void TriggerTouchPhone() => _touchPhoneQueued = true;

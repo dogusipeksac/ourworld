@@ -544,6 +544,16 @@ namespace Gridroam.Player
                     return;
                 }
 
+                case InteractableKind.TownCitizen:
+                {
+                    TownPedestrian citizen = _nearestInteractable.GetComponentInParent<TownPedestrian>();
+                    if (citizen != null)
+                    {
+                        citizen.TalkToPlayer(ActiveWorldPosition);
+                    }
+                    return;
+                }
+
                 case InteractableKind.InspectObject:
                 {
                     if (!string.IsNullOrEmpty(_nearestInteractable.InteractableId) &&

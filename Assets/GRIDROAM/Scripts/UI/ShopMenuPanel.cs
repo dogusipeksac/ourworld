@@ -20,25 +20,62 @@ namespace Gridroam.UI
         [SerializeField] private CanvasGroup canvasGroup;
         [SerializeField] private Text titleLabel;
         [SerializeField] private Text balanceSubLabel;
-        [SerializeField] private Button[] itemButtons = new Button[3];
-        [SerializeField] private Text[] itemLabels = new Text[3];
+        [SerializeField] private Button[] itemButtons = new Button[5];
+        [SerializeField] private Text[] itemLabels = new Text[5];
         [SerializeField] private Button closeButton;
         [SerializeField] private Text closeLabel;
 
-        private static readonly int[] ItemPrices = { 15, 22, 30 };
-        private static readonly float[] ItemEnergyGains = { 25f, 35f, 50f };
-        private static readonly string[] ItemNameKeys =
+        private enum ShopOfferKind
         {
-            "ui.shop.item_coffee",
-            "ui.shop.item_sandwich",
-            "ui.shop.item_meal"
-        };
-        private static readonly string[] ItemFallbacksTr =
+            Energy,
+            RunningShoes,
+            TurboKit,
+            JacketColor,
+            FuelCan
+        }
+
+        private struct ShopOffer
         {
-            "Taze Kahve · 15 ₺ (+25 Enerji)",
-            "Sahil Sandviçi · 22 ₺ (+35 Enerji)",
-            "Sıcak Yemek · 30 ₺ (+50 Enerji)"
+            public string LabelTr;
+            public int Price;
+            public ShopOfferKind Kind;
+            public float Param;
+        }
+
+        private static readonly ShopOffer[] FoodShopOffers =
+        {
+            new ShopOffer { LabelTr = "Türk Kahvesi · 15 ₺ (+25 Enerji)",           Price = 15, Kind = ShopOfferKind.Energy, Param = 25f },
+            new ShopOffer { LabelTr = "Kaşarlı Tost · 25 ₺ (+40 Enerji)",           Price = 25, Kind = ShopOfferKind.Energy, Param = 40f },
+            new ShopOffer { LabelTr = "Sıcak Yemek / Pizza · 40 ₺ (+65 Enerji)",    Price = 40, Kind = ShopOfferKind.Energy, Param = 65f },
+            new ShopOffer { LabelTr = "Enerji İçeceği · 55 ₺ (Tam Enerji %100)",    Price = 55, Kind = ShopOfferKind.Energy, Param = 100f },
+            new ShopOffer { LabelTr = "Yol Kumanyası · 75 ₺ (Tam Enerji + Depo)",   Price = 75, Kind = ShopOfferKind.FuelCan, Param = 100f }
         };
+
+        private static readonly ShopOffer[] GearVendorOffers =
+        {
+            new ShopOffer { LabelTr = "Koşu Ayakkabısı · 180 ₺ (Kalıcı +%22 Hız)",   Price = 180, Kind = ShopOfferKind.RunningShoes, Param = 0f },
+            new ShopOffer { LabelTr = "Bordo Deri Ceket · 220 ₺ (Kıyafet Değiştir)", Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 1f },
+            new ShopOffer { LabelTr = "Zeytin Parka · 220 ₺ (Kıyafet Değiştir)",     Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 2f },
+            new ShopOffer { LabelTr = "Antrasit Ceket · 220 ₺ (Kıyafet Değiştir)",   Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 3f },
+            new ShopOffer { LabelTr = "Soğuk Meyve Suyu · 20 ₺ (+30 Enerji)",        Price = 20,  Kind = ShopOfferKind.Energy,       Param = 30f }
+        };
+
+        private static readonly ShopOffer[] AutoVendorOffers =
+        {
+            new ShopOffer { LabelTr = "Turbo Motor Kiti · 350 ₺ (Kalıcı +%28 Güç)",  Price = 350, Kind = ShopOfferKind.TurboKit,    Param = 0f },
+            new ShopOffer { LabelTr = "Acil Yakıt Bidonu · 60 ₺ (Depoyu Doldur)",    Price = 60,  Kind = ShopOfferKind.FuelCan,     Param = 0f },
+            new ShopOffer { LabelTr = "Klasik Lacivert Ceket · 120 ₺ (Kıyafet)",     Price = 120, Kind = ShopOfferKind.JacketColor, Param = 0f },
+            new ShopOffer { LabelTr = "Tamirci Kahvesi · 15 ₺ (+25 Enerji)",         Price = 15,  Kind = ShopOfferKind.Energy,      Param = 25f },
+            new ShopOffer { LabelTr = "Enerji Barı · 35 ₺ (+55 Enerji)",             Price = 35,  Kind = ShopOfferKind.Energy,      Param = 55f }
+        };
+
+        private ShopOffer[] GetActiveOffers()
+        {
+            string id = (_activeShopId ?? string.Empty).ToLowerInvariant();
+            if (id.Contains("vendor_gear")) return GearVendorOffers;
+            if (id.Contains("vendor_auto")) return AutoVendorOffers;
+            return FoodShopOffers;
+        }
 
         private string _activeShopId = string.Empty;
         private int _openedFrame = -1;
@@ -163,15 +200,33 @@ namespace Gridroam.UI
 
         private void TryBuyItem(int index)
         {
-            if (index < 0 || index >= ItemPrices.Length || SaveManager.Instance == null)
+            ShopOffer[] offers = GetActiveOffers();
+            if (index < 0 || index >= offers.Length || SaveManager.Instance == null)
             {
                 return;
             }
 
-            int cost = ItemPrices[index];
-            float gain = ItemEnergyGains[index];
+            ShopOffer offer = offers[index];
+            SaveData data = SaveManager.Instance.Data;
 
-            if (!SaveManager.Instance.TrySpend(cost))
+            if (offer.Kind == ShopOfferKind.RunningShoes && data.hasRunningShoes)
+            {
+                if (PlayerModeController.Instance != null)
+                {
+                    PlayerModeController.Instance.RaiseStatusMessage("Koşu ayakkabısına zaten sahipsin!");
+                }
+                return;
+            }
+            if (offer.Kind == ShopOfferKind.TurboKit && data.hasTurboKit)
+            {
+                if (PlayerModeController.Instance != null)
+                {
+                    PlayerModeController.Instance.RaiseStatusMessage("Turbo Motor Kiti aracında zaten takılı!");
+                }
+                return;
+            }
+
+            if (!SaveManager.Instance.TrySpend(offer.Price))
             {
                 if (PlayerModeController.Instance != null)
                 {
@@ -180,42 +235,81 @@ namespace Gridroam.UI
                 return;
             }
 
-            if (PlayerNeedsController.Instance != null)
+            string feedback = "Satın alındı!";
+            switch (offer.Kind)
             {
-                PlayerNeedsController.Instance.RestoreEnergy(gain);
+                case ShopOfferKind.Energy:
+                    if (PlayerNeedsController.Instance != null)
+                    {
+                        PlayerNeedsController.Instance.RestoreEnergy(offer.Param);
+                    }
+                    feedback = $"Afiyet olsun! +{Mathf.RoundToInt(offer.Param)} Enerji";
+                    break;
+
+                case ShopOfferKind.RunningShoes:
+                    data.hasRunningShoes = true;
+                    SaveManager.Instance.Save();
+                    feedback = "Koşu Ayakkabısı alındı! Koşma hızın kalıcı olarak +%22 arttı.";
+                    break;
+
+                case ShopOfferKind.TurboKit:
+                    data.hasTurboKit = true;
+                    SaveManager.Instance.Save();
+                    feedback = "Turbo Motor Kiti takıldı! Araç tork ve hızı kalıcı olarak +%28 arttı.";
+                    break;
+
+                case ShopOfferKind.JacketColor:
+                    int colorIdx = Mathf.RoundToInt(offer.Param);
+                    data.playerJacketColorIndex = colorIdx;
+                    SaveManager.Instance.Save();
+                    if (PlayerModeController.Instance != null && PlayerModeController.Instance.FootController != null)
+                    {
+                        PlayerModeController.Instance.FootController.ApplyJacketColor(colorIdx);
+                    }
+                    feedback = "Yeni ceketin üzerine giyildi! Harika görünüyor.";
+                    break;
+
+                case ShopOfferKind.FuelCan:
+                    if (offer.Param > 0f && PlayerNeedsController.Instance != null)
+                    {
+                        PlayerNeedsController.Instance.RestoreEnergy(offer.Param);
+                    }
+                    if (PlayerModeController.Instance != null && PlayerModeController.Instance.PlayerSedan != null)
+                    {
+                        PlayerModeController.Instance.PlayerSedan.SetFuel(1f);
+                    }
+                    data.missionSedanFuel = 1f;
+                    SaveManager.Instance.Save();
+                    feedback = "Sedan yakıt deposu %100 dolduruldu!";
+                    break;
             }
 
             RefreshLabels();
-
             if (PlayerModeController.Instance != null)
             {
-                string fmt = LocalizationService.Tr("ui.shop.bought", "Afiyet olsun! +{0} Enerji");
-                PlayerModeController.Instance.RaiseStatusMessage(string.Format(fmt, Mathf.RoundToInt(gain)));
+                PlayerModeController.Instance.RaiseStatusMessage(feedback);
             }
         }
 
         public void RefreshLabels()
         {
-            bool isMarket = !string.IsNullOrEmpty(_activeShopId) && _activeShopId.ToLowerInvariant().Contains("market");
-            bool isPizza = !string.IsNullOrEmpty(_activeShopId) && _activeShopId.ToLowerInvariant().Contains("pizza");
-
+            string lowerId = (_activeShopId ?? string.Empty).ToLowerInvariant();
             if (titleLabel != null)
             {
-                if (isMarket)
-                {
+                if (lowerId.Contains("vendor_gear"))
+                    titleLabel.text = "Kerem · Giyim & Spor Tezgâhı";
+                else if (lowerId.Contains("vendor_auto"))
+                    titleLabel.text = "Tarık · Oto Parça & Modifiye";
+                else if (lowerId.Contains("market"))
                     titleLabel.text = LocalizationService.Tr("ui.shop.market_title", "Kasaba Market");
-                }
-                else if (isPizza)
-                {
-                    titleLabel.text = LocalizationService.Tr("ui.shop.pizza_title", "Liman Pizza");
-                }
+                else if (lowerId.Contains("pizza"))
+                    titleLabel.text = LocalizationService.Tr("ui.shop.pizza_title", "Çınarlı Pizza");
                 else
-                {
-                    titleLabel.text = LocalizationService.Tr("ui.shop.cafe_title", "Sahil Kafe");
-                }
+                    titleLabel.text = LocalizationService.Tr("ui.shop.cafe_title", "Çınar Kafe");
             }
 
-            int money = SaveManager.Instance != null ? SaveManager.Instance.Data.money : 250;
+            SaveData data = SaveManager.Instance != null ? SaveManager.Instance.Data : null;
+            int money = data != null ? data.money : 250;
             float energy = PlayerNeedsController.Instance != null ? PlayerNeedsController.Instance.Energy : 80f;
 
             if (balanceSubLabel != null)
@@ -224,17 +318,30 @@ namespace Gridroam.UI
                 balanceSubLabel.text = string.Format(subFmt, money, Mathf.RoundToInt(energy));
             }
 
+            ShopOffer[] offers = GetActiveOffers();
             if (itemLabels != null)
             {
-                for (int i = 0; i < itemLabels.Length && i < ItemNameKeys.Length; i++)
+                for (int i = 0; i < itemLabels.Length; i++)
                 {
+                    bool hasOffer = i < offers.Length;
+                    if (itemButtons != null && i < itemButtons.Length && itemButtons[i] != null)
+                    {
+                        itemButtons[i].gameObject.SetActive(hasOffer);
+                    }
+                    if (!hasOffer) continue;
+
+                    ShopOffer off = offers[i];
+                    bool alreadyOwned =
+                        (off.Kind == ShopOfferKind.RunningShoes && data != null && data.hasRunningShoes) ||
+                        (off.Kind == ShopOfferKind.TurboKit && data != null && data.hasTurboKit);
+
                     if (itemLabels[i] != null)
                     {
-                        itemLabels[i].text = LocalizationService.Tr(ItemNameKeys[i], ItemFallbacksTr[i]);
+                        itemLabels[i].text = alreadyOwned ? $"{off.LabelTr}  [ALINDI]" : off.LabelTr;
                     }
                     if (itemButtons != null && i < itemButtons.Length && itemButtons[i] != null)
                     {
-                        itemButtons[i].interactable = money >= ItemPrices[i];
+                        itemButtons[i].interactable = !alreadyOwned && money >= off.Price;
                     }
                 }
             }
@@ -260,7 +367,9 @@ namespace Gridroam.UI
 
             if (kb.digit1Key.wasPressedThisFrame || kb.numpad1Key.wasPressedThisFrame) { TryBuyItem(0); return; }
             if (kb.digit2Key.wasPressedThisFrame || kb.numpad2Key.wasPressedThisFrame) { TryBuyItem(1); return; }
-            if (kb.digit3Key.wasPressedThisFrame || kb.numpad3Key.wasPressedThisFrame) { TryBuyItem(2); }
+            if (kb.digit3Key.wasPressedThisFrame || kb.numpad3Key.wasPressedThisFrame) { TryBuyItem(2); return; }
+            if (kb.digit4Key.wasPressedThisFrame || kb.numpad4Key.wasPressedThisFrame) { TryBuyItem(3); return; }
+            if (kb.digit5Key.wasPressedThisFrame || kb.numpad5Key.wasPressedThisFrame) { TryBuyItem(4); }
         }
 
         private IEnumerator AnimatePanelRoutine(bool opening)

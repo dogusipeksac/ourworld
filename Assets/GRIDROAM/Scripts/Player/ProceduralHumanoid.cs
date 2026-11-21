@@ -55,9 +55,13 @@ namespace Gridroam.Player
         private float _prevYaw;
         private float _smoothedTurnLean;
         private float _waveTimer = -1f;
+        private float _punchTimer = -1f;
+        private float _hitReactTimer = -1f;
         private float _startledTimer = -1f;
         private float _startledDuration = 1.1f;
         private float _autoWaveCountdown = 8f;
+        private const float PunchDuration = 0.36f;
+        private const float HitReactDuration = 0.55f;
         private Vector3 _chestBaseScale = new Vector3(0.39f, 0.20f, 0.23f);
         private bool _initialized;
 
@@ -320,6 +324,18 @@ namespace Gridroam.Player
             _waveTimer = 0f;
         }
 
+        public void PlayPunch()
+        {
+            _punchTimer = 0f;
+            _waveTimer = -1f;
+        }
+
+        public void PlayHitReact()
+        {
+            _hitReactTimer = 0f;
+            _waveTimer = -1f;
+        }
+
         public void PlayStartled(float duration = 1.1f)
         {
             _startledDuration = Mathf.Max(0.35f, duration);
@@ -462,6 +478,24 @@ namespace Gridroam.Player
                 if (_waveTimer >= WaveDuration)
                 {
                     _waveTimer = -1f;
+                }
+            }
+
+            if (_punchTimer >= 0f)
+            {
+                _punchTimer += dt;
+                if (_punchTimer >= PunchDuration)
+                {
+                    _punchTimer = -1f;
+                }
+            }
+
+            if (_hitReactTimer >= 0f)
+            {
+                _hitReactTimer += dt;
+                if (_hitReactTimer >= HitReactDuration)
+                {
+                    _hitReactTimer = -1f;
                 }
             }
 
@@ -635,8 +669,40 @@ namespace Gridroam.Player
                 targetSpineRot.x += 7f * squatEnv;
             }
 
+            // --- Hit recoil stagger animation (when punched) ---
+            if (_hitReactTimer >= 0f)
+            {
+                float hNorm = Mathf.Clamp01(_hitReactTimer / HitReactDuration);
+                float hEnv = Mathf.Sin(hNorm * Mathf.PI);
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -26f, hEnv);
+                targetSpineRot.y = Mathf.Lerp(targetSpineRot.y, 18f, hEnv);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -24f, hEnv);
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-75f, 0f, -38f), hEnv);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-68f, 0f, 36f), hEnv);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-48f, 0f, 0f), hEnv);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-52f, 0f, 0f), hEnv);
+            }
+            // --- Right-hand melee punch / shove overlay (0.36 s) ---
+            else if (_punchTimer >= 0f)
+            {
+                float pNorm = Mathf.Clamp01(_punchTimer / PunchDuration);
+                // Crisp windup (0..0.28), snap punch (0.28..0.60), recover (0.60..1.0)
+                float thrust = pNorm < 0.28f
+                    ? -(pNorm / 0.28f) * 0.4f
+                    : (pNorm < 0.62f
+                        ? Mathf.Lerp(-0.4f, 1.0f, (pNorm - 0.28f) / 0.34f)
+                        : Mathf.Lerp(1.0f, 0f, (pNorm - 0.62f) / 0.38f));
+                float guardEnv = Mathf.Sin(pNorm * Mathf.PI);
+
+                targetSpineRot.y += -28f * thrust;
+                targetSpineRot.x += 12f * Mathf.Max(0f, thrust);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-92f, -14f, 8f), Mathf.Clamp01(thrust));
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-12f, 0f, 0f), Mathf.Clamp01(thrust));
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-45f, 18f, -16f), guardEnv);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-88f, 0f, 0f), guardEnv);
+            }
             // --- Startled arms-up pose (pedestrian near fast vehicle) ---
-            if (_startledTimer >= 0f)
+            else if (_startledTimer >= 0f)
             {
                 float sNorm = Mathf.Clamp01(_startledTimer / _startledDuration);
                 float sEnv = Mathf.Sin(sNorm * Mathf.PI);

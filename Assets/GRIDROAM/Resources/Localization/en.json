@@ -29,6 +29,9 @@
     { "key": "ui.btn.drive", "value": "Drive" },
     { "key": "ui.btn.job_board", "value": "Start Job" },
     { "key": "ui.btn.shop", "value": "Shop" },
+    { "key": "ui.btn.vendor", "value": "Trade" },
+    { "key": "ui.btn.chat", "value": "Chat" },
+    { "key": "ui.btn.punch", "value": "Punch" },
     { "key": "ui.btn.sleep", "value": "Sleep (8h)" },
     { "key": "ui.btn.refuel", "value": "Refuel" },
     { "key": "ui.btn.vending", "value": "Buy Drink (5 ₺)" },
@@ -60,7 +63,7 @@
     { "key": "ui.fail.timeout", "value": "Time ran out before the delivery was completed." },
     { "key": "ui.fail.lost_target", "value": "You lost sight of the target vehicle." },
     { "key": "ui.fail.spotted", "value": "You got too close and alerted the driver." },
-    { "key": "ui.hint.controls_foot", "value": "WASD Move · Shift Sprint · RMB Look · E Interact · M Phone" },
+    { "key": "ui.hint.controls_foot", "value": "WASD Move · Shift Sprint · LMB/V Punch · RMB Look · E Talk · M Map" },
     { "key": "ui.hint.controls_drive", "value": "W/S Gas & Brake · A/D Steer · Space Handbrake · F/E Exit · M Phone" },
 
     { "key": "ui.needs.tired_badge", "value": "Tired" },

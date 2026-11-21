@@ -46,6 +46,11 @@ namespace Gridroam.Core
         public int litterCollectedCount;
         public float totalPlayTimeSeconds;
 
+        // E6: Permanent shop upgrades & wardrobe
+        public bool hasRunningShoes;
+        public bool hasTurboKit;
+        public int playerJacketColorIndex;
+
         // E8: Player position & active mode/vehicle state
         public bool hasSavedPlayerState;
         public float playerPosX = -3.0f;

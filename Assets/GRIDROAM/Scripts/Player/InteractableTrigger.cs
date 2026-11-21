@@ -17,7 +17,8 @@ namespace Gridroam.Player
         ShopCounter,
         Bed,
         FuelPump,
-        VendingMachine
+        VendingMachine,
+        TownCitizen
     }
 
     /// <summary>

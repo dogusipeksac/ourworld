@@ -1,6 +1,8 @@
 using System;
 using Gridroam.CameraSystem;
+using Gridroam.Core;
 using Gridroam.Input;
+using Gridroam.World;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -30,13 +32,25 @@ namespace Gridroam.Player
 
         private static readonly int SpeedHash = Animator.StringToHash("Speed");
         private static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly Color[] JacketColors =
+        {
+            new Color(0.16f, 0.27f, 0.42f, 1f), // 0: Klasik Lacivert
+            new Color(0.48f, 0.12f, 0.16f, 1f), // 1: Bordo Deri
+            new Color(0.24f, 0.36f, 0.20f, 1f), // 2: Zeytin Parka
+            new Color(0.14f, 0.15f, 0.18f, 1f)  // 3: Antrasit Sokak
+        };
+
         private static AudioClip _sharedFootstepClip;
+        private static AudioClip _sharedPunchHitClip;
+        private static AudioClip _sharedPunchWhooshClip;
 
         private CharacterController _controller;
         private ThirdPersonCameraRig _cameraRig;
         private AudioSource _footstepAudio;
         private float _verticalVelocity;
         private float _currentSpeed;
+        private float _punchCooldown;
         private Vector3 _moveDirection = Vector3.forward;
         private bool _movementEnabled = true;
 
@@ -91,6 +105,94 @@ namespace Gridroam.Player
         private void Start()
         {
             _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
+            if (InputHub.Instance != null)
+            {
+                InputHub.Instance.OnAttackPressed += HandleAttackPressed;
+            }
+            if (SaveManager.Instance != null && SaveManager.Instance.Data != null)
+            {
+                ApplyJacketColor(SaveManager.Instance.Data.playerJacketColorIndex);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (InputHub.Instance != null)
+            {
+                InputHub.Instance.OnAttackPressed -= HandleAttackPressed;
+            }
+        }
+
+        public void ApplyJacketColor(int colorIndex)
+        {
+            if (visualRoot == null) return;
+            int idx = Mathf.Clamp(colorIndex, 0, JacketColors.Length - 1);
+            Color col = JacketColors[idx];
+            Renderer[] renderers = visualRoot.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer r = renderers[i];
+                if (r == null) continue;
+                Material[] mats = r.materials;
+                bool changed = false;
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    if (mats[m] != null && mats[m].name.Contains("MAT_Char_Shirt"))
+                    {
+                        if (mats[m].HasProperty(BaseColorId))
+                        {
+                            mats[m].SetColor(BaseColorId, col);
+                            changed = true;
+                        }
+                    }
+                }
+                if (changed) r.materials = mats;
+            }
+        }
+
+        private void HandleAttackPressed()
+        {
+            if (!_movementEnabled || _controller == null || !_controller.enabled || _punchCooldown > 0f)
+            {
+                return;
+            }
+
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode == null || mode.CurrentMode != ControlMode.OnFoot || mode.IsModalLocked)
+            {
+                return;
+            }
+
+            _punchCooldown = 0.52f;
+            if (humanoid != null)
+            {
+                humanoid.PlayPunch();
+            }
+
+            Vector3 punchCenter = transform.position + transform.forward * 1.05f + Vector3.up * 1.05f;
+            Collider[] hits = Physics.OverlapSphere(punchCenter, 1.05f);
+            bool landedHit = false;
+            for (int i = 0; i < hits.Length; i++)
+            {
+                if (hits[i] == null) continue;
+                TownPedestrian ped = hits[i].GetComponentInParent<TownPedestrian>();
+                if (ped != null)
+                {
+                    ped.OnPunchedByPlayer(transform.position, transform.forward);
+                    landedHit = true;
+                    break;
+                }
+            }
+
+            if (_footstepAudio != null)
+            {
+                AudioClip clip = landedHit ? _sharedPunchHitClip : _sharedPunchWhooshClip;
+                if (clip != null)
+                {
+                    _footstepAudio.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
+                    _footstepAudio.PlayOneShot(clip, landedHit ? 0.52f : 0.28f);
+                }
+            }
         }
 
         private void EnsureFootstepAudio()
@@ -109,6 +211,43 @@ namespace Gridroam.Player
             {
                 _sharedFootstepClip = BuildProceduralFootstepClip(44100);
             }
+            if (_sharedPunchHitClip == null)
+            {
+                _sharedPunchHitClip = BuildProceduralPunchClip(44100, isHit: true);
+            }
+            if (_sharedPunchWhooshClip == null)
+            {
+                _sharedPunchWhooshClip = BuildProceduralPunchClip(44100, isHit: false);
+            }
+        }
+
+        private static AudioClip BuildProceduralPunchClip(int sampleRate, bool isHit)
+        {
+            int count = Mathf.RoundToInt(sampleRate * (isHit ? 0.11f : 0.09f));
+            float[] data = new float[count];
+            System.Random rng = new System.Random(isHit ? 31337 : 42424);
+            float lp = 0f;
+            double phase = 0.0;
+            for (int i = 0; i < count; i++)
+            {
+                float t = (float)i / count;
+                float env = isHit ? Mathf.Exp(-t * 14f) : Mathf.Sin(t * Mathf.PI) * 0.6f;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += (isHit ? 0.45f : 0.18f) * (white - lp);
+                if (isHit)
+                {
+                    float freq = Mathf.Lerp(160f, 45f, t);
+                    phase += (2.0 * Math.PI * freq) / sampleRate;
+                    data[i] = Mathf.Clamp(((float)Math.Sin(phase) * 0.78f + lp * 0.55f) * env, -1f, 1f);
+                }
+                else
+                {
+                    data[i] = Mathf.Clamp(lp * env * 0.8f, -1f, 1f);
+                }
+            }
+            AudioClip clip = AudioClip.Create(isHit ? "PunchHit" : "PunchWhoosh", count, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
         private static AudioClip BuildProceduralFootstepClip(int sampleRate)
@@ -259,6 +398,10 @@ namespace Gridroam.Player
             }
 
             float dt = Time.deltaTime;
+            if (_punchCooldown > 0f)
+            {
+                _punchCooldown -= dt;
+            }
 
             Vector2 moveInput = (_movementEnabled && InputHub.Instance != null)
                 ? InputHub.Instance.MoveInput
@@ -279,7 +422,9 @@ namespace Gridroam.Player
             }
 
             bool isTired = PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsTired;
-            float effectiveRunSpeed = isTired ? (runSpeed * 0.75f) : runSpeed;
+            bool hasShoes = SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasRunningShoes;
+            float baseRun = hasShoes ? (runSpeed * 1.22f) : runSpeed;
+            float effectiveRunSpeed = isTired ? (baseRun * 0.75f) : baseRun;
             float targetSpeed = (sprint ? effectiveRunSpeed : walkSpeed) * inputMag;
             float rate = targetSpeed > _currentSpeed ? acceleration : deceleration;
             _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, rate * dt);

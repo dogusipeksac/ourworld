@@ -1606,7 +1606,7 @@ namespace Gridroam.Editor
             m01.missionId = "m01_get_the_keys";
             m01.titleKey = "m01.title";
             m01.summaryKey = "m01.summary";
-            m01.rewardMoney = 100;
+            m01.rewardMoney = 150;
             m01.nextMissionId = "m02_last_delivery";
             m01.autoStartNextMission = true;
             m01.retryPlayerAnchorId = "spawn_garage_foot";
@@ -1636,7 +1636,7 @@ namespace Gridroam.Editor
             m02.missionId = "m02_last_delivery";
             m02.titleKey = "m02.title";
             m02.summaryKey = "m02.summary";
-            m02.rewardMoney = 150;
+            m02.rewardMoney = 250;
             m02.nextMissionId = "m03_missing_car";
             m02.autoStartNextMission = true;
             m02.retryPlayerAnchorId = "spawn_garage_foot";
@@ -1667,7 +1667,7 @@ namespace Gridroam.Editor
             m03.missionId = "m03_missing_car";
             m03.titleKey = "m03.title";
             m03.summaryKey = "m03.summary";
-            m03.rewardMoney = 150;
+            m03.rewardMoney = 220;
             m03.nextMissionId = "m04_night_tail";
             m03.autoStartNextMission = true;
             m03.retryPlayerAnchorId = "spawn_garage_foot";
@@ -1698,7 +1698,7 @@ namespace Gridroam.Editor
             m04.missionId = "m04_night_tail";
             m04.titleKey = "m04.title";
             m04.summaryKey = "m04.summary";
-            m04.rewardMoney = 200;
+            m04.rewardMoney = 350;
             m04.nextMissionId = "m05_end_of_shift";
             m04.autoStartNextMission = true;
             m04.retryPlayerAnchorId = "spawn_harbor_tail_start";
@@ -1738,7 +1738,7 @@ namespace Gridroam.Editor
             m05.missionId = "m05_end_of_shift";
             m05.titleKey = "m05.title";
             m05.summaryKey = "m05.summary";
-            m05.rewardMoney = 300;
+            m05.rewardMoney = 500;
             m05.nextMissionId = string.Empty;
             m05.autoStartNextMission = false;
             m05.retryPlayerAnchorId = "spawn_garage_foot";

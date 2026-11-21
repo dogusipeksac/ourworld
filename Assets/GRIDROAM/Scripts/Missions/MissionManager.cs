@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Gridroam.Core;
 using Gridroam.Input;
 using Gridroam.Player;
@@ -603,6 +604,30 @@ namespace Gridroam.Missions
             ShowCurrentDialogueLine();
         }
 
+        /// <summary>
+        /// Displays an immediate single-line or multi-line conversation with any street NPC
+        /// using the main HUD dialogue panel without affecting active story mission state.
+        /// </summary>
+        public void ShowQuickNpcDialogue(string speakerName, string bodyText, Action onCompleted = null)
+        {
+            if (IsDialoguePlaying || _isFailed)
+            {
+                return;
+            }
+
+            DialogueData temp = ScriptableObject.CreateInstance<DialogueData>();
+            temp.lines = new List<DialogueLine>
+            {
+                new DialogueLine { speakerKey = speakerName, textKey = bodyText }
+            };
+            temp.choices = new List<DialogueChoice>();
+            StartDialogue(temp, () =>
+            {
+                Destroy(temp);
+                onCompleted?.Invoke();
+            });
+        }
+
         public void AdvanceDialogue()
         {
             if (_activeDialogue == null || _dialogueWaitingForChoice)
@@ -655,7 +680,9 @@ namespace Gridroam.Missions
         private void ShowCurrentDialogueLine()
         {
             DialogueLine line = _activeDialogue.lines[_dialogueLineIndex];
-            string speaker = LocalizationService.Tr(line.speakerKey, string.Empty);
+            string speaker = string.IsNullOrEmpty(line.speakerKey)
+                ? string.Empty
+                : LocalizationService.Tr(line.speakerKey, line.speakerKey);
             string text = LocalizationService.Tr(line.textKey, line.textKey);
             OnDialogueLineShown?.Invoke(speaker, text);
         }

@@ -643,6 +643,10 @@ namespace Gridroam.Vehicle
             if (!parked && hasFuel && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
             {
                 float engineTorque = EvaluateEngineTorque(EngineRpm);
+                if (SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasTurboKit)
+                {
+                    engineTorque *= 1.28f;
+                }
                 float totalWheelTorque = engineTorque * effectiveThrottle * activeGearRatio * finalDriveRatio * drivetrainEfficiency;
                 float sign = CurrentGear == -1 ? -1f : 1f;
                 perDrivenWheelTorque = (totalWheelTorque / drivenWheelCount) * sign;

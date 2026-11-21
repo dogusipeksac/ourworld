@@ -38,6 +38,7 @@ namespace Gridroam.Editor
             BuildResidentialAndPark(townRoot.transform, mats, rng, outdoorBenchSeats);
             List<TrafficStopLine> stopLines = BuildTownStreetFurniture(townRoot.transform, mats, prefabs, rng, outdoorBenchSeats);
             BuildSideJobStartPoints(townRoot.transform, mats);
+            BuildStreetVendors(townRoot.transform, mats);
             BuildVendingAndMailboxes(townRoot.transform, mats);
             BuildTownPedestrians(townRoot.transform, mats, outdoorBenchSeats);
 
@@ -435,23 +436,142 @@ namespace Gridroam.Editor
             root.transform.SetParent(parent, false);
             root.transform.position = worldPos;
 
-            GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ring.name = "JobGlowRing";
-            ring.transform.SetParent(root.transform, false);
-            ring.transform.localPosition = new Vector3(0f, 0.035f, 0f);
-            ring.transform.localScale = new Vector3(2.8f, 0.035f, 2.8f);
-            UnityEngine.Object.DestroyImmediate(ring.GetComponent<Collider>());
-            if (glowMat != null)
-            {
-                ring.GetComponent<Renderer>().sharedMaterial = glowMat;
-            }
+            // Grounded wooden Street Notice Board instead of unrealistic glowing arcade ground circles!
+            Material woodMat = _activeMaterialSet != null ? _activeMaterialSet.TownFurnitureWood : glowMat;
+            Material darkMat = _activeMaterialSet != null ? _activeMaterialSet.SedanTrimDark : glowMat;
+            Material paperMat = _activeMaterialSet != null ? _activeMaterialSet.TownInteriorPaintCream : glowMat;
+
+            GameObject boardStand = new GameObject("NoticeBoardStand");
+            boardStand.transform.SetParent(root.transform, false);
+            CreateStaticPart("PostL", PrimitiveType.Cube, boardStand.transform, new Vector3(-0.46f, 0.88f, 0f), Quaternion.identity, new Vector3(0.08f, 1.76f, 0.08f), darkMat);
+            CreateStaticPart("PostR", PrimitiveType.Cube, boardStand.transform, new Vector3(0.46f, 0.88f, 0f), Quaternion.identity, new Vector3(0.08f, 1.76f, 0.08f), darkMat);
+            CreateStaticPart("FrameBack", PrimitiveType.Cube, boardStand.transform, new Vector3(0f, 1.38f, 0f), Quaternion.identity, new Vector3(1.04f, 0.78f, 0.09f), woodMat);
+            CreateStaticPart("PaperFlyer1", PrimitiveType.Cube, boardStand.transform, new Vector3(-0.22f, 1.42f, 0.052f), Quaternion.identity, new Vector3(0.32f, 0.42f, 0.01f), paperMat);
+            CreateStaticPart("PaperFlyer2", PrimitiveType.Cube, boardStand.transform, new Vector3(0.22f, 1.34f, 0.052f), Quaternion.identity, new Vector3(0.32f, 0.36f, 0.01f), paperMat);
+            CreateStaticPart("RoofCap", PrimitiveType.Cube, boardStand.transform, new Vector3(0f, 1.80f, 0f), Quaternion.identity, new Vector3(1.16f, 0.08f, 0.24f), darkMat);
+            MarkStaticEnvironment(boardStand);
 
             InteractableTrigger trig = root.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.JobBoard, triggerId, "ui.btn.job_board", radius);
 
             JobBoardPoint board = root.AddComponent<JobBoardPoint>();
-            board.Configure(jobType, nameKey, locKey, ring.transform);
+            board.Configure(jobType, nameKey, locKey, null);
             return root;
+        }
+
+        private static void BuildStreetVendors(Transform parent, MaterialSet mats)
+        {
+            GameObject vendorsRoot = new GameObject("Town_StreetVendors");
+            vendorsRoot.transform.SetParent(parent, false);
+
+            // 1. Kerem — Kasaba Meydanı Giyim & Spor Tezgâhı (Running Shoes + Jackets!)
+            CreateStreetVendorStall(
+                "Vendor_Gear_Kerem",
+                "vendor_gear",
+                "Kerem",
+                "Giyim & Spor Satıcısı",
+                "GİYİM & SPOR",
+                vendorsRoot.transform,
+                new Vector3(12.2f, 0.02f, 80.0f),
+                Quaternion.Euler(0f, -90f, 0f),
+                mats.TownAwningTerracotta,
+                BlenderCharacterVariant.CasualMale,
+                mats.PedShirtBurgundy,
+                mats.CharPantsDenim,
+                mats.CharSkinMedium,
+                mats.CharHair,
+                mats);
+
+            // 2. Tarık — Tamirhane Yanı Oto Parça & Modifiye Tezgâhı (Turbo Kit + Emergency Fuel!)
+            CreateStreetVendorStall(
+                "Vendor_Auto_Tarik",
+                "vendor_auto",
+                "Tarık",
+                "Oto Parça & Modifiye",
+                "OTO MODİFİYE",
+                vendorsRoot.transform,
+                new Vector3(13.8f, 0.02f, -35.0f),
+                Quaternion.identity,
+                mats.TownAwningNavy,
+                BlenderCharacterVariant.Worker,
+                mats.PedShirtOlive,
+                mats.CharPantsKhaki,
+                mats.CharSkinWarm,
+                mats.CharHairBrown,
+                mats);
+        }
+
+        private static void CreateStreetVendorStall(
+            string stallName,
+            string vendorShopId,
+            string vendorName,
+            string vendorRole,
+            string signText,
+            Transform parent,
+            Vector3 pos,
+            Quaternion rot,
+            Material awningMat,
+            BlenderCharacterVariant variant,
+            Material shirtMat,
+            Material pantsMat,
+            Material skinMat,
+            Material hairMat,
+            MaterialSet mats)
+        {
+            GameObject stall = new GameObject(stallName);
+            stall.transform.SetParent(parent, false);
+            stall.transform.SetPositionAndRotation(pos, rot);
+
+            // Wooden counter table + canopy awning + sign
+            CreateStaticPart("CounterBody", PrimitiveType.Cube, stall.transform,
+                new Vector3(0f, 0.48f, 0f), Quaternion.identity, new Vector3(2.4f, 0.96f, 0.85f), mats.TownFurnitureWood);
+            CreateStaticPart("CounterTop", PrimitiveType.Cube, stall.transform,
+                new Vector3(0f, 0.99f, 0f), Quaternion.identity, new Vector3(2.55f, 0.07f, 0.95f), mats.PlasterTrim);
+            CreateStaticPart("PostL", PrimitiveType.Cube, stall.transform,
+                new Vector3(-1.12f, 1.35f, -0.34f), Quaternion.identity, new Vector3(0.09f, 2.70f, 0.09f), mats.SedanTrimDark);
+            CreateStaticPart("PostR", PrimitiveType.Cube, stall.transform,
+                new Vector3(1.12f, 1.35f, -0.34f), Quaternion.identity, new Vector3(0.09f, 2.70f, 0.09f), mats.SedanTrimDark);
+            CreateStaticPart("CanopyAwning", PrimitiveType.Cube, stall.transform,
+                new Vector3(0f, 2.66f, 0.05f), Quaternion.Euler(10f, 0f, 0f), new Vector3(2.75f, 0.14f, 1.55f), awningMat);
+
+            CreateWorldSignText(
+                signText,
+                stall.transform,
+                new Vector3(0f, 2.64f, 0.84f),
+                Quaternion.Euler(0f, 180f, 0f),
+                new Vector2(2.3f, 0.34f),
+                new Color(0.98f, 0.97f, 0.94f, 1f));
+
+            BoxCollider col = stall.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.52f, 0f);
+            col.size = new Vector3(2.55f, 1.04f, 0.95f);
+            MarkStaticEnvironment(stall);
+
+            // Blender Street Vendor NPC standing behind the counter
+            GameObject npcObj = new GameObject($"NPC_{vendorName}");
+            npcObj.transform.SetParent(stall.transform, false);
+            npcObj.transform.localPosition = new Vector3(0f, 0f, -0.82f);
+            npcObj.transform.localRotation = Quaternion.identity;
+
+            CapsuleCollider npcCol = npcObj.AddComponent<CapsuleCollider>();
+            npcCol.center = new Vector3(0f, 0.9f, 0f);
+            npcCol.radius = 0.36f;
+            npcCol.height = 1.78f;
+            Rigidbody rb = npcObj.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+
+            ProceduralHumanoid hum = BuildBlenderHumanoid(npcObj.transform, mats, variant, shirtMat, pantsMat, skinMat, hairMat, 1.76f);
+            hum.SetAutoRandomWave(true);
+
+            TownPedestrian vendorPed = npcObj.AddComponent<TownPedestrian>();
+            vendorPed.ConfigureCitizen(vendorName, vendorRole, null, brave: true, shopId: vendorShopId);
+
+            GameObject trigGo = new GameObject("VendorTrigger");
+            trigGo.transform.SetParent(stall.transform, false);
+            trigGo.transform.localPosition = new Vector3(0f, 0.9f, 0.65f);
+            InteractableTrigger trig = trigGo.AddComponent<InteractableTrigger>();
+            trig.Configure(InteractableKind.ShopCounter, vendorShopId, "ui.btn.vendor", 3.2f);
         }
 
         private static void BuildVendingAndMailboxes(Transform parent, MaterialSet mats)
@@ -1301,6 +1421,17 @@ namespace Gridroam.Editor
 
             SeatInteractable[] seatArray = benchSeats != null ? benchSeats.ToArray() : Array.Empty<SeatInteractable>();
 
+            string[] citizenNames = { "Ahmet", "Selin", "Kemal", "Zeynep", "Murat", "Elif", "Hakan", "Ayşe", "Burak", "Deniz", "Emre", "Merve", "Can", "Derya" };
+            string[] citizenRoles = { "Mahalleli", "Esnaf", "Şoför", "Öğrenci", "Tüccar", "Komşu", "Teknisyen" };
+            string[][] citizenChats =
+            {
+                new[] { "Selam! Meydandaki Kerem yeni koşu ayakkabıları getirmiş, bir bak istersen.", "Bugün hava tam yürüyüşlük, değil mi?" },
+                new[] { "Tamirhane tarafındaki Tarık'ta araba için turbo kiti var, bayağı fark ediyormuş.", "Çınarlı Kasabası küçük ama herkes birbirini tanır." },
+                new[] { "Kuzey Kargo Deposu'ndan çıkan araçları gördün mü? Bu aralar bir gariplik var.", "Dikkatli sür, kavşaklardaki trafik ışıkları düzenli çalışıyor." },
+                new[] { "Batı taraftaki evlerin arasında koyu renkli terk edilmiş bir araba görmüştüm sanki.", "Yorulduysan Çınar Kafe'de güzel kahve yapıyorlar." },
+                new[] { "İlan panolarından pizza veya taksi işi alıp hızlıca para biriktirebilirsin.", "Kazandığın parayla ceketini bile değiştirebilirsin!" }
+            };
+
             for (int i = 0; i < schedules.Length; i++)
             {
                 Vector3[] route = schedules[i];
@@ -1343,6 +1474,14 @@ namespace Gridroam.Editor
 
                 TownPedestrian ped = pedObj.AddComponent<TownPedestrian>();
                 ped.ConfigureSchedule(route, seatArray, hum, 1.30f + (i % 4) * 0.12f, nextWp);
+                ped.ConfigureCitizen(
+                    citizenNames[i % citizenNames.Length],
+                    citizenRoles[i % citizenRoles.Length],
+                    citizenChats[i % citizenChats.Length],
+                    brave: (i % 4 == 0));
+
+                InteractableTrigger chatTrig = pedObj.AddComponent<InteractableTrigger>();
+                chatTrig.Configure(InteractableKind.TownCitizen, $"citizen_{i + 1:00}", "ui.btn.chat", 2.6f);
             }
         }
     }
