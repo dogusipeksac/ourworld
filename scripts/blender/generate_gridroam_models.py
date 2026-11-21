@@ -1178,6 +1178,94 @@ def build_traffic_light_pole(mats):
 
 
 # ---------------------------------------------------------------------------
+# 11. Classical Urban Street Lamp (5.20m tall, upright, tight pole footprint!)
+# ---------------------------------------------------------------------------
+def build_street_lamp(mats):
+    parts = []
+    # Fluted cast-iron base + tapered cylindrical post up to 4.95m
+    pole_prof = [
+        (0.22, 0.00),
+        (0.22, 0.14),
+        (0.17, 0.24),
+        (0.15, 0.78),
+        (0.11, 0.92),
+        (0.085, 1.05),
+        (0.062, 4.85),
+        (0.088, 4.94),
+        (0.030, 5.10),
+    ]
+    parts.append(add_revolved_profile("Lamp_Post", pole_prof, 14, mats["TrimDark"], smooth_angle=44.0))
+
+    # Graceful curved bracket arm extending forward (+Y) to lantern head
+    arm_pts = [
+        (0.0, 0.04, 4.55),
+        (0.0, 0.32, 4.95),
+        (0.0, 0.68, 5.12),
+        (0.0, 0.92, 5.05),
+    ]
+    parts.append(add_tube_along_points("Lamp_BracketArm", arm_pts, [0.044, 0.038, 0.034, 0.032], 8, mats["TrimDark"], smooth_angle=48.0))
+    # Decorative scroll brace under bracket arm
+    parts.append(add_tube_along_points("Lamp_Brace", [(0.0, 0.06, 4.25), (0.0, 0.36, 4.66), (0.0, 0.56, 4.98)], [0.020, 0.018, 0.018], 6, mats["TrimDark"]))
+
+    # Sculpted modern lantern hood + glowing glass diffuser
+    parts.append(add_beveled_box("Lamp_HoodTop", (0.0, 0.96, 5.06), (0.34, 0.52, 0.09), mats["TrimDark"], bevel=0.025, segments=2))
+    parts.append(add_beveled_box("Lamp_GlowLens", (0.0, 0.96, 4.98), (0.26, 0.42, 0.07), mats["Headlight"], bevel=0.018, segments=1))
+
+    return join_objects(parts, "Street_Lamp")
+
+
+# ---------------------------------------------------------------------------
+# 12. Clean Single Urban Street Trash Can (0.48m x 0.88m)
+# ---------------------------------------------------------------------------
+def build_street_trash_can(mats):
+    parts = []
+    # Tapered ribbed metal bin with flanged rim and domed hooded top
+    body_prof = [
+        (0.20, 0.00),
+        (0.21, 0.06),
+        (0.22, 0.64),
+        (0.24, 0.66),
+        (0.24, 0.70),
+        (0.21, 0.70),
+        (0.19, 0.08),
+    ]
+    parts.append(add_revolved_profile("Bin_Body", body_prof, 16, mats["TrimDark"], smooth_angle=44.0))
+    # Horizontal stainless reinforcement bands
+    for bz in (0.22, 0.44, 0.65):
+        parts.append(add_cylinder_part(f"Bin_Band_{bz}", (0.0, 0.0, bz), 0.232, 0.232, 0.032, 16, mats["Chrome"]))
+    # Hooded top dome with side struts
+    parts.append(add_cylinder_part("Bin_TopCap", (0.0, 0.0, 0.86), 0.24, 0.14, 0.10, 16, mats["AccentTeal"]))
+    for sx in (-1.0, 1.0):
+        parts.append(add_beveled_box(f"Bin_Strut_{sx}", (sx * 0.21, 0.0, 0.75), (0.032, 0.06, 0.14), mats["TrimDark"], bevel=0.006, segments=1))
+    return join_objects(parts, "Street_TrashCan")
+
+
+# ---------------------------------------------------------------------------
+# 13. Clean Single Tripod Work Floodlight (0.76m x 2.12m)
+# ---------------------------------------------------------------------------
+def build_work_floodlight(mats):
+    parts = []
+    # 3 tripod legs meeting at central collar (z = 0.68)
+    for i in range(3):
+        ang = (2.0 * math.pi * i) / 3.0 + 0.4
+        ca, sa = math.cos(ang), math.sin(ang)
+        parts.append(add_tube_along_points(
+            f"Flood_Leg_{i}",
+            [(ca * 0.42, sa * 0.42, 0.0), (ca * 0.05, sa * 0.05, 0.68)],
+            [0.020, 0.022], 6, mats["TrimDark"],
+        ))
+    # Telescoping central pole + crossbar
+    parts.append(add_cylinder_part("Flood_PoleLow", (0.0, 0.0, 1.02), 0.028, 0.026, 0.90, 10, mats["AccentMustard"]))
+    parts.append(add_cylinder_part("Flood_PoleHigh", (0.0, 0.0, 1.66), 0.020, 0.020, 0.56, 10, mats["Chrome"]))
+    parts.append(add_beveled_box("Flood_Crossbar", (0.0, 0.0, 1.94), (0.64, 0.05, 0.05), mats["AccentMustard"], bevel=0.008, segments=1))
+    # Twin LED halogen lamp housings + glowing lenses
+    for sx in (-1.0, 1.0):
+        parts.append(add_beveled_box(f"Flood_Head_{sx}", (sx * 0.22, 0.02, 2.06), (0.24, 0.12, 0.18), mats["AccentMustard"], bevel=0.018, segments=2, rot_euler=(0.14, 0.0, 0.0)))
+        parts.append(add_beveled_box(f"Flood_Lens_{sx}", (sx * 0.22, 0.085, 2.055), (0.20, 0.025, 0.14), mats["Headlight"], bevel=0.006, segments=1, rot_euler=(0.14, 0.0, 0.0)))
+    return join_objects(parts, "Work_FloodLight")
+
+
+# ---------------------------------------------------------------------------
 # Studio Showcase Render (to visually verify all exported Blender models!)
 # ---------------------------------------------------------------------------
 def render_showcase(preview_entries):
@@ -1305,6 +1393,9 @@ def main():
         ("Town_Mailbox.fbx", build_mailbox),
         ("Shipping_Container.fbx", build_shipping_container),
         ("Traffic_Light_Pole.fbx", build_traffic_light_pole),
+        ("Street_Lamp.fbx", build_street_lamp),
+        ("Street_TrashCan.fbx", build_street_trash_can),
+        ("Work_FloodLight.fbx", build_work_floodlight),
     ]
 
     print(f"[GRIDROAM Blender] Generating {len(builders)} realistic 3D FBX models into {OUT_FBX_DIR} ...")

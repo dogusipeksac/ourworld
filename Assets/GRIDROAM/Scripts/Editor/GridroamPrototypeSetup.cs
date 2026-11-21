@@ -665,19 +665,70 @@ namespace Gridroam.Editor
                 NpcHarborReceiver = BuildNpcPrefab("NPC_HarborReceiver", "npc_harbor_receiver", mats, mats.ReceiverSuit, mats.CharPants, BlenderCharacterVariant.CasualFemale, mats.CharSkin, mats.CharHairBrown),
                 ApartmentBuilding = BuildApartmentPrefab(mats),
                 TrafficVehicle = BuildTrafficPlaceholderPrefab(mats),
-                ConcreteBarrier = BuildFbxPropPrefab("concrete_road_barrier", "Prop_ConcreteBarrier_Placeholder", 1.05f, addCollider: true, isStatic: true, fallbackMat: mats.Concrete),
-                StreetLamp = BuildFbxPropPrefab("street_lamp_01", "Prop_StreetLamp_CC0", 5.2f, addCollider: true, isStatic: true, fallbackMat: mats.Concrete, addLampGlow: true, lampGlowMat: mats.LampGlow),
-                WoodenCrate = BuildFbxPropPrefab("wooden_crate_01", "Prop_WoodenCrate_CC0", 1.05f, addCollider: true, isStatic: true, fallbackMat: mats.PlasterTrim),
-                OilBarrel = BuildFbxPropPrefab("Barrel_01", "Prop_OilBarrel_CC0", 0.95f, addCollider: true, isStatic: true, fallbackMat: mats.ContainerRed),
-                FireHydrant = BuildFbxPropPrefab("fire_hydrant", "Prop_FireHydrant_CC0", 0.85f, addCollider: true, isStatic: true, fallbackMat: mats.ContainerRed),
-                TrashCan = BuildFbxPropPrefab("metal_trash_can", "Prop_TrashCan_CC0", 0.85f, addCollider: true, isStatic: true, fallbackMat: mats.GarageRoofMetal),
-                ToolCart = BuildFbxPropPrefab("tool_cart", "Prop_ToolCart_CC0", 1.02f, addCollider: true, isStatic: true, fallbackMat: mats.ContainerRed),
+                ConcreteBarrier = BuildFbxPropPrefab("concrete_road_barrier", "Prop_ConcreteBarrier_Placeholder", 1.05f, addCollider: true, isStatic: true, fallbackMat: mats.Concrete, explicitColliderSize: new Vector3(1.90f, 1.05f, 0.68f)),
+                StreetLamp = BuildBlenderPropPrefab("Street_Lamp.fbx", "Prop_StreetLamp_CC0", mats, useCapsulePoleCollider: true, colliderSize: new Vector3(0.32f, 5.2f, 0.32f), isStatic: true, addNightLampGlow: true),
+                WoodenCrate = BuildFbxPropPrefab("wooden_crate_01", "Prop_WoodenCrate_CC0", 0.90f, addCollider: true, isStatic: true, fallbackMat: mats.PlasterTrim, explicitColliderSize: new Vector3(0.95f, 0.90f, 0.85f)),
+                OilBarrel = BuildFbxPropPrefab("Barrel_01", "Prop_OilBarrel_CC0", 0.95f, addCollider: true, isStatic: true, fallbackMat: mats.ContainerRed, explicitColliderSize: new Vector3(0.62f, 0.95f, 0.62f)),
+                FireHydrant = BuildFbxPropPrefab("fire_hydrant", "Prop_FireHydrant_CC0", 0.85f, addCollider: true, isStatic: true, fallbackMat: mats.ContainerRed, explicitColliderSize: new Vector3(0.42f, 0.85f, 0.42f)),
+                TrashCan = BuildBlenderPropPrefab("Street_TrashCan.fbx", "Prop_TrashCan_CC0", mats, useCapsulePoleCollider: false, colliderSize: new Vector3(0.48f, 0.88f, 0.48f), isStatic: true),
+                ToolCart = BuildFbxPropPrefab("tool_cart", "Prop_ToolCart_CC0", 1.02f, addCollider: true, isStatic: true, fallbackMat: mats.ContainerRed, explicitColliderSize: new Vector3(0.95f, 1.02f, 0.65f)),
                 OldTyre = BuildFbxPropPrefab("old_tyre", "Prop_OldTyre_CC0", 0.30f, addCollider: false, isStatic: true, fallbackMat: mats.WheelRubber),
-                FloodLights = BuildFbxPropPrefab("flood_lights", "Prop_FloodLights_CC0", 2.25f, addCollider: true, isStatic: true, fallbackMat: mats.GarageRoofMetal),
+                FloodLights = BuildBlenderPropPrefab("Work_FloodLight.fbx", "Prop_FloodLights_CC0", mats, useCapsulePoleCollider: true, colliderSize: new Vector3(0.56f, 2.12f, 0.56f), isStatic: true),
                 OceanBuoy = BuildFbxPropPrefab("ocean_buoy", "Prop_OceanBuoy_CC0", 2.8f, addCollider: false, isStatic: false, fallbackMat: mats.ContainerRed),
                 RollerShutterDoor = BuildFbxPropPrefab("rollershutter_door", "Prop_RollerShutter_CC0", 3.6f, addCollider: false, isStatic: true, fallbackMat: mats.GarageRoofMetal),
                 WoodenBench = BuildFbxPropPrefab("painted_wooden_bench", "Prop_WoodenBench_CC0", 0.86f, addCollider: false, isStatic: true, fallbackMat: mats.TownWood)
             };
+        }
+
+        private static GameObject BuildBlenderPropPrefab(
+            string fbxFileName,
+            string prefabName,
+            MaterialSet mats,
+            bool useCapsulePoleCollider,
+            Vector3 colliderSize,
+            bool isStatic,
+            bool addNightLampGlow = false)
+        {
+            GameObject root = new GameObject(prefabName);
+            GameObject visualRoot = new GameObject("VisualRoot");
+            visualRoot.transform.SetParent(root.transform, false);
+
+            GameObject meshInst = InstantiateBlenderModel(fbxFileName, "BlenderPropMesh", visualRoot.transform, mats);
+            if (meshInst == null)
+            {
+                CreatePrimitiveChild("Fallback_Prop", PrimitiveType.Cube, visualRoot.transform,
+                    new Vector3(0f, colliderSize.y * 0.5f, 0f), colliderSize, mats.Concrete, removeCollider: true);
+            }
+
+            if (useCapsulePoleCollider)
+            {
+                CapsuleCollider cap = root.AddComponent<CapsuleCollider>();
+                cap.center = new Vector3(0f, colliderSize.y * 0.5f, 0f);
+                cap.radius = Mathf.Max(0.14f, colliderSize.x * 0.5f);
+                cap.height = Mathf.Max(0.5f, colliderSize.y);
+            }
+            else
+            {
+                BoxCollider box = root.AddComponent<BoxCollider>();
+                box.center = new Vector3(0f, colliderSize.y * 0.5f, 0f);
+                box.size = colliderSize;
+            }
+
+            if (isStatic)
+            {
+                MarkStaticEnvironment(root);
+            }
+
+            if (addNightLampGlow)
+            {
+                GameObject bulbGo = CreatePrimitiveChild("Lantern_WarmBulb", PrimitiveType.Sphere, visualRoot.transform,
+                    new Vector3(0f, 4.94f, 0.96f), new Vector3(0.24f, 0.14f, 0.34f), mats.LampGlow, removeCollider: true);
+                MarkStaticPaintable(bulbGo);
+                NightLight nl = bulbGo.AddComponent<NightLight>();
+                nl.Configure(null, new[] { bulbGo.GetComponent<Renderer>() }, new Color(1.0f, 0.80f, 0.42f) * 3.0f);
+            }
+
+            return SaveAsPrefab(root, $"{PrefabDir}/{prefabName}.prefab");
         }
 
         private static GameObject BuildFbxPropPrefab(
@@ -688,7 +739,8 @@ namespace Gridroam.Editor
             bool isStatic,
             Material fallbackMat,
             bool addLampGlow = false,
-            Material lampGlowMat = null)
+            Material lampGlowMat = null,
+            Vector3? explicitColliderSize = null)
         {
             GameObject root = new GameObject(prefabName);
             GameObject visualRoot = new GameObject("VisualRoot");
@@ -762,11 +814,22 @@ namespace Gridroam.Editor
             if (addCollider)
             {
                 BoxCollider box = root.AddComponent<BoxCollider>();
-                box.center = combinedBounds.center;
-                box.size = new Vector3(
-                    Mathf.Max(0.35f, combinedBounds.size.x),
-                    Mathf.Max(0.35f, combinedBounds.size.y),
-                    Mathf.Max(0.35f, combinedBounds.size.z));
+                if (explicitColliderSize.HasValue)
+                {
+                    Vector3 s = explicitColliderSize.Value;
+                    box.center = new Vector3(0f, s.y * 0.5f, 0f);
+                    box.size = s;
+                }
+                else
+                {
+                    // Guard against bloated third-party FBX bounds creating invisible walls
+                    Vector3 clampedSize = new Vector3(
+                        Mathf.Clamp(combinedBounds.size.x, 0.35f, 2.0f),
+                        Mathf.Clamp(combinedBounds.size.y, 0.35f, targetHeightMeters + 0.5f),
+                        Mathf.Clamp(combinedBounds.size.z, 0.35f, 2.0f));
+                    box.center = new Vector3(0f, clampedSize.y * 0.5f, 0f);
+                    box.size = clampedSize;
+                }
             }
 
             if (isStatic)
