@@ -1,0 +1,23 @@
+rules_version = '2';
+// OurWorld / GRIDROAM — players may only CREATE feedback documents (anonymous auth).
+// Nobody can read, update or delete from the client; the export script uses the Admin SDK.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /feedback/{docId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+             'text', 'category', 'status', 'uid', 'appVersion', 'platform',
+             'deviceModel', 'language', 'completedMissions', 'playMinutes', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 5
+        && request.resource.data.text.size() <= 1000
+        && request.resource.data.category in ['idea', 'bug', 'other']
+        && request.resource.data.status == 'new';
+      allow read, update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

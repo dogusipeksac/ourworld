@@ -115,7 +115,20 @@ def box_uv(obj, scale=2.0):
     bm.free()
 
 
-def make_obj_from_bm(name, bm, mat, smooth_angle=52.0):
+def apply_subsurf(obj, levels=1, smooth_angle=68.0):
+    mod = obj.modifiers.new(name="Subsurf", type="SUBSURF")
+    mod.levels = levels
+    mod.render_levels = levels
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    box_uv(obj, scale=2.6)
+    apply_smooth(obj, angle_deg=smooth_angle)
+    return obj
+
+
+def make_obj_from_bm(name, bm, mat, smooth_angle=52.0, subsurf_levels=0):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     mesh = bpy.data.meshes.new(name + "_Mesh")
     bm.to_mesh(mesh)
@@ -124,12 +137,14 @@ def make_obj_from_bm(name, bm, mat, smooth_angle=52.0):
     bpy.context.collection.objects.link(obj)
     if mat is not None:
         obj.data.materials.append(mat)
-    box_uv(obj)
+    box_uv(obj, scale=2.6)
     apply_smooth(obj, angle_deg=smooth_angle)
+    if subsurf_levels > 0:
+        apply_subsurf(obj, levels=subsurf_levels, smooth_angle=smooth_angle)
     return obj
 
 
-def loft_oval_rings(name, ring_specs, segments, mat, cap_bottom=True, cap_top=True, smooth_angle=60.0):
+def loft_oval_rings(name, ring_specs, segments, mat, cap_bottom=True, cap_top=True, smooth_angle=64.0, subsurf_levels=1):
     """
     Loft an anatomical organic body segment from oval cross-section specs.
     Each spec: (z, rx, ry_front, ry_back, y_offset, x_offset)
@@ -165,7 +180,7 @@ def loft_oval_rings(name, ring_specs, segments, mat, cap_bottom=True, cap_top=Tr
             sn = (s + 1) % segments
             bm.faces.new((c_top, rings[-1][s], rings[-1][sn]))
 
-    return make_obj_from_bm(name, bm, mat, smooth_angle=smooth_angle)
+    return make_obj_from_bm(name, bm, mat, smooth_angle=smooth_angle, subsurf_levels=subsurf_levels)
 
 
 def add_ellipsoid(name, center, radii, mat, segs=14, rings=10, rot_euler=(0.0, 0.0, 0.0), smooth_angle=65.0):
@@ -230,24 +245,24 @@ def attach_mesh_to_pivot(mesh_obj, pivot_obj):
 # ---------------------------------------------------------------------------
 def build_pelvis_mesh(mats, is_female=False):
     parts = []
-    hip_w = 0.162 if is_female else 0.154
-    waist_w = 0.126 if is_female else 0.138
+    hip_w = 0.178 if is_female else 0.172
+    waist_w = 0.138 if is_female else 0.154
     specs = [
-        (-0.088, hip_w * 0.88, 0.092, 0.106, -0.004, 0.0),
-        (-0.038, hip_w * 0.98, 0.100, 0.118, -0.004, 0.0),
-        (0.012,  hip_w * 0.96, 0.098, 0.112, -0.002, 0.0),
-        (0.052,  waist_w + 0.006, 0.092, 0.098, 0.0, 0.0),
-        (0.082,  waist_w, 0.088, 0.090, 0.0, 0.0),
+        (-0.092, hip_w * 0.90, 0.108, 0.128, -0.004, 0.0),
+        (-0.040, hip_w * 0.99, 0.118, 0.138, -0.004, 0.0),
+        (0.014,  hip_w * 0.97, 0.116, 0.130, -0.002, 0.0),
+        (0.056,  waist_w + 0.008, 0.110, 0.118, 0.0, 0.0),
+        (0.086,  waist_w, 0.106, 0.110, 0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Pelvis_Jeans", specs, 18, mats["CharPants"], smooth_angle=68.0))
+    parts.append(loft_oval_rings("Pelvis_Jeans", specs, 18, mats["CharPants"], smooth_angle=70.0, subsurf_levels=1))
 
     # Leather belt wrapping cleanly around waist top + brushed metal buckle
     belt_specs = [
-        (0.046, waist_w + 0.010, 0.097, 0.099, 0.0, 0.0),
-        (0.074, waist_w + 0.010, 0.097, 0.099, 0.0, 0.0),
+        (0.048, waist_w + 0.011, 0.116, 0.120, 0.0, 0.0),
+        (0.078, waist_w + 0.011, 0.116, 0.120, 0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Pelvis_Belt", belt_specs, 18, mats["CharBelt"], cap_bottom=False, cap_top=False, smooth_angle=45.0))
-    parts.append(add_bevel_box("Belt_Buckle", (0.0, 0.101, 0.060), (0.042, 0.013, 0.034), mats["CharBuckle"], bevel=0.004, segments=1))
+    parts.append(loft_oval_rings("Pelvis_Belt", belt_specs, 18, mats["CharBelt"], cap_bottom=False, cap_top=False, smooth_angle=48.0, subsurf_levels=0))
+    parts.append(add_bevel_box("Belt_Buckle", (0.0, 0.120, 0.063), (0.044, 0.014, 0.036), mats["CharBuckle"], bevel=0.004, segments=1))
     return join_parts_at_origin(parts, "Pelvis_Mesh")
 
 
@@ -256,56 +271,56 @@ def build_torso_mesh(mats, variant="male"):
     is_female = (variant == "female")
     is_worker = (variant == "worker")
 
-    waist_w = 0.132 if is_female else 0.146
-    chest_w = 0.166 if is_female else 0.194
-    shldr_w = 0.172 if is_female else 0.198
-    chest_f = 0.122 if is_female else 0.122
-    chest_b = 0.102 if is_female else 0.110
+    waist_w = 0.144 if is_female else 0.162
+    chest_w = 0.184 if is_female else 0.214
+    shldr_w = 0.188 if is_female else 0.216
+    chest_f = 0.146 if is_female else 0.150
+    chest_b = 0.124 if is_female else 0.136
 
-    # Inner undershirt core (tucked cleanly inside outer jacket — zero shoulder poke-through!)
+    # Inner undershirt core (full realistic ribcage depth — zero cardboard-thin silhouette!)
     inner_specs = [
-        (-0.005, waist_w - 0.006, 0.090, 0.092, 0.0, 0.0),
-        (0.14,   waist_w + 0.004, 0.104, 0.094, 0.004, 0.0),
+        (-0.005, waist_w - 0.005, 0.108, 0.112, 0.0, 0.0),
+        (0.14,   waist_w + 0.006, 0.126, 0.118, 0.004, 0.0),
         (0.29,   chest_w - 0.014, chest_f + 0.002, chest_b - 0.010, 0.006, 0.0),
-        (0.39,   shldr_w - 0.036, 0.086, 0.082, 0.002, 0.0),
-        (0.44,   0.092, 0.072, 0.074, 0.0, 0.0),
-        (0.475,  0.066, 0.064, 0.066, 0.0, 0.0),
+        (0.39,   shldr_w - 0.036, 0.106, 0.104, 0.002, 0.0),
+        (0.44,   0.104, 0.086, 0.088, 0.0, 0.0),
+        (0.475,  0.072, 0.070, 0.072, 0.0, 0.0),
     ]
     inner_mat = mats["CharShirt"] if is_worker else mats["CharUndershirt"]
-    parts.append(loft_oval_rings("Torso_Inner", inner_specs, 18, inner_mat, smooth_angle=66.0))
+    parts.append(loft_oval_rings("Torso_Inner", inner_specs, 18, inner_mat, smooth_angle=68.0, subsurf_levels=1))
 
     # Main outer sculpted jacket / shirt shell with natural sloped trapezius shoulders & clean hem
     if is_worker:
         jacket_specs = [
-            (-0.018, waist_w + 0.018, 0.110, 0.112, 0.0, 0.0),
-            (0.06,   waist_w + 0.015, 0.110, 0.108, 0.002, 0.0),
-            (0.19,   (waist_w + chest_w) * 0.5 + 0.008, 0.120, 0.112, 0.005, 0.0),
-            (0.31,   chest_w + 0.008, chest_f + 0.008, chest_b + 0.008, 0.005, 0.0),
-            (0.385,  shldr_w + 0.006, 0.102, 0.102, 0.002, 0.0),
-            (0.435,  0.112, 0.086, 0.088, 0.0, 0.0),
-            (0.472,  0.084, 0.076, 0.078, -0.003, 0.0),
+            (-0.022, waist_w + 0.020, 0.130, 0.134, 0.0, 0.0),
+            (0.06,   waist_w + 0.016, 0.130, 0.130, 0.002, 0.0),
+            (0.19,   (waist_w + chest_w) * 0.5 + 0.010, 0.142, 0.136, 0.005, 0.0),
+            (0.31,   chest_w + 0.010, chest_f + 0.010, chest_b + 0.010, 0.006, 0.0),
+            (0.388,  shldr_w + 0.008, 0.122, 0.122, 0.002, 0.0),
+            (0.438,  0.122, 0.098, 0.102, 0.0, 0.0),
+            (0.474,  0.090, 0.084, 0.086, -0.003, 0.0),
         ]
-        parts.append(loft_oval_rings("Torso_WorkJacket", jacket_specs, 20, mats["CharShirt"], smooth_angle=64.0))
-        parts.append(add_bevel_box("Work_ZipPlacket", (0.0, chest_f + 0.008, 0.21), (0.022, 0.012, 0.41), mats["CharBelt"], bevel=0.004, segments=1))
+        parts.append(loft_oval_rings("Torso_WorkJacket", jacket_specs, 20, mats["CharShirt"], smooth_angle=68.0, subsurf_levels=1))
+        parts.append(add_bevel_box("Work_ZipPlacket", (0.0, chest_f + 0.010, 0.21), (0.024, 0.014, 0.41), mats["CharBelt"], bevel=0.004, segments=1))
         for sx in (-1.0, 1.0):
-            parts.append(add_bevel_box(f"Work_Pocket_{sx}", (sx * 0.078, chest_f + 0.006, 0.295), (0.064, 0.016, 0.068), mats["CharShirt"], bevel=0.005, segments=1))
-            parts.append(add_bevel_box(f"Work_PocketFlap_{sx}", (sx * 0.078, chest_f + 0.010, 0.324), (0.068, 0.012, 0.020), mats["CharPants"], bevel=0.004, segments=1))
+            parts.append(add_bevel_box(f"Work_Pocket_{sx}", (sx * 0.086, chest_f + 0.008, 0.295), (0.068, 0.018, 0.072), mats["CharShirt"], bevel=0.006, segments=1))
+            parts.append(add_bevel_box(f"Work_PocketFlap_{sx}", (sx * 0.086, chest_f + 0.012, 0.326), (0.072, 0.014, 0.022), mats["CharPants"], bevel=0.004, segments=1))
     else:
-        # Open-front casual jacket: clean flared hem sitting cleanly OVER pelvis (zero z-fighting!) + sloped trapezius shoulders
+        # Open-front casual jacket: sculpted lapel drape & rich athletic chest volume
         bm = bmesh.new()
-        segs = 20
+        segs = 22
         ring_specs = [
-            (-0.048, waist_w + 0.024, 0.116, 0.122, -0.002, 0.0),
-            (0.03,   waist_w + 0.018, 0.112, 0.114, 0.0, 0.0),
-            (0.16,   (waist_w + chest_w) * 0.5 + 0.008, 0.118, 0.112, 0.004, 0.0),
-            (0.30,   chest_w + 0.008, chest_f + 0.010, chest_b + 0.010, 0.005, 0.0),
-            (0.385,  shldr_w + 0.005, 0.102, 0.102, 0.002, 0.0),
-            (0.435,  0.110, 0.085, 0.088, 0.0, 0.0),
-            (0.472,  0.084, 0.076, 0.080, -0.004, 0.0),
+            (-0.052, waist_w + 0.026, 0.136, 0.144, -0.002, 0.0),
+            (0.03,   waist_w + 0.020, 0.132, 0.136, 0.0, 0.0),
+            (0.16,   (waist_w + chest_w) * 0.5 + 0.010, 0.140, 0.136, 0.004, 0.0),
+            (0.30,   chest_w + 0.010, chest_f + 0.012, chest_b + 0.012, 0.006, 0.0),
+            (0.388,  shldr_w + 0.006, 0.122, 0.122, 0.002, 0.0),
+            (0.438,  0.120, 0.098, 0.102, 0.0, 0.0),
+            (0.474,  0.090, 0.084, 0.088, -0.004, 0.0),
         ]
         jacket_angles = [math.radians(108.0 + (s / (segs - 1)) * 324.0) for s in range(segs)]
         out_rings, in_rings = [], []
-        thick = 0.013
+        thick = 0.015
         for (z, rx, ry_f, ry_b, y_off, x_off) in ring_specs:
             ro, ri = [], []
             for ang in jacket_angles:
@@ -326,14 +341,14 @@ def build_torso_mesh(mats, variant="male"):
             bm.faces.new((in_rings[0][s], in_rings[0][s + 1], out_rings[0][s + 1], out_rings[0][s]))
             bm.faces.new((out_rings[-1][s], out_rings[-1][s + 1], in_rings[-1][s + 1], in_rings[-1][s]))
 
-        parts.append(make_obj_from_bm("Torso_OpenJacket", bm, mats["CharShirt"], smooth_angle=62.0))
+        parts.append(make_obj_from_bm("Torso_OpenJacket", bm, mats["CharShirt"], smooth_angle=66.0, subsurf_levels=1))
 
     # Rolled jacket collar sitting snugly around neck base
     collar_specs = [
-        (0.455, 0.088, 0.080, 0.084, -0.005, 0.0),
-        (0.495, 0.082, 0.076, 0.082, -0.007, 0.0),
+        (0.455, 0.094, 0.088, 0.092, -0.005, 0.0),
+        (0.498, 0.086, 0.082, 0.088, -0.007, 0.0),
     ]
-    parts.append(loft_oval_rings("Torso_Collar", collar_specs, 18, mats["CharShirt"], cap_bottom=False, cap_top=True, smooth_angle=52.0))
+    parts.append(loft_oval_rings("Torso_Collar", collar_specs, 18, mats["CharShirt"], cap_bottom=False, cap_top=True, smooth_angle=56.0, subsurf_levels=0))
 
     return join_parts_at_origin(parts, "Chest")
 
@@ -393,17 +408,18 @@ def build_head_mesh(mats, variant="male"):
             rot_euler=(0.0, 0.0, -sx * 0.25),
         ))
 
-    # Realistic Eyes (sclera + dark iris + gentle natural eyebrows)
+    # Realistic Eyes (recessed sclera + iris + upper eyelid/lash contour + natural eyebrows)
     eye_x = 0.031
-    eye_y = 0.096
-    eye_z = 0.118 + z_shift
-    brow_h = 0.0045 if is_female else 0.0060
+    eye_y = 0.095
+    eye_z = 0.117 + z_shift
+    brow_h = 0.0045 if is_female else 0.0062
     for sx in (-1.0, 1.0):
-        parts.append(add_ellipsoid(f"Eye_Sclera_{sx}", (sx * eye_x, eye_y, eye_z), (0.0135, 0.0105, 0.0092), mats["CharEyeWhite"], segs=12, rings=8))
-        parts.append(add_ellipsoid(f"Eye_Iris_{sx}", (sx * eye_x, eye_y + 0.0072, eye_z), (0.0070, 0.0062, 0.0072), mats["CharEyeIris"], segs=10, rings=8))
+        parts.append(add_ellipsoid(f"Eye_Sclera_{sx}", (sx * eye_x, eye_y, eye_z), (0.0135, 0.010, 0.0085), mats["CharEyeWhite"], segs=12, rings=8))
+        parts.append(add_ellipsoid(f"Eye_Iris_{sx}", (sx * eye_x, eye_y + 0.0068, eye_z), (0.0068, 0.006, 0.0068), mats["CharEyeIris"], segs=10, rings=8))
+        parts.append(add_ellipsoid(f"Eye_UpperLid_{sx}", (sx * eye_x, eye_y + 0.003, eye_z + 0.0055), (0.0155, 0.009, 0.0042), mats["CharSkin"], segs=10, rings=6))
         parts.append(add_bevel_box(
             f"Eyebrow_{sx}",
-            (sx * eye_x, eye_y + 0.0065, eye_z + 0.018),
+            (sx * eye_x, eye_y + 0.007, eye_z + 0.0185),
             (0.028, 0.007, brow_h),
             mats["CharHair"],
             bevel=0.002, segments=1,
@@ -414,106 +430,119 @@ def build_head_mesh(mats, variant="male"):
     parts.append(add_ellipsoid("Mouth_UpperLip", (0.0, 0.096, 0.060 + z_shift), (0.021, 0.0095, 0.0050), mats["CharLips"], segs=10, rings=6))
     parts.append(add_ellipsoid("Mouth_LowerLip", (0.0, 0.094, 0.052 + z_shift), (0.018, 0.0095, 0.0052), mats["CharLips"], segs=10, rings=6))
 
-    # Distinct Realistic Hairstyle / Headgear per Variant!
+    # Natural Multi-Layered Sculpted Hairstyles (zero Playmobil helmet or hollow cylinder!)
     if is_female:
-        # Smooth continuous wraparound shoulder-length bob curving naturally around temples & nape
-        hair_wrap = [
-            (-0.048 + z_shift, 0.098, 0.018, 0.104, -0.036, 0.0),
-            (0.035 + z_shift,  0.102, 0.032, 0.114, -0.028, 0.0),
-            (0.108 + z_shift,  0.100, 0.056, 0.120, -0.018, 0.0),
-            (0.162 + z_shift,  0.098, 0.096, 0.122, -0.008, 0.0),
-            (0.198 + z_shift,  0.090, 0.096, 0.114, -0.008, 0.0),
-            (0.226 + z_shift,  0.058, 0.064, 0.072, -0.008, 0.0),
+        # Close-fitting natural scalp crown
+        crown_specs = [
+            (0.125 + z_shift, 0.088, 0.072, 0.112, -0.014, 0.0),
+            (0.168 + z_shift, 0.092, 0.096, 0.116, -0.008, 0.0),
+            (0.200 + z_shift, 0.084, 0.092, 0.108, -0.006, 0.0),
+            (0.222 + z_shift, 0.052, 0.058, 0.066, -0.006, 0.0),
         ]
-        parts.append(loft_oval_rings("Hair_FemaleBob", hair_wrap, 20, mats["CharHair"], smooth_angle=68.0))
-        # Soft side-swept bangs framing forehead
-        parts.append(add_ellipsoid("Hair_FemaleBangs", (0.020, 0.068, 0.188 + z_shift), (0.072, 0.044, 0.028), mats["CharHair"], segs=12, rings=8, rot_euler=(-0.15, 0.16, -0.18)))
+        parts.append(loft_oval_rings("Hair_FemaleCrown", crown_specs, 20, mats["CharHair"], smooth_angle=70.0, subsurf_levels=1))
+        # Tapered layered back hair curving naturally down over neck/upper back
+        back_hair = [
+            (-0.045 + z_shift, 0.076, 0.022, 0.036, -0.098, 0.0),
+            (0.030 + z_shift,  0.094, 0.028, 0.046, -0.088, 0.0),
+            (0.100 + z_shift,  0.096, 0.032, 0.054, -0.076, 0.0),
+            (0.162 + z_shift,  0.088, 0.036, 0.058, -0.062, 0.0),
+        ]
+        parts.append(loft_oval_rings("Hair_FemaleBackFlow", back_hair, 18, mats["CharHair"], smooth_angle=70.0, subsurf_levels=1))
+        # Soft tapered side locks framing cheeks naturally
+        for sx in (-1.0, 1.0):
+            side_lock = [
+                (-0.015 + z_shift, 0.018, 0.028, 0.030, -0.015, sx * 0.082),
+                (0.055 + z_shift,  0.022, 0.042, 0.042, -0.012, sx * 0.086),
+                (0.125 + z_shift,  0.024, 0.050, 0.048, -0.010, sx * 0.084),
+                (0.180 + z_shift,  0.022, 0.042, 0.040, -0.008, sx * 0.068),
+            ]
+            parts.append(loft_oval_rings(f"Hair_FemaleSide_{sx}", side_lock, 12, mats["CharHair"], smooth_angle=70.0, subsurf_levels=1))
+        # Soft side-swept fringe
+        parts.append(add_ellipsoid("Hair_FemaleBangs", (0.022, 0.064, 0.186 + z_shift), (0.068, 0.040, 0.024), mats["CharHair"], segs=14, rings=8, rot_euler=(-0.15, 0.16, -0.18)))
     elif is_worker:
         nape_specs = [
             (0.082 + z_shift, 0.084, 0.032, 0.096, -0.026, 0.0),
             (0.145 + z_shift, 0.090, 0.048, 0.106, -0.020, 0.0),
         ]
-        parts.append(loft_oval_rings("Hair_WorkerShort", nape_specs, 14, mats["CharHair"], smooth_angle=58.0))
+        parts.append(loft_oval_rings("Hair_WorkerShort", nape_specs, 14, mats["CharHair"], smooth_angle=60.0, subsurf_levels=1))
         cap_specs = [
             (0.142 + z_shift, 0.096, 0.108, 0.114, -0.004, 0.0),
             (0.180 + z_shift, 0.094, 0.104, 0.112, -0.006, 0.0),
             (0.214 + z_shift, 0.080, 0.086, 0.094, -0.008, 0.0),
             (0.232 + z_shift, 0.040, 0.042, 0.046, -0.008, 0.0),
         ]
-        parts.append(loft_oval_rings("Worker_CapCrown", cap_specs, 18, mats["CharShirt"], smooth_angle=58.0))
+        parts.append(loft_oval_rings("Worker_CapCrown", cap_specs, 18, mats["CharShirt"], smooth_angle=60.0, subsurf_levels=1))
         parts.append(add_ellipsoid("Worker_CapBrim", (0.0, 0.124, 0.148 + z_shift), (0.088, 0.066, 0.011), mats["CharPants"], segs=14, rings=6, rot_euler=(0.16, 0.0, 0.0)))
         parts.append(add_ellipsoid("Worker_CapButton", (0.0, -0.008, 0.236 + z_shift), (0.012, 0.012, 0.006), mats["CharPants"], segs=8, rings=6))
     else:
+        # Realistic tapered modern men's haircut (snug tapered sides + natural swept top, no helmet rim!)
         hair_specs = [
-            (0.088 + z_shift, 0.084, 0.024, 0.100, -0.030, 0.0),
-            (0.135 + z_shift, 0.093, 0.064, 0.112, -0.018, 0.0),
-            (0.174 + z_shift, 0.096, 0.100, 0.116, -0.006, 0.0),
-            (0.208 + z_shift, 0.086, 0.094, 0.106, -0.004, 0.0),
-            (0.230 + z_shift, 0.054, 0.064, 0.068, 0.002, 0.0),
+            (0.088 + z_shift, 0.084, 0.018, 0.094, -0.028, 0.0),
+            (0.132 + z_shift, 0.090, 0.056, 0.108, -0.018, 0.0),
+            (0.172 + z_shift, 0.092, 0.092, 0.112, -0.008, 0.0),
+            (0.204 + z_shift, 0.082, 0.088, 0.102, -0.005, 0.0),
+            (0.224 + z_shift, 0.050, 0.058, 0.064, 0.000, 0.0),
         ]
-        parts.append(loft_oval_rings("Hair_MaleBase", hair_specs, 18, mats["CharHair"], smooth_angle=62.0))
-        parts.append(add_ellipsoid("Hair_MaleQuiff", (0.012, 0.056, 0.202 + z_shift), (0.072, 0.054, 0.030), mats["CharHair"], segs=12, rings=8, rot_euler=(-0.18, 0.12, -0.15)))
+        parts.append(loft_oval_rings("Hair_MaleBase", hair_specs, 20, mats["CharHair"], smooth_angle=68.0, subsurf_levels=1))
+        parts.append(add_ellipsoid("Hair_MaleTopSweep", (0.010, 0.042, 0.204 + z_shift), (0.068, 0.058, 0.026), mats["CharHair"], segs=14, rings=8, rot_euler=(-0.14, 0.10, -0.14)))
 
     return join_parts_at_origin(parts, "Head_Mesh")
 
 
 def build_upper_arm_mesh(mats, is_female=False):
     parts = []
-    r_sh = 0.052 if is_female else 0.059
-    r_mid = 0.045 if is_female else 0.053
-    r_el = 0.042 if is_female else 0.048
-    # Natural smooth deltoid cap blended seamlessly with sloped torso shoulders (no blocky shoulder pads!)
+    r_sh = 0.056 if is_female else 0.064
+    r_mid = 0.050 if is_female else 0.058
+    r_el = 0.047 if is_female else 0.054
+    # Smooth overlapping elbow/shoulder ends (no sausage pinch under Subsurf!)
     specs = [
-        (-0.305, r_el * 0.92, r_el * 0.92, r_el * 0.92, 0.0, 0.0),
-        (-0.270, r_el,        r_el,        r_el,        0.0, 0.0),
+        (-0.325, r_el * 0.88, r_el * 0.88, r_el * 0.88, 0.0, 0.0),
+        (-0.295, r_el,        r_el,        r_el,        0.0, 0.0),
+        (-0.265, r_el * 1.02, r_el * 1.02, r_el * 1.02, 0.0, 0.0),
         (-0.145, r_mid,       r_mid * 1.04, r_mid * 1.02, 0.0, 0.0),
-        (-0.045, r_sh,        r_sh * 1.02, r_sh * 1.02, 0.0, 0.0),
-        (-0.002, r_sh * 0.86, r_sh * 0.88, r_sh * 0.88, 0.0, 0.0),
-        (0.026,  r_sh * 0.48, r_sh * 0.50, r_sh * 0.50, 0.0, 0.0),
+        (-0.040, r_sh,        r_sh * 1.02, r_sh * 1.02, 0.0, 0.0),
+        (0.005,  r_sh * 0.96, r_sh * 0.96, r_sh * 0.96, 0.0, 0.0),
+        (0.038,  r_sh * 0.72, r_sh * 0.74, r_sh * 0.74, 0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("UpperArm_Sleeve", specs, 16, mats["CharShirt"], smooth_angle=68.0))
+    parts.append(loft_oval_rings("UpperArm_Sleeve", specs, 16, mats["CharShirt"], smooth_angle=70.0, subsurf_levels=1))
     return join_parts_at_origin(parts, "UpperArm_Mesh")
 
 
 def build_forearm_and_hand_mesh(mats, side_sign=1.0, is_female=False):
     parts = []
-    r_el = 0.044 if is_female else 0.050
-    r_wr = 0.029 if is_female else 0.033
-    # Long jacket sleeve down to cuffed wrist (z=0.03 down to -0.225), then bare skin wrist & sculpted 3D hand!
+    r_el = 0.047 if is_female else 0.054
+    r_wr = 0.032 if is_female else 0.037
     sleeve_specs = [
-        (-0.225, r_wr + 0.008, r_wr + 0.008, r_wr + 0.008, 0.0, 0.0),
-        (-0.205, r_wr + 0.010, r_wr + 0.010, r_wr + 0.010, 0.0, 0.0),
+        (-0.225, r_wr + 0.009, r_wr + 0.009, r_wr + 0.009, 0.0, 0.0),
+        (-0.205, r_wr + 0.011, r_wr + 0.011, r_wr + 0.011, 0.0, 0.0),
         (-0.100, r_el * 0.90,  r_el * 0.92,  r_el * 0.90,  0.0, 0.0),
-        (-0.015, r_el * 0.98,  r_el * 0.98,  r_el * 0.98,  0.0, 0.0),
-        (0.022,  r_el * 0.72,  r_el * 0.72,  r_el * 0.72,  0.0, 0.0),
+        (-0.015, r_el * 1.00,  r_el * 1.00,  r_el * 1.00,  0.0, 0.0),
+        (0.018,  r_el * 0.96,  r_el * 0.96,  r_el * 0.96,  0.0, 0.0),
+        (0.042,  r_el * 0.72,  r_el * 0.72,  r_el * 0.72,  0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Forearm_Sleeve", sleeve_specs, 14, mats["CharShirt"], smooth_angle=60.0))
+    parts.append(loft_oval_rings("Forearm_Sleeve", sleeve_specs, 14, mats["CharShirt"], smooth_angle=66.0, subsurf_levels=1))
 
-    # Wrist skin collar
     wrist_specs = [
-        (-0.258, r_wr * 0.92, r_wr * 0.80, r_wr * 0.80, 0.004, 0.0),
+        (-0.258, r_wr * 0.92, r_wr * 0.82, r_wr * 0.82, 0.004, 0.0),
         (-0.215, r_wr,        r_wr * 0.92, r_wr * 0.92, 0.0,   0.0),
     ]
-    parts.append(loft_oval_rings("Wrist_Skin", wrist_specs, 12, mats["CharSkin"], smooth_angle=60.0))
+    parts.append(loft_oval_rings("Wrist_Skin", wrist_specs, 12, mats["CharSkin"], smooth_angle=62.0, subsurf_levels=0))
 
-    # Sculpted 3D Hand: beveled palm + contoured finger block + angled opposable thumb!
-    palm_x = 0.024 if is_female else 0.027
-    palm_y = 0.064 if is_female else 0.072
-    parts.append(add_bevel_box("Hand_Palm", (0.0, 0.006, -0.292), (palm_x, palm_y, 0.074), mats["CharSkin"], bevel=0.009, segments=2))
-    # Slightly curved fingers hanging naturally below palm
+    palm_x = 0.026 if is_female else 0.030
+    palm_y = 0.068 if is_female else 0.076
+    parts.append(add_bevel_box("Hand_Palm", (0.0, 0.006, -0.292), (palm_x, palm_y, 0.076), mats["CharSkin"], bevel=0.010, segments=2))
     parts.append(add_bevel_box(
         "Hand_Fingers",
         (-side_sign * 0.005, 0.008, -0.352),
-        (palm_x * 0.78, palm_y * 0.92, 0.068),
+        (palm_x * 0.80, palm_y * 0.92, 0.070),
         mats["CharSkin"],
-        bevel=0.007, segments=2,
+        bevel=0.008, segments=2,
         rot_euler=(0.0, side_sign * 0.14, 0.0),
     ))
-    # Angled thumb on inner-front side (+Y front, toward body -side_sign)
     parts.append(add_bevel_box(
         "Hand_Thumb",
-        (-side_sign * 0.008, 0.044, -0.305),
-        (0.017, 0.020, 0.052),
+        (-side_sign * 0.008, 0.046, -0.305),
+        (0.019, 0.022, 0.054),
         mats["CharSkin"],
         bevel=0.006, segments=1,
         rot_euler=(-0.38, side_sign * 0.15, 0.0),
@@ -522,40 +551,40 @@ def build_forearm_and_hand_mesh(mats, side_sign=1.0, is_female=False):
 
 
 def build_thigh_mesh(mats, is_female=False):
-    r_top = 0.084 if is_female else 0.088
-    r_mid = 0.076 if is_female else 0.080
-    r_kn = 0.058 if is_female else 0.063
+    r_top = 0.092 if is_female else 0.098
+    r_mid = 0.084 if is_female else 0.090
+    r_kn = 0.066 if is_female else 0.071
     specs = [
-        (-0.448, r_kn * 0.90, r_kn * 0.92, r_kn * 0.90, 0.0, 0.0),
-        (-0.415, r_kn,        r_kn * 1.04, r_kn * 0.98, 0.002, 0.0),
-        (-0.230, r_mid,       r_mid * 1.08, r_mid * 1.04, 0.004, 0.0),
-        (-0.060, r_top,       r_top * 1.04, r_top * 1.08, 0.0, 0.0),
-        (0.015,  r_top * 0.92, r_top * 0.94, r_top * 0.96, 0.0, 0.0),
-        (0.055,  r_top * 0.60, r_top * 0.62, r_top * 0.62, 0.0, 0.0),
+        (-0.468, r_kn * 0.86, r_kn * 0.88, r_kn * 0.86, 0.0, 0.0),
+        (-0.432, r_kn,        r_kn * 1.04, r_kn * 1.00, 0.002, 0.0),
+        (-0.395, r_kn * 1.02, r_kn * 1.06, r_kn * 1.02, 0.002, 0.0),
+        (-0.230, r_mid,       r_mid * 1.10, r_mid * 1.06, 0.004, 0.0),
+        (-0.060, r_top,       r_top * 1.06, r_top * 1.10, 0.0, 0.0),
+        (0.015,  r_top * 0.94, r_top * 0.96, r_top * 0.98, 0.0, 0.0),
+        (0.060,  r_top * 0.68, r_top * 0.70, r_top * 0.70, 0.0, 0.0),
     ]
-    return loft_oval_rings("Thigh_Mesh", specs, 14, mats["CharPants"], smooth_angle=62.0)
+    return loft_oval_rings("Thigh_Mesh", specs, 16, mats["CharPants"], smooth_angle=68.0, subsurf_levels=1)
 
 
 def build_shin_mesh(mats, is_female=False):
     parts = []
-    r_kn = 0.058 if is_female else 0.063
-    r_calf = 0.056 if is_female else 0.062
-    r_hem = 0.046 if is_female else 0.051
-    # Trouser leg down to cuffed ankle hem (z=0.035 down to -0.395)
+    r_kn = 0.066 if is_female else 0.071
+    r_calf = 0.063 if is_female else 0.070
+    r_hem = 0.052 if is_female else 0.058
     specs = [
-        (-0.395, r_hem,        r_hem * 1.02, r_hem * 1.02, 0.0, 0.0),
-        (-0.340, r_hem * 1.02, r_hem * 1.04, r_hem * 1.06, -0.002, 0.0),
-        (-0.180, r_calf,       r_calf * 0.96, r_calf * 1.12, -0.006, 0.0),
-        (-0.025, r_kn,         r_kn * 1.02,   r_kn * 0.98,   0.002, 0.0),
-        (0.032,  r_kn * 0.72,  r_kn * 0.74,   r_kn * 0.72,   0.0, 0.0),
+        (-0.395, r_hem,        r_hem * 1.04, r_hem * 1.04, 0.0, 0.0),
+        (-0.340, r_hem * 1.04, r_hem * 1.06, r_hem * 1.08, -0.002, 0.0),
+        (-0.180, r_calf,       r_calf * 0.98, r_calf * 1.14, -0.006, 0.0),
+        (-0.025, r_kn,         r_kn * 1.04,   r_kn * 1.00,   0.002, 0.0),
+        (0.020,  r_kn * 0.98,  r_kn * 1.00,   r_kn * 0.98,   0.0, 0.0),
+        (0.052,  r_kn * 0.76,  r_kn * 0.78,   r_kn * 0.76,   0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Shin_Trouser", specs, 14, mats["CharPants"], smooth_angle=62.0))
-    # Subtle ankle sock/collar bridging cleanly into shoe
+    parts.append(loft_oval_rings("Shin_Trouser", specs, 16, mats["CharPants"], smooth_angle=68.0, subsurf_levels=1))
     sock_specs = [
-        (-0.435, 0.038, 0.042, 0.042, 0.0, 0.0),
-        (-0.385, 0.041, 0.045, 0.045, 0.0, 0.0),
+        (-0.435, 0.042, 0.046, 0.046, 0.0, 0.0),
+        (-0.385, 0.045, 0.049, 0.049, 0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Ankle_Sock", sock_specs, 12, mats["CharShoeSole"], smooth_angle=55.0))
+    parts.append(loft_oval_rings("Ankle_Sock", sock_specs, 12, mats["CharShoeSole"], smooth_angle=55.0, subsurf_levels=0))
     return join_parts_at_origin(parts, "Shin_Mesh")
 
 
@@ -584,8 +613,8 @@ def build_foot_shoe_mesh(mats, is_worker=False):
 def build_character_rig(rig_name, variant, mats):
     is_female = (variant == "female")
     is_worker = (variant == "worker")
-    shldr_x = 0.172 if is_female else 0.198
-    hip_x = 0.098 if is_female else 0.102
+    shldr_x = 0.174 if is_female else 0.200
+    hip_x = 0.102 if is_female else 0.106
 
     root = make_pivot(rig_name, None, (0.0, 0.0, 0.0))
 

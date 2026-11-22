@@ -32,6 +32,7 @@ namespace Gridroam.Input
         private bool _touchContinueDialogueQueued;
         private bool _touchPhoneQueued;
         private bool _touchAttackQueued;
+        private bool _touchJumpQueued;
 
         public Vector2 MoveInput { get; private set; }
         public bool SprintHeld { get; private set; }
@@ -44,6 +45,7 @@ namespace Gridroam.Input
 
         public event Action OnInteractPressed;
         public event Action OnAttackPressed;
+        public event Action OnJumpPressed;
         public event Action OnExitVehiclePressed;
         public event Action OnContinueDialoguePressed;
         public event Action OnRetryPressed;
@@ -63,10 +65,22 @@ namespace Gridroam.Input
             Instance = this;
         }
 
+        private static bool IsTypingInUiField()
+        {
+            EventSystem es = EventSystem.current;
+            if (es == null || es.currentSelectedGameObject == null) return false;
+            UnityEngine.UI.InputField field = es.currentSelectedGameObject.GetComponent<UnityEngine.UI.InputField>();
+            return field != null && field.isFocused;
+        }
+
         private void Update()
         {
             Keyboard kb = Keyboard.current;
             Mouse mouse = Mouse.current;
+            if (IsTypingInUiField())
+            {
+                kb = null; // Ignore keyboard shortcuts (M, E, WASD...) while typing into a UI text field.
+            }
 
             // --- On-foot movement (WASD + Touch Joystick) ---
             Vector2 kbMove = Vector2.zero;
@@ -147,12 +161,14 @@ namespace Gridroam.Input
             bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
             bool lmbAttack = mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverUi;
             bool attack = _touchAttackQueued || (kb != null && kb.vKey.wasPressedThisFrame) || lmbAttack;
+            bool jump = _touchJumpQueued || (kb != null && kb.spaceKey.wasPressedThisFrame);
 
             _touchInteractQueued = false;
             _touchExitVehicleQueued = false;
             _touchContinueDialogueQueued = false;
             _touchPhoneQueued = false;
             _touchAttackQueued = false;
+            _touchJumpQueued = false;
 
             if (togglePhone)
             {
@@ -172,6 +188,11 @@ namespace Gridroam.Input
             if (attack)
             {
                 OnAttackPressed?.Invoke();
+            }
+
+            if (jump)
+            {
+                OnJumpPressed?.Invoke();
             }
 
             if (exitVehicle)
@@ -223,6 +244,7 @@ namespace Gridroam.Input
         public void SetTouchSprint(bool pressed) => _touchSprint = pressed;
         public void TriggerTouchInteract() => _touchInteractQueued = true;
         public void TriggerTouchAttack() => _touchAttackQueued = true;
+        public void TriggerTouchJump() => _touchJumpQueued = true;
         public void TriggerTouchExitVehicle() => _touchExitVehicleQueued = true;
         public void TriggerTouchContinueDialogue() => _touchContinueDialogueQueued = true;
         public void TriggerTouchPhone() => _touchPhoneQueued = true;

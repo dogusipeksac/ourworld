@@ -46,6 +46,17 @@ namespace Gridroam.World
             frontDoorLocalOffset = new Vector3(halfDepthX + 0.85f, 0.12f, 0f);
         }
 
+        public void ConfigureWithLocalFront(string id, List<Renderer> exteriorRenderers, string label, Vector3 explicitFrontDoorLocal)
+        {
+            houseId = id;
+            exteriorWallRenderers = exteriorRenderers != null ? exteriorRenderers : new List<Renderer>();
+            if (!string.IsNullOrEmpty(label))
+            {
+                displayName = label;
+            }
+            frontDoorLocalOffset = explicitFrontDoorLocal;
+        }
+
         private void Awake()
         {
             _mpb = new MaterialPropertyBlock();

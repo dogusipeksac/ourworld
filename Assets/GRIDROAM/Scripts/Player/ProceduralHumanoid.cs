@@ -54,14 +54,31 @@ namespace Gridroam.Player
         private float _noiseSeed;
         private float _prevYaw;
         private float _smoothedTurnLean;
+        // v13 animation polish: acceleration lean, idle weight shifts, run crouch, fall flail
+        private float _prevSpeedMs;
+        private float _smoothedAccelLean;
+        private float _idleShift;
+        private float _idleShiftTarget;
+        private float _idleShiftCountdown = 7f;
         private float _waveTimer = -1f;
         private float _punchTimer = -1f;
+        private int _combatMoveIndex;
         private float _hitReactTimer = -1f;
+        private float _knockdownTimer = -1f;
+        private float _vaultTimer = -1f;
+        private bool _isSwimming;
+        private float _swimSpeed;
+        private float _swimPhase;
+        private int _prayerStage;
+        private float _prayerSelamYaw;
         private float _startledTimer = -1f;
         private float _startledDuration = 1.1f;
         private float _autoWaveCountdown = 8f;
         private const float PunchDuration = 0.36f;
+        private const float KickDuration = 0.44f;
         private const float HitReactDuration = 0.55f;
+        private const float KnockdownDuration = 2.65f;
+        private const float VaultDuration = 0.42f;
         private Vector3 _chestBaseScale = new Vector3(0.39f, 0.20f, 0.23f);
         private bool _initialized;
 
@@ -326,6 +343,12 @@ namespace Gridroam.Player
 
         public void PlayPunch()
         {
+            PlayCombatMove(1);
+        }
+
+        public void PlayCombatMove(int comboStep)
+        {
+            _combatMoveIndex = comboStep % 3;
             _punchTimer = 0f;
             _waveTimer = -1f;
         }
@@ -334,6 +357,45 @@ namespace Gridroam.Player
         {
             _hitReactTimer = 0f;
             _waveTimer = -1f;
+        }
+
+        private float _activeKnockdownDuration = KnockdownDuration;
+
+        public void PlayKnockdown(float duration = KnockdownDuration)
+        {
+            _activeKnockdownDuration = Mathf.Max(1.2f, duration);
+            _knockdownTimer = 0f;
+            _hitReactTimer = -1f;
+            _waveTimer = -1f;
+        }
+
+        public void PlayVault()
+        {
+            _vaultTimer = 0f;
+            _waveTimer = -1f;
+        }
+
+        public void SetSwimming(bool swimming, float swimSpeed)
+        {
+            _isSwimming = swimming;
+            _swimSpeed = Mathf.Max(0f, swimSpeed);
+        }
+
+        /// <summary>
+        /// Sets an animated Salah (Namaz) prayer stage:
+        /// 0 = None, 1 = Kıyam (standing hands folded), 2 = Rükû (bow), 3 = Secde (prostration),
+        /// 4 = Oturuş / Tahiyyat (kneeling; selamHeadYaw +55 right / -55 left for Selam).
+        /// </summary>
+        public void SetPrayerPose(int stage, float selamHeadYaw = 0f)
+        {
+            _prayerStage = Mathf.Clamp(stage, 0, 4);
+            _prayerSelamYaw = Mathf.Clamp(selamHeadYaw, -65f, 65f);
+            if (_prayerStage > 0)
+            {
+                _waveTimer = -1f;
+                _punchTimer = -1f;
+                _startledTimer = -1f;
+            }
         }
 
         public void PlayStartled(float duration = 1.1f)
@@ -410,23 +472,23 @@ namespace Gridroam.Player
             }
             else
             {
-                hips.localPosition = new Vector3(0f, 0.08f, -0.02f);
+                hips.localPosition = new Vector3(0f, 0.08f, 0.02f);
                 hips.localRotation = Quaternion.identity;
-                if (spine != null) spine.localRotation = Quaternion.Euler(-4f, 0f, 0f);
-                if (neck != null) neck.localRotation = Quaternion.Euler(3f, 0f, 0f);
+                if (spine != null) spine.localRotation = Quaternion.Euler(-7f, 0f, 0f);
+                if (neck != null) neck.localRotation = Quaternion.Euler(5f, 0f, 0f);
                 if (head != null) head.localRotation = Quaternion.identity;
 
-                if (lHip != null) lHip.localRotation = Quaternion.Euler(-90f, 0f, -5f);
-                if (rHip != null) rHip.localRotation = Quaternion.Euler(-90f, 0f, 5f);
-                if (lKnee != null) lKnee.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                if (rKnee != null) rKnee.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                if (lHip != null) lHip.localRotation = Quaternion.Euler(-88f, 0f, -5f);
+                if (rHip != null) rHip.localRotation = Quaternion.Euler(-88f, 0f, 5f);
+                if (lKnee != null) lKnee.localRotation = Quaternion.Euler(88f, 0f, 0f);
+                if (rKnee != null) rKnee.localRotation = Quaternion.Euler(88f, 0f, 0f);
                 if (lAnkle != null) lAnkle.localRotation = Quaternion.identity;
                 if (rAnkle != null) rAnkle.localRotation = Quaternion.identity;
 
-                if (lShoulder != null) lShoulder.localRotation = Quaternion.Euler(-22f, 8f, 10f);
-                if (rShoulder != null) rShoulder.localRotation = Quaternion.Euler(-22f, -8f, -10f);
-                if (lElbow != null) lElbow.localRotation = Quaternion.Euler(-58f, 0f, -12f);
-                if (rElbow != null) rElbow.localRotation = Quaternion.Euler(-58f, 0f, 12f);
+                if (lShoulder != null) lShoulder.localRotation = Quaternion.Euler(8f, 0f, -10f);
+                if (rShoulder != null) rShoulder.localRotation = Quaternion.Euler(8f, 0f, 10f);
+                if (lElbow != null) lElbow.localRotation = Quaternion.Euler(-44f, 0f, 10f);
+                if (rElbow != null) rElbow.localRotation = Quaternion.Euler(-44f, 0f, -10f);
             }
         }
 
@@ -484,7 +546,8 @@ namespace Gridroam.Player
             if (_punchTimer >= 0f)
             {
                 _punchTimer += dt;
-                if (_punchTimer >= PunchDuration)
+                float dur = _combatMoveIndex == 2 ? KickDuration : PunchDuration;
+                if (_punchTimer >= dur)
                 {
                     _punchTimer = -1f;
                 }
@@ -496,6 +559,24 @@ namespace Gridroam.Player
                 if (_hitReactTimer >= HitReactDuration)
                 {
                     _hitReactTimer = -1f;
+                }
+            }
+
+            if (_knockdownTimer >= 0f)
+            {
+                _knockdownTimer += dt;
+                if (_knockdownTimer >= _activeKnockdownDuration)
+                {
+                    _knockdownTimer = -1f;
+                }
+            }
+
+            if (_vaultTimer >= 0f)
+            {
+                _vaultTimer += dt;
+                if (_vaultTimer >= VaultDuration)
+                {
+                    _vaultTimer = -1f;
                 }
             }
 
@@ -572,39 +653,50 @@ namespace Gridroam.Player
             _smoothedLookYaw = Mathf.Lerp(_smoothedLookYaw, useLookIk ? desiredLookYaw : 0f, lookBlendRate);
             _smoothedLookPitch = Mathf.Lerp(_smoothedLookPitch, useLookIk ? desiredLookPitch : 0f, lookBlendRate);
 
-            // --- Walk / Run components ---
+            // --- Biomechanical Walk / Run Gait (grounded double-bounce, pelvic weight shift, arm lag, heel-to-toe) ---
             float sinL = Mathf.Sin(_phase);
             float sinR = Mathf.Sin(_phase + Mathf.PI);
+            float armLagL = Mathf.Sin(_phase - 0.42f);
+            float armLagR = Mathf.Sin(_phase + Mathf.PI - 0.42f);
 
-            float thighAmp = Mathf.Lerp(25f, 45f, runBlend);
-            float maxKneeBend = Mathf.Lerp(60f, 95f, runBlend);
-            float armAmp = Mathf.Lerp(18f, 50f, runBlend);
-            float elbowBaseBend = Mathf.Lerp(15f, 80f, runBlend);
-            float bobAmp = Mathf.Lerp(0.02f, 0.05f, runBlend);
-            float torsoForwardLean = Mathf.Lerp(3f, 12f, runBlend);
+            float thighAmp = Mathf.Lerp(26f, 48f, runBlend);
+            float maxKneeBend = Mathf.Lerp(58f, 96f, runBlend);
+            float armAmp = Mathf.Lerp(20f, 52f, runBlend);
+            float elbowBaseBend = Mathf.Lerp(18f, 82f, runBlend);
+            float bobAmp = Mathf.Lerp(0.026f, 0.056f, runBlend);
+            float torsoForwardLean = Mathf.Lerp(4.5f, 14.5f, runBlend);
 
             float walkThighL = -sinL * thighAmp;
             float walkThighR = -sinR * thighAmp;
 
-            float swingL = Mathf.Max(0f, Mathf.Sin(_phase + 1.15f));
-            float swingR = Mathf.Max(0f, Mathf.Sin(_phase + Mathf.PI + 1.15f));
-            float walkKneeL = swingL * maxKneeBend;
-            float walkKneeR = swingR * maxKneeBend;
+            // Swing phase clearance + subtle stance-phase weight absorption knee bend (~11 deg)
+            float swingL = Mathf.Max(0f, Mathf.Sin(_phase + 1.12f));
+            float swingR = Mathf.Max(0f, Mathf.Sin(_phase + Mathf.PI + 1.12f));
+            float stanceLoadL = Mathf.Max(0f, -Mathf.Sin(_phase - 0.35f)) * 11f;
+            float stanceLoadR = Mathf.Max(0f, -Mathf.Sin(_phase + Mathf.PI - 0.35f)) * 11f;
+            float walkKneeL = swingL * maxKneeBend + stanceLoadL;
+            float walkKneeR = swingR * maxKneeBend + stanceLoadR;
 
-            float walkAnkleL = Mathf.Clamp(-(walkThighL + walkKneeL) * 0.65f, -25f, 25f);
-            float walkAnkleR = Mathf.Clamp(-(walkThighR + walkKneeR) * 0.65f, -25f, 25f);
+            // Realistic heel-strike dorsiflexion -> flat stance -> toe-off plantarflexion
+            float heelToeL = Mathf.Cos(_phase - 0.45f) * 16f;
+            float heelToeR = Mathf.Cos(_phase + Mathf.PI - 0.45f) * 16f;
+            float walkAnkleL = Mathf.Clamp(-(walkThighL + walkKneeL) * 0.48f + heelToeL, -28f, 28f);
+            float walkAnkleR = Mathf.Clamp(-(walkThighR + walkKneeR) * 0.48f + heelToeR, -28f, 28f);
 
             float walkShoulderL = sinL * armAmp;
             float walkShoulderR = sinR * armAmp;
-            float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -sinL) * 14f);
-            float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, -sinR) * 14f);
+            float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -armLagL) * 20f);
+            float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, -armLagR) * 20f);
 
-            float walkBobY = Mathf.Abs(Mathf.Sin(_phase)) * bobAmp - bobAmp * 0.45f;
-            float walkHipYaw = sinL * 6f;
+            // Double-frequency vertical center-of-mass bounce & natural pelvic sway/roll onto stance leg
+            float walkBobY = -Mathf.Cos(_phase * 2f) * bobAmp;
+            float walkHipYaw = sinL * Mathf.Lerp(7.5f, 11f, runBlend);
+            float walkHipRoll = -sinL * Mathf.Lerp(3.8f, 5.2f, runBlend);
+            float walkHipSwayX = -Mathf.Cos(_phase) * Mathf.Lerp(0.022f, 0.012f, runBlend);
 
             // Blend Idle <-> Locomotion
             Vector3 targetHipsPos = new Vector3(
-                Mathf.Lerp(idleWeightShiftX, 0f, moveBlend),
+                Mathf.Lerp(idleWeightShiftX, walkHipSwayX, moveBlend),
                 hipsBaseY + walkBobY * moveBlend,
                 0f);
 
@@ -613,28 +705,65 @@ namespace Gridroam.Player
                 ? (_smoothedLookYaw * 0.75f)
                 : defaultHeadYaw;
 
-            Vector3 targetHipsRot = new Vector3(0f, walkHipYaw * moveBlend, 0f);
+            Vector3 targetHipsRot = new Vector3(0f, walkHipYaw * moveBlend, walkHipRoll * moveBlend);
             Vector3 targetSpineRot = new Vector3(
                 Mathf.Lerp(idleChestPitch, torsoForwardLean, moveBlend),
-                -walkHipYaw * 0.55f * moveBlend,
-                _smoothedTurnLean);
+                -walkHipYaw * 1.15f * moveBlend,
+                _smoothedTurnLean - walkHipRoll * 0.65f * moveBlend);
             Vector3 targetNeckRot = new Vector3(
                 -targetSpineRot.x * 0.35f + _smoothedLookPitch * 0.25f,
                 _smoothedLookYaw * 0.25f,
                 -_smoothedTurnLean * 0.35f);
             Vector3 targetHeadRot = new Vector3(_smoothedLookPitch * 0.75f, finalHeadYaw, 0f);
 
-            Vector3 targetLHipRot = new Vector3(walkThighL * moveBlend, 0f, 0f);
-            Vector3 targetRHipRot = new Vector3(walkThighR * moveBlend, 0f, 0f);
-            Vector3 targetLKneeRot = new Vector3(walkKneeL * moveBlend, 0f, 0f);
-            Vector3 targetRKneeRot = new Vector3(walkKneeR * moveBlend, 0f, 0f);
-            Vector3 targetLAnkleRot = new Vector3(walkAnkleL * moveBlend, 0f, 0f);
-            Vector3 targetRAnkleRot = new Vector3(walkAnkleR * moveBlend, 0f, 0f);
+            // Natural relaxed human idle stance (feet slightly apart, relaxed shoulders & soft elbow bend — never stiff!)
+            Vector3 targetLHipRot = new Vector3(walkThighL * moveBlend, 0f, Mathf.Lerp(-3.2f, 0f, moveBlend));
+            Vector3 targetRHipRot = new Vector3(walkThighR * moveBlend, 0f, Mathf.Lerp(3.2f, 0f, moveBlend));
+            Vector3 targetLKneeRot = new Vector3(Mathf.Lerp(3.5f, walkKneeL, moveBlend), 0f, 0f);
+            Vector3 targetRKneeRot = new Vector3(Mathf.Lerp(3.5f, walkKneeR, moveBlend), 0f, 0f);
+            Vector3 targetLAnkleRot = new Vector3(Mathf.Lerp(-3.5f, walkAnkleL, moveBlend), 0f, 0f);
+            Vector3 targetRAnkleRot = new Vector3(Mathf.Lerp(-3.5f, walkAnkleR, moveBlend), 0f, 0f);
 
-            Vector3 targetLShoulderRot = new Vector3(walkShoulderL * moveBlend, 0f, -3f);
-            Vector3 targetRShoulderRot = new Vector3(walkShoulderR * moveBlend, 0f, 3f);
-            Vector3 targetLElbowRot = new Vector3(Mathf.Lerp(-8f, walkElbowL, moveBlend), 0f, 0f);
-            Vector3 targetRElbowRot = new Vector3(Mathf.Lerp(-8f, walkElbowR, moveBlend), 0f, 0f);
+            float idleArmBreath = breathWave * 1.4f;
+            Vector3 targetLShoulderRot = new Vector3(Mathf.Lerp(3.5f + idleArmBreath, walkShoulderL, moveBlend), 0f, Mathf.Lerp(-9.5f, -4.5f, moveBlend));
+            Vector3 targetRShoulderRot = new Vector3(Mathf.Lerp(3.5f + idleArmBreath, walkShoulderR, moveBlend), 0f, Mathf.Lerp(9.5f, 4.5f, moveBlend));
+            Vector3 targetLElbowRot = new Vector3(Mathf.Lerp(-16f, walkElbowL, moveBlend), 0f, 0f);
+            Vector3 targetRElbowRot = new Vector3(Mathf.Lerp(-16f, walkElbowR, moveBlend), 0f, 0f);
+
+            // --- v13 polish: lean into acceleration, settle back when stopping ---
+            float accel = (_speedMs - _prevSpeedMs) / dt;
+            _prevSpeedMs = _speedMs;
+            float targetAccelLean = _grounded ? Mathf.Clamp(accel * 1.4f, -7f, 9f) : 0f;
+            _smoothedAccelLean = Mathf.Lerp(_smoothedAccelLean, targetAccelLean, 1f - Mathf.Exp(-6f * dt));
+            targetSpineRot.x += _smoothedAccelLean;
+            targetNeckRot.x -= _smoothedAccelLean * 0.4f; // keep gaze level
+
+            // --- v13 polish: slightly lower, more athletic pelvis while running (reduces stiff-leg float) ---
+            targetHipsPos.y -= 0.035f * runBlend * moveBlend;
+
+            // --- v13 polish: natural idle weight shift from leg to leg (contrapposto) every few seconds ---
+            if (moveBlend < 0.05f && _grounded)
+            {
+                _idleShiftCountdown -= dt;
+                if (_idleShiftCountdown <= 0f)
+                {
+                    _idleShiftTarget = _idleShiftTarget == 0f ? (UnityEngine.Random.value < 0.5f ? -1f : 1f) : 0f;
+                    _idleShiftCountdown = UnityEngine.Random.Range(4.5f, 9f);
+                }
+            }
+            else
+            {
+                _idleShiftTarget = 0f;
+            }
+            _idleShift = Mathf.Lerp(_idleShift, _idleShiftTarget, 1f - Mathf.Exp(-1.8f * dt));
+            float idleW = _idleShift * (1f - moveBlend);
+            targetHipsPos.x += idleW * 0.03f;
+            targetHipsRot.z += idleW * 3.2f;
+            targetSpineRot.z -= idleW * 2.4f;
+            targetLKneeRot.x += Mathf.Max(0f, idleW) * 9f;   // relaxed knee on the unloaded leg
+            targetRKneeRot.x += Mathf.Max(0f, -idleW) * 9f;
+            targetLHipRot.x -= Mathf.Max(0f, idleW) * 4f;
+            targetRHipRot.x -= Mathf.Max(0f, -idleW) * 4f;
 
             // --- Airborne override ---
             if (!_grounded)
@@ -669,37 +798,224 @@ namespace Gridroam.Player
                 targetSpineRot.x += 7f * squatEnv;
             }
 
+            // --- v13 polish: arms flail and legs reach when falling from height ---
+            if (!_grounded && _verticalVelocity < -3.5f && _airborneTimer > 0.35f)
+            {
+                float fall = Mathf.Clamp01((-_verticalVelocity - 3.5f) / 6f);
+                float flail = Mathf.Sin(_idleTime * 14f);
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-95f + flail * 18f, 0f, -55f), fall);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-95f - flail * 18f, 0f, 55f), fall);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-20f, 0f, 0f), fall);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-20f, 0f, 0f), fall);
+                targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-10f - flail * 8f, 0f, -6f), fall);
+                targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-10f + flail * 8f, 0f, 6f), fall);
+                targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(22f, 0f, 0f), fall);
+                targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(22f, 0f, 0f), fall);
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -6f, fall);
+            }
+
+            // --- Prayer (Namaz / Salah) animated pose override (Kıyam -> Rükû -> Secde -> Oturuş/Selam) ---
+            if (_prayerStage > 0)
+            {
+                if (_prayerStage == 1)
+                {
+                    // Kıyam: upright serene stance, hands folded calmly over abdomen, gaze lowered toward secde spot
+                    targetHipsPos = new Vector3(0f, hipsBaseY, 0f);
+                    targetHipsRot = Vector3.zero;
+                    targetSpineRot = new Vector3(3f + idleChestPitch * 0.45f, 0f, 0f);
+                    targetNeckRot = new Vector3(8f, 0f, 0f);
+                    targetHeadRot = new Vector3(12f, 0f, 0f);
+                    targetLShoulderRot = new Vector3(-28f, 24f, 12f);
+                    targetRShoulderRot = new Vector3(-30f, -24f, -12f);
+                    targetLElbowRot = new Vector3(-86f, 24f, 0f);
+                    targetRElbowRot = new Vector3(-88f, -24f, 0f);
+                    targetLHipRot = new Vector3(0f, 0f, -2f);
+                    targetRHipRot = new Vector3(0f, 0f, 2f);
+                    targetLKneeRot = new Vector3(2f, 0f, 0f);
+                    targetRKneeRot = new Vector3(2f, 0f, 0f);
+                    targetLAnkleRot = Vector3.zero;
+                    targetRAnkleRot = Vector3.zero;
+                }
+                else if (_prayerStage == 2)
+                {
+                    // Rükû: straight horizontal back bow, hands resting on knees
+                    targetHipsPos = new Vector3(0f, hipsBaseY - 0.04f, -0.08f);
+                    targetHipsRot = new Vector3(16f, 0f, 0f);
+                    targetSpineRot = new Vector3(68f, 0f, 0f);
+                    targetNeckRot = new Vector3(-6f, 0f, 0f);
+                    targetHeadRot = new Vector3(-8f, 0f, 0f);
+                    targetLShoulderRot = new Vector3(-82f, 4f, -6f);
+                    targetRShoulderRot = new Vector3(-82f, -4f, 6f);
+                    targetLElbowRot = new Vector3(-12f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-12f, 0f, 0f);
+                    targetLHipRot = new Vector3(-16f, 0f, -2f);
+                    targetRHipRot = new Vector3(-16f, 0f, 2f);
+                    targetLKneeRot = new Vector3(4f, 0f, 0f);
+                    targetRKneeRot = new Vector3(4f, 0f, 0f);
+                    targetLAnkleRot = Vector3.zero;
+                    targetRAnkleRot = Vector3.zero;
+                }
+                else if (_prayerStage == 3)
+                {
+                    // Secde: prostration with knees, hands, and forehead lowered gently onto the emerald carpet
+                    targetHipsPos = new Vector3(0f, 0.42f, -0.08f);
+                    targetHipsRot = new Vector3(58f, 0f, 0f);
+                    targetSpineRot = new Vector3(44f, 0f, 0f);
+                    targetNeckRot = new Vector3(-14f, 0f, 0f);
+                    targetHeadRot = new Vector3(-10f, 0f, 0f);
+                    targetLShoulderRot = new Vector3(-118f, 8f, -18f);
+                    targetRShoulderRot = new Vector3(-118f, -8f, 18f);
+                    targetLElbowRot = new Vector3(-64f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-64f, 0f, 0f);
+                    targetLHipRot = new Vector3(-118f, 0f, -6f);
+                    targetRHipRot = new Vector3(-118f, 0f, 6f);
+                    targetLKneeRot = new Vector3(132f, 0f, 0f);
+                    targetRKneeRot = new Vector3(132f, 0f, 0f);
+                    targetLAnkleRot = new Vector3(-28f, 0f, 0f);
+                    targetRAnkleRot = new Vector3(-28f, 0f, 0f);
+                }
+                else
+                {
+                    // Oturuş / Tahiyyat & Selam: calm kneeling seat, hands on thighs, gentle right/left head turn for Selam
+                    targetHipsPos = new Vector3(0f, 0.36f, -0.04f);
+                    targetHipsRot = new Vector3(4f, 0f, 0f);
+                    targetSpineRot = new Vector3(2f + idleChestPitch * 0.35f, 0f, 0f);
+                    targetNeckRot = new Vector3(5f, _prayerSelamYaw * 0.35f, 0f);
+                    targetHeadRot = new Vector3(10f, _prayerSelamYaw * 0.65f, 0f);
+                    targetLShoulderRot = new Vector3(-34f, 6f, -4f);
+                    targetRShoulderRot = new Vector3(-34f, -6f, 4f);
+                    targetLElbowRot = new Vector3(-26f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-26f, 0f, 0f);
+                    targetLHipRot = new Vector3(-62f, 0f, -6f);
+                    targetRHipRot = new Vector3(-62f, 0f, 6f);
+                    targetLKneeRot = new Vector3(136f, 0f, 0f);
+                    targetRKneeRot = new Vector3(136f, 0f, 0f);
+                    targetLAnkleRot = new Vector3(38f, 0f, 0f);
+                    targetRAnkleRot = new Vector3(38f, 0f, 0f);
+                }
+            }
+            // --- Swimming override (front-crawl freestyle when moving, treading water when idle) ---
+            else if (_isSwimming)
+            {
+                float swimBlend = Mathf.Clamp01(_swimSpeed / 1.8f);
+                _swimPhase += dt * Mathf.Lerp(2.8f, 6.4f, swimBlend);
+                float strokeL = Mathf.Sin(_swimPhase);
+                float strokeR = Mathf.Sin(_swimPhase + Mathf.PI);
+
+                targetHipsPos = new Vector3(0f, Mathf.Lerp(0.56f, 0.72f, swimBlend) + Mathf.Sin(_swimPhase * 0.5f) * 0.04f, 0f);
+                targetHipsRot = new Vector3(Mathf.Lerp(18f, 74f, swimBlend), 0f, strokeL * 14f * swimBlend);
+                targetSpineRot = new Vector3(Mathf.Lerp(-8f, -18f, swimBlend), -strokeL * 18f * swimBlend, 0f);
+                targetNeckRot = new Vector3(Mathf.Lerp(-8f, -38f, swimBlend), 0f, 0f);
+                targetHeadRot = new Vector3(Mathf.Lerp(-6f, -20f, swimBlend), 0f, 0f);
+
+                targetLShoulderRot = new Vector3(Mathf.Lerp(-55f, -155f + strokeL * 78f, swimBlend), 0f, Mathf.Lerp(-36f + strokeL * 24f, -22f, swimBlend));
+                targetRShoulderRot = new Vector3(Mathf.Lerp(-55f, -155f + strokeR * 78f, swimBlend), 0f, Mathf.Lerp(36f - strokeR * 24f, 22f, swimBlend));
+                targetLElbowRot = new Vector3(Mathf.Lerp(-48f, -28f - Mathf.Max(0f, strokeL) * 45f, swimBlend), 0f, 0f);
+                targetRElbowRot = new Vector3(Mathf.Lerp(-48f, -28f - Mathf.Max(0f, strokeR) * 45f, swimBlend), 0f, 0f);
+
+                float kickL = Mathf.Sin(_swimPhase * 2.2f);
+                float kickR = Mathf.Sin(_swimPhase * 2.2f + Mathf.PI);
+                targetLHipRot = new Vector3(Mathf.Lerp(-16f, 10f + kickL * 22f, swimBlend), 0f, -5f);
+                targetRHipRot = new Vector3(Mathf.Lerp(-16f, 10f + kickR * 22f, swimBlend), 0f, 5f);
+                targetLKneeRot = new Vector3(Mathf.Lerp(36f, 18f + Mathf.Max(0f, -kickL) * 26f, swimBlend), 0f, 0f);
+                targetRKneeRot = new Vector3(Mathf.Lerp(36f, 18f + Mathf.Max(0f, -kickR) * 26f, swimBlend), 0f, 0f);
+                targetLAnkleRot = new Vector3(28f, 0f, 0f);
+                targetRAnkleRot = new Vector3(28f, 0f, 0f);
+            }
+            // --- Parkour Vault hurdle animation (0.42 s) ---
+            else if (_vaultTimer >= 0f)
+            {
+                float vNorm = Mathf.Clamp01(_vaultTimer / VaultDuration);
+                float vEnv = Mathf.Sin(vNorm * Mathf.PI);
+                targetHipsPos.y = hipsBaseY + 0.16f * vEnv;
+                targetSpineRot = new Vector3(32f * vEnv, -12f * vEnv, 14f * vEnv);
+                targetLShoulderRot = new Vector3(-86f * vEnv, 12f * vEnv, -16f * vEnv);
+                targetRShoulderRot = new Vector3(-72f * vEnv, -12f * vEnv, 24f * vEnv);
+                targetLElbowRot = new Vector3(-24f * vEnv, 0f, 0f);
+                targetRElbowRot = new Vector3(-34f * vEnv, 0f, 0f);
+                targetLHipRot = new Vector3(-84f * vEnv, 0f, -14f * vEnv);
+                targetRHipRot = new Vector3(-68f * vEnv, 0f, 18f * vEnv);
+                targetLKneeRot = new Vector3(105f * vEnv, 0f, 0f);
+                targetRKneeRot = new Vector3(95f * vEnv, 0f, 0f);
+            }
+            // --- Full NPC Knockdown onto back & smooth recovery stand-up ---
+            else if (_knockdownTimer >= 0f)
+            {
+                float kNorm = Mathf.Clamp01(_knockdownTimer / Mathf.Max(1.0f, _activeKnockdownDuration));
+                float downFactor = kNorm < 0.16f
+                    ? Mathf.SmoothStep(0f, 1f, kNorm / 0.16f)
+                    : (kNorm < 0.72f ? 1f : Mathf.SmoothStep(1f, 0f, (kNorm - 0.72f) / 0.28f));
+
+                targetHipsPos = Vector3.Lerp(targetHipsPos, new Vector3(0f, 0.20f, -0.18f), downFactor);
+                targetHipsRot = Vector3.Lerp(targetHipsRot, new Vector3(-86f, 8f, 6f), downFactor);
+                targetSpineRot = Vector3.Lerp(targetSpineRot, new Vector3(10f, 0f, 0f), downFactor);
+                targetHeadRot = Vector3.Lerp(targetHeadRot, new Vector3(18f, -14f, 0f), downFactor);
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-25f, 0f, -62f), downFactor);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-18f, 0f, 58f), downFactor);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-28f, 0f, 0f), downFactor);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-34f, 0f, 0f), downFactor);
+                targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(6f, 0f, -14f), downFactor);
+                targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-12f, 0f, 16f), downFactor);
+                targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(18f, 0f, 0f), downFactor);
+                targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(32f, 0f, 0f), downFactor);
+            }
             // --- Hit recoil stagger animation (when punched) ---
-            if (_hitReactTimer >= 0f)
+            else if (_hitReactTimer >= 0f)
             {
                 float hNorm = Mathf.Clamp01(_hitReactTimer / HitReactDuration);
                 float hEnv = Mathf.Sin(hNorm * Mathf.PI);
-                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -26f, hEnv);
-                targetSpineRot.y = Mathf.Lerp(targetSpineRot.y, 18f, hEnv);
-                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -24f, hEnv);
-                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-75f, 0f, -38f), hEnv);
-                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-68f, 0f, 36f), hEnv);
-                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-48f, 0f, 0f), hEnv);
-                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-52f, 0f, 0f), hEnv);
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -28f, hEnv);
+                targetSpineRot.y = Mathf.Lerp(targetSpineRot.y, 22f, hEnv);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -26f, hEnv);
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-78f, 0f, -40f), hEnv);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-70f, 0f, 38f), hEnv);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-52f, 0f, 0f), hEnv);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-56f, 0f, 0f), hEnv);
             }
-            // --- Right-hand melee punch / shove overlay (0.36 s) ---
+            // --- 3-Hit Weighted Street Combat Combo: 0 = Left Jab, 1 = Heavy Right Hook, 2 = Front Push Kick ---
             else if (_punchTimer >= 0f)
             {
-                float pNorm = Mathf.Clamp01(_punchTimer / PunchDuration);
-                // Crisp windup (0..0.28), snap punch (0.28..0.60), recover (0.60..1.0)
-                float thrust = pNorm < 0.28f
-                    ? -(pNorm / 0.28f) * 0.4f
-                    : (pNorm < 0.62f
-                        ? Mathf.Lerp(-0.4f, 1.0f, (pNorm - 0.28f) / 0.34f)
-                        : Mathf.Lerp(1.0f, 0f, (pNorm - 0.62f) / 0.38f));
+                float dur = _combatMoveIndex == 2 ? KickDuration : PunchDuration;
+                float pNorm = Mathf.Clamp01(_punchTimer / dur);
+                float thrust = pNorm < 0.25f
+                    ? -(pNorm / 0.25f) * 0.45f
+                    : (pNorm < 0.58f
+                        ? Mathf.Lerp(-0.45f, 1.0f, (pNorm - 0.25f) / 0.33f)
+                        : Mathf.Lerp(1.0f, 0f, (pNorm - 0.58f) / 0.42f));
+                float tPos = Mathf.Clamp01(thrust);
                 float guardEnv = Mathf.Sin(pNorm * Mathf.PI);
 
-                targetSpineRot.y += -28f * thrust;
-                targetSpineRot.x += 12f * Mathf.Max(0f, thrust);
-                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-92f, -14f, 8f), Mathf.Clamp01(thrust));
-                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-12f, 0f, 0f), Mathf.Clamp01(thrust));
-                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-45f, 18f, -16f), guardEnv);
-                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-88f, 0f, 0f), guardEnv);
+                if (_combatMoveIndex == 0)
+                {
+                    // Hit 1: Snappy Left Jab
+                    targetSpineRot.y += 24f * thrust;
+                    targetSpineRot.x += 10f * tPos;
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-90f, 10f, -6f), tPos);
+                    targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-8f, 0f, 0f), tPos);
+                    targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-52f, -18f, 16f), guardEnv);
+                    targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-92f, 0f, 0f), guardEnv);
+                }
+                else if (_combatMoveIndex == 1)
+                {
+                    // Hit 2: Heavy Right Hook / Cross with big torso torque
+                    targetSpineRot.y += -38f * thrust;
+                    targetSpineRot.x += 15f * tPos;
+                    targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-86f, -34f, 22f), tPos);
+                    targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-36f, 0f, 0f), tPos);
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-54f, 20f, -18f), guardEnv);
+                    targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-96f, 0f, 0f), guardEnv);
+                }
+                else
+                {
+                    // Hit 3: Powerful Front Push Kick!
+                    targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -22f, tPos);
+                    targetSpineRot.y += -16f * tPos;
+                    targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-98f, 0f, 6f), tPos);
+                    targetRKneeRot = Vector3.Lerp(targetRKneeRot, pNorm < 0.34f ? new Vector3(88f, 0f, 0f) : new Vector3(8f, 0f, 0f), guardEnv);
+                    targetRAnkleRot = Vector3.Lerp(targetRAnkleRot, new Vector3(24f, 0f, 0f), tPos);
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-42f, 0f, -34f), guardEnv);
+                    targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(26f, 0f, 28f), guardEnv);
+                }
             }
             // --- Startled arms-up pose (pedestrian near fast vehicle) ---
             else if (_startledTimer >= 0f)
@@ -739,12 +1055,12 @@ namespace Gridroam.Player
                 chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * dt));
             }
 
-            float damp = _landSquatTimer >= 0f ? 28f : (_grounded ? 14f : 10f);
+            float damp = _prayerStage > 0 ? 6.5f : (_landSquatTimer >= 0f ? 28f : (_grounded ? 14f : 10f));
             hips.localPosition = Vector3.Lerp(hips.localPosition, targetHipsPos, 1f - Mathf.Exp(-damp * dt));
             SmoothRotate(hips, targetHipsRot, damp, dt);
             SmoothRotate(spine, targetSpineRot, damp, dt);
             SmoothRotate(neck, targetNeckRot, damp, dt);
-            SmoothRotate(head, targetHeadRot, 9f, dt);
+            SmoothRotate(head, targetHeadRot, _prayerStage > 0 ? 6.0f : 9f, dt);
 
             SmoothRotate(lHip, targetLHipRot, damp, dt);
             SmoothRotate(rHip, targetRHipRot, damp, dt);
@@ -792,23 +1108,24 @@ namespace Gridroam.Player
                 float headNoise = (Mathf.PerlinNoise(_noiseSeed, _idleTime * 0.16f) - 0.5f) * 2f;
                 float headLookYaw = headNoise * 11f;
 
-                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.08f, -0.02f), 1f - Mathf.Exp(-12f * dt));
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.08f, 0.02f), 1f - Mathf.Exp(-12f * dt));
                 SmoothRotate(hips, Vector3.zero, 12f, dt);
-                SmoothRotate(spine, new Vector3(-4f + breath, 0f, 0f), 10f, dt);
-                SmoothRotate(neck, new Vector3(3f, 0f, 0f), 10f, dt);
+                SmoothRotate(spine, new Vector3(-7f + breath, 0f, 0f), 10f, dt);
+                SmoothRotate(neck, new Vector3(5f, 0f, 0f), 10f, dt);
                 SmoothRotate(head, new Vector3(0f, headLookYaw, 0f), 6f, dt);
 
-                SmoothRotate(lHip, new Vector3(-90f, 0f, -5f), 12f, dt);
-                SmoothRotate(rHip, new Vector3(-90f, 0f, 5f), 12f, dt);
-                SmoothRotate(lKnee, new Vector3(90f, 0f, 0f), 12f, dt);
-                SmoothRotate(rKnee, new Vector3(90f, 0f, 0f), 12f, dt);
+                SmoothRotate(lHip, new Vector3(-88f, 0f, -5f), 12f, dt);
+                SmoothRotate(rHip, new Vector3(-88f, 0f, 5f), 12f, dt);
+                SmoothRotate(lKnee, new Vector3(88f, 0f, 0f), 12f, dt);
+                SmoothRotate(rKnee, new Vector3(88f, 0f, 0f), 12f, dt);
                 SmoothRotate(lAnkle, Vector3.zero, 12f, dt);
                 SmoothRotate(rAnkle, Vector3.zero, 12f, dt);
 
-                SmoothRotate(lShoulder, new Vector3(-22f, 8f, 10f), 12f, dt);
-                SmoothRotate(rShoulder, new Vector3(-22f, -8f, -10f), 12f, dt);
-                SmoothRotate(lElbow, new Vector3(-58f, 0f, -12f), 12f, dt);
-                SmoothRotate(rElbow, new Vector3(-58f, 0f, 12f), 12f, dt);
+                // Hands resting comfortably downward on lap/thighs (never floating out in front!)
+                SmoothRotate(lShoulder, new Vector3(8f, 0f, -10f), 12f, dt);
+                SmoothRotate(rShoulder, new Vector3(8f, 0f, 10f), 12f, dt);
+                SmoothRotate(lElbow, new Vector3(-44f, 0f, 10f), 12f, dt);
+                SmoothRotate(rElbow, new Vector3(-44f, 0f, -10f), 12f, dt);
             }
         }
 

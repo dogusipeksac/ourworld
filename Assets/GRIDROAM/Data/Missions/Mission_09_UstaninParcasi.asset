@@ -1,0 +1,104 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_09_UstaninParcasi
+  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  missionId: m09_ustanin_parcasi
+  titleKey: m09.title
+  summaryKey: m09.summary
+  rewardMoney: 450
+  nextMissionId: m10_mahalle_senligi
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 1
+  steps:
+  - stepType: 1
+    objectiveKey: m09.step1.objective
+    targetAnchorId: npc_mechanic
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: d058cf022f8164b38a6ed17f3a580899, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 0
+    objectiveKey: m09.step2.objective
+    targetAnchorId: m09_fuel_zone
+    triggerRadius: 10
+    dialogueAsset: {fileID: 0}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 1
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 5
+    objectiveKey: m09.step3.objective
+    targetAnchorId: m09_spare_part
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 8b26174e3c9e7407d9221c79133a74f0, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 4
+    objectiveKey: m09.step4.objective
+    targetAnchorId: m09_garage_zone
+    triggerRadius: 8
+    dialogueAsset: {fileID: 0}
+    timeLimitSeconds: 110
+    unlocksVehicleKeys: 0
+    requiresVehicle: 1
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 1
+    objectiveKey: m09.step5.objective
+    targetAnchorId: npc_mechanic
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 8d9c185d9752d4981b782aca2e4a6665, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 

@@ -23,7 +23,7 @@ namespace Gridroam.Core
         public int schemaVersion = 3;
         public List<string> completedMissionIds = new List<string>();
         public string nextMissionId = "m01_get_the_keys";
-        public bool hasVehicleKeys;
+        public bool hasVehicleKeys = true;
         public string lastEndingChoice = string.Empty;
         public string languageCode = "tr";
         public int graphicsTierIndex = 1; // 0 = Low, 1 = Medium
@@ -44,7 +44,9 @@ namespace Gridroam.Core
         public int taxiFaresDone;
         public int housesPaintedCount;
         public int litterCollectedCount;
+        public int footballGoalsScored;
         public float totalPlayTimeSeconds;
+        public float lastAtmClaimPlayTimeSeconds = -999f;
 
         // E6: Permanent shop upgrades & wardrobe
         public bool hasRunningShoes;

@@ -15,7 +15,7 @@ MonoBehaviour:
   missionId: m01_get_the_keys
   titleKey: m01.title
   summaryKey: m01.summary
-  rewardMoney: 100
+  rewardMoney: 150
   nextMissionId: m02_last_delivery
   autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot

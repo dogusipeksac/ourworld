@@ -68,9 +68,10 @@ def get_common_materials():
         "Bark": make_mat("Bark", (0.34, 0.23, 0.15), roughness=0.88, metallic=0.0),
         "FoliageA": make_mat("FoliageA", (0.28, 0.48, 0.22), roughness=0.78, metallic=0.0),
         "FoliageB": make_mat("FoliageB", (0.38, 0.56, 0.25), roughness=0.76, metallic=0.0),
-        "StoneTrim": make_mat("StoneTrim", (0.78, 0.75, 0.70), roughness=0.72, metallic=0.0),
+        "StoneTrim": make_mat("StoneTrim", (0.82, 0.79, 0.73), roughness=0.68, metallic=0.0),
         "Concrete": make_mat("Concrete", (0.64, 0.64, 0.62), roughness=0.82, metallic=0.0),
-        "Water": make_mat("Water", (0.08, 0.28, 0.42), roughness=0.08, metallic=0.10),
+        "Wood": make_mat("Wood", (0.46, 0.28, 0.14), roughness=0.52, metallic=0.0),
+        "Water": make_mat("Water", (0.12, 0.54, 0.72), roughness=0.08, metallic=0.10),
         "AccentTeal": make_mat("AccentTeal", (0.14, 0.45, 0.48), roughness=0.35, metallic=0.18),
         "AccentMustard": make_mat("AccentMustard", (0.82, 0.62, 0.16), roughness=0.38, metallic=0.10),
         "AccentBlue": make_mat("AccentBlue", (0.16, 0.34, 0.58), roughness=0.36, metallic=0.22),
@@ -412,41 +413,65 @@ def build_car_wheel(mats):
 # ---------------------------------------------------------------------------
 # 2. Lofted Sculpted Vehicle Body Helper (with Wheel Arch Cutouts!)
 # ---------------------------------------------------------------------------
+def apply_subsurf(obj, levels=2, smooth_angle=62.0):
+    """Apply Catmull-Clark Subdivision Surface for smooth, modern organic/automotive curves."""
+    mod = obj.modifiers.new(name="Subsurf", type="SUBSURF")
+    mod.levels = levels
+    mod.render_levels = levels
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    box_uv_project(obj, scale=1.0)
+    apply_auto_smooth(obj, angle_deg=smooth_angle)
+    return obj
+
+
 def build_lofted_lower_hull(name, sections, mat, front_axle_y, rear_axle_y, arch_radius, arch_center_z):
     """
-    Build a smooth, realistic lower vehicle body lofted across Y stations.
-    sections: list of (y, half_width_bottom, half_width_mid, half_width_top, z_bottom, z_mid, z_top_side, z_top_crown)
-    Automatically arches the bottom sill upward over the front & rear wheel wells!
+    Build a smooth, sleek, Catmull-Clark subdivided lower vehicle body lofted across Y stations.
+    Automatically forms clean curved wheel arches with zero harsh jagged seams.
     """
+    # Insert dense intermediate stations near wheel arches so arch curves stay ultra-clean under Subsurf
+    dense_sections = []
+    for i in range(len(sections) - 1):
+        s0, s1 = sections[i], sections[i + 1]
+        dense_sections.append(s0)
+        mid = tuple((a + b) * 0.5 for a, b in zip(s0, s1))
+        dense_sections.append(mid)
+    dense_sections.append(sections[-1])
+
     bm = bmesh.new()
     rings = []
 
-    for (y, hw_b, hw_m, hw_t, z_b, z_m, z_ts, z_tc) in sections:
-        # Check if this Y station falls inside front or rear wheel arch
+    for (y, hw_b, hw_m, hw_t, z_b, z_m, z_ts, z_tc) in dense_sections:
         arch_lift = 0.0
         for ay in (front_axle_y, rear_axle_y):
             dy = abs(y - ay)
-            if dy < arch_radius:
-                arch_z = arch_center_z + math.sqrt(max(0.0, arch_radius * arch_radius - dy * dy))
+            if dy < arch_radius * 0.96:
+                arch_z = arch_center_z + math.sqrt(max(0.0, (arch_radius * 0.96) ** 2 - dy * dy))
                 arch_lift = max(arch_lift, max(0.0, arch_z - z_b))
 
         z_sill = z_b + arch_lift
-        z_mid_adj = max(z_m, z_sill + 0.05)
-
-        # 10-point symmetric closed cross-section (clockwise when looking from +Y)
+        z_mid_adj = max(z_m, z_sill + 0.06)
+        # Smooth contoured cross-section with soft shoulder tumblehome
         pts = [
             Vector((0.0, y, z_b)),
-            Vector((hw_b * 0.72, y, z_b + 0.02)),
-            Vector((hw_b, y, z_sill + 0.03)),
+            Vector((hw_b * 0.74, y, z_b + 0.015)),
+            Vector((hw_b, y, z_sill + 0.025)),
+            Vector((hw_m * 1.01, y, (z_sill + z_mid_adj) * 0.52)),
             Vector((hw_m, y, z_mid_adj)),
+            Vector((hw_t * 1.01, y, (z_mid_adj + z_ts) * 0.55)),
             Vector((hw_t, y, z_ts)),
-            Vector((hw_t * 0.52, y, (z_ts + z_tc) * 0.5 + 0.012)),
+            Vector((hw_t * 0.55, y, (z_ts + z_tc) * 0.5 + 0.016)),
             Vector((0.0, y, z_tc)),
-            Vector((-hw_t * 0.52, y, (z_ts + z_tc) * 0.5 + 0.012)),
+            Vector((-hw_t * 0.55, y, (z_ts + z_tc) * 0.5 + 0.016)),
             Vector((-hw_t, y, z_ts)),
+            Vector((-hw_t * 1.01, y, (z_mid_adj + z_ts) * 0.55)),
             Vector((-hw_m, y, z_mid_adj)),
-            Vector((-hw_b, y, z_sill + 0.03)),
-            Vector((-hw_b * 0.72, y, z_b + 0.02)),
+            Vector((-hw_m * 1.01, y, (z_sill + z_mid_adj) * 0.52)),
+            Vector((-hw_b, y, z_sill + 0.025)),
+            Vector((-hw_b * 0.74, y, z_b + 0.015)),
         ]
         rings.append([bm.verts.new(p) for p in pts])
 
@@ -457,11 +482,16 @@ def build_lofted_lower_hull(name, sections, mat, front_axle_y, rear_axle_y, arch
             kn = (k + 1) % n_ring
             bm.faces.new((r0[k], r0[kn], r1[kn], r1[k]))
 
-    # Cap rear and front
-    bm.faces.new(rings[0])
-    bm.faces.new(list(reversed(rings[-1])))
+    # Clean quad-friendly fan caps at front & rear noses
+    rear_c = bm.verts.new(Vector((0.0, dense_sections[0][0] - 0.025, (dense_sections[0][4] + dense_sections[0][6]) * 0.5)))
+    front_c = bm.verts.new(Vector((0.0, dense_sections[-1][0] + 0.025, (dense_sections[-1][4] + dense_sections[-1][6]) * 0.5)))
+    for k in range(n_ring):
+        kn = (k + 1) % n_ring
+        bm.faces.new((rear_c, rings[0][kn], rings[0][k]))
+        bm.faces.new((front_c, rings[-1][k], rings[-1][kn]))
 
-    return create_mesh_object(name, bm, mat=mat, smooth_angle=38.0)
+    obj = create_mesh_object(name, bm, mat=mat, smooth_angle=62.0)
+    return apply_subsurf(obj, levels=1, smooth_angle=64.0)
 
 
 def build_wheel_arch_flares_and_wells(parts, half_wid, front_y, rear_y, arch_r, arch_z, mats):
@@ -562,7 +592,7 @@ def build_cabin_greenhouse(parts, y_back_base, y_back_roof, y_front_roof, y_fron
         bm_r.faces.new((r0[-1], r0[0], r1[0], r1[-1]))
     bm_r.faces.new(roof_rings[0])
     bm_r.faces.new(list(reversed(roof_rings[-1])))
-    parts.append(create_mesh_object("Cabin_RoofPanel", bm_r, mat=mats["BodyPaint"], smooth_angle=45.0))
+    parts.append(create_mesh_object("Cabin_RoofPanel", bm_r, mat=mats["BodyPaint"], smooth_angle=55.0))
 
     # 3. Sculpted A-pillars, B-pillars, C-pillars & window sill trim
     for sx in (-1.0, 1.0):
@@ -807,6 +837,157 @@ def build_car_pickup(mats):
     return finalize_car_with_light_children(parts, head_parts, tail_parts, rev_parts, "Car_Pickup")
 
 
+def build_car_sports_coupe(mats):
+    """Low, wide, sleek 2-door aerodynamic sports coupe with GT wing, hood vents & wide haunches."""
+    parts = []
+    # Length 4.36m (y = -2.18..+2.18), Width 1.96m (hw = 0.98), frontAxle = +1.34, rearAxle = -1.30
+    front_y, rear_y = 1.34, -1.30
+    arch_r, arch_z = 0.41, 0.38
+    sections = [
+        (-2.16, 0.78, 0.92, 0.86, 0.28, 0.56, 0.86, 0.89),
+        (-1.92, 0.88, 0.97, 0.91, 0.23, 0.58, 0.90, 0.93),
+        (-1.55, 0.92, 0.99, 0.93, 0.21, 0.60, 0.92, 0.95),
+        (-1.30, 0.93, 0.99, 0.93, 0.21, 0.60, 0.92, 0.95),
+        (-0.90, 0.91, 0.96, 0.90, 0.21, 0.58, 0.89, 0.92),
+        (0.00,  0.90, 0.95, 0.89, 0.20, 0.56, 0.87, 0.90),
+        (0.85,  0.91, 0.96, 0.90, 0.20, 0.55, 0.84, 0.88),
+        (1.34,  0.91, 0.96, 0.88, 0.21, 0.54, 0.80, 0.84),
+        (1.75,  0.86, 0.92, 0.82, 0.22, 0.51, 0.73, 0.78),
+        (2.04,  0.76, 0.84, 0.72, 0.24, 0.47, 0.65, 0.69),
+        (2.16,  0.66, 0.74, 0.62, 0.27, 0.44, 0.58, 0.62),
+    ]
+    parts.append(build_lofted_lower_hull("Sports_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    build_wheel_arch_flares_and_wells(parts, 0.97, front_y, rear_y, arch_r, arch_z, mats)
+
+    # Low sleek teardrop fastback cabin
+    build_cabin_greenhouse(
+        parts,
+        y_back_base=-1.52, y_back_roof=-0.76,
+        y_front_roof=0.22, y_front_base=0.92,
+        z_belt=0.88, z_roof=1.24,
+        hw_belt=0.84, hw_roof=0.64,
+        mats=mats,
+    )
+
+    # Aggressive GT Rear Wing on twin uprights + sculpted hood vents + side intakes
+    parts.append(add_beveled_box("GT_WingBlade", (0.0, -2.02, 1.14), (1.72, 0.24, 0.045), mats["TrimDark"], bevel=0.015, segments=1, rot_euler=(-0.10, 0.0, 0.0)))
+    for sx in (-1.0, 1.0):
+        parts.append(add_beveled_box(f"GT_WingStrut_{sx}", (sx * 0.52, -2.00, 1.02), (0.045, 0.16, 0.22), mats["TrimDark"], bevel=0.008, segments=1))
+        parts.append(add_beveled_box(f"GT_WingEndplate_{sx}", (sx * 0.86, -2.02, 1.13), (0.03, 0.28, 0.15), mats["BodyPaint"], bevel=0.008, segments=1))
+        parts.append(add_beveled_box(f"Sports_SideIntake_{sx}", (sx * 0.95, -0.78, 0.60), (0.06, 0.36, 0.22), mats["InteriorDark"], bevel=0.014, segments=1))
+        parts.append(add_beveled_box(f"Sports_HoodVent_{sx}", (sx * 0.34, 1.32, 0.83), (0.24, 0.34, 0.025), mats["TrimDark"], bevel=0.006, segments=1, rot_euler=(-0.14, 0.0, 0.0)))
+
+    head_parts, tail_parts, rev_parts = [], [], []
+    add_car_trim_details(
+        parts, head_parts, tail_parts, rev_parts, half_wid=0.97, half_len=2.18, front_y=front_y, rear_y=rear_y,
+        z_bumper=0.32, z_light=0.62, mirror_y=0.52, mirror_z=0.90,
+        door_handle_ys=(-0.18,), mats=mats, is_pickup=False,
+    )
+    return finalize_car_with_light_children(parts, head_parts, tail_parts, rev_parts, "Car_SportsCoupe")
+
+
+def build_car_suv(mats):
+    """Tall, rugged 4x4 SUV with roof luggage rack, rear spare wheel & high off-road stance."""
+    parts = []
+    # Length 4.62m (y = -2.31..+2.31), Width 1.98m (hw = 0.99), frontAxle = +1.42, rearAxle = -1.38
+    front_y, rear_y = 1.42, -1.38
+    arch_r, arch_z = 0.47, 0.45
+    sections = [
+        (-2.28, 0.86, 0.96, 0.92, 0.38, 0.74, 1.12, 1.14),
+        (-2.05, 0.92, 0.99, 0.95, 0.34, 0.76, 1.14, 1.16),
+        (-1.38, 0.94, 0.99, 0.95, 0.33, 0.76, 1.14, 1.16),
+        (0.00,  0.94, 0.99, 0.95, 0.33, 0.76, 1.14, 1.16),
+        (1.00,  0.94, 0.99, 0.95, 0.33, 0.76, 1.12, 1.16),
+        (1.42,  0.94, 0.99, 0.94, 0.33, 0.76, 1.10, 1.15),
+        (1.92,  0.91, 0.96, 0.90, 0.35, 0.75, 1.07, 1.12),
+        (2.22,  0.84, 0.91, 0.84, 0.39, 0.73, 1.02, 1.06),
+        (2.30,  0.76, 0.84, 0.78, 0.43, 0.72, 0.98, 1.02),
+    ]
+    parts.append(build_lofted_lower_hull("SUV_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    build_wheel_arch_flares_and_wells(parts, 0.98, front_y, rear_y, arch_r, arch_z, mats)
+
+    # Tall spacious full-length SUV greenhouse
+    build_cabin_greenhouse(
+        parts,
+        y_back_base=-2.18, y_back_roof=-2.02,
+        y_front_roof=0.68, y_front_base=1.18,
+        z_belt=1.13, z_roof=1.80,
+        hw_belt=0.92, hw_roof=0.80,
+        mats=mats,
+    )
+
+    # Roof rack rails + crossbars + rear-door mounted spare tire!
+    for sx in (-1.0, 1.0):
+        parts.append(add_tube_along_points(
+            f"SUV_RoofRail_{sx}",
+            [(sx * 0.72, -1.90, 1.83), (sx * 0.72, -1.85, 1.91), (sx * 0.72, 0.56, 1.91), (sx * 0.72, 0.62, 1.83)],
+            0.028, 6, mats["TrimDark"],
+        ))
+        parts.append(add_beveled_box(f"SUV_SideStep_{sx}", (sx * 0.98, 0.02, 0.36), (0.16, 2.04, 0.055), mats["Chrome"], bevel=0.012, segments=1))
+    for cy in (-1.55, -0.60, 0.30):
+        parts.append(add_beveled_box(f"SUV_CrossBar_{cy}", (0.0, cy, 1.91), (1.44, 0.06, 0.032), mats["TrimDark"], bevel=0.008, segments=1))
+
+    # Rear tailgate mounted spare tire + hub cover
+    parts.append(add_cylinder_part("SUV_SpareTire", (0.0, -2.42, 1.06), 0.36, 0.36, 0.24, 18, mats["WheelRubber"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+    parts.append(add_cylinder_part("SUV_SpareCover", (0.0, -2.53, 1.06), 0.24, 0.24, 0.05, 16, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+
+    head_parts, tail_parts, rev_parts = [], [], []
+    add_car_trim_details(
+        parts, head_parts, tail_parts, rev_parts, half_wid=0.98, half_len=2.31, front_y=front_y, rear_y=rear_y,
+        z_bumper=0.47, z_light=0.88, mirror_y=0.86, mirror_z=1.18,
+        door_handle_ys=(-0.72, 0.24), mats=mats, is_pickup=True,
+    )
+    return finalize_car_with_light_children(parts, head_parts, tail_parts, rev_parts, "Car_SUV")
+
+
+def build_car_delivery_van(mats):
+    """Tall European commercial cargo/delivery panel van with high roof & twin rear doors."""
+    parts = []
+    # Length 5.04m (y = -2.52..+2.52), Width 1.98m (hw = 0.99), frontAxle = +1.58, rearAxle = -1.56
+    front_y, rear_y = 1.58, -1.56
+    arch_r, arch_z = 0.44, 0.42
+    sections = [
+        (-2.50, 0.92, 0.99, 0.96, 0.34, 0.74, 1.14, 1.16),
+        (-1.56, 0.94, 0.99, 0.96, 0.32, 0.74, 1.14, 1.16),
+        (0.40,  0.94, 0.99, 0.96, 0.32, 0.74, 1.14, 1.16),
+        (1.25,  0.94, 0.99, 0.95, 0.32, 0.74, 1.12, 1.15),
+        (1.58,  0.94, 0.99, 0.94, 0.32, 0.73, 1.09, 1.13),
+        (2.05,  0.90, 0.95, 0.89, 0.34, 0.71, 1.04, 1.08),
+        (2.38,  0.83, 0.89, 0.82, 0.38, 0.68, 0.96, 1.00),
+        (2.50,  0.74, 0.82, 0.74, 0.42, 0.66, 0.88, 0.92),
+    ]
+    parts.append(build_lofted_lower_hull("Van_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    build_wheel_arch_flares_and_wells(parts, 0.98, front_y, rear_y, arch_r, arch_z, mats)
+
+    # Tall solid commercial cargo box behind front cab (y = -2.48..+0.55, z = 1.10..2.18)
+    parts.append(add_beveled_box("Van_CargoBox", (0.0, -0.96, 1.64), (1.92, 3.04, 1.08), mats["BodyPaint"], bevel=0.09, segments=2))
+    # Subtle side panel body trim strips & sliding door rail
+    for sx in (-1.0, 1.0):
+        parts.append(add_beveled_box(f"Van_SideRubStrip_{sx}", (sx * 0.985, -0.45, 0.74), (0.04, 2.35, 0.14), mats["TrimDark"], bevel=0.01, segments=1))
+        parts.append(add_beveled_box(f"Van_SlideRail_{sx}", (sx * 0.965, -1.05, 1.24), (0.03, 1.95, 0.04), mats["TrimDark"], bevel=0.006, segments=1))
+    # Rear twin cargo door seam + grab handles
+    parts.append(add_beveled_box("Van_RearDoorSeam", (0.0, -2.49, 1.44), (0.03, 0.03, 1.38), mats["TrimDark"], bevel=0.005, segments=1))
+    parts.append(add_beveled_box("Van_RearHandle", (0.14, -2.50, 1.12), (0.04, 0.04, 0.16), mats["TrimDark"], bevel=0.008, segments=1))
+
+    # Front Van Cab Greenhouse (windshield & front doors, blending cleanly into tall cargo roof)
+    build_cabin_greenhouse(
+        parts,
+        y_back_base=0.45, y_back_roof=0.52,
+        y_front_roof=1.34, y_front_base=1.88,
+        z_belt=1.10, z_roof=2.10,
+        hw_belt=0.94, hw_roof=0.84,
+        mats=mats,
+    )
+
+    head_parts, tail_parts, rev_parts = [], [], []
+    add_car_trim_details(
+        parts, head_parts, tail_parts, rev_parts, half_wid=0.98, half_len=2.52, front_y=front_y, rear_y=rear_y,
+        z_bumper=0.42, z_light=0.78, mirror_y=1.42, mirror_z=1.16,
+        door_handle_ys=(0.82,), mats=mats, is_pickup=True,
+    )
+    return finalize_car_with_light_children(parts, head_parts, tail_parts, rev_parts, "Car_DeliveryVan")
+
+
 # ---------------------------------------------------------------------------
 # 4. Organic Plane Tree (Çınar Ağacı) — Flared Roots, Forking Limbs & Multi-Cluster Canopy
 # ---------------------------------------------------------------------------
@@ -896,69 +1077,202 @@ def build_plane_tree(mats):
 
 
 # ---------------------------------------------------------------------------
-# 5. Classical Carved Stone Town Square Fountain
+# 5. Classical Carved Travertine Stone Town Square Fountain (Smooth 32-Sided)
 # ---------------------------------------------------------------------------
 def build_town_fountain(mats):
     parts = []
-    # Stepped octagonal basin wall (outer radius 3.1m, height 0.72m)
+    # Smooth 32-sided carved Mediterranean stone basin with stepped plinth & rounded coping lip
     basin_profile = [
-        (3.26, 0.00),
-        (3.26, 0.14),
-        (3.14, 0.16),
-        (3.10, 0.62),
-        (3.22, 0.64),
-        (3.22, 0.74),
+        (3.32, 0.00),
+        (3.32, 0.14),
+        (3.20, 0.18),
+        (3.14, 0.22),
+        (3.10, 0.56),
+        (3.16, 0.62),
+        (3.26, 0.66),
+        (3.26, 0.74),
+        (3.18, 0.77),
+        (2.82, 0.77),
         (2.74, 0.74),
         (2.74, 0.64),
-        (2.82, 0.60),
-        (2.80, 0.16),
-        (0.00, 0.16),
+        (2.82, 0.58),
+        (2.78, 0.18),
+        (0.00, 0.18),
     ]
-    parts.append(add_revolved_profile("Fountain_OctagonalBasin", basin_profile, 8, mats["StoneTrim"], smooth_angle=25.0))
+    parts.append(add_revolved_profile("Fountain_CarvedBasin", basin_profile, 32, mats["StoneTrim"], smooth_angle=52.0))
 
-    # Basin water surface disc
-    parts.append(add_cylinder_part("Fountain_WaterPool", (0.0, 0.0, 0.56), 2.84, 2.84, 0.04, 16, mats["Water"], smooth_angle=45.0))
+    # 8 carved classical stone pilasters accenting the outer basin rim
+    for i in range(8):
+        ang = (2.0 * math.pi * i) / 8.0
+        ca, sa = math.cos(ang), math.sin(ang)
+        parts.append(add_beveled_box(
+            f"Fountain_Pilaster_{i}",
+            (ca * 3.16, sa * 3.16, 0.40),
+            (0.22, 0.34, 0.48),
+            mats["StoneTrim"],
+            bevel=0.03,
+            segments=2,
+            rot_euler=(0.0, 0.0, ang),
+        ))
 
-    # Carved central tiered pedestal + scalloped bowls + turned stone finial
+    # Shimmering basin water surface disc
+    parts.append(add_cylinder_part("Fountain_WaterPool", (0.0, 0.0, 0.58), 2.84, 2.84, 0.04, 32, mats["Water"], smooth_angle=55.0))
+
+    # Carved central tiered pedestal + scalloped bowls + turned stone finial (32 segments smooth!)
     center_profile = [
-        (0.88, 0.14),
-        (0.86, 0.30),
-        (0.70, 0.36),
-        (0.56, 0.44),
-        (0.50, 1.15),
-        (0.64, 1.24),
-        (0.76, 1.38),
+        (0.94, 0.16),
+        (0.92, 0.30),
+        (0.76, 0.38),
+        (0.60, 0.46),
+        (0.52, 0.56),
+        (0.48, 1.12),
+        (0.62, 1.24),
+        (0.78, 1.38),
         # Lower scallop bowl flare
-        (1.22, 1.56),
-        (1.32, 1.72),
-        (1.26, 1.78),
-        (1.12, 1.76),
-        (0.92, 1.62),
+        (1.24, 1.56),
+        (1.36, 1.72),
+        (1.30, 1.80),
+        (1.16, 1.78),
+        (0.94, 1.62),
         (0.42, 1.56),
         # Upper fluted column
         (0.36, 1.72),
         (0.32, 2.38),
-        (0.42, 2.48),
+        (0.44, 2.48),
         # Upper bowl
-        (0.76, 2.66),
-        (0.82, 2.78),
-        (0.76, 2.82),
-        (0.62, 2.76),
+        (0.78, 2.66),
+        (0.86, 2.78),
+        (0.80, 2.84),
+        (0.64, 2.76),
         (0.28, 2.68),
-        # Turned finial spire
+        # Turned bronze/stone finial spire
         (0.22, 2.86),
         (0.28, 3.04),
         (0.22, 3.22),
         (0.11, 3.38),
-        (0.02, 3.55),
+        (0.03, 3.56),
     ]
-    parts.append(add_revolved_profile("Fountain_CenterSculpture", center_profile, 20, mats["StoneTrim"], smooth_angle=46.0))
+    parts.append(add_revolved_profile("Fountain_CenterSculpture", center_profile, 32, mats["StoneTrim"], smooth_angle=58.0))
+
+    # 12 decorative vertical flutes around lower stone pedestal
+    for f_idx in range(12):
+        ang = (2.0 * math.pi * f_idx) / 12.0
+        ca, sa = math.cos(ang), math.sin(ang)
+        parts.append(add_cylinder_part(
+            f"Fountain_Flute_{f_idx}",
+            (ca * 0.48, sa * 0.48, 0.85),
+            0.055, 0.048, 0.62, 8, mats["StoneTrim"], smooth_angle=55.0,
+        ))
 
     # Water inside lower & upper bowls
-    parts.append(add_cylinder_part("Fountain_WaterLower", (0.0, 0.0, 1.70), 1.12, 1.12, 0.03, 18, mats["Water"], smooth_angle=45.0))
-    parts.append(add_cylinder_part("Fountain_WaterUpper", (0.0, 0.0, 2.74), 0.64, 0.64, 0.03, 16, mats["Water"], smooth_angle=45.0))
+    parts.append(add_cylinder_part("Fountain_WaterLower", (0.0, 0.0, 1.72), 1.16, 1.16, 0.03, 28, mats["Water"], smooth_angle=55.0))
+    parts.append(add_cylinder_part("Fountain_WaterUpper", (0.0, 0.0, 2.76), 0.66, 0.66, 0.03, 24, mats["Water"], smooth_angle=55.0))
 
     return join_objects(parts, "Town_Fountain")
+
+
+# ---------------------------------------------------------------------------
+# 5B. Ornate Cast-Iron & Varnished Teak Park Bench (Upright, Seat Y=0.45m!)
+# ---------------------------------------------------------------------------
+def build_town_park_bench(mats):
+    """
+    Detailed realistic park bench:
+    - Width: 1.88m (X = -0.94..+0.94), Depth: 0.66m (Y = -0.34..+0.32), Height: 0.88m
+    - Front faces +Y (Unity +Z), Seat top sits cleanly at Z = 0.45m (Unity Y = 0.45m)
+    """
+    parts = []
+
+    # 6 contoured beveled teak wood seat slats (front lip curves down slightly for comfort)
+    seat_slats = [
+        (0.24,  0.425, 0.34),
+        (0.16,  0.448, 0.08),
+        (0.07,  0.450, 0.00),
+        (-0.02, 0.445, -0.05),
+        (-0.11, 0.436, -0.08),
+        (-0.20, 0.425, -0.10),
+    ]
+    for i, (sy, sz, pitch) in enumerate(seat_slats):
+        parts.append(add_beveled_box(
+            f"Bench_SeatSlat_{i}",
+            (0.0, sy, sz),
+            (1.86, 0.072, 0.032),
+            mats["Wood"],
+            bevel=0.008,
+            segments=2,
+            rot_euler=(pitch, 0.0, 0.0),
+        ))
+
+    # 4 ergonomic curved teak wood backrest slats
+    back_slats = [
+        (-0.23, 0.56, -0.22),
+        (-0.26, 0.66, -0.22),
+        (-0.29, 0.76, -0.20),
+        (-0.32, 0.86, -0.18),
+    ]
+    for i, (by, bz, pitch) in enumerate(back_slats):
+        parts.append(add_beveled_box(
+            f"Bench_BackSlat_{i}",
+            (0.0, by, bz),
+            (1.86, 0.032, 0.082),
+            mats["Wood"],
+            bevel=0.008,
+            segments=2,
+            rot_euler=(pitch, 0.0, 0.0),
+        ))
+
+    # Cast-iron frames (left, right, and center structural under-support)
+    for idx, sx in enumerate((-0.78, 0.78)):
+        # Front curved leg rising into armrest loop
+        leg_front = [
+            (sx, 0.28, 0.00),
+            (sx, 0.26, 0.22),
+            (sx, 0.22, 0.42),
+            (sx, 0.22, 0.61),
+            (sx, 0.14, 0.64),
+            (sx, -0.10, 0.64),
+            (sx, -0.23, 0.62),
+        ]
+        parts.append(add_tube_along_points(f"Bench_FrontArm_{idx}", leg_front, 0.024, 8, mats["TrimDark"], smooth_angle=52.0))
+
+        # Rear leg sweeping up behind backrest slats
+        leg_back = [
+            (sx, -0.28, 0.00),
+            (sx, -0.24, 0.22),
+            (sx, -0.21, 0.42),
+            (sx, -0.24, 0.58),
+            (sx, -0.33, 0.87),
+        ]
+        parts.append(add_tube_along_points(f"Bench_BackLeg_{idx}", leg_back, 0.024, 8, mats["TrimDark"], smooth_angle=52.0))
+
+        # Contoured cast-iron seat cradle under slats + decorative lower stretcher bar
+        cradle = [
+            (sx, 0.25, 0.40),
+            (sx, 0.06, 0.425),
+            (sx, -0.19, 0.40),
+        ]
+        parts.append(add_tube_along_points(f"Bench_Cradle_{idx}", cradle, 0.020, 8, mats["TrimDark"], smooth_angle=52.0))
+        parts.append(add_tube_along_points(
+            f"Bench_SideBrace_{idx}",
+            [(sx, 0.25, 0.18), (sx, 0.00, 0.24), (sx, -0.24, 0.18)],
+            0.018, 6, mats["TrimDark"], smooth_angle=50.0,
+        ))
+        # Cast-iron floor foot pads
+        parts.append(add_beveled_box(f"Bench_FootF_{idx}", (sx, 0.28, 0.015), (0.06, 0.09, 0.03), mats["TrimDark"], bevel=0.006, segments=1))
+        parts.append(add_beveled_box(f"Bench_FootB_{idx}", (sx, -0.28, 0.015), (0.06, 0.09, 0.03), mats["TrimDark"], bevel=0.006, segments=1))
+
+        # Subtle chrome carriage bolt heads along slats
+        for by, bz, _ in back_slats:
+            parts.append(add_cylinder_part(f"Bolt_{idx}_{bz:.2f}", (sx, by + 0.018, bz), 0.010, 0.010, 0.012, 8, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+
+    # Center iron reinforcement strap + longitudinal tie bar under seat
+    parts.append(add_tube_along_points(
+        "Bench_CenterStrap",
+        [(0.0, 0.22, 0.40), (0.0, -0.19, 0.40), (0.0, -0.32, 0.85)],
+        0.015, 6, mats["TrimDark"], smooth_angle=48.0,
+    ))
+    parts.append(add_cylinder_part("Bench_UnderTieBar", (0.0, -0.02, 0.24), 0.016, 0.016, 1.56, 8, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+
+    return join_objects(parts, "Town_ParkBench")
 
 
 # ---------------------------------------------------------------------------
@@ -1304,15 +1618,22 @@ def render_showcase(preview_entries):
                 w.location = car_obj.location + rot @ Vector((wx, wy, wheel_r))
                 w.rotation_euler = car_obj.rotation_euler
 
-    place_car_with_wheels(build_car_sedan(mats), (-4.4, -2.5), 148.0, 0.84, 1.38, -1.32, 0.34, (0.68, 0.14, 0.14))
-    place_car_with_wheels(build_car_hatchback(mats), (0.0, -2.5), -32.0, 0.80, 1.22, -1.22, 0.32, (0.14, 0.36, 0.56))
-    place_car_with_wheels(build_car_pickup(mats), (4.6, -2.5), 148.0, 0.87, 1.56, -1.56, 0.37, (0.88, 0.88, 0.86))
+    place_car_with_wheels(build_car_sedan(mats), (-6.8, -3.2), 148.0, 0.84, 1.38, -1.32, 0.34, (0.68, 0.14, 0.14))
+    place_car_with_wheels(build_car_hatchback(mats), (-3.8, -3.2), 148.0, 0.80, 1.22, -1.22, 0.32, (0.14, 0.36, 0.56))
+    place_car_with_wheels(build_car_sports_coupe(mats), (-0.8, -3.2), 148.0, 0.88, 1.34, -1.30, 0.34, (0.94, 0.68, 0.10))
+    place_car_with_wheels(build_car_suv(mats), (2.4, -3.2), 148.0, 0.88, 1.42, -1.38, 0.38, (0.10, 0.28, 0.18))
+    place_car_with_wheels(build_car_pickup(mats), (5.6, -3.2), 148.0, 0.87, 1.56, -1.56, 0.37, (0.88, 0.88, 0.86))
+    place_car_with_wheels(build_car_delivery_van(mats), (8.8, -3.2), 148.0, 0.88, 1.58, -1.56, 0.36, (0.92, 0.90, 0.84))
 
     tree = build_plane_tree(mats)
     tree.location = Vector((-7.2, 4.2, 0.0))
 
     fountain = build_town_fountain(mats)
     fountain.location = Vector((-1.6, 4.8, 0.0))
+
+    bench = build_town_park_bench(mats)
+    bench.location = Vector((1.6, 1.2, 0.0))
+    bench.rotation_euler = Euler((0.0, 0.0, math.radians(155.0)), "XYZ")
 
     pump = build_fuel_pump(mats)
     pump.location = Vector((2.8, 3.2, 0.0))
@@ -1385,9 +1706,13 @@ def main():
         ("Car_Sedan.fbx", build_car_sedan),
         ("Car_Hatchback.fbx", build_car_hatchback),
         ("Car_Pickup.fbx", build_car_pickup),
+        ("Car_SportsCoupe.fbx", build_car_sports_coupe),
+        ("Car_SUV.fbx", build_car_suv),
+        ("Car_DeliveryVan.fbx", build_car_delivery_van),
         ("Car_Wheel.fbx", build_car_wheel),
         ("Tree_PlaneTree.fbx", build_plane_tree),
         ("Town_Fountain.fbx", build_town_fountain),
+        ("Town_ParkBench.fbx", build_town_park_bench),
         ("Gas_FuelPump.fbx", build_fuel_pump),
         ("Town_VendingMachine.fbx", build_vending_machine),
         ("Town_Mailbox.fbx", build_mailbox),

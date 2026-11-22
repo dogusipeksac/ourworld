@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Gridroam.Core;
 using Gridroam.Player;
+using Gridroam.Vehicle;
 using UnityEngine;
 
 namespace Gridroam.World
@@ -21,8 +22,11 @@ namespace Gridroam.World
     /// </summary>
     public class AmbientTrafficManager : MonoBehaviour
     {
+        public static AmbientTrafficManager Instance { get; private set; }
+
         [Header("Pooled Prefab")]
         [SerializeField] private GameObject trafficVehiclePrefab;
+        [SerializeField] private GameObject drivableReplacementPrefab;
         [SerializeField] private int poolPrewarmCount = 8;
 
         [Header("Density & Distance Culling")]
@@ -51,7 +55,13 @@ namespace Gridroam.World
         private int _currentMaxActive;
         private float _spawnCheckTimer;
 
-        public void Configure(GameObject prefab, List<Transform> waypoints, List<TrafficStopLine> signalStops = null)
+        private int _hijackedCounter;
+
+        public void Configure(
+            GameObject prefab,
+            List<Transform> waypoints,
+            List<TrafficStopLine> signalStops = null,
+            GameObject drivablePrefab = null)
         {
             trafficVehiclePrefab = prefab;
             loopWaypoints = waypoints;
@@ -59,11 +69,20 @@ namespace Gridroam.World
             {
                 stopLines = signalStops;
             }
+            if (drivablePrefab != null)
+            {
+                drivableReplacementPrefab = drivablePrefab;
+            }
         }
 
         public void SetStopLines(List<TrafficStopLine> signalStops)
         {
             stopLines = signalStops != null ? signalStops : new List<TrafficStopLine>();
+        }
+
+        private void Awake()
+        {
+            Instance = this;
         }
 
         private void Start()
@@ -78,15 +97,83 @@ namespace Gridroam.World
             if (trafficVehiclePrefab != null && loopWaypoints != null && loopWaypoints.Count >= 2)
             {
                 _pool = new SimpleObjectPool(trafficVehiclePrefab, transform, poolPrewarmCount);
+                if (PlayerModeController.Instance != null)
+                {
+                    PlayerModeController.Instance.RefreshInteractablesCache();
+                }
             }
         }
 
         private void OnDestroy()
         {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
             if (GraphicsProfileManager.Instance != null)
             {
                 GraphicsProfileManager.Instance.OnTierChanged -= HandleGraphicsTierChanged;
             }
+        }
+
+        /// <summary>
+        /// Converts an active ambient traffic car into a real WheelCollider drivable vehicle
+        /// so the player can enter and drive ANY moving car in the open world.
+        /// </summary>
+        public SedanVehicleController TryHijackTrafficCar(GameObject trafficCarObj)
+        {
+            if (trafficCarObj == null || drivableReplacementPrefab == null)
+            {
+                return null;
+            }
+
+            ActiveAgent found = null;
+            int foundIdx = -1;
+            for (int i = 0; i < _activeAgents.Count; i++)
+            {
+                ActiveAgent agent = _activeAgents[i];
+                if (agent.Go == null) continue;
+                if (agent.Go == trafficCarObj || trafficCarObj.transform.IsChildOf(agent.Go.transform))
+                {
+                    found = agent;
+                    foundIdx = i;
+                    break;
+                }
+            }
+
+            if (found == null)
+            {
+                return null;
+            }
+
+            Vector3 pos = found.Go.transform.position;
+            Quaternion rot = found.Go.transform.rotation;
+
+            if (_pool != null)
+            {
+                _pool.Release(found.Go);
+            }
+            _activeAgents.RemoveAt(foundIdx);
+
+            _hijackedCounter++;
+            GameObject drivableGo = Instantiate(drivableReplacementPrefab, pos + Vector3.up * 0.14f, rot);
+            drivableGo.name = $"HijackedTrafficCar_{_hijackedCounter:00}";
+            drivableGo.SetActive(true);
+
+            SedanVehicleController controller = drivableGo.GetComponent<SedanVehicleController>();
+            InteractableTrigger trig = drivableGo.GetComponent<InteractableTrigger>();
+            if (trig == null)
+            {
+                trig = drivableGo.AddComponent<InteractableTrigger>();
+            }
+            trig.Configure(InteractableKind.TownVehicle, $"traffic_car_{_hijackedCounter:00}", "ui.btn.drive", 4.1f);
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.RefreshInteractablesCache();
+            }
+
+            return controller;
         }
 
         private void HandleGraphicsTierChanged(GraphicsTier tier)
@@ -273,6 +360,16 @@ namespace Gridroam.World
                 Quaternion rot = dir.sqrMagnitude > 0.01f ? Quaternion.LookRotation(dir.normalized, Vector3.up) : Quaternion.identity;
 
                 GameObject go = _pool.Get(wp.position, rot);
+                InteractableTrigger trig = go.GetComponent<InteractableTrigger>();
+                if (trig == null)
+                {
+                    trig = go.AddComponent<InteractableTrigger>();
+                    trig.Configure(InteractableKind.TownVehicle, "traffic_car", "ui.btn.drive", 4.4f);
+                    if (PlayerModeController.Instance != null)
+                    {
+                        PlayerModeController.Instance.RefreshInteractablesCache();
+                    }
+                }
                 float cruise = cruiseSpeed * UnityEngine.Random.Range(0.85f, 1.12f);
                 _activeAgents.Add(new ActiveAgent
                 {

@@ -49,15 +49,15 @@ namespace Gridroam.World
 
         private static readonly AtmosphereKey[] Keys =
         {
-            new AtmosphereKey { Hour = 0.0f,  SunPitch = -35f, SunColor = new Color(0.36f, 0.45f, 0.62f), SunIntensity = 0.10f, AmbientIntensity = 0.40f, FogColor = new Color(0.06f, 0.08f, 0.13f), SkyExposure = 0.24f },
-            new AtmosphereKey { Hour = 5.2f,  SunPitch = -8f,  SunColor = new Color(0.46f, 0.48f, 0.66f), SunIntensity = 0.20f, AmbientIntensity = 0.46f, FogColor = new Color(0.14f, 0.16f, 0.24f), SkyExposure = 0.34f },
-            new AtmosphereKey { Hour = 6.5f,  SunPitch = 10f,  SunColor = new Color(1.00f, 0.66f, 0.46f), SunIntensity = 1.15f, AmbientIntensity = 0.84f, FogColor = new Color(0.62f, 0.50f, 0.48f), SkyExposure = 0.82f },
-            new AtmosphereKey { Hour = 9.0f,  SunPitch = 34f,  SunColor = new Color(1.00f, 0.94f, 0.84f), SunIntensity = 1.85f, AmbientIntensity = 1.12f, FogColor = new Color(0.62f, 0.70f, 0.78f), SkyExposure = 1.10f },
-            new AtmosphereKey { Hour = 12.5f, SunPitch = 62f,  SunColor = new Color(1.00f, 0.97f, 0.92f), SunIntensity = 2.10f, AmbientIntensity = 1.24f, FogColor = new Color(0.67f, 0.76f, 0.84f), SkyExposure = 1.20f },
-            new AtmosphereKey { Hour = 16.8f, SunPitch = 28f,  SunColor = new Color(1.00f, 0.86f, 0.68f), SunIntensity = 1.95f, AmbientIntensity = 1.12f, FogColor = new Color(0.60f, 0.58f, 0.60f), SkyExposure = 1.08f },
-            new AtmosphereKey { Hour = 19.3f, SunPitch = 6f,   SunColor = new Color(1.00f, 0.52f, 0.30f), SunIntensity = 1.05f, AmbientIntensity = 0.74f, FogColor = new Color(0.45f, 0.33f, 0.37f), SkyExposure = 0.74f },
-            new AtmosphereKey { Hour = 20.5f, SunPitch = -14f, SunColor = new Color(0.38f, 0.46f, 0.64f), SunIntensity = 0.12f, AmbientIntensity = 0.42f, FogColor = new Color(0.08f, 0.10f, 0.16f), SkyExposure = 0.27f },
-            new AtmosphereKey { Hour = 24.0f, SunPitch = -35f, SunColor = new Color(0.36f, 0.45f, 0.62f), SunIntensity = 0.10f, AmbientIntensity = 0.40f, FogColor = new Color(0.06f, 0.08f, 0.13f), SkyExposure = 0.24f }
+            new AtmosphereKey { Hour = 0.0f,  SunPitch = -35f, SunColor = new Color(0.46f, 0.58f, 0.82f), SunIntensity = 0.24f, AmbientIntensity = 0.62f, FogColor = new Color(0.09f, 0.12f, 0.20f), SkyExposure = 0.42f },
+            new AtmosphereKey { Hour = 5.2f,  SunPitch = -8f,  SunColor = new Color(0.54f, 0.56f, 0.78f), SunIntensity = 0.30f, AmbientIntensity = 0.64f, FogColor = new Color(0.18f, 0.20f, 0.30f), SkyExposure = 0.48f },
+            new AtmosphereKey { Hour = 6.5f,  SunPitch = 12f,  SunColor = new Color(1.00f, 0.70f, 0.48f), SunIntensity = 1.25f, AmbientIntensity = 0.90f, FogColor = new Color(0.66f, 0.54f, 0.50f), SkyExposure = 0.88f },
+            new AtmosphereKey { Hour = 9.0f,  SunPitch = 36f,  SunColor = new Color(1.00f, 0.94f, 0.84f), SunIntensity = 1.85f, AmbientIntensity = 1.15f, FogColor = new Color(0.64f, 0.72f, 0.80f), SkyExposure = 1.12f },
+            new AtmosphereKey { Hour = 12.5f, SunPitch = 56f,  SunColor = new Color(1.00f, 0.97f, 0.90f), SunIntensity = 2.05f, AmbientIntensity = 1.24f, FogColor = new Color(0.68f, 0.77f, 0.85f), SkyExposure = 1.20f },
+            new AtmosphereKey { Hour = 16.8f, SunPitch = 28f,  SunColor = new Color(1.00f, 0.86f, 0.66f), SunIntensity = 1.95f, AmbientIntensity = 1.12f, FogColor = new Color(0.62f, 0.58f, 0.58f), SkyExposure = 1.08f },
+            new AtmosphereKey { Hour = 18.8f, SunPitch = 11f,  SunColor = new Color(1.00f, 0.56f, 0.32f), SunIntensity = 1.32f, AmbientIntensity = 0.86f, FogColor = new Color(0.52f, 0.38f, 0.42f), SkyExposure = 0.84f },
+            new AtmosphereKey { Hour = 20.5f, SunPitch = -14f, SunColor = new Color(0.48f, 0.58f, 0.82f), SunIntensity = 0.26f, AmbientIntensity = 0.64f, FogColor = new Color(0.11f, 0.14f, 0.22f), SkyExposure = 0.45f },
+            new AtmosphereKey { Hour = 24.0f, SunPitch = -35f, SunColor = new Color(0.46f, 0.58f, 0.82f), SunIntensity = 0.24f, AmbientIntensity = 0.62f, FogColor = new Color(0.09f, 0.12f, 0.20f), SkyExposure = 0.42f }
         };
 
         public static void RegisterNightLight(NightLight lightMarker)
@@ -219,6 +219,11 @@ namespace Gridroam.World
                 _sunLight.shadowStrength = Mathf.Lerp(0.18f, 0.78f, Mathf.InverseLerp(0.2f, 1.2f, sample.SunIntensity));
             }
 
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            float dayFactor = Mathf.InverseLerp(0.24f, 1.85f, sample.SunIntensity);
+            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.18f, 0.24f, 0.38f), new Color(0.62f, 0.74f, 0.88f), dayFactor) * sample.AmbientIntensity;
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.16f, 0.17f, 0.22f), new Color(0.54f, 0.53f, 0.50f), dayFactor) * sample.AmbientIntensity;
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.10f, 0.09f, 0.08f), new Color(0.28f, 0.24f, 0.20f), dayFactor) * sample.AmbientIntensity;
             RenderSettings.ambientIntensity = sample.AmbientIntensity;
             RenderSettings.fogColor = sample.FogColor;
 

@@ -23,6 +23,7 @@ namespace Gridroam.Vehicle
         private volatile float _rpm = 850f;
         private volatile float _throttle;
         private volatile bool _isDriving;
+        private volatile bool _isPaused;
         private volatile float _sampleRate = 48000f;
 
         // Audio-thread synthesis state
@@ -137,6 +138,7 @@ namespace Gridroam.Vehicle
 
             bool driving = vehicle.IsPlayerDriving;
             _isDriving = driving;
+            _isPaused = Time.timeScale <= 0.001f || AudioListener.pause;
             _rpm = Mathf.Clamp(vehicle.EngineRpm, 600f, 7500f);
             _throttle = Mathf.Clamp01(vehicle.CurrentThrottle);
 
@@ -164,7 +166,7 @@ namespace Gridroam.Vehicle
                 return;
             }
 
-            if (!_isDriving)
+            if (!_isDriving || _isPaused)
             {
                 for (int i = 0; i < data.Length; i++)
                 {

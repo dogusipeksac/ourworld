@@ -54,3 +54,7 @@ sysinfo.txt
 crashlytics-build.properties
 .DS_Store
 Thumbs.db
+
+# Firebase admin credentials & feedback tooling
+*-firebase-adminsdk-*.json
+.venv/

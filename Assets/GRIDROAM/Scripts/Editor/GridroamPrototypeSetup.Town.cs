@@ -36,6 +36,7 @@ namespace Gridroam.Editor
             BuildGasStation(townRoot.transform, mats);
             BuildTownSquare(townRoot.transform, mats, prefabs, outdoorBenchSeats);
             BuildResidentialAndPark(townRoot.transform, mats, rng, outdoorBenchSeats);
+            BuildIstanbulBosphorusAndAnatolia(townRoot.transform, mats, prefabs, rng, outdoorBenchSeats);
             List<TrafficStopLine> stopLines = BuildTownStreetFurniture(townRoot.transform, mats, prefabs, rng, outdoorBenchSeats);
             BuildSideJobStartPoints(townRoot.transform, mats);
             BuildStreetVendors(townRoot.transform, mats);
@@ -705,6 +706,22 @@ namespace Gridroam.Editor
                 }
             }
 
+            // Live animated sparkling water jets & cascading mist droplets on the fountain!
+            CreateFountainWaterParticles(fountain.transform, mats.PoolWaterClear);
+
+            // 4 Carved Travertine Flowerbed Planters with lush shrubs & Mediterranean blooms framing Town Square
+            Vector3[] planterSpots =
+            {
+                new Vector3(12.2f, 0.02f, 68.5f),
+                new Vector3(12.2f, 0.02f, 91.5f),
+                new Vector3(-8.2f, 0.02f, 68.5f),
+                new Vector3(-8.2f, 0.02f, 91.5f)
+            };
+            for (int p = 0; p < planterSpots.Length; p++)
+            {
+                CreateSquarePlanter($"Square_Planter_{p + 1}", sqRoot.transform, planterSpots[p], mats, p);
+            }
+
             float[] benchAngles = { 30f, 90f, 150f, 210f, 270f, 330f };
             SeatInteractable[] npcBenchSlots = new SeatInteractable[2];
             for (int i = 0; i < benchAngles.Length; i++)
@@ -744,7 +761,11 @@ namespace Gridroam.Editor
                 CreateTownTree($"Square_Tree_{i + 1}", sqRoot.transform, sqTrees[i], mats, 1.0f + (i % 2) * 0.14f, i);
             }
 
-            BuildClockTower(sqRoot.transform, new Vector3(-13.8f, 0.02f, 80.0f), mats);
+            // Iconic Blender 3D Galata Kulesi overlooking Beyoğlu / Taksim Square!
+            BuildGalataTowerLandmark(sqRoot.transform, new Vector3(-13.8f, 0.02f, 80.0f), mats);
+
+            // Nostaljik İstiklal Kırmızı Tramvayı on steel rails + İstanbul Simitçi Arabası!
+            BuildIstanbulTramAndSimitCart(sqRoot.transform, mats);
 
             Vector3[] lampPositions =
             {
@@ -761,26 +782,200 @@ namespace Gridroam.Editor
             }
         }
 
+        private static void CreateFountainWaterParticles(Transform fountainRoot, Material waterMat)
+        {
+            GameObject sprayGo = new GameObject("Fountain_WaterSpray");
+            sprayGo.transform.SetParent(fountainRoot, false);
+            sprayGo.transform.localPosition = new Vector3(0f, 3.50f, 0f);
+            sprayGo.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+
+            ParticleSystem ps = sprayGo.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule main = ps.main;
+            main.loop = true;
+            main.duration = 2.0f;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.85f, 1.15f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.45f, 2.25f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.055f, 0.115f);
+            main.startColor = new Color(0.82f, 0.95f, 1.0f, 0.72f);
+            main.gravityModifier = 0.62f;
+            main.maxParticles = 140;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+            ParticleSystem.EmissionModule emission = ps.emission;
+            emission.rateOverTime = 72f;
+
+            ParticleSystem.ShapeModule shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 32f;
+            shape.radius = 0.12f;
+
+            ParticleSystemRenderer psr = sprayGo.GetComponent<ParticleSystemRenderer>();
+            if (waterMat != null)
+            {
+                psr.sharedMaterial = waterMat;
+            }
+            psr.renderMode = ParticleSystemRenderMode.Billboard;
+            psr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            psr.receiveShadows = false;
+        }
+
+        private static void CreateSquarePlanter(string name, Transform parent, Vector3 basePos, MaterialSet mats, int idx)
+        {
+            GameObject planter = new GameObject(name);
+            planter.transform.SetParent(parent, false);
+            planter.transform.position = basePos;
+
+            Material stone = mats.TravertineStone != null ? mats.TravertineStone : mats.PlasterTrim;
+            CreateLocalTiledBox("Planter_StoneBox", planter.transform,
+                new Vector3(0f, 0.28f, 0f), new Vector3(1.85f, 0.56f, 1.85f),
+                Quaternion.identity, stone, 1.4f, collider: true);
+            CreateLocalTiledBox("Planter_Rim", planter.transform,
+                new Vector3(0f, 0.58f, 0f), new Vector3(2.02f, 0.08f, 2.02f),
+                Quaternion.identity, stone, 1.4f, collider: false);
+            CreateLocalTiledBox("Planter_Soil", planter.transform,
+                new Vector3(0f, 0.54f, 0f), new Vector3(1.62f, 0.06f, 1.62f),
+                Quaternion.identity, mats.TownBark, 1.2f, collider: false);
+
+            // Lush layered greenery + bright flower accents
+            Material shrubMat = idx % 2 == 0 ? mats.TownFoliageA : mats.TownFoliageB;
+            CreateStaticPart("Shrub_Center", PrimitiveType.Sphere, planter.transform,
+                new Vector3(0f, 0.88f, 0f), Quaternion.identity, new Vector3(1.22f, 0.82f, 1.22f), shrubMat);
+            CreateStaticPart("Shrub_SideA", PrimitiveType.Sphere, planter.transform,
+                new Vector3(-0.42f, 0.78f, 0.34f), Quaternion.identity, new Vector3(0.76f, 0.56f, 0.76f), mats.TownHedge);
+            CreateStaticPart("Shrub_SideB", PrimitiveType.Sphere, planter.transform,
+                new Vector3(0.42f, 0.76f, -0.32f), Quaternion.identity, new Vector3(0.74f, 0.54f, 0.74f), mats.TownHedge);
+
+            Material bloomMat = idx % 2 == 0 ? mats.TownAwningTerracotta : mats.TownFabricMustard;
+            CreateStaticPart("Bloom_1", PrimitiveType.Sphere, planter.transform, new Vector3(-0.26f, 1.12f, 0.20f), Quaternion.identity, Vector3.one * 0.18f, bloomMat);
+            CreateStaticPart("Bloom_2", PrimitiveType.Sphere, planter.transform, new Vector3(0.28f, 1.08f, -0.16f), Quaternion.identity, Vector3.one * 0.16f, bloomMat);
+            CreateStaticPart("Bloom_3", PrimitiveType.Sphere, planter.transform, new Vector3(0.08f, 1.22f, 0.14f), Quaternion.identity, Vector3.one * 0.15f, mats.TownInteriorPaintCream);
+        }
+
+        private static void BuildGalataTowerLandmark(Transform parent, Vector3 basePos, MaterialSet mats)
+        {
+            GameObject galata = new GameObject("Istanbul_GalataKulesi");
+            galata.transform.SetParent(parent, false);
+            galata.transform.position = basePos;
+
+            GameObject mesh = InstantiateBlenderModel("Istanbul_GalataTower.fbx", "GalataTowerMesh", galata.transform, mats);
+            if (mesh != null)
+            {
+                CapsuleCollider col = galata.AddComponent<CapsuleCollider>();
+                col.center = new Vector3(0f, 12.0f, 0f);
+                col.radius = 3.75f;
+                col.height = 24.0f;
+                MarkStaticEnvironment(galata);
+                CreatePointLamp("Lamp_GalataBalcony", galata.transform, basePos + new Vector3(0f, 16.5f, 0f), new Color(1.0f, 0.82f, 0.48f), 26f, 3.2f);
+            }
+            else
+            {
+                BuildClockTower(parent, basePos, mats);
+            }
+        }
+
+        private static void BuildIstanbulTramAndSimitCart(Transform parent, MaterialSet mats)
+        {
+            // Embedded steel tram rails along East side of Beyoğlu Square (x = +10.2, z = 54..104)
+            CreateStaticBlock("TramRail_W", parent, new Vector3(9.42f, 0.030f, 79.0f), new Vector3(0.08f, 0.015f, 50.0f), mats.SedanChrome, addCollider: false);
+            CreateStaticBlock("TramRail_E", parent, new Vector3(10.98f, 0.030f, 79.0f), new Vector3(0.08f, 0.015f, 50.0f), mats.SedanChrome, addCollider: false);
+
+            // Nostaljik Kırmızı İstiklal Tramvayı (T2 Taksim-Tünel)
+            GameObject tram = new GameObject("Istanbul_IstiklalTramvayi");
+            tram.transform.SetParent(parent, false);
+            tram.transform.position = new Vector3(10.2f, 0.03f, 65.5f);
+            GameObject tramMesh = InstantiateBlenderModel("Istanbul_Tram.fbx", "IstiklalTramMesh", tram.transform, mats);
+            if (tramMesh != null)
+            {
+                BoxCollider tCol = tram.AddComponent<BoxCollider>();
+                tCol.center = new Vector3(0f, 1.65f, 0f);
+                tCol.size = new Vector3(2.25f, 3.30f, 8.40f);
+                MarkStaticEnvironment(tram);
+                CreateWorldSignText("TAKSİM · TÜNEL", tram.transform, new Vector3(0f, 3.00f, 4.22f), Quaternion.Euler(0f, 180f, 0f), new Vector2(1.4f, 0.24f), new Color(0.14f, 0.10f, 0.08f, 1f));
+            }
+
+            // Iconic Red Istanbul Simitçi Cart on Beyoğlu Square
+            GameObject simit = new GameObject("Istanbul_SimitciArabasi");
+            simit.transform.SetParent(parent, false);
+            simit.transform.SetPositionAndRotation(new Vector3(6.8f, 0.03f, 88.5f), Quaternion.Euler(0f, -125f, 0f));
+            GameObject simitMesh = InstantiateBlenderModel("Istanbul_SimitCart.fbx", "SimitCartMesh", simit.transform, mats);
+            if (simitMesh != null)
+            {
+                BoxCollider sCol = simit.AddComponent<BoxCollider>();
+                sCol.center = new Vector3(0f, 0.85f, 0f);
+                sCol.size = new Vector3(1.15f, 1.70f, 1.45f);
+                MarkStaticEnvironment(simit);
+            }
+        }
+
         private static void BuildClockTower(Transform parent, Vector3 basePos, MaterialSet mats)
         {
             GameObject tower = new GameObject("Square_ClockTower");
             tower.transform.SetParent(parent, false);
 
+            Material stone = mats.TravertineStone != null ? mats.TravertineStone : mats.PlasterTrim;
+
+            // Stepped stone plinth + carved masonry base (replaces blank concrete cube!)
+            CreateTiledBox("Tower_Plinth", tower.transform,
+                basePos + new Vector3(0f, 0.25f, 0f), new Vector3(4.8f, 0.50f, 4.8f),
+                Quaternion.identity, stone, 2.0f, collider: true);
             CreateTiledBox("Tower_Base", tower.transform,
-                basePos + new Vector3(0f, 1.5f, 0f), new Vector3(4.2f, 3.0f, 4.2f),
-                Quaternion.identity, mats.Concrete, 2.0f, collider: true);
+                basePos + new Vector3(0f, 1.85f, 0f), new Vector3(4.2f, 2.75f, 4.2f),
+                Quaternion.identity, mats.TownBrickHouse, 1.6f, collider: true);
+            CreateTiledBox("Tower_BaseCornice", tower.transform,
+                basePos + new Vector3(0f, 3.32f, 0f), new Vector3(4.55f, 0.28f, 4.55f),
+                Quaternion.identity, stone, 2.0f, collider: false);
+
+            // 4 Architectural Travertine Corner Pilasters framing the base & shaft
+            float[] cornerSigns = { -1f, 1f };
+            for (int cx = 0; cx < 2; cx++)
+            {
+                for (int cz = 0; cz < 2; cz++)
+                {
+                    float px = cornerSigns[cx] * 2.04f;
+                    float pz = cornerSigns[cz] * 2.04f;
+                    CreateTiledBox($"Tower_BasePilaster_{cx}_{cz}", tower.transform,
+                        basePos + new Vector3(px, 1.85f, pz), new Vector3(0.42f, 2.85f, 0.42f),
+                        Quaternion.identity, stone, 1.5f, collider: false);
+
+                    float spx = cornerSigns[cx] * 1.64f;
+                    float spz = cornerSigns[cz] * 1.64f;
+                    CreateTiledBox($"Tower_ShaftPilaster_{cx}_{cz}", tower.transform,
+                        basePos + new Vector3(spx, 7.40f, spz), new Vector3(0.32f, 8.20f, 0.32f),
+                        Quaternion.identity, stone, 1.5f, collider: false);
+                }
+            }
+
+            // Recessed ornate wooden entrance portal facing East (+X) onto Town Square
+            CreateTiledBox("Tower_DoorFrame", tower.transform,
+                basePos + new Vector3(2.12f, 1.38f, 0f), new Vector3(0.18f, 2.35f, 1.48f),
+                Quaternion.identity, stone, 1.4f, collider: false);
+            CreateTiledBox("Tower_DoorLeaf", tower.transform,
+                basePos + new Vector3(2.18f, 1.32f, 0f), new Vector3(0.08f, 2.18f, 1.18f),
+                Quaternion.identity, mats.TownDoorWood, 1.4f, collider: false);
 
             CreateTiledBox("Tower_Shaft", tower.transform,
-                basePos + new Vector3(0f, 7.25f, 0f), new Vector3(3.4f, 8.5f, 3.4f),
-                Quaternion.identity, mats.PlasterTrim, 3.0f, collider: true);
+                basePos + new Vector3(0f, 7.45f, 0f), new Vector3(3.4f, 8.2f, 3.4f),
+                Quaternion.identity, stone, 2.4f, collider: true);
+            CreateTiledBox("Tower_MidMold", tower.transform,
+                basePos + new Vector3(0f, 11.45f, 0f), new Vector3(3.85f, 0.26f, 3.85f),
+                Quaternion.identity, stone, 2.0f, collider: false);
+
+            // Tall lit narrow lancet windows on East & West shaft faces
+            for (int side = -1; side <= 1; side += 2)
+            {
+                GameObject win = CreateTiledBox($"Tower_LancetWin_{side}", tower.transform,
+                    basePos + new Vector3(side * 1.72f, 7.60f, 0f), new Vector3(0.08f, 2.60f, 0.72f),
+                    Quaternion.identity, mats.WindowLitWarm, 1.5f, collider: false, staticBatch: false);
+                AttachWindowNightLight(win);
+            }
 
             CreateTiledBox("Tower_ClockBox", tower.transform,
                 basePos + new Vector3(0f, 12.9f, 0f), new Vector3(3.7f, 2.8f, 3.7f),
-                Quaternion.identity, mats.Concrete, 2.0f, collider: true);
+                Quaternion.identity, mats.TownBrickHouse, 1.6f, collider: true);
 
             CreateTiledBox("Tower_Cornice", tower.transform,
-                basePos + new Vector3(0f, 14.45f, 0f), new Vector3(4.1f, 0.35f, 4.1f),
-                Quaternion.identity, mats.PlasterTrim, 2.0f, collider: false);
+                basePos + new Vector3(0f, 14.45f, 0f), new Vector3(4.25f, 0.36f, 4.25f),
+                Quaternion.identity, stone, 2.0f, collider: false);
             CreateTiledBox("Tower_CapLower", tower.transform,
                 basePos + new Vector3(0f, 15.05f, 0f), new Vector3(3.0f, 0.9f, 3.0f),
                 Quaternion.identity, mats.TownRoofTile, 1.5f, collider: false);
@@ -852,7 +1047,7 @@ namespace Gridroam.Editor
                 BuildEnterableResidentialHouse(
                     $"House_West_{i + 1:00}",
                     $"house_w_{i + 1:00}",
-                    $"Çınar Caddesi No: {i + 1}",
+                    $"Balat Caddesi No: {i + 1}",
                     resRoot.transform,
                     new Vector3(-43.5f, 0f, westHouseZs[i]),
                     Quaternion.identity,
@@ -873,7 +1068,7 @@ namespace Gridroam.Editor
                 BuildEnterableResidentialHouse(
                     $"House_East_{i + 1:00}",
                     $"house_e_{i + 1:00}",
-                    $"Cumhuriyet Caddesi No: {i + 10}",
+                    $"Karaköy Yokuşu No: {i + 10}",
                     resRoot.transform,
                     new Vector3(43.5f, 0f, eastHouseZs[i]),
                     Quaternion.Euler(0f, 180f, 0f),
@@ -886,55 +1081,595 @@ namespace Gridroam.Editor
                     houseSeed: 3100 + i * 41);
             }
 
-            // South-East Community Plaza & Parking Garden (x = +48, z = +10)
-            GameObject eastGarden = new GameObject("Town_EastCommunityGarden");
-            eastGarden.transform.SetParent(parent, false);
-            CreateTiledBox("EastGarden_WalkwayNS", eastGarden.transform,
-                new Vector3(48.0f, 0.014f, 10.0f), new Vector3(3.2f, 0.028f, 48.0f),
-                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
-            CreateTiledBox("EastGarden_WalkwayEW", eastGarden.transform,
-                new Vector3(48.0f, 0.014f, 10.0f), new Vector3(30.0f, 0.028f, 3.2f),
-                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
-            var egB1 = CreateBench("EastGarden_Bench_1", eastGarden.transform, new Vector3(44.5f, 0.02f, 6.0f), Quaternion.Euler(0f, 90f, 0f), mats);
-            var egB2 = CreateBench("EastGarden_Bench_2", eastGarden.transform, new Vector3(51.5f, 0.02f, 14.0f), Quaternion.Euler(0f, -90f, 0f), mats);
-            benchSeatCollector.Add(egB1.leftSlot); benchSeatCollector.Add(egB1.rightSlot);
-            benchSeatCollector.Add(egB2.leftSlot); benchSeatCollector.Add(egB2.rightSlot);
-            CreateTownTree("EastGarden_Tree_1", eastGarden.transform, new Vector3(38.0f, 0f, -6.0f), mats, 1.05f, 41);
-            CreateTownTree("EastGarden_Tree_2", eastGarden.transform, new Vector3(58.0f, 0f, -6.0f), mats, 1.12f, 42);
-            CreateTownTree("EastGarden_Tree_3", eastGarden.transform, new Vector3(38.0f, 0f, 26.0f), mats, 0.98f, 43);
-            CreateTownTree("EastGarden_Tree_4", eastGarden.transform, new Vector3(58.0f, 0f, 26.0f), mats, 1.06f, 44);
+            // South-East Block (x = +48, z = +10): Çınarlı Açık Yüzme Havuzu (Swimmable Outdoor Pool Club!)
+            BuildTownSwimmingPool(parent, mats, benchSeatCollector);
 
-            // Central North Block: Çınarlı Park (x = -16..+16, z = +124..+176, centered at (0, 0, 150))
-            GameObject parkRoot = new GameObject("Town_CinarliPark");
+            // Central North Block: Ortaköy / Sultanahmet Camii & Avlusu (x = -16..+16, z = +124..+176)
+            GameObject parkRoot = new GameObject("Town_IstanbulMosquePlaza");
             parkRoot.transform.SetParent(parent, false);
 
-            CreateTiledBox("Park_PathNS", parkRoot.transform,
-                new Vector3(0f, 0.014f, 150f), new Vector3(3.2f, 0.028f, 52f),
-                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
-            CreateTiledBox("Park_PathEW", parkRoot.transform,
-                new Vector3(0f, 0.014f, 150f), new Vector3(32f, 0.028f, 3.2f),
-                Quaternion.identity, mats.TownPaving, 2.0f, collider: false);
+            CreateTiledBox("MosquePlaza_Paving", parkRoot.transform,
+                new Vector3(0f, 0.014f, 150f), new Vector3(31f, 0.028f, 50f),
+                Quaternion.identity, mats.TownPaving, 2.2f, collider: false);
+
+            GameObject mosqueGo = new GameObject("Istanbul_BogazCamii");
+            mosqueGo.transform.SetParent(parkRoot.transform, false);
+            mosqueGo.transform.SetPositionAndRotation(new Vector3(0f, 0.02f, 155.5f), Quaternion.Euler(0f, 180f, 0f));
+            GameObject mosqueMesh = InstantiateBlenderModel("Istanbul_Mosque.fbx", "IstanbulMosqueMesh", mosqueGo.transform, mats);
+            if (mosqueMesh != null)
+            {
+                BoxCollider mCol = mosqueGo.AddComponent<BoxCollider>();
+                mCol.center = new Vector3(0f, 5.0f, -1.0f);
+                mCol.size = new Vector3(17.5f, 10.0f, 17.5f);
+                MarkStaticEnvironment(mosqueGo);
+                CreatePointLamp("Lamp_MosqueCourtyard", mosqueGo.transform, new Vector3(0f, 7.5f, 143.5f), new Color(1.0f, 0.86f, 0.56f), 28f, 3.0f);
+            }
 
             Vector3[] parkTrees =
             {
-                new Vector3(-11f, 0f, 134f),
-                new Vector3(11f, 0f, 134f),
-                new Vector3(-11f, 0f, 166f),
-                new Vector3(11f, 0f, 166f),
-                new Vector3(-8f, 0f, 156f),
-                new Vector3(8f, 0f, 142f)
+                new Vector3(-12.5f, 0f, 132f),
+                new Vector3(12.5f, 0f, 132f),
+                new Vector3(-12.5f, 0f, 170f),
+                new Vector3(12.5f, 0f, 170f)
             };
             for (int i = 0; i < parkTrees.Length; i++)
             {
                 CreateTownTree($"Park_Tree_{i + 1}", parkRoot.transform, parkTrees[i], mats, 1.0f + (i % 3) * 0.14f, i + 20);
             }
 
-            var pb1 = CreateBench("Park_Bench_1", parkRoot.transform, new Vector3(-5.5f, 0.02f, 146.5f), Quaternion.identity, mats);
-            var pb2 = CreateBench("Park_Bench_2", parkRoot.transform, new Vector3(5.5f, 0.02f, 153.5f), Quaternion.Euler(0f, 180f, 0f), mats);
-            var pb3 = CreateBench("Park_Bench_3", parkRoot.transform, new Vector3(5.5f, 0.02f, 146.5f), Quaternion.identity, mats);
+            var pb1 = CreateBench("Park_Bench_1", parkRoot.transform, new Vector3(-6.5f, 0.02f, 135.5f), Quaternion.identity, mats);
+            var pb2 = CreateBench("Park_Bench_2", parkRoot.transform, new Vector3(6.5f, 0.02f, 135.5f), Quaternion.identity, mats);
             benchSeatCollector.Add(pb1.leftSlot); benchSeatCollector.Add(pb1.rightSlot);
             benchSeatCollector.Add(pb2.leftSlot); benchSeatCollector.Add(pb2.rightSlot);
-            benchSeatCollector.Add(pb3.leftSlot); benchSeatCollector.Add(pb3.rightSlot);
+        }
+
+        /// <summary>
+        /// Builds the swimmable İstanbul Boğazı strait, 100% drivable Boğaziçi Asma Köprüsü (z=116)
+        /// & Galata Köprüsü (z=44), walkable Kız Kulesi Island, Şehir Hatları Ferry Pier,
+        /// and Anadolu Yakası (Üsküdar Sahil Bulvarı + 6 Enterable Kuzguncuk Yalıları + 4 Cars).
+        /// </summary>
+        private static void BuildIstanbulBosphorusAndAnatolia(
+            Transform parent,
+            MaterialSet mats,
+            PrefabSet prefabs,
+            System.Random rng,
+            List<SeatInteractable> benchSeatCollector)
+        {
+            GameObject istRoot = new GameObject("Istanbul_BosphorusAndAnatolia");
+            istRoot.transform.SetParent(parent, false);
+
+            // =================================================================
+            // 1. SWIMMABLE İSTANBUL BOĞAZI STRAIT (x = 78..148, water y = -0.20m, seabed y = -1.75m)
+            // =================================================================
+            CreateStaticBlock("Bosphorus_WaterSurface", istRoot.transform,
+                new Vector3(113f, -0.22f, 80f), new Vector3(70f, 0.06f, 640f),
+                mats.IstanbulBosphorusWater, addCollider: false);
+
+            GameObject straitZoneGo = new GameObject("Bosphorus_WaterZone");
+            straitZoneGo.transform.SetParent(istRoot.transform, false);
+            straitZoneGo.transform.position = new Vector3(113f, -0.95f, 80f);
+            BoxCollider swCol = straitZoneGo.AddComponent<BoxCollider>();
+            swCol.isTrigger = true;
+            swCol.size = new Vector3(69.5f, 2.2f, 360f);
+            WaterZone straitWater = straitZoneGo.AddComponent<WaterZone>();
+            straitWater.Configure(Vector3.zero, new Vector3(69.5f, 2.2f, 360f), surfaceY: -0.20f, floorY: -1.75f);
+
+            // European & Anatolian stone seawalls + waterfront promenades
+            CreateTiledBox("Seawall_Avrupa", istRoot.transform,
+                new Vector3(77.4f, -0.88f, 80f), new Vector3(1.4f, 1.80f, 300f),
+                Quaternion.identity, mats.TravertineStone, 2.5f, collider: true);
+            CreateTiledBox("Seawall_Anadolu", istRoot.transform,
+                new Vector3(148.6f, -0.88f, 80f), new Vector3(1.4f, 1.80f, 300f),
+                Quaternion.identity, mats.TravertineStone, 2.5f, collider: true);
+
+            // Wide stone swimming staircases descending into the Bosphorus on BOTH shores (so player can swim in & walk out!)
+            float[] shoreStairZs = { 10f, 92f };
+            for (int si = 0; si < shoreStairZs.Length; si++)
+            {
+                float sz = shoreStairZs[si];
+                for (int step = 0; step < 5; step++)
+                {
+                    float topY = -0.15f - step * 0.28f;
+                    float h = topY - (-1.75f);
+                    // European side stepping east (+X) into water
+                    CreateTiledBox($"BosphorusStair_EU_{si}_{step}", istRoot.transform,
+                        new Vector3(78.25f + step * 0.45f, -1.75f + h * 0.5f, sz), new Vector3(0.46f, h, 4.8f),
+                        Quaternion.identity, mats.TravertineStone, 1.5f, collider: true);
+                    // Anatolian side stepping west (-X) into water
+                    CreateTiledBox($"BosphorusStair_AS_{si}_{step}", istRoot.transform,
+                        new Vector3(147.75f - step * 0.45f, -1.75f + h * 0.5f, sz), new Vector3(0.46f, h, 4.8f),
+                        Quaternion.identity, mats.TravertineStone, 1.5f, collider: true);
+                }
+            }
+
+            // =================================================================
+            // 2. BOĞAZİÇİ ASMA KÖPRÜSÜ (100% DRIVABLE & WALKABLE at z = +116.0!)
+            // =================================================================
+            BuildBosphorusSuspensionBridge(istRoot.transform, mats, zCenter: 116.0f);
+
+            // =================================================================
+            // 3. GALATA KÖPRÜSÜ (Southern Low-Arch Coastal Bridge at z = +44.0!)
+            // =================================================================
+            BuildGalataCoastalBridge(istRoot.transform, mats, prefabs, zCenter: 44.0f);
+
+            // =================================================================
+            // 4. KIZ KULESİ ADASI (Walkable Islet in the Bosphorus at x=113, z=10)
+            // =================================================================
+            GameObject kizRoot = new GameObject("Istanbul_KizKulesiAdasi");
+            kizRoot.transform.SetParent(istRoot.transform, false);
+            CreateTiledBox("Kiz_StoneIslet", kizRoot.transform,
+                new Vector3(113f, -0.58f, 10f), new Vector3(22f, 2.36f, 22f),
+                Quaternion.identity, mats.TravertineStone, 2.2f, collider: true);
+
+            // Stone landing steps on West & East sides of Kız Kulesi islet so swimmers can climb right onto the island!
+            for (int step = 0; step < 6; step++)
+            {
+                float topY = 0.45f - step * 0.28f;
+                float h = Mathf.Max(0.25f, topY - (-1.75f));
+                CreateTiledBox($"KizStep_W_{step}", kizRoot.transform,
+                    new Vector3(101.75f - step * 0.45f, -1.75f + h * 0.5f, 10f), new Vector3(0.46f, h, 4.2f),
+                    Quaternion.identity, mats.TravertineStone, 1.5f, collider: true);
+                CreateTiledBox($"KizStep_E_{step}", kizRoot.transform,
+                    new Vector3(124.25f + step * 0.45f, -1.75f + h * 0.5f, 10f), new Vector3(0.46f, h, 4.2f),
+                    Quaternion.identity, mats.TravertineStone, 1.5f, collider: true);
+            }
+
+            GameObject kizTower = new GameObject("Istanbul_KizKulesi");
+            kizTower.transform.SetParent(kizRoot.transform, false);
+            kizTower.transform.position = new Vector3(113f, 0.60f, 10f);
+            GameObject kizMesh = InstantiateBlenderModel("Istanbul_KizKulesi.fbx", "KizKulesiMesh", kizTower.transform, mats);
+            if (kizMesh != null)
+            {
+                BoxCollider kCol = kizTower.AddComponent<BoxCollider>();
+                kCol.center = new Vector3(0f, 2.2f, 0f);
+                kCol.size = new Vector3(12.0f, 4.4f, 12.0f);
+                MarkStaticEnvironment(kizTower);
+            }
+            CreatePointLamp("Lamp_KizKulesi", kizRoot.transform, new Vector3(113f, 13.5f, 10f), new Color(1.0f, 0.84f, 0.52f), 28f, 3.4f);
+
+            // =================================================================
+            // 5. BEŞİKTAŞ / ORTAKÖY İSKELESİ + ŞEHİR HATLARI BOĞAZ VAPURU (x=85, z=80)
+            // =================================================================
+            CreateTiledBox("Besiktas_FerryPier", istRoot.transform,
+                new Vector3(80.2f, 0.08f, 80f), new Vector3(5.2f, 0.34f, 15.0f),
+                Quaternion.identity, mats.TownWood, 1.8f, collider: true);
+            CreateStaticPart("PierSignPost", PrimitiveType.Cylinder, istRoot.transform, new Vector3(79.5f, 1.5f, 73.2f), Quaternion.identity, new Vector3(0.10f, 1.5f, 0.10f), mats.SedanTrimDark);
+            CreateStaticPart("PierSignBoard", PrimitiveType.Cube, istRoot.transform, new Vector3(79.5f, 2.75f, 73.2f), Quaternion.identity, new Vector3(0.14f, 0.65f, 3.2f), mats.TownAwningNavy);
+            CreateWorldSignText("BOĞAZ İSKELESİ", istRoot.transform, new Vector3(79.40f, 2.75f, 73.2f), Quaternion.Euler(0f, 90f, 0f), new Vector2(3.0f, 0.52f), Color.white);
+
+            GameObject ferryObj = new GameObject("Istanbul_SehirHatlariVapuru");
+            ferryObj.transform.SetParent(istRoot.transform, false);
+            ferryObj.transform.SetPositionAndRotation(new Vector3(86.2f, -0.35f, 80f), Quaternion.identity);
+            GameObject ferryMesh = InstantiateBlenderModel("Istanbul_Ferry.fbx", "BogazVapuruMesh", ferryObj.transform, mats);
+            if (ferryMesh != null)
+            {
+                BoxCollider fCol = ferryObj.AddComponent<BoxCollider>();
+                fCol.center = new Vector3(0f, 2.5f, 0f);
+                fCol.size = new Vector3(5.2f, 5.0f, 21.5f);
+                MarkStaticEnvironment(ferryObj);
+            }
+
+            // =================================================================
+            // 6. ANADOLU YAKASI — ÜSKÜDAR SAHİL BULVARI & KUZGUNCUK YALILARI (x=148..215)
+            // =================================================================
+            GameObject anadoluRoot = new GameObject("Istanbul_AnadoluYakasi_Uskudar");
+            anadoluRoot.transform.SetParent(istRoot.transform, false);
+
+            // Wide stone Üsküdar waterfront promenade facing Kız Kulesi & Avrupa skyline
+            CreateTiledBox("Uskudar_SahilPromenade", anadoluRoot.transform,
+                new Vector3(153.5f, 0.014f, 80f), new Vector3(9.2f, 0.028f, 224f),
+                Quaternion.identity, mats.TownPaving, 2.2f, collider: false);
+
+            // Üsküdar Sahil Asphalt Boulevard (x = 164.0, connects Boğaziçi Bridge z=116 & Galata Bridge z=44!)
+            CreateStaticBlock("Road_UskudarSahil", anadoluRoot.transform,
+                new Vector3(164.0f, 0.012f, 80f), new Vector3(11.5f, 0.024f, 218f),
+                mats.RoadAsphaltMain, addCollider: false);
+            for (float z = -12f; z <= 172f; z += 12f)
+            {
+                if (Mathf.Abs(z - 44f) < 9f || Mathf.Abs(z - 116f) < 9f) continue;
+                CreateStaticBlock($"Dash_Uskudar_{z:0}", anadoluRoot.transform,
+                    new Vector3(164.0f, 0.028f, z), new Vector3(0.20f, 0.01f, 4.4f),
+                    mats.RoadMarkingWhite, addCollider: false);
+            }
+
+            // Üsküdar Waterfront Benches, Trees, Street Lamps & Signboard
+            float[] uskudarBenchZs = { 2f, 22f, 68f, 90f, 140f };
+            for (int i = 0; i < uskudarBenchZs.Length; i++)
+            {
+                var ub = CreateBench($"Uskudar_Bench_{i + 1}", anadoluRoot.transform,
+                    new Vector3(152.2f, 0.02f, uskudarBenchZs[i]), Quaternion.Euler(0f, -90f, 0f), mats);
+                benchSeatCollector.Add(ub.leftSlot);
+                benchSeatCollector.Add(ub.rightSlot);
+                CreateTownTree($"Uskudar_Tree_{i + 1}", anadoluRoot.transform,
+                    new Vector3(155.8f, 0f, uskudarBenchZs[i] + 9.0f), mats, 1.02f + (i % 2) * 0.14f, 70 + i);
+                PlacePrefabInstance(prefabs.StreetLamp, anadoluRoot.transform,
+                    new Vector3(157.5f, 0.02f, uskudarBenchZs[i] - 4.0f), Quaternion.Euler(0f, 90f, 0f));
+            }
+
+            CreateStaticPart("UskudarSign_Post", PrimitiveType.Cylinder, anadoluRoot.transform, new Vector3(156.5f, 1.5f, 34f), Quaternion.identity, new Vector3(0.11f, 1.5f, 0.11f), mats.SedanTrimDark);
+            CreateStaticPart("UskudarSign_Board", PrimitiveType.Cube, anadoluRoot.transform, new Vector3(156.5f, 2.85f, 34f), Quaternion.identity, new Vector3(0.16f, 0.72f, 3.8f), mats.TownAwningTerracotta);
+            CreateWorldSignText("ÜSKÜDAR SAHİL", anadoluRoot.transform, new Vector3(156.40f, 2.85f, 34f), Quaternion.Euler(0f, 90f, 0f), new Vector2(3.6f, 0.60f), Color.white);
+
+            // 6 Enterable Kuzguncuk / Üsküdar Cumbalı Boğaz Yalıları overlooking the Bosphorus!
+            Material[] yaliPalette = { mats.BuildingFacadeC, mats.PlasterTrim, mats.BuildingFacadeA, mats.TownBrickHouse, mats.BuildingFacadeB };
+            float[] yaliZs = { -8.0f, 16.0f, 64.0f, 88.0f, 138.0f, 164.0f };
+            for (int i = 0; i < yaliZs.Length; i++)
+            {
+                BuildEnterableResidentialHouse(
+                    $"House_Anadolu_Yali_{i + 1:00}",
+                    $"house_as_{i + 1:00}",
+                    $"Kuzguncuk Yalı No: {i + 1}",
+                    anadoluRoot.transform,
+                    new Vector3(186.0f, 0f, yaliZs[i]),
+                    Quaternion.Euler(0f, 180f, 0f),
+                    depthX: 9.4f,
+                    widthZ: 10.8f,
+                    wallMat: yaliPalette[i % yaliPalette.Length],
+                    hasChimney: i % 2 == 0,
+                    hasGardenTree: true,
+                    mats: mats,
+                    houseSeed: 5100 + i * 53);
+            }
+
+            // 4 Extra Drivable Cars parked cleanly along Üsküdar Sahil Bulvarı
+            (Vector3 pos, float yaw, GameObject prefab)[] anadoluCars =
+            {
+                (new Vector3(170.5f, 0.28f, 12.0f), 0f, prefabs.TownCarYellowSportsCoupe),
+                (new Vector3(170.5f, 0.28f, 76.0f), 180f, prefabs.TownCarCharcoalSUV),
+                (new Vector3(170.5f, 0.28f, 148.0f), 0f, prefabs.TownCarBlueHatchback),
+                (new Vector3(170.5f, 0.28f, -12.0f), 0f, prefabs.TownCarWhitePickup)
+            };
+            for (int i = 0; i < anadoluCars.Length; i++)
+            {
+                if (anadoluCars[i].prefab == null) continue;
+                GameObject car = PlacePrefabInstance(anadoluCars[i].prefab, anadoluRoot.transform,
+                    anadoluCars[i].pos, Quaternion.Euler(0f, anadoluCars[i].yaw, 0f));
+                car.name = $"Anadolu_DrivableCar_{i + 1:00}";
+                InteractableTrigger trig = car.GetComponent<InteractableTrigger>();
+                if (trig != null)
+                {
+                    trig.Configure(InteractableKind.TownVehicle, $"anadolu_car_{i + 1:00}", "ui.btn.drive", 3.8f);
+                }
+            }
+        }
+
+        private static void BuildBosphorusSuspensionBridge(Transform parent, MaterialSet mats, float zCenter)
+        {
+            GameObject bridge = new GameObject("Istanbul_BogaziciAsmaKoprusu");
+            bridge.transform.SetParent(parent, false);
+
+            const float deckY = 4.40f;
+            const float deckW = 12.4f;
+            const float deckThick = 0.60f;
+            const float westStart = 74.5f;
+            const float westTowerX = 96.0f;
+            const float eastTowerX = 130.0f;
+            const float eastEnd = 151.5f;
+
+            // 1. Flat central suspended asphalt roadway deck (x = 96..130, top y = 4.40m)
+            float spanLen = eastTowerX - westTowerX;
+            CreateTiledBox("Bridge_CenterDeck", bridge.transform,
+                new Vector3((westTowerX + eastTowerX) * 0.5f, deckY - deckThick * 0.5f, zCenter),
+                new Vector3(spanLen + 0.4f, deckThick, deckW),
+                Quaternion.identity, mats.RoadAsphaltCross, 3.0f, collider: true);
+
+            // 2. Smooth drivable West approach ramp (x = 74.5 -> 96.0, y = 0.0 -> 4.40m, slope 11.5 deg)
+            BuildSmoothBridgeRamp("Bridge_WestRamp", bridge.transform, westStart, 0.01f, westTowerX, deckY, zCenter, deckW, deckThick, mats.RoadAsphaltCross);
+            // 3. Smooth drivable East descent ramp (x = 130.0 -> 151.5, y = 4.40m -> 0.0)
+            BuildSmoothBridgeRamp("Bridge_EastRamp", bridge.transform, eastTowerX, deckY, eastEnd, 0.01f, zCenter, deckW, deckThick, mats.RoadAsphaltCross);
+
+            // Short flat asphalt connectors joining x=72 & x=164 coastal boulevards seamlessly to bridge ends
+            CreateStaticBlock("Bridge_WestJoin", bridge.transform, new Vector3(72.5f, 0.014f, zCenter), new Vector3(6.0f, 0.024f, deckW), mats.RoadAsphaltCross, addCollider: false);
+            CreateStaticBlock("Bridge_EastJoin", bridge.transform, new Vector3(157.5f, 0.014f, zCenter), new Vector3(13.0f, 0.024f, deckW), mats.RoadAsphaltCross, addCollider: false);
+
+            // Crash guardrails along both sides of central suspended deck
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float gz = zCenter + side * (deckW * 0.5f - 0.25f);
+                CreateTiledBox($"Bridge_GuardRail_{side}", bridge.transform,
+                    new Vector3((westTowerX + eastTowerX) * 0.5f, deckY + 0.52f, gz),
+                    new Vector3(spanLen, 1.04f, 0.32f),
+                    Quaternion.identity, mats.IstanbulBridgeSteel, 2.0f, collider: true);
+            }
+
+            // 4. Twin 34m Blender Steel H-Frame Suspension Pylons (cross-beam tucked cleanly right below deckY!)
+            float[] towerXs = { westTowerX, eastTowerX };
+            for (int t = 0; t < towerXs.Length; t++)
+            {
+                GameObject pylon = new GameObject($"Bosphorus_Pylon_{t + 1}");
+                pylon.transform.SetParent(bridge.transform, false);
+                pylon.transform.position = new Vector3(towerXs[t], -2.60f, zCenter);
+                InstantiateBlenderModel("Istanbul_BosphorusBridgeTower.fbx", $"PylonMesh_{t + 1}", pylon.transform, mats);
+                MarkStaticEnvironment(pylon);
+            }
+
+            // 5. Parabolic Steel Main Suspension Cables + Vertical Suspender Hangers on both sides (z = zCenter +/- 8.4)
+            const float towerTopY = 31.8f; // 34.4 - 2.60
+            const float midSagY = 7.2f;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float cz = zCenter + side * 8.4f;
+                // Center span parabolic main cable + vertical suspender ropes
+                const int segs = 12;
+                Vector3 prev = Vector3.zero;
+                for (int i = 0; i <= segs; i++)
+                {
+                    float u = (float)i / segs;
+                    float x = Mathf.Lerp(westTowerX, eastTowerX, u);
+                    float d = (u - 0.5f) * 2f; // -1..+1
+                    float y = Mathf.Lerp(midSagY, towerTopY, d * d);
+                    Vector3 cur = new Vector3(x, y, cz);
+                    if (i > 0)
+                    {
+                        CreateCableSegment($"Cable_Mid_{side}_{i}", bridge.transform, prev, cur, 0.24f, mats.IstanbulBridgeSteel);
+                    }
+                    if (i > 0 && i < segs)
+                    {
+                        CreateCableSegment($"Hanger_{side}_{i}", bridge.transform, new Vector3(x, deckY, zCenter + side * (deckW * 0.5f - 0.2f)), cur, 0.075f, mats.SedanChrome);
+                    }
+                    prev = cur;
+                }
+                // Backstay cables sloping from tower tops down to shore anchorages
+                CreateCableSegment($"Cable_BackW_{side}", bridge.transform, new Vector3(westStart, 0.4f, cz), new Vector3(westTowerX, towerTopY, cz), 0.24f, mats.IstanbulBridgeSteel);
+                CreateCableSegment($"Cable_BackE_{side}", bridge.transform, new Vector3(eastTowerX, towerTopY, cz), new Vector3(eastEnd, 0.4f, cz), 0.24f, mats.IstanbulBridgeSteel);
+            }
+
+            // Overhead Highway Signboard ("BOĞAZİÇİ KÖPRÜSÜ")
+            CreateStaticBlock("Bridge_SignBeam", bridge.transform, new Vector3(westTowerX - 1.2f, deckY + 5.2f, zCenter), new Vector3(0.24f, 0.95f, 8.2f), mats.TownAwningNavy, addCollider: false);
+            CreateWorldSignText("BOĞAZİÇİ KÖPRÜSÜ", bridge.transform, new Vector3(westTowerX - 1.36f, deckY + 5.2f, zCenter), Quaternion.Euler(0f, 90f, 0f), new Vector2(7.6f, 0.78f), Color.white);
+            CreatePointLamp("Lamp_BridgeCenter", bridge.transform, new Vector3(113f, deckY + 8.5f, zCenter), new Color(1.0f, 0.85f, 0.55f), 36f, 3.4f);
+        }
+
+        private static void BuildSmoothBridgeRamp(
+            string name,
+            Transform parent,
+            float x0,
+            float y0,
+            float x1,
+            float y1,
+            float zCenter,
+            float widthZ,
+            float thickness,
+            Material mat)
+        {
+            float dx = x1 - x0;
+            float dy = y1 - y0;
+            float len = Mathf.Sqrt(dx * dx + dy * dy);
+            float angleDeg = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+            Quaternion rot = Quaternion.Euler(0f, 0f, angleDeg);
+            Vector3 midTop = new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, zCenter);
+            Vector3 center = midTop - (rot * Vector3.up) * (thickness * 0.5f);
+
+            CreateTiledBox(name, parent, center, new Vector3(len + 0.16f, thickness, widthZ), rot, mat, 3.0f, collider: true);
+        }
+
+        private static void CreateCableSegment(string name, Transform parent, Vector3 a, Vector3 b, float radius, Material mat)
+        {
+            Vector3 delta = b - a;
+            float len = delta.magnitude;
+            if (len < 0.05f) return;
+            GameObject cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cyl.name = name;
+            cyl.transform.SetParent(parent, false);
+            cyl.transform.position = (a + b) * 0.5f;
+            cyl.transform.up = delta / len;
+            cyl.transform.localScale = new Vector3(radius * 2f, len * 0.5f, radius * 2f);
+            UnityEngine.Object.DestroyImmediate(cyl.GetComponent<Collider>());
+            cyl.GetComponent<Renderer>().sharedMaterial = mat;
+            MarkStaticEnvironment(cyl);
+        }
+
+        private static void BuildGalataCoastalBridge(Transform parent, MaterialSet mats, PrefabSet prefabs, float zCenter)
+        {
+            GameObject galataBr = new GameObject("Istanbul_GalataKoprusu");
+            galataBr.transform.SetParent(parent, false);
+
+            const float deckY = 0.52f;
+            const float deckW = 12.6f;
+            const float deckThick = 0.50f;
+
+            // Central flat coastal bridge deck (x = 78..148) + ultra-gentle shore ramps (72..78 & 148..154)
+            CreateTiledBox("GalataBridge_Deck", galataBr.transform,
+                new Vector3(113f, deckY - deckThick * 0.5f, zCenter),
+                new Vector3(70.4f, deckThick, deckW),
+                Quaternion.identity, mats.RoadAsphaltCross, 3.0f, collider: true);
+            BuildSmoothBridgeRamp("GalataBridge_RampW", galataBr.transform, 72.5f, 0.01f, 78.2f, deckY, zCenter, deckW, deckThick, mats.RoadAsphaltCross);
+            BuildSmoothBridgeRamp("GalataBridge_RampE", galataBr.transform, 147.8f, deckY, 153.5f, 0.01f, zCenter, deckW, deckThick, mats.RoadAsphaltCross);
+            CreateStaticBlock("GalataBridge_EastJoin", galataBr.transform, new Vector3(158.0f, 0.014f, zCenter), new Vector3(12.0f, 0.024f, deckW), mats.RoadAsphaltCross, addCollider: false);
+
+            // Stone piers standing in the Bosphorus + cast-iron promenade railings + vintage street lamps
+            float[] pierXs = { 88f, 104f, 122f, 138f };
+            for (int i = 0; i < pierXs.Length; i++)
+            {
+                CreateTiledBox($"GalataBridge_Pier_{i}", galataBr.transform,
+                    new Vector3(pierXs[i], -0.95f, zCenter), new Vector3(2.4f, 2.2f, deckW + 0.6f),
+                    Quaternion.identity, mats.TravertineStone, 2.0f, collider: true);
+            }
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float rz = zCenter + side * (deckW * 0.5f - 0.25f);
+                CreateTiledBox($"GalataBridge_Rail_{side}", galataBr.transform,
+                    new Vector3(113f, deckY + 0.48f, rz), new Vector3(70.0f, 0.96f, 0.26f),
+                    Quaternion.identity, mats.SedanTrimDark, 2.0f, collider: true);
+
+                for (float lx = 86f; lx <= 140f; lx += 18f)
+                {
+                    PlacePrefabInstance(prefabs.StreetLamp, galataBr.transform,
+                        new Vector3(lx, deckY, rz - side * 0.35f), Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f));
+                }
+            }
+        }
+
+        private static void BuildTownSwimmingPool(
+            Transform parent,
+            MaterialSet mats,
+            List<SeatInteractable> benchSeatCollector)
+        {
+            GameObject poolRoot = new GameObject("Town_SwimmingPoolClub");
+            poolRoot.transform.SetParent(parent, false);
+
+            const float cx = 48.0f;
+            const float cz = 10.0f;
+            const float deckH = 1.60f;
+            const float waterY = 1.48f;
+            const float floorTopY = 0.06f;
+
+            // Ground apron paving around the pool terrace
+            CreateTiledBox("Pool_GroundApron", poolRoot.transform,
+                new Vector3(cx, 0.012f, cz), new Vector3(30.0f, 0.024f, 36.0f),
+                Quaternion.identity, mats.TownPaving, 2.5f, collider: false);
+
+            // 4 Solid raised stone deck blocks enclosing a real open 10m x 16m recessed basin (zero ground holes!)
+            // Outer: x = 37..59 (22m), z = -4..24 (28m). Inner basin: x = 43..53 (10m), z = 2..18 (16m).
+            CreateTiledBox("PoolDeck_West", poolRoot.transform,
+                new Vector3(40.0f, deckH * 0.5f, cz), new Vector3(6.0f, deckH, 28.0f),
+                Quaternion.identity, mats.TownPaving, 2.2f, collider: true);
+            CreateTiledBox("PoolDeck_East", poolRoot.transform,
+                new Vector3(56.0f, deckH * 0.5f, cz), new Vector3(6.0f, deckH, 28.0f),
+                Quaternion.identity, mats.TownPaving, 2.2f, collider: true);
+            CreateTiledBox("PoolDeck_South", poolRoot.transform,
+                new Vector3(cx, deckH * 0.5f, -1.0f), new Vector3(10.0f, deckH, 6.0f),
+                Quaternion.identity, mats.TownPaving, 2.2f, collider: true);
+            CreateTiledBox("PoolDeck_North", poolRoot.transform,
+                new Vector3(cx, deckH * 0.5f, 21.0f), new Vector3(10.0f, deckH, 6.0f),
+                Quaternion.identity, mats.TownPaving, 2.2f, collider: true);
+
+            // Clean white stone coping lip framing the water edge
+            CreateTiledBox("PoolCoping_W", poolRoot.transform, new Vector3(42.82f, deckH + 0.02f, cz), new Vector3(0.38f, 0.04f, 16.76f), Quaternion.identity, mats.PlasterTrim, 2.0f, collider: false);
+            CreateTiledBox("PoolCoping_E", poolRoot.transform, new Vector3(53.18f, deckH + 0.02f, cz), new Vector3(0.38f, 0.04f, 16.76f), Quaternion.identity, mats.PlasterTrim, 2.0f, collider: false);
+            CreateTiledBox("PoolCoping_S", poolRoot.transform, new Vector3(cx, deckH + 0.02f, 1.82f), new Vector3(10.0f, 0.04f, 0.38f), Quaternion.identity, mats.PlasterTrim, 2.0f, collider: false);
+            CreateTiledBox("PoolCoping_N", poolRoot.transform, new Vector3(cx, deckH + 0.02f, 18.18f), new Vector3(10.0f, 0.04f, 0.38f), Quaternion.identity, mats.PlasterTrim, 2.0f, collider: false);
+
+            // Bright ceramic tiled pool floor + 4 decorative inner blue wall liners + swimming lane lines
+            CreateTiledBox("PoolBasin_Floor", poolRoot.transform,
+                new Vector3(cx, floorTopY * 0.5f, cz), new Vector3(10.04f, floorTopY, 16.04f),
+                Quaternion.identity, mats.PoolTileBlue, 1.8f, collider: true);
+            CreateTiledBox("PoolBasin_InnerWall_W", poolRoot.transform, new Vector3(43.04f, deckH * 0.5f, cz), new Vector3(0.08f, deckH, 16.0f), Quaternion.identity, mats.PoolTileBlue, 1.5f, collider: false);
+            CreateTiledBox("PoolBasin_InnerWall_E", poolRoot.transform, new Vector3(52.96f, deckH * 0.5f, cz), new Vector3(0.08f, deckH, 16.0f), Quaternion.identity, mats.PoolTileBlue, 1.5f, collider: false);
+            CreateTiledBox("PoolBasin_InnerWall_S", poolRoot.transform, new Vector3(cx, deckH * 0.5f, 2.04f), new Vector3(10.0f, deckH, 0.08f), Quaternion.identity, mats.PoolTileBlue, 1.5f, collider: false);
+            CreateTiledBox("PoolBasin_InnerWall_N", poolRoot.transform, new Vector3(cx, deckH * 0.5f, 17.96f), new Vector3(10.0f, deckH, 0.08f), Quaternion.identity, mats.PoolTileBlue, 1.5f, collider: false);
+
+            // Lane guide stripes on pool bottom
+            for (int lane = -1; lane <= 1; lane++)
+            {
+                CreateStaticBlock($"PoolLaneStripe_{lane + 1}", poolRoot.transform,
+                    new Vector3(cx + lane * 2.8f, floorTopY + 0.008f, cz), new Vector3(0.16f, 0.012f, 12.8f),
+                    mats.SedanTrimDark, addCollider: false);
+            }
+
+            // Submerged walk-in corner steps (SW corner, x = 43.1..46.0, z = 2.1..4.6) so player can walk in & out smoothly
+            for (int s = 0; s < 5; s++)
+            {
+                float stepTopY = deckH - (s + 1) * 0.28f;
+                float stepZ = 2.08f + s * 0.44f + 0.22f;
+                CreateTiledBox($"PoolSubmergedStep_{s + 1}", poolRoot.transform,
+                    new Vector3(44.55f, stepTopY * 0.5f, stepZ), new Vector3(2.90f, stepTopY, 0.44f),
+                    Quaternion.identity, mats.PoolTileBlue, 1.2f, collider: true);
+            }
+
+            // Translucent turquoise water surface + WaterZone swimming trigger
+            CreateStaticBlock("Pool_WaterSurfaceVisual", poolRoot.transform,
+                new Vector3(cx, waterY - 0.03f, cz), new Vector3(9.94f, 0.06f, 15.94f),
+                mats.PoolWaterClear, addCollider: false);
+
+            GameObject waterZoneGo = new GameObject("Pool_WaterZone");
+            waterZoneGo.transform.SetParent(poolRoot.transform, false);
+            waterZoneGo.transform.position = new Vector3(cx, 0.85f, cz);
+            BoxCollider wzCol = waterZoneGo.AddComponent<BoxCollider>();
+            wzCol.isTrigger = true;
+            wzCol.size = new Vector3(9.92f, 1.72f, 15.92f);
+            WaterZone waterZone = waterZoneGo.AddComponent<WaterZone>();
+            waterZone.Configure(Vector3.zero, new Vector3(9.92f, 1.72f, 15.92f), surfaceY: waterY, floorY: floorTopY);
+
+            // Wide walkable exterior staircases on West (facing Cumhuriyet Caddesi) and South (facing Güney Yolu)
+            const int extSteps = 6;
+            const float stepDepth = 0.45f;
+            float stepRise = deckH / extSteps;
+            for (int i = 0; i < extSteps; i++)
+            {
+                float h = stepRise * (i + 1);
+                // West stairs (ascending +X toward x = 37.0)
+                float wx = 37.0f - (extSteps - i - 0.5f) * stepDepth;
+                CreateTiledBox($"PoolStairs_W_{i + 1}", poolRoot.transform,
+                    new Vector3(wx, h * 0.5f, cz), new Vector3(stepDepth, h, 6.2f),
+                    Quaternion.identity, mats.Sidewalk, 1.5f, collider: true);
+
+                // South stairs (ascending +Z toward z = -4.0)
+                float sz = -4.0f - (extSteps - i - 0.5f) * stepDepth;
+                CreateTiledBox($"PoolStairs_S_{i + 1}", poolRoot.transform,
+                    new Vector3(cx, h * 0.5f, sz), new Vector3(6.2f, h, stepDepth),
+                    Quaternion.identity, mats.Sidewalk, 1.5f, collider: true);
+            }
+
+            // Diving board on North deck extending out over the water
+            CreateTiledBox("DivingBoard_Base", poolRoot.transform,
+                new Vector3(cx, deckH + 0.16f, 19.45f), new Vector3(0.74f, 0.32f, 1.35f),
+                Quaternion.identity, mats.Concrete, 1.5f, collider: true);
+            CreateTiledBox("DivingBoard_Plank", poolRoot.transform,
+                new Vector3(cx, deckH + 0.35f, 18.10f), new Vector3(0.60f, 0.08f, 3.20f),
+                Quaternion.identity, mats.PlasterTrim, 1.5f, collider: true);
+
+            // Chrome pool ladders on East & West rims
+            Vector3[] ladderSpots = { new Vector3(53.05f, deckH, 14.2f), new Vector3(42.95f, deckH, 14.2f) };
+            for (int i = 0; i < ladderSpots.Length; i++)
+            {
+                float dir = i == 0 ? 1f : -1f;
+                Vector3 lp = ladderSpots[i];
+                CreateStaticPart($"PoolLadder_RailA_{i}", PrimitiveType.Cylinder, poolRoot.transform, lp + new Vector3(dir * 0.15f, 0.32f, -0.26f), Quaternion.identity, new Vector3(0.05f, 0.65f, 0.05f), mats.SedanChrome);
+                CreateStaticPart($"PoolLadder_RailB_{i}", PrimitiveType.Cylinder, poolRoot.transform, lp + new Vector3(dir * 0.15f, 0.32f, 0.26f), Quaternion.identity, new Vector3(0.05f, 0.65f, 0.05f), mats.SedanChrome);
+                CreateStaticPart($"PoolLadder_TopA_{i}", PrimitiveType.Cube, poolRoot.transform, lp + new Vector3(0f, 0.64f, -0.26f), Quaternion.identity, new Vector3(0.36f, 0.05f, 0.05f), mats.SedanChrome);
+                CreateStaticPart($"PoolLadder_TopB_{i}", PrimitiveType.Cube, poolRoot.transform, lp + new Vector3(0f, 0.64f, 0.26f), Quaternion.identity, new Vector3(0.36f, 0.05f, 0.05f), mats.SedanChrome);
+            }
+
+            // 4 Sittable Sun Loungers + 2 Striped Parasols on East & West decks
+            (Vector3 pos, float yaw, Material mat)[] loungers =
+            {
+                (new Vector3(56.2f, deckH, 5.2f), -90f, mats.TownFabricTeal),
+                (new Vector3(56.2f, deckH, 8.2f), -90f, mats.TownFabricTeal),
+                (new Vector3(56.2f, deckH, 13.0f), -90f, mats.TownFabricMustard),
+                (new Vector3(56.2f, deckH, 16.0f), -90f, mats.TownFabricMustard)
+            };
+            for (int i = 0; i < loungers.Length; i++)
+            {
+                GameObject lg = new GameObject($"Pool_SunLounger_{i + 1}");
+                lg.transform.SetParent(poolRoot.transform, false);
+                lg.transform.SetPositionAndRotation(loungers[i].pos, Quaternion.Euler(0f, loungers[i].yaw, 0f));
+
+                CreateStaticPart("Frame", PrimitiveType.Cube, lg.transform, new Vector3(0f, 0.22f, 0f), Quaternion.identity, new Vector3(0.76f, 0.08f, 1.92f), mats.PlasterTrim);
+                CreateStaticPart("Pad", PrimitiveType.Cube, lg.transform, new Vector3(0f, 0.29f, 0.14f), Quaternion.identity, new Vector3(0.70f, 0.07f, 1.38f), loungers[i].mat);
+                CreateStaticPart("Backrest", PrimitiveType.Cube, lg.transform, new Vector3(0f, 0.48f, -0.68f), Quaternion.Euler(28f, 0f, 0f), new Vector3(0.70f, 0.08f, 0.64f), loungers[i].mat);
+                BoxCollider lCol = lg.AddComponent<BoxCollider>();
+                lCol.center = new Vector3(0f, 0.30f, 0f);
+                lCol.size = new Vector3(0.78f, 0.60f, 1.94f);
+                MarkStaticEnvironment(lg);
+
+                SeatInteractable seat = CreateSeatSlot($"LoungerSeat_{i + 1}", $"pool_lounger_{i + 1}", lg.transform,
+                    new Vector3(0f, 0.35f, 0.05f), Quaternion.identity, 1.55f);
+                benchSeatCollector.Add(seat);
+            }
+
+            // 2 Poolside Parasol Umbrellas
+            Vector3[] umbrellaPos = { new Vector3(56.4f, deckH, 6.7f), new Vector3(56.4f, deckH, 14.5f) };
+            Material[] umbrellaMats = { mats.TownAwningTerracotta, mats.TownAwningNavy };
+            for (int i = 0; i < umbrellaPos.Length; i++)
+            {
+                CreateStaticPart($"Parasol_Pole_{i}", PrimitiveType.Cylinder, poolRoot.transform, umbrellaPos[i] + Vector3.up * 1.32f, Quaternion.identity, new Vector3(0.06f, 1.32f, 0.06f), mats.SedanTrimDark);
+                CreateStaticPart($"Parasol_Canopy_{i}", PrimitiveType.Cylinder, poolRoot.transform, umbrellaPos[i] + Vector3.up * 2.52f, Quaternion.identity, new Vector3(2.45f, 0.10f, 2.45f), umbrellaMats[i]);
+            }
+
+            // Pool Club Signboard facing Cumhuriyet Caddesi
+            CreateStaticPart("PoolSign_PostL", PrimitiveType.Cylinder, poolRoot.transform, new Vector3(36.8f, 1.4f, 14.0f), Quaternion.identity, new Vector3(0.10f, 1.4f, 0.10f), mats.SedanTrimDark);
+            CreateStaticPart("PoolSign_PostR", PrimitiveType.Cylinder, poolRoot.transform, new Vector3(36.8f, 1.4f, 17.6f), Quaternion.identity, new Vector3(0.10f, 1.4f, 0.10f), mats.SedanTrimDark);
+            CreateStaticPart("PoolSign_Board", PrimitiveType.Cube, poolRoot.transform, new Vector3(36.8f, 2.55f, 15.8f), Quaternion.identity, new Vector3(0.14f, 0.78f, 3.85f), mats.TownFabricTeal);
+            CreateWorldSignText("YÜZME HAVUZU", poolRoot.transform, new Vector3(36.70f, 2.55f, 15.8f), Quaternion.Euler(0f, 90f, 0f), new Vector2(3.6f, 0.65f), new Color(0.98f, 0.98f, 0.96f, 1f));
+
+            // Lush perimeter trees & night lighting
+            CreateTownTree("Pool_Tree_SW", poolRoot.transform, new Vector3(34.5f, 0f, -6.5f), mats, 1.05f, 41);
+            CreateTownTree("Pool_Tree_SE", poolRoot.transform, new Vector3(61.5f, 0f, -6.5f), mats, 1.12f, 42);
+            CreateTownTree("Pool_Tree_NW", poolRoot.transform, new Vector3(34.5f, 0f, 26.5f), mats, 1.02f, 43);
+            CreateTownTree("Pool_Tree_NE", poolRoot.transform, new Vector3(61.5f, 0f, 26.5f), mats, 1.08f, 44);
+            CreatePointLamp("Lamp_Pool_N", poolRoot.transform, new Vector3(cx, 5.2f, 20.5f), new Color(0.82f, 0.96f, 1.0f), 22f, 2.8f);
+            CreatePointLamp("Lamp_Pool_S", poolRoot.transform, new Vector3(cx, 5.2f, -0.5f), new Color(0.82f, 0.96f, 1.0f), 22f, 2.8f);
         }
 
         private static List<TrafficStopLine> BuildTownStreetFurniture(
@@ -1000,24 +1735,35 @@ namespace Gridroam.Editor
                 PlacePrefabInstance(prefabs.TrashCan, furnRoot.transform, trashCans[i], Quaternion.Euler(0f, i * 45f, 0f));
             }
 
-            // 8 Drivable Town Cars parked cleanly off active driving lanes
+            // 12 Diverse Drivable Town Cars across all 6 distinct Blender 3D vehicle models (Sports Coupe, SUV, Delivery Van, Pickup, Hatchback, Sedan)
+            // Parked cleanly in shoulder bays off active driving lanes — EVERY single car is unlocked & drivable!
             (Vector3 pos, float yaw, int fixedVariant)[] parkedCars =
             {
                 (new Vector3(19.6f, 0.28f, -12.0f), 0f, 0),    // Red Hatchback near Pizzeria
+                (new Vector3(19.6f, 0.28f, 24.0f), 0f, 7),     // White Delivery Van near Market
+                (new Vector3(19.6f, 0.28f, 64.0f), 0f, 3),     // Yellow Sports Coupe at Town Square!
                 (new Vector3(19.6f, 0.28f, 102.0f), 0f, 2),    // Green Sedan near Taxi Rank
+                (new Vector3(32.2f, 0.28f, 1.5f), 0f, 5),      // Charcoal 4x4 SUV at Swimming Pool Club!
+                (new Vector3(15.5f, 0.28f, -32.5f), 0f, 4),    // Blue Sports Coupe next to Tamirhane!
                 (new Vector3(-28.4f, 0.28f, 0.0f), 180f, 1),   // White Pickup on Çınar Caddesi
-                (new Vector3(-28.4f, 0.28f, 70.0f), 180f, 0),  // Hatchback in West Residential
-                (new Vector3(-28.4f, 0.28f, 140.0f), 180f, 2), // Sedan near Park
-                (new Vector3(28.4f, 0.28f, 70.0f), 0f, 1),     // Pickup in East Residential
-                (new Vector3(56.0f, 0.28f, 18.0f), 90f, 0),    // Hatchback at East Community Garden
-                (new Vector3(-67.6f, 0.28f, 80.0f), 0f, 1)     // Pickup on West Ring Street
+                (new Vector3(-28.4f, 0.28f, 70.0f), 180f, 8),  // Blue Hatchback in West Residential
+                (new Vector3(-28.4f, 0.28f, 140.0f), 180f, 6), // Forest Green 4x4 SUV near Çınarlı Park
+                (new Vector3(28.4f, 0.28f, 70.0f), 0f, 1),     // White Pickup in East Residential
+                (new Vector3(28.4f, 0.28f, 162.0f), 0f, 7),    // White Delivery Van near North Cargo Depot
+                (new Vector3(-67.6f, 0.28f, 80.0f), 0f, 3)     // Yellow Sports Coupe on West Ring Street
             };
 
             GameObject[] drivableVariants =
             {
-                prefabs.TownCarRedHatchback,
-                prefabs.TownCarWhitePickup,
-                prefabs.TownCarGreenSedan
+                prefabs.TownCarRedHatchback,       // 0
+                prefabs.TownCarWhitePickup,        // 1
+                prefabs.TownCarGreenSedan,         // 2
+                prefabs.TownCarYellowSportsCoupe,  // 3
+                prefabs.TownCarBlueSportsCoupe,    // 4
+                prefabs.TownCarCharcoalSUV,        // 5
+                prefabs.TownCarGreenSUV,           // 6
+                prefabs.TownCarWhiteVan,           // 7
+                prefabs.TownCarBlueHatchback       // 8
             };
 
             for (int i = 0; i < parkedCars.Length; i++)
@@ -1127,13 +1873,9 @@ namespace Gridroam.Editor
             bench.transform.SetParent(parent, false);
             bench.transform.SetPositionAndRotation(pos, rot);
 
-            if (_activeBenchPrefab != null)
-            {
-                GameObject meshInst = PlacePrefabInstance(_activeBenchPrefab, bench.transform, Vector3.zero, Quaternion.identity);
-                meshInst.transform.localPosition = Vector3.zero;
-                meshInst.transform.localRotation = Quaternion.identity;
-            }
-            else
+            // Always use our upright sculpted Blender Park Bench (Teak slats at Y=0.45m + wrought-iron frame — zero floating NPCs!)
+            GameObject benchMesh = InstantiateBlenderModel("Town_ParkBench.fbx", "ParkBenchMesh", bench.transform, mats);
+            if (benchMesh == null)
             {
                 CreatePrimitiveChild("Seat", PrimitiveType.Cube, bench.transform,
                     new Vector3(0f, 0.45f, 0f), new Vector3(1.85f, 0.09f, 0.52f), mats.TownWood, removeCollider: true);

@@ -154,15 +154,31 @@ namespace Gridroam.CameraSystem
                 _pitch = Mathf.Lerp(_pitch, drivingDefaultPitch, 1f - Mathf.Exp(-2.2f * Time.deltaTime));
             }
 
-            float minPitch = _isDrivingMode ? 4f : footMinPitch;
-            float maxPitch = _isDrivingMode ? 42f : footMaxPitch;
-            _pitch = Mathf.Clamp(_pitch, minPitch, maxPitch);
-
             Vector3 desiredOffset = _isDrivingMode
                 ? drivingPivotOffset
                 : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
             Vector3 desiredPivot = target.position + desiredOffset;
             _smoothedPivot = Vector3.Lerp(_smoothedPivot, desiredPivot, 1f - Mathf.Exp(-pivotFollowSpeed * Time.deltaTime));
+
+            // Automatic overhead ceiling detection: works inside ANY house, shop, porch or garage
+            // even before an InteriorZone trigger fires so the camera can NEVER float above a roof!
+            bool hasOverheadCeiling = false;
+            float ceilingY = float.MaxValue;
+            if (!_isDrivingMode &&
+                Physics.Raycast(_smoothedPivot, Vector3.up, out RaycastHit ceilHit, 4.2f, collisionMask, QueryTriggerInteraction.Ignore))
+            {
+                if (ceilHit.transform != null && ceilHit.transform != target && !ceilHit.transform.IsChildOf(target))
+                {
+                    hasOverheadCeiling = true;
+                    ceilingY = ceilHit.point.y;
+                }
+            }
+
+            bool effectivelyIndoors = !_isDrivingMode && (IsIndoors || hasOverheadCeiling);
+
+            float minPitch = _isDrivingMode ? 4f : (hasOverheadCeiling ? -10f : footMinPitch);
+            float maxPitch = _isDrivingMode ? 42f : (hasOverheadCeiling ? 22f : footMaxPitch);
+            _pitch = Mathf.Clamp(_pitch, minPitch, maxPitch);
 
             float speedFactor = 0f;
             if (_isDrivingMode && _targetRb != null)
@@ -173,15 +189,16 @@ namespace Gridroam.CameraSystem
 
             float desiredDistance = _isDrivingMode
                 ? drivingDistance + speedFactor * drivingSpeedExtraDistance
-                : GetEffectiveFootMaxDistance();
-            _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distanceBlendSpeed * Time.deltaTime));
+                : (hasOverheadCeiling ? Mathf.Min(GetEffectiveFootMaxDistance(), 1.90f) : GetEffectiveFootMaxDistance());
+            float distSpeed = effectivelyIndoors ? distanceBlendSpeed * 2.2f : distanceBlendSpeed;
+            _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distSpeed * Time.deltaTime));
 
             if (_camera == null) _camera = GetComponent<Camera>();
             if (_camera != null)
             {
                 float desiredFov = _isDrivingMode
                     ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor)
-                    : baseFov;
+                    : (effectivelyIndoors ? 66f : baseFov);
                 _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, desiredFov, 1f - Mathf.Exp(-fovSmoothSpeed * Time.deltaTime));
             }
 
@@ -190,8 +207,64 @@ namespace Gridroam.CameraSystem
 
             float finalDistance = ComputeCollisionAdjustedDistance(_smoothedPivot, backDir, _currentDistance);
 
-            transform.position = _smoothedPivot + backDir * finalDistance;
-            transform.LookAt(_smoothedPivot);
+            Vector3 shakeOffset = Vector3.zero;
+            if (_shakeTimer > 0f)
+            {
+                _shakeTimer -= Time.unscaledDeltaTime;
+                float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
+                shakeOffset = new Vector3(
+                    (Mathf.PerlinNoise(Time.unscaledTime * 42f, 1.3f) - 0.5f) * 2f * amp,
+                    (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 42f) - 0.5f) * 2f * amp,
+                    0f);
+            }
+
+            Vector3 finalPos = _smoothedPivot + backDir * finalDistance + transform.TransformDirection(shakeOffset);
+
+            // Hard safety clamp below overhead ceiling & above floor so camera NEVER clips through roof slabs!
+            if (hasOverheadCeiling)
+            {
+                float maxCamY = ceilingY - 0.36f;
+                if (finalPos.y > maxCamY)
+                {
+                    finalPos.y = maxCamY;
+                }
+            }
+            if (!_isDrivingMode)
+            {
+                float minCamY = target.position.y + 0.55f;
+                if (finalPos.y < minCamY)
+                {
+                    finalPos.y = minCamY;
+                }
+            }
+
+            // Pinpoint secondary linecast guarantees camera stays cleanly inside walls even near tight doorway lintels
+            if (Physics.Linecast(_smoothedPivot, finalPos, out RaycastHit lineHit, collisionMask, QueryTriggerInteraction.Ignore))
+            {
+                if (lineHit.transform != null && lineHit.transform != target && !lineHit.transform.IsChildOf(target))
+                {
+                    Vector3 toCam = finalPos - _smoothedPivot;
+                    float safeDist = Mathf.Max(0.32f, lineHit.distance - 0.16f);
+                    if (toCam.sqrMagnitude > 0.0001f)
+                    {
+                        finalPos = _smoothedPivot + toCam.normalized * safeDist;
+                    }
+                }
+            }
+
+            transform.position = finalPos;
+            transform.LookAt(_smoothedPivot + shakeOffset * 0.45f);
+        }
+
+        private float _shakeTimer;
+        private float _shakeDuration;
+        private float _shakeIntensity;
+
+        public void AddShake(float intensity, float duration = 0.18f)
+        {
+            _shakeIntensity = Mathf.Max(_shakeIntensity, intensity);
+            _shakeDuration = Mathf.Max(0.05f, duration);
+            _shakeTimer = _shakeDuration;
         }
 
         private float ComputeCollisionAdjustedDistance(Vector3 origin, Vector3 direction, float maxDist)

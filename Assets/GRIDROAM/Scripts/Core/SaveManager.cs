@@ -28,7 +28,11 @@ namespace Gridroam.Core
         public event Action<SaveData> OnSaveUpdated;
         public event Action<int> OnMoneyChanged;
 
+        private const int CurrentSchemaVersion = 3;
+
         private string SavePath => Path.Combine(Application.persistentDataPath, saveFileName);
+        private string TempSavePath => SavePath + ".tmp";
+        private string BackupSavePath => SavePath + ".bak";
 
         private void Awake()
         {
@@ -72,35 +76,54 @@ namespace Gridroam.Core
 
         public void Load()
         {
-            try
+            SaveData loaded = TryReadSaveFile(SavePath);
+            if (loaded == null)
             {
                 if (File.Exists(SavePath))
                 {
-                    string json = File.ReadAllText(SavePath);
-                    SaveData loaded = JsonUtility.FromJson<SaveData>(json);
-                    if (loaded != null)
-                    {
-                        Data = loaded;
-                        SanitizeAndMigrateLoadedData();
-                    }
-                    else
-                    {
-                        Data = new SaveData();
-                    }
+                    Debug.LogWarning("[SaveManager] Primary save file was missing or corrupted; attempting backup recovery.");
                 }
-                else
+                loaded = TryReadSaveFile(BackupSavePath);
+                if (loaded != null)
                 {
-                    Data = new SaveData();
+                    Debug.LogWarning("[SaveManager] Successfully recovered player progress from backup (.bak).");
                 }
             }
-            catch (Exception ex)
+
+            if (loaded != null)
             {
-                Debug.LogWarning($"[SaveManager] Failed to load save file, resetting defaults. {ex.Message}");
+                Data = loaded;
+                SanitizeAndMigrateLoadedData();
+            }
+            else
+            {
                 Data = new SaveData();
             }
 
             LastMoneyDelta = 0;
             OnSaveLoaded?.Invoke(Data);
+        }
+
+        private static SaveData TryReadSaveFile(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                return null;
+            }
+            try
+            {
+                string json = File.ReadAllText(path);
+                if (string.IsNullOrWhiteSpace(json) || !json.TrimStart().StartsWith("{"))
+                {
+                    return null;
+                }
+                return JsonUtility.FromJson<SaveData>(json);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[SaveManager] Failed to parse '{path}': {ex.Message}");
+                return null;
+            }
         }
 
         private void SanitizeAndMigrateLoadedData()
@@ -114,24 +137,32 @@ namespace Gridroam.Core
                 Data.housePaint = new List<HousePaintEntry>();
             }
 
-            // Safely upgrade older schema v1 saves so new fields have valid starting defaults
-            if (Data.schemaVersion < 2)
+            // Forward-compatibility guard: never auto-reset saves written by a newer schema version!
+            if (Data.schemaVersion > CurrentSchemaVersion)
             {
-                Data.schemaVersion = 2;
-                Data.money = 250;
-                Data.energy = 80f;
-                Data.timeOfDayHours = 9.0f;
-                Data.missionSedanFuel = 0.8f;
-                Data.savedVehicleFuel = 0.8f;
-                Data.languageCode = "tr";
-                Data.hasSavedPlayerState = false;
+                Debug.LogWarning($"[SaveManager] Loaded newer save schema v{Data.schemaVersion} (app supports v{CurrentSchemaVersion}); preserving user data without reset.");
             }
-
-            // Clear stale world coordinates from pre-v8 map layouts so player spawns safely in the redesigned town
-            if (Data.schemaVersion < 3)
+            else
             {
-                Data.schemaVersion = 3;
-                Data.hasSavedPlayerState = false;
+                // Safely upgrade older schema v1 saves so new fields have valid starting defaults
+                if (Data.schemaVersion < 2)
+                {
+                    Data.schemaVersion = 2;
+                    Data.money = 250;
+                    Data.energy = 80f;
+                    Data.timeOfDayHours = 9.0f;
+                    Data.missionSedanFuel = 0.8f;
+                    Data.savedVehicleFuel = 0.8f;
+                    Data.languageCode = "tr";
+                    Data.hasSavedPlayerState = false;
+                }
+
+                // Clear stale world coordinates from pre-v8 map layouts so player spawns safely in Selman Sokağı
+                if (Data.schemaVersion < 3)
+                {
+                    Data.schemaVersion = 3;
+                    Data.hasSavedPlayerState = false;
+                }
             }
 
             if (string.IsNullOrWhiteSpace(Data.languageCode))
@@ -158,12 +189,47 @@ namespace Gridroam.Core
 
                 _autoSaveTimer = 0f;
                 string json = JsonUtility.ToJson(Data, true);
-                File.WriteAllText(SavePath, json);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    Debug.LogError("[SaveManager] Refused to write empty save payload.");
+                    return;
+                }
+
+                string dir = Path.GetDirectoryName(SavePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                // 1. Write to temporary file on the same filesystem first
+                File.WriteAllText(TempSavePath, json);
+
+                // 2. Preserve last known good save as .bak before replacing primary
+                if (File.Exists(SavePath))
+                {
+                    try
+                    {
+                        File.Replace(TempSavePath, SavePath, BackupSavePath, ignoreMetadataErrors: true);
+                    }
+                    catch (Exception)
+                    {
+                        // Mobile / cross-FS safe fallback
+                        File.Copy(SavePath, BackupSavePath, overwrite: true);
+                        File.Copy(TempSavePath, SavePath, overwrite: true);
+                        if (File.Exists(TempSavePath)) File.Delete(TempSavePath);
+                    }
+                }
+                else
+                {
+                    File.Move(TempSavePath, SavePath);
+                    File.Copy(SavePath, BackupSavePath, overwrite: true);
+                }
+
                 OnSaveUpdated?.Invoke(Data);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SaveManager] Failed to save progress: {ex.Message}");
+                Debug.LogError($"[SaveManager] Failed to save progress atomically: {ex.Message}");
             }
         }
 
@@ -309,10 +375,9 @@ namespace Gridroam.Core
 
             try
             {
-                if (File.Exists(SavePath))
-                {
-                    File.Delete(SavePath);
-                }
+                if (File.Exists(SavePath)) File.Delete(SavePath);
+                if (File.Exists(BackupSavePath)) File.Delete(BackupSavePath);
+                if (File.Exists(TempSavePath)) File.Delete(TempSavePath);
             }
             catch (Exception ex)
             {

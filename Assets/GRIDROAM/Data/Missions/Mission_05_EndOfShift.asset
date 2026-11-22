@@ -15,9 +15,9 @@ MonoBehaviour:
   missionId: m05_end_of_shift
   titleKey: m05.title
   summaryKey: m05.summary
-  rewardMoney: 300
-  nextMissionId: 
-  autoStartNextMission: 0
+  rewardMoney: 500
+  nextMissionId: m06_bakkal_siparisi
+  autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot
   retryVehicleAnchorId: spawn_garage_sedan
   retryStartInVehicle: 0

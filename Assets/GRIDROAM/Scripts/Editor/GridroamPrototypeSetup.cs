@@ -45,7 +45,7 @@ namespace Gridroam.Editor
         private const string SceneDir = RootDir + "/Scenes";
         public const string TestScenePath = SceneDir + "/GRIDROAM_GarageHarbor_Test.unity";
 
-        [MenuItem("GRIDROAM/1. Build Garage-Harbor Prototype (Missions 1-2)", priority = 1)]
+        [MenuItem("GRIDROAM/1. Build Sultanbeyli Selman Sokağı (Görevler 1-5 + Yan İşler)", priority = 1)]
         public static void BuildFullPrototypeMenu()
         {
             BuildFullPrototype(showDialog: true);
@@ -69,13 +69,13 @@ namespace Gridroam.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[GRIDROAM] Open-World Liman Kasabası v5 (Side Jobs, Economy, Day/Night Cycle, Shops & Gas Station, Phone/Map & Minimap, Turkish UI) built successfully!");
+            Debug.Log("[GRIDROAM] Sultanbeyli · Selman Sokağı (Görevler 1-5, 4 Yan İş, Hz. Osman Camii, Ekonomi, Gün/Gece, Telefon/Harita & Türkçe Arayüz) başarıyla oluşturuldu!");
             if (showDialog)
             {
                 EditorUtility.DisplayDialog(
-                    "GRIDROAM Open-World Liman Kasabası Ready (Android & iOS)",
-                    "Liman Kasabası open world with Side Jobs (Pizza, Taxi, Street Cleanup, House Painting), Economy, Day/Night Cycle, Café/Market/Gas Station, Phone Map & Minimap, Turkish primary localization, and Missions 1 & 2 is ready.\n\nPress Play to explore!",
-                    "OK");
+                    "GRIDROAM · Sultanbeyli Selman Sokağı Hazır (Android & iOS)",
+                    "Sultanbeyli · Selman Sokağı açık dünyası (Görevler 1–5, Pizza/Taksi/Temizlik/Boyama yan işleri, içi gezilebilir evler & Hz. Osman Camii, ATM, sokak kedileri, mahalle futbolu, telefon/harita ve Türkçe arayüz) hazır.\n\nOynamak için Play'e bas!",
+                    "Tamam");
             }
         }
 
@@ -89,32 +89,88 @@ namespace Gridroam.Editor
             Debug.Log("[GRIDROAM] Shared Android & iOS settings + URP Mobile Low/Medium profiles configured.");
         }
 
+        public const string AppIconAssetPath = "Assets/GRIDROAM/Art/Store/AppIcon_1024.png";
+
         public static void ConfigureCrossPlatformMobileSettings()
         {
-            const string bundleId = "com.dogusstore.gridroam";
+            const string bundleId = "com.dogusstore.ourworld";
 
-            PlayerSettings.productName = "GRIDROAM";
+            PlayerSettings.companyName = "Dogus Store";
+            PlayerSettings.productName = "OurWorld";
+            PlayerSettings.bundleVersion = "1.0.0";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = true;
             PlayerSettings.allowedAutorotateToLandscapeRight = true;
             PlayerSettings.statusBarHidden = true;
+            PlayerSettings.SplashScreen.backgroundColor = new Color(0.09f, 0.114f, 0.141f, 1f);
 
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, bundleId);
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
+            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.forceInternetPermission = true; // Player feedback -> Firebase (Öneri sekmesi)
+            if (PlayerSettings.Android.bundleVersionCode < 1)
+            {
+                PlayerSettings.Android.bundleVersionCode = 1;
+            }
 
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, bundleId);
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.iOS, ScriptingImplementation.IL2CPP);
             PlayerSettings.iOS.targetOSVersionString = "15.0";
             PlayerSettings.iOS.targetDevice = iOSTargetDevice.iPhoneAndiPad;
+            if (string.IsNullOrWhiteSpace(PlayerSettings.iOS.buildNumber) || PlayerSettings.iOS.buildNumber == "0")
+            {
+                PlayerSettings.iOS.buildNumber = "1";
+            }
             PlayerSettings.iOS.deferSystemGesturesMode =
                 UnityEngine.iOS.SystemGestureDeferMode.BottomEdge |
                 UnityEngine.iOS.SystemGestureDeferMode.TopEdge;
             PlayerSettings.iOS.hideHomeButton = false;
             PlayerSettings.iOS.requiresFullScreen = true;
+
+            ApplyStoreAppIcons();
+        }
+
+        public static void ApplyStoreAppIcons()
+        {
+            if (!File.Exists(AppIconAssetPath))
+            {
+                return;
+            }
+
+            TextureImporter ti = AssetImporter.GetAtPath(AppIconAssetPath) as TextureImporter;
+            if (ti != null)
+            {
+                bool dirty = false;
+                if (ti.textureType != TextureImporterType.Default) { ti.textureType = TextureImporterType.Default; dirty = true; }
+                if (ti.npotScale != TextureImporterNPOTScale.None) { ti.npotScale = TextureImporterNPOTScale.None; dirty = true; }
+                if (ti.mipmapEnabled) { ti.mipmapEnabled = false; dirty = true; }
+                if (ti.alphaIsTransparency) { ti.alphaIsTransparency = false; dirty = true; }
+                if (ti.maxTextureSize < 1024) { ti.maxTextureSize = 1024; dirty = true; }
+                if (ti.textureCompression != TextureImporterCompression.Uncompressed) { ti.textureCompression = TextureImporterCompression.Uncompressed; dirty = true; }
+                if (dirty) ti.SaveAndReimport();
+            }
+
+            Texture2D iconTex = AssetDatabase.LoadAssetAtPath<Texture2D>(AppIconAssetPath);
+            if (iconTex == null) return;
+
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { iconTex }, IconKind.Any);
+
+            // Populate all Android & iOS legacy/application icon slots cleanly
+            NamedBuildTarget[] targets = { NamedBuildTarget.Android, NamedBuildTarget.iOS };
+            for (int t = 0; t < targets.Length; t++)
+            {
+                int[] sizes = PlayerSettings.GetIconSizes(targets[t], IconKind.Application);
+                if (sizes != null && sizes.Length > 0)
+                {
+                    Texture2D[] filled = new Texture2D[sizes.Length];
+                    for (int i = 0; i < filled.Length; i++) filled[i] = iconTex;
+                    PlayerSettings.SetIcons(targets[t], filled, IconKind.Application);
+                }
+            }
         }
 
         private static void EnsureDirectories()
@@ -166,6 +222,22 @@ namespace Gridroam.Editor
 
                     bool isNormal = lower.Contains("normalgl") || lower.Contains("nor_gl");
                     ConfigureTextureImporter(assetPath, isNormal, 1024);
+                }
+            }
+
+            // Enable Read/Write on all Blender vehicle FBX meshes so VehicleDamageSystem can deform/crumple them at runtime!
+            if (Directory.Exists(BlenderModelsDir))
+            {
+                string[] carFbxs = Directory.GetFiles(BlenderModelsDir, "Car_*.fbx", SearchOption.TopDirectoryOnly);
+                foreach (string rawFbx in carFbxs)
+                {
+                    string fbxAssetPath = rawFbx.Replace("\\", "/");
+                    ModelImporter mi = AssetImporter.GetAtPath(fbxAssetPath) as ModelImporter;
+                    if (mi != null && !mi.isReadable)
+                    {
+                        mi.isReadable = true;
+                        mi.SaveAndReimport();
+                    }
                 }
             }
         }
@@ -223,7 +295,19 @@ namespace Gridroam.Editor
 
             if (medAsset != null)
             {
-                ConfigureUrpSerialized(medAsset, renderScale: 0.90f, shadowDistance: 45f, shadowRes: 1024, hdr: true, msaa: 2, cascades: 2);
+                // Wire PC_Renderer (with ScreenSpaceAmbientOcclusion enabled) for rich contact shading & crisp 2048 shadows!
+                ScriptableRendererData pcRenderer = AssetDatabase.LoadAssetAtPath<ScriptableRendererData>("Assets/Settings/PC_Renderer.asset");
+                if (pcRenderer != null)
+                {
+                    SerializedObject medSo = new SerializedObject(medAsset);
+                    SerializedProperty listProp = medSo.FindProperty("m_RendererDataList");
+                    if (listProp != null && listProp.arraySize > 0)
+                    {
+                        listProp.GetArrayElementAtIndex(0).objectReferenceValue = pcRenderer;
+                        medSo.ApplyModifiedPropertiesWithoutUndo();
+                    }
+                }
+                ConfigureUrpSerialized(medAsset, renderScale: 1.00f, shadowDistance: 75f, shadowRes: 2048, hdr: true, msaa: 4, cascades: 3);
             }
 
             return (lowAsset, medAsset);
@@ -382,6 +466,43 @@ namespace Gridroam.Editor
             public Material CarRed;
             public Material CarWhite;
             public Material CarDarkGreen;
+            public Material CarYellow;
+            public Material CarSkyBlue;
+            public Material CarCharcoal;
+            public Material CarVanCream;
+            public Material PoolTileBlue;
+            public Material PoolWaterClear;
+            public Material TravertineStone;
+            public Material IstanbulLeadRoof;
+            public Material IstanbulBridgeSteel;
+            public Material IstanbulTramRed;
+            public Material IstanbulGoldBrass;
+            public Material IstanbulFerryHull;
+            public Material IstanbulBosphorusWater;
+            public Material KilitParke;
+            public Material RawBrick;
+            public Material RedPlaster;
+            public Material SagePlaster;
+            public Material YellowPlaster;
+            public Material OrangeStripe;
+            public Material OliveFacade;
+            public Material FenceBlue;
+            public Material WhitePVC;
+            public Material DarkInterior;
+            public Material RustSteel;
+            public Material VineBrown;
+            public Material DoorTeal;
+            public Material StreetSignBlue;
+            public Material PeachPlaster;
+            public Material CoralPlaster;
+            public Material PinkPlaster;
+            public Material PowderBlue;
+            public Material MeshGreen;
+            public Material CobaltBlue;
+            public Material LilacGate;
+            public Material TurquoiseRust;
+            public Material Galvanized;
+            public Material SignRed;
             public Material BrakeCaliper;
             public Material CanRed;
             public Material CanBlue;
@@ -505,6 +626,43 @@ namespace Gridroam.Editor
                 CarRed = CreateOrLoadMaterial("MAT_Car_Red", urpLit, new Color(0.55f, 0.06f, 0.05f), 0.75f, 0.40f),
                 CarWhite = CreateOrLoadMaterial("MAT_Car_White", urpLit, new Color(0.92f, 0.92f, 0.90f), 0.78f, 0.32f),
                 CarDarkGreen = CreateOrLoadMaterial("MAT_Car_DarkGreen", urpLit, new Color(0.07f, 0.23f, 0.15f), 0.76f, 0.42f),
+                CarYellow = CreateOrLoadMaterial("MAT_Car_Yellow", urpLit, new Color(0.94f, 0.68f, 0.08f), 0.88f, 0.46f),
+                CarSkyBlue = CreateOrLoadMaterial("MAT_Car_SkyBlue", urpLit, new Color(0.12f, 0.42f, 0.74f), 0.86f, 0.48f),
+                CarCharcoal = CreateOrLoadMaterial("MAT_Car_Charcoal", urpLit, new Color(0.16f, 0.18f, 0.21f), 0.82f, 0.52f),
+                CarVanCream = CreateOrLoadMaterial("MAT_Car_VanCream", urpLit, new Color(0.92f, 0.90f, 0.84f), 0.65f, 0.20f),
+                PoolTileBlue = CreateOrLoadMaterial("MAT_Pool_TileBlue", urpLit, new Color(0.16f, 0.58f, 0.78f), 0.72f, 0.05f),
+                PoolWaterClear = CreateOrLoadMaterial("MAT_Pool_WaterClear", urpLit, new Color(0.12f, 0.70f, 0.88f, 0.66f), 0.95f, 0.08f),
+                TravertineStone = CreateOrLoadMaterial("MAT_Travertine_Stone", urpLit, new Color(0.94f, 0.91f, 0.85f), 0.24f, 0.0f),
+                IstanbulLeadRoof = CreateOrLoadMaterial("MAT_Istanbul_LeadRoof", urpLit, new Color(0.28f, 0.31f, 0.36f), 0.52f, 0.62f),
+                IstanbulBridgeSteel = CreateOrLoadMaterial("MAT_Istanbul_BridgeSteel", urpLit, new Color(0.86f, 0.88f, 0.90f), 0.65f, 0.68f),
+                IstanbulTramRed = CreateOrLoadMaterial("MAT_Istanbul_TramRed", urpLit, new Color(0.74f, 0.10f, 0.10f), 0.86f, 0.42f),
+                IstanbulGoldBrass = CreateOrLoadMaterial("MAT_Istanbul_GoldBrass", urpLit, new Color(0.88f, 0.70f, 0.22f), 0.84f, 0.90f),
+                IstanbulFerryHull = CreateOrLoadMaterial("MAT_Istanbul_FerryHull", urpLit, new Color(0.10f, 0.14f, 0.20f), 0.55f, 0.22f),
+                IstanbulBosphorusWater = CreateOrLoadMaterial("MAT_Istanbul_BosphorusWater", urpLit, new Color(0.06f, 0.34f, 0.50f, 0.78f), 0.94f, 0.14f),
+                KilitParke = CreateOrLoadMaterial("MAT_Sultanbeyli_KilitParke", urpLit, Color.white, 0.18f, 0.0f),
+                RawBrick = CreateOrLoadMaterial("MAT_Sultanbeyli_RawBrick", urpLit, new Color(0.95f, 0.92f, 0.90f), 0.14f, 0.0f),
+                RedPlaster = CreatePbrMaterial("MAT_Sultanbeyli_RedPlaster", urpLit, "Plaster003", new Color(0.68f, 0.21f, 0.16f), 0.14f, 0f, new Vector2(2f, 2f), 0.65f),
+                SagePlaster = CreatePbrMaterial("MAT_Sultanbeyli_SagePlaster", urpLit, "Plaster003", new Color(0.66f, 0.69f, 0.58f), 0.14f, 0f, new Vector2(2f, 2f), 0.65f),
+                YellowPlaster = CreatePbrMaterial("MAT_Sultanbeyli_YellowPlaster", urpLit, "Plaster003", new Color(0.88f, 0.80f, 0.56f), 0.15f, 0f, new Vector2(3f, 3f), 0.65f),
+                OrangeStripe = CreatePbrMaterial("MAT_Sultanbeyli_OrangeStripe", urpLit, "Plaster003", new Color(0.76f, 0.43f, 0.21f), 0.16f, 0f, new Vector2(2f, 3f), 0.65f),
+                OliveFacade = CreatePbrMaterial("MAT_Sultanbeyli_OliveFacade", urpLit, "Plaster003", new Color(0.35f, 0.44f, 0.31f), 0.18f, 0f, new Vector2(2f, 3f), 0.65f),
+                FenceBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_FenceBlue", urpLit, new Color(0.40f, 0.57f, 0.74f), 0.58f, 0.52f),
+                WhitePVC = CreateOrLoadMaterial("MAT_Sultanbeyli_WhitePVC", urpLit, new Color(0.94f, 0.94f, 0.93f), 0.62f, 0.05f),
+                DarkInterior = CreateOrLoadMaterial("MAT_Sultanbeyli_DarkInterior", urpLit, new Color(0.05f, 0.05f, 0.06f), 0.08f, 0.0f),
+                RustSteel = CreateOrLoadMaterial("MAT_Sultanbeyli_RustSteel", urpLit, new Color(0.38f, 0.24f, 0.17f), 0.26f, 0.55f),
+                VineBrown = CreateOrLoadMaterial("MAT_Sultanbeyli_VineBrown", urpLit, new Color(0.30f, 0.21f, 0.15f), 0.10f, 0.0f),
+                DoorTeal = CreateOrLoadMaterial("MAT_Sultanbeyli_DoorTeal", urpLit, new Color(0.11f, 0.29f, 0.38f), 0.52f, 0.22f),
+                StreetSignBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_StreetSignBlue", urpLit, new Color(0.08f, 0.24f, 0.58f), 0.48f, 0.15f),
+                PeachPlaster = CreatePbrMaterial("MAT_Sultanbeyli_PeachPlaster", urpLit, "Plaster003", new Color(0.88f, 0.74f, 0.65f), 0.15f, 0f, new Vector2(2f, 2f), 0.65f),
+                CoralPlaster = CreatePbrMaterial("MAT_Sultanbeyli_CoralPlaster", urpLit, "Plaster003", new Color(0.77f, 0.43f, 0.40f), 0.15f, 0f, new Vector2(2f, 2f), 0.65f),
+                PinkPlaster = CreatePbrMaterial("MAT_Sultanbeyli_PinkPlaster", urpLit, "Plaster003", new Color(0.83f, 0.63f, 0.65f), 0.15f, 0f, new Vector2(2f, 3f), 0.65f),
+                PowderBlue = CreatePbrMaterial("MAT_Sultanbeyli_PowderBlue", urpLit, "Plaster003", new Color(0.58f, 0.69f, 0.78f), 0.16f, 0f, new Vector2(2f, 3f), 0.65f),
+                MeshGreen = CreatePbrMaterial("MAT_Sultanbeyli_MeshGreen", urpLit, "Grass001", new Color(0.14f, 0.30f, 0.17f), 0.12f, 0f, new Vector2(4f, 2f), 0.60f),
+                CobaltBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_CobaltBlue", urpLit, new Color(0.09f, 0.38f, 0.78f), 0.55f, 0.35f),
+                LilacGate = CreateOrLoadMaterial("MAT_Sultanbeyli_LilacGate", urpLit, new Color(0.66f, 0.58f, 0.78f), 0.48f, 0.42f),
+                TurquoiseRust = CreateOrLoadMaterial("MAT_Sultanbeyli_TurquoiseRust", urpLit, new Color(0.22f, 0.56f, 0.52f), 0.34f, 0.40f),
+                Galvanized = CreatePbrMaterial("MAT_Sultanbeyli_Galvanized", urpLit, "CorrugatedSteel005", new Color(0.70f, 0.72f, 0.74f), 0.52f, 0.68f, new Vector2(2f, 2f), 0.85f),
+                SignRed = CreateOrLoadMaterial("MAT_Sultanbeyli_SignRed", urpLit, new Color(0.76f, 0.11f, 0.11f), 0.54f, 0.15f),
                 BrakeCaliper = CreateOrLoadMaterial("MAT_Brake_Caliper", urpLit, new Color(0.76f, 0.11f, 0.09f), 0.65f, 0.35f),
                 CanRed = CreateOrLoadMaterial("MAT_Can_Red", urpLit, new Color(0.78f, 0.14f, 0.14f), 0.72f, 0.55f),
                 CanBlue = CreateOrLoadMaterial("MAT_Can_Blue", urpLit, new Color(0.14f, 0.38f, 0.76f), 0.72f, 0.55f),
@@ -532,9 +690,126 @@ namespace Gridroam.Editor
                 set.SeaWater.SetFloat("_BumpScale", 0.35f);
                 set.SeaWater.EnableKeyword("_NORMALMAP");
                 EditorUtility.SetDirty(set.SeaWater);
+
+                set.PoolWaterClear.SetTexture("_BumpMap", waterNormal);
+                set.PoolWaterClear.SetTextureScale("_BumpMap", new Vector2(8f, 12f));
+                set.PoolWaterClear.SetFloat("_BumpScale", 0.18f);
+                set.PoolWaterClear.EnableKeyword("_NORMALMAP");
+
+                set.IstanbulBosphorusWater.SetTexture("_BumpMap", waterNormal);
+                set.IstanbulBosphorusWater.SetTextureScale("_BumpMap", new Vector2(24f, 90f));
+                set.IstanbulBosphorusWater.SetFloat("_BumpScale", 0.28f);
+                set.IstanbulBosphorusWater.EnableKeyword("_NORMALMAP");
             }
 
+            // Configure transparent water surfaces (Pool & Bosphorus Strait)
+            Material[] transparentWaters = { set.PoolWaterClear, set.IstanbulBosphorusWater };
+            foreach (Material wm in transparentWaters)
+            {
+                if (wm == null) continue;
+                wm.SetFloat("_Surface", 1f);
+                wm.SetFloat("_Blend", 0f);
+                wm.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                wm.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                wm.SetFloat("_ZWrite", 0f);
+                wm.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                wm.renderQueue = (int)RenderQueue.Transparent;
+                EditorUtility.SetDirty(wm);
+            }
+
+            // Wire RealismPBR micro-textures (Denim, Cotton, Hair, Skin, Teak Wood, Travertine Stone)
+            // to eliminate flat untextured plastic surfaces across characters, benches & fountain!
+            string pbrDir = $"{TexturesDir}/RealismPBR";
+            Texture2D cottonCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Cotton_Color.png");
+            Texture2D cottonNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Cotton_NormalGL.png");
+            Texture2D denimCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Denim_Color.png");
+            Texture2D denimNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Denim_NormalGL.png");
+            Texture2D hairCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Hair_Color.png");
+            Texture2D hairNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Hair_NormalGL.png");
+            Texture2D skinNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Skin_NormalGL.png");
+            Texture2D teakCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/TeakWood_Color.png");
+            Texture2D teakNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/TeakWood_NormalGL.png");
+            Texture2D travCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Travertine_Color.png");
+            Texture2D travNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/Travertine_NormalGL.png");
+
+            Material[] clothMats =
+            {
+                set.CharShirt, set.CharUndershirt, set.MechanicSuit, set.ReceiverSuit,
+                set.PedShirtRed, set.PedShirtOlive, set.PedShirtMustard, set.PedShirtTeal, set.PedShirtBurgundy
+            };
+            foreach (Material m in clothMats) ApplyPbrDetailMaps(m, cottonCol, cottonNrm, new Vector2(3.5f, 3.5f), 0.55f, 0.14f);
+
+            Material[] denimMats = { set.CharPants, set.CharPantsDenim, set.CharPantsKhaki };
+            foreach (Material m in denimMats) ApplyPbrDetailMaps(m, denimCol, denimNrm, new Vector2(4.0f, 4.0f), 0.65f, 0.12f);
+
+            Material[] hairMats = { set.CharHair, set.CharHairBrown, set.CharHairBlonde };
+            foreach (Material m in hairMats) ApplyPbrDetailMaps(m, hairCol, hairNrm, new Vector2(3.0f, 3.0f), 0.58f, 0.36f);
+
+            Material[] skinMats = { set.CharSkin, set.CharSkinMedium, set.CharSkinWarm };
+            foreach (Material m in skinMats) ApplyPbrDetailMaps(m, null, skinNrm, new Vector2(4.0f, 4.0f), 0.22f, 0.22f);
+
+            Material[] woodMats = { set.TownWood, set.TownFurnitureWood, set.TownDoorWood };
+            foreach (Material m in woodMats) ApplyPbrDetailMaps(m, teakCol, teakNrm, new Vector2(1.8f, 1.8f), 0.65f, 0.32f);
+
+            ApplyPbrDetailMaps(set.TravertineStone, travCol, travNrm, new Vector2(2.2f, 2.2f), 0.72f, 0.24f);
+
+            // Authentic Sultanbeyli / Selman Sokağı PBR detail maps (Kilit Parke sidewalk + exposed hollow red brick!)
+            Texture2D kilitCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/KilitParke_Color.png");
+            Texture2D kilitNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/KilitParke_NormalGL.png");
+            Texture2D rawBrickCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/RawBrick_Color.png");
+            Texture2D rawBrickNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/RawBrick_NormalGL.png");
+            ApplyPbrDetailMaps(set.KilitParke, kilitCol, kilitNrm, Vector2.one, 0.85f, 0.18f);
+            ApplyPbrDetailMaps(set.RawBrick, rawBrickCol, rawBrickNrm, new Vector2(1.4f, 1.4f), 0.90f, 0.14f);
+
+            // Automotive glossy metallic clearcoat across all 6 vehicle paint materials!
+            Material[] carPaintMats =
+            {
+                set.SedanBody, set.CarRed, set.CarWhite, set.CarDarkGreen,
+                set.CarYellow, set.CarSkyBlue, set.CarCharcoal, set.CarVanCream, set.TrafficBody
+            };
+            foreach (Material m in carPaintMats) ApplyAutomotiveClearcoat(m);
+
             return set;
+        }
+
+        private static void ApplyPbrDetailMaps(
+            Material mat,
+            Texture2D albedo,
+            Texture2D normalMap,
+            Vector2 tiling,
+            float bumpScale,
+            float smoothness)
+        {
+            if (mat == null) return;
+            if (albedo != null && mat.HasProperty("_BaseMap"))
+            {
+                mat.SetTexture("_BaseMap", albedo);
+                mat.SetTextureScale("_BaseMap", tiling);
+            }
+            if (normalMap != null && mat.HasProperty("_BumpMap"))
+            {
+                mat.SetTexture("_BumpMap", normalMap);
+                mat.SetTextureScale("_BumpMap", tiling);
+                mat.SetFloat("_BumpScale", bumpScale);
+                mat.EnableKeyword("_NORMALMAP");
+            }
+            if (mat.HasProperty("_Smoothness"))
+            {
+                mat.SetFloat("_Smoothness", smoothness);
+            }
+            EditorUtility.SetDirty(mat);
+        }
+
+        private static void ApplyAutomotiveClearcoat(Material mat)
+        {
+            if (mat == null) return;
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.86f);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", Mathf.Max(0.38f, mat.GetFloat("_Metallic")));
+            if (mat.HasProperty("_ClearCoat")) mat.SetFloat("_ClearCoat", 1.0f);
+            if (mat.HasProperty("_ClearCoatMask")) mat.SetFloat("_ClearCoatMask", 0.90f);
+            if (mat.HasProperty("_ClearCoatSmoothness")) mat.SetFloat("_ClearCoatSmoothness", 0.96f);
+            mat.EnableKeyword("_CLEARCOAT");
+            EditorUtility.SetDirty(mat);
         }
 
         private static Material CreatePbrMaterial(
@@ -621,7 +896,10 @@ namespace Gridroam.Editor
         {
             Sedan,
             Hatchback,
-            Pickup
+            Pickup,
+            SportsCoupe,
+            SUV,
+            DeliveryVan
         }
 
         private static MaterialSet _activeMaterialSet;
@@ -631,8 +909,14 @@ namespace Gridroam.Editor
             public GameObject Player;
             public GameObject PlayerSedan;
             public GameObject TownCarRedHatchback;
+            public GameObject TownCarBlueHatchback;
             public GameObject TownCarWhitePickup;
             public GameObject TownCarGreenSedan;
+            public GameObject TownCarYellowSportsCoupe;
+            public GameObject TownCarBlueSportsCoupe;
+            public GameObject TownCarCharcoalSUV;
+            public GameObject TownCarGreenSUV;
+            public GameObject TownCarWhiteVan;
             public GameObject NpcMechanic;
             public GameObject NpcHarborReceiver;
             public GameObject ApartmentBuilding;
@@ -659,8 +943,14 @@ namespace Gridroam.Editor
                 Player = BuildPlayerPrefab(mats),
                 PlayerSedan = BuildSedanPrefab("Vehicle_PlayerSedan", "player_sedan", mats.SedanBody, InteractableKind.PlayerVehicle),
                 TownCarRedHatchback = BuildVehicleVariantPrefab("Vehicle_TownHatchback_Red", string.Empty, mats.CarRed, InteractableKind.TownVehicle, VehicleBodyVariant.Hatchback, mats),
+                TownCarBlueHatchback = BuildVehicleVariantPrefab("Vehicle_TownHatchback_Blue", string.Empty, mats.CarSkyBlue, InteractableKind.TownVehicle, VehicleBodyVariant.Hatchback, mats),
                 TownCarWhitePickup = BuildVehicleVariantPrefab("Vehicle_TownPickup_White", string.Empty, mats.CarWhite, InteractableKind.TownVehicle, VehicleBodyVariant.Pickup, mats),
                 TownCarGreenSedan = BuildSedanPrefab("Vehicle_TownSedan_Green", string.Empty, mats.CarDarkGreen, InteractableKind.TownVehicle),
+                TownCarYellowSportsCoupe = BuildVehicleVariantPrefab("Vehicle_SportsCoupe_Yellow", string.Empty, mats.CarYellow, InteractableKind.TownVehicle, VehicleBodyVariant.SportsCoupe, mats),
+                TownCarBlueSportsCoupe = BuildVehicleVariantPrefab("Vehicle_SportsCoupe_Blue", string.Empty, mats.CarSkyBlue, InteractableKind.TownVehicle, VehicleBodyVariant.SportsCoupe, mats),
+                TownCarCharcoalSUV = BuildVehicleVariantPrefab("Vehicle_SUV_Charcoal", string.Empty, mats.CarCharcoal, InteractableKind.TownVehicle, VehicleBodyVariant.SUV, mats),
+                TownCarGreenSUV = BuildVehicleVariantPrefab("Vehicle_SUV_Green", string.Empty, mats.CarDarkGreen, InteractableKind.TownVehicle, VehicleBodyVariant.SUV, mats),
+                TownCarWhiteVan = BuildVehicleVariantPrefab("Vehicle_DeliveryVan_White", string.Empty, mats.CarVanCream, InteractableKind.TownVehicle, VehicleBodyVariant.DeliveryVan, mats),
                 NpcMechanic = BuildNpcPrefab("NPC_Mechanic", "npc_mechanic", mats, mats.MechanicSuit, mats.CharPantsDenim, BlenderCharacterVariant.Worker, mats.CharSkinMedium, mats.CharHair),
                 NpcHarborReceiver = BuildNpcPrefab("NPC_HarborReceiver", "npc_harbor_receiver", mats, mats.ReceiverSuit, mats.CharPants, BlenderCharacterVariant.CasualFemale, mats.CharSkin, mats.CharHairBrown),
                 ApartmentBuilding = BuildApartmentPrefab(mats),
@@ -676,7 +966,7 @@ namespace Gridroam.Editor
                 FloodLights = BuildBlenderPropPrefab("Work_FloodLight.fbx", "Prop_FloodLights_CC0", mats, useCapsulePoleCollider: true, colliderSize: new Vector3(0.56f, 2.12f, 0.56f), isStatic: true),
                 OceanBuoy = BuildFbxPropPrefab("ocean_buoy", "Prop_OceanBuoy_CC0", 2.8f, addCollider: false, isStatic: false, fallbackMat: mats.ContainerRed),
                 RollerShutterDoor = BuildFbxPropPrefab("rollershutter_door", "Prop_RollerShutter_CC0", 3.6f, addCollider: false, isStatic: true, fallbackMat: mats.GarageRoofMetal),
-                WoodenBench = BuildFbxPropPrefab("painted_wooden_bench", "Prop_WoodenBench_CC0", 0.86f, addCollider: false, isStatic: true, fallbackMat: mats.TownWood)
+                WoodenBench = BuildBlenderPropPrefab("Town_ParkBench.fbx", "Prop_WoodenBench_CC0", mats, useCapsulePoleCollider: false, colliderSize: new Vector3(1.88f, 0.88f, 0.66f), isStatic: true)
             };
         }
 
@@ -977,9 +1267,42 @@ namespace Gridroam.Editor
             if (slotName.StartsWith("Bark")) return mats.TownBark;
             if (slotName.StartsWith("FoliageA")) return foliageAOverride != null ? foliageAOverride : mats.TownFoliageA;
             if (slotName.StartsWith("FoliageB")) return foliageBOverride != null ? foliageBOverride : mats.TownFoliageB;
-            if (slotName.StartsWith("StoneTrim")) return mats.PlasterTrim;
+            if (slotName.StartsWith("StoneTrim")) return mats.TravertineStone != null ? mats.TravertineStone : mats.PlasterTrim;
             if (slotName.StartsWith("Concrete")) return mats.Concrete;
-            if (slotName.StartsWith("Water")) return mats.SeaWater;
+            if (slotName.StartsWith("Wood")) return mats.TownWood;
+            if (slotName.StartsWith("Water")) return mats.PoolWaterClear != null ? mats.PoolWaterClear : mats.SeaWater;
+            if (slotName.StartsWith("LeadRoof")) return mats.IstanbulLeadRoof != null ? mats.IstanbulLeadRoof : mats.GarageRoofMetal;
+            if (slotName.StartsWith("BridgeSteel")) return mats.IstanbulBridgeSteel != null ? mats.IstanbulBridgeSteel : mats.PlasterTrim;
+            if (slotName.StartsWith("TramRed")) return mats.IstanbulTramRed != null ? mats.IstanbulTramRed : mats.CarRed;
+            if (slotName.StartsWith("CreamPaint")) return mats.TownInteriorPaintCream;
+            if (slotName.StartsWith("GoldBrass")) return mats.IstanbulGoldBrass != null ? mats.IstanbulGoldBrass : mats.RoadMarkingYellow;
+            if (slotName.StartsWith("FerryHull")) return mats.IstanbulFerryHull != null ? mats.IstanbulFerryHull : mats.SedanTrimDark;
+            if (slotName.StartsWith("SimitGold")) return mats.TownFabricMustard;
+            if (slotName.StartsWith("RoofTile")) return mats.TownRoofTile;
+            if (slotName.StartsWith("RedPlaster")) return mats.RedPlaster != null ? mats.RedPlaster : mats.TownBrickHouse;
+            if (slotName.StartsWith("SagePlaster")) return mats.SagePlaster != null ? mats.SagePlaster : mats.PlasterTrim;
+            if (slotName.StartsWith("YellowPlaster")) return mats.YellowPlaster != null ? mats.YellowPlaster : mats.TownInteriorPaintCream;
+            if (slotName.StartsWith("OrangeStripe")) return mats.OrangeStripe != null ? mats.OrangeStripe : mats.ContainerOchre;
+            if (slotName.StartsWith("OliveFacade")) return mats.OliveFacade != null ? mats.OliveFacade : mats.PedShirtOlive;
+            if (slotName.StartsWith("RawBrick")) return mats.RawBrick != null ? mats.RawBrick : mats.TownBrickHouse;
+            if (slotName.StartsWith("FenceBlue")) return mats.FenceBlue != null ? mats.FenceBlue : mats.ContainerBlue;
+            if (slotName.StartsWith("WhitePVC")) return mats.WhitePVC != null ? mats.WhitePVC : mats.CharShoeSole;
+            if (slotName.StartsWith("DarkInterior")) return mats.DarkInterior != null ? mats.DarkInterior : mats.SedanTrimDark;
+            if (slotName.StartsWith("RustSteel")) return mats.RustSteel != null ? mats.RustSteel : mats.TownBark;
+            if (slotName.StartsWith("VineBrown")) return mats.VineBrown != null ? mats.VineBrown : mats.TownBark;
+            if (slotName.StartsWith("ShrubGreen")) return mats.TownHedge;
+            if (slotName.StartsWith("DoorTeal")) return mats.DoorTeal != null ? mats.DoorTeal : mats.TownFabricTeal;
+            if (slotName.StartsWith("PeachPlaster")) return mats.PeachPlaster != null ? mats.PeachPlaster : mats.PlasterTrim;
+            if (slotName.StartsWith("CoralPlaster")) return mats.CoralPlaster != null ? mats.CoralPlaster : mats.RedPlaster;
+            if (slotName.StartsWith("PinkPlaster")) return mats.PinkPlaster != null ? mats.PinkPlaster : mats.PlasterTrim;
+            if (slotName.StartsWith("PowderBlue")) return mats.PowderBlue != null ? mats.PowderBlue : mats.FenceBlue;
+            if (slotName.StartsWith("MeshGreen")) return mats.MeshGreen != null ? mats.MeshGreen : mats.TownHedge;
+            if (slotName.StartsWith("CobaltBlue")) return mats.CobaltBlue != null ? mats.CobaltBlue : mats.ContainerBlue;
+            if (slotName.StartsWith("LilacGate")) return mats.LilacGate != null ? mats.LilacGate : mats.PlasterTrim;
+            if (slotName.StartsWith("TurquoiseRust")) return mats.TurquoiseRust != null ? mats.TurquoiseRust : mats.DoorTeal;
+            if (slotName.StartsWith("Galvanized")) return mats.Galvanized != null ? mats.Galvanized : mats.GarageRoofMetal;
+            if (slotName.StartsWith("SignRed")) return mats.SignRed != null ? mats.SignRed : mats.CarRed;
+            if (slotName.StartsWith("DarkWood")) return mats.TownDoorDark;
             if (slotName.StartsWith("AccentTeal")) return mats.TownFabricTeal;
             if (slotName.StartsWith("AccentMustard")) return mats.TownFabricMustard;
             if (slotName.StartsWith("AccentBlue")) return mats.ContainerBlue;
@@ -988,6 +1311,8 @@ namespace Gridroam.Editor
             if (slotName.StartsWith("CanBlue")) return mats.CanBlue;
             if (slotName.StartsWith("CanGreen")) return mats.CanGreen;
             if (slotName.StartsWith("CanOrange")) return mats.CanOrange;
+            if (slotName.StartsWith("CatFur")) return mats.TownFabricMustard;
+            if (slotName.StartsWith("Terracotta")) return mats.TownAwningTerracotta;
 
             return mats.Concrete;
         }
@@ -1051,8 +1376,8 @@ namespace Gridroam.Editor
             }
 
             bool isFemale = variant == BlenderCharacterVariant.CasualFemale;
-            float shldrX = isFemale ? 0.172f : 0.198f;
-            float hipX = isFemale ? 0.098f : 0.102f;
+            float shldrX = isFemale ? 0.174f : 0.200f;
+            float hipX = isFemale ? 0.102f : 0.106f;
 
             return ProceduralHumanoid.BuildWithCustomParts(
                 parent,
@@ -1167,12 +1492,26 @@ namespace Gridroam.Editor
 
             bool isHatchback = variant == VehicleBodyVariant.Hatchback;
             bool isPickup = variant == VehicleBodyVariant.Pickup;
+            bool isSports = variant == VehicleBodyVariant.SportsCoupe;
+            bool isSuv = variant == VehicleBodyVariant.SUV;
+            bool isVan = variant == VehicleBodyVariant.DeliveryVan;
 
-            float massKg = isHatchback ? 1150f : (isPickup ? 1800f : 1350f);
-            float bodyLength = isHatchback ? 3.90f : (isPickup ? 5.00f : 4.42f);
-            float bodyWidth = isHatchback ? 1.80f : (isPickup ? 1.94f : 1.88f);
+            float massKg = isHatchback ? 1150f
+                : (isSports ? 1220f
+                : (isPickup ? 1800f
+                : (isSuv ? 1950f
+                : (isVan ? 2150f : 1350f))));
+            float bodyLength = isHatchback ? 3.90f
+                : (isSports ? 4.36f
+                : (isPickup ? 5.00f
+                : (isSuv ? 4.62f
+                : (isVan ? 5.04f : 4.42f))));
+            float bodyWidth = isHatchback ? 1.80f
+                : (isSports ? 1.96f
+                : (isPickup ? 1.94f
+                : (isSuv ? 1.98f
+                : (isVan ? 1.98f : 1.88f))));
             float halfLen = bodyLength * 0.5f;
-            float halfWid = bodyWidth * 0.5f;
 
             Rigidbody rb = root.AddComponent<Rigidbody>();
             rb.mass = massKg;
@@ -1194,18 +1533,34 @@ namespace Gridroam.Editor
             GameObject chassisColObj = new GameObject("ChassisCollider");
             chassisColObj.transform.SetParent(root.transform, false);
             BoxCollider chassisBox = chassisColObj.AddComponent<BoxCollider>();
-            chassisBox.center = new Vector3(0f, isPickup ? 0.78f : 0.72f, 0f);
-            chassisBox.size = new Vector3(bodyWidth + 0.02f, isPickup ? 1.05f : 0.95f, bodyLength + 0.04f);
+            float colHeight = isVan ? 1.48f : (isSuv ? 1.24f : (isPickup ? 1.05f : (isSports ? 0.84f : 0.95f)));
+            float colCenterY = isVan ? 0.98f : (isSuv ? 0.88f : (isPickup ? 0.78f : (isSports ? 0.64f : 0.72f)));
+            chassisBox.center = new Vector3(0f, colCenterY, 0f);
+            chassisBox.size = new Vector3(bodyWidth + 0.02f, colHeight, bodyLength + 0.04f);
 
             GameObject visualRoot = new GameObject("VisualRoot");
             visualRoot.transform.SetParent(root.transform, false);
 
-            float frontAxleZ = isHatchback ? 1.22f : (isPickup ? 1.56f : 1.38f);
-            float rearAxleZ = isHatchback ? -1.22f : (isPickup ? -1.56f : -1.32f);
-            float wheelX = isHatchback ? 0.80f : (isPickup ? 0.87f : 0.84f);
+            float frontAxleZ = isHatchback ? 1.22f
+                : (isSports ? 1.34f
+                : (isPickup ? 1.56f
+                : (isSuv ? 1.42f
+                : (isVan ? 1.58f : 1.38f))));
+            float rearAxleZ = isHatchback ? -1.22f
+                : (isSports ? -1.30f
+                : (isPickup ? -1.56f
+                : (isSuv ? -1.38f
+                : (isVan ? -1.56f : -1.32f))));
+            float wheelX = isHatchback ? 0.80f
+                : ((isSports || isPickup) ? 0.87f
+                : ((isSuv || isVan) ? 0.88f : 0.84f));
             float frontZ = halfLen + 0.02f;
 
-            string carFbx = isPickup ? "Car_Pickup.fbx" : (isHatchback ? "Car_Hatchback.fbx" : "Car_Sedan.fbx");
+            string carFbx = isPickup ? "Car_Pickup.fbx"
+                : (isHatchback ? "Car_Hatchback.fbx"
+                : (isSports ? "Car_SportsCoupe.fbx"
+                : (isSuv ? "Car_SUV.fbx"
+                : (isVan ? "Car_DeliveryVan.fbx" : "Car_Sedan.fbx"))));
             GameObject blenderCar = InstantiateBlenderModel(carFbx, "BlenderCarMesh", visualRoot.transform, mats, bodyPaintOverride: bodyMat);
             if (blenderCar == null)
             {
@@ -1216,9 +1571,12 @@ namespace Gridroam.Editor
                     new Vector3(0f, 1.28f, -0.20f), new Vector3(bodyWidth * 0.82f, 0.42f, bodyLength * 0.42f), mats.SedanGlass, removeCollider: true);
             }
 
+            float driverSeatY = isVan ? 0.68f : (isSuv ? 0.60f : (isPickup ? 0.52f : (isSports ? 0.34f : 0.45f)));
+            float driverSeatZ = isVan ? 0.90f : (isPickup ? 0.12f : (isSports ? -0.32f : -0.25f));
+
             GameObject steeringWheel = new GameObject("SteeringWheel");
             steeringWheel.transform.SetParent(visualRoot.transform, false);
-            steeringWheel.transform.localPosition = new Vector3(-0.38f, isPickup ? 1.08f : 1.0f, isPickup ? 0.72f : 0.35f);
+            steeringWheel.transform.localPosition = new Vector3(-0.38f, driverSeatY + 0.54f, driverSeatZ + 0.58f);
             steeringWheel.transform.localRotation = Quaternion.Euler(65f, 0f, 0f);
             CreatePrimitiveChild("SteeringWheelRim", PrimitiveType.Cylinder, steeringWheel.transform,
                 Vector3.zero, new Vector3(0.34f, 0.025f, 0.34f), mats.SedanTrimDark, removeCollider: true);
@@ -1227,7 +1585,7 @@ namespace Gridroam.Editor
 
             GameObject seatedDriverRoot = new GameObject("SeatedDriverRoot");
             seatedDriverRoot.transform.SetParent(visualRoot.transform, false);
-            seatedDriverRoot.transform.localPosition = new Vector3(-0.38f, isPickup ? 0.52f : 0.45f, isPickup ? 0.12f : -0.25f);
+            seatedDriverRoot.transform.localPosition = new Vector3(-0.38f, driverSeatY, driverSeatZ);
             ProceduralHumanoid seatedDriver = BuildBlenderHumanoid(
                 seatedDriverRoot.transform,
                 mats,
@@ -1242,7 +1600,7 @@ namespace Gridroam.Editor
 
             GameObject beamObj = new GameObject("Headlight_Beam");
             beamObj.transform.SetParent(visualRoot.transform, false);
-            beamObj.transform.localPosition = new Vector3(0f, 0.76f, frontZ + 0.04f);
+            beamObj.transform.localPosition = new Vector3(0f, isSuv ? 0.88f : 0.76f, frontZ + 0.04f);
             beamObj.transform.localRotation = Quaternion.Euler(7f, 0f, 0f);
             Light headlight = beamObj.AddComponent<Light>();
             headlight.type = LightType.Spot;
@@ -1259,11 +1617,11 @@ namespace Gridroam.Editor
             GameObject wvParent = new GameObject("WheelVisuals");
             wvParent.transform.SetParent(root.transform, false);
 
-            float wheelRadius = isPickup ? 0.37f : (isHatchback ? 0.32f : 0.34f);
-            float suspDist = isPickup ? 0.28f : (isHatchback ? 0.21f : 0.22f);
-            float springRate = isPickup ? 25000f : (isHatchback ? 32000f : 35000f);
-            float damperRate = isPickup ? 3300f : (isHatchback ? 4200f : 4500f);
-            float wheelY = isPickup ? 0.44f : 0.40f;
+            float wheelRadius = isSuv ? 0.38f : (isPickup ? 0.37f : (isVan ? 0.36f : (isHatchback ? 0.32f : 0.34f)));
+            float suspDist = isSuv ? 0.30f : (isPickup ? 0.28f : (isSports ? 0.18f : (isHatchback ? 0.21f : 0.22f)));
+            float springRate = isSports ? 42000f : (isVan ? 38000f : (isSuv ? 30000f : (isPickup ? 25000f : (isHatchback ? 32000f : 35000f))));
+            float damperRate = isSports ? 5200f : (isPickup ? 3300f : (isHatchback ? 4200f : 4500f));
+            float wheelY = isSuv ? 0.45f : (isPickup ? 0.44f : (isVan ? 0.42f : (isSports ? 0.38f : 0.40f)));
 
             WheelCollider fl = CreateWheelCollider("WheelFL", wcParent.transform, new Vector3(-wheelX, wheelY, frontAxleZ), wheelRadius, suspDist, springRate, damperRate);
             WheelCollider fr = CreateWheelCollider("WheelFR", wcParent.transform, new Vector3(wheelX, wheelY, frontAxleZ), wheelRadius, suspDist, springRate, damperRate);
@@ -1283,7 +1641,7 @@ namespace Gridroam.Editor
             exitR.transform.SetParent(root.transform, false);
             exitR.transform.localPosition = new Vector3(1.90f, 0.08f, 0.1f);
 
-            bool frontMotor = isHatchback;
+            bool frontMotor = isHatchback || isSuv;
             bool rearMotor = !isHatchback;
 
             SedanVehicleController controller = root.AddComponent<SedanVehicleController>();
@@ -1296,10 +1654,10 @@ namespace Gridroam.Editor
             controller.ConfigureTuning(
                 wheelbaseMeters: frontAxleZ - rearAxleZ,
                 trackWidthMeters: wheelX * 2f,
-                antiRoll: isPickup ? 3000f : 4200f,
-                comOffset: isPickup ? new Vector3(0f, -0.38f, 0.12f) : new Vector3(0f, -0.42f, 0.08f),
-                maxBrake: isPickup ? 3600f : 3200f,
-                finalDrive: isHatchback ? 4.1f : 3.9f);
+                antiRoll: isSports ? 5400f : (isPickup ? 3000f : (isSuv ? 3400f : 4200f)),
+                comOffset: isSports ? new Vector3(0f, -0.46f, 0.04f) : ((isPickup || isSuv) ? new Vector3(0f, -0.38f, 0.12f) : new Vector3(0f, -0.42f, 0.08f)),
+                maxBrake: (isPickup || isSuv || isVan) ? 3800f : (isSports ? 4000f : 3200f),
+                finalDrive: isSports ? 4.45f : (isHatchback ? 4.1f : (isVan ? 3.7f : 3.9f)));
 
             AudioSource engineSrc = root.AddComponent<AudioSource>();
             engineSrc.spatialBlend = 0.6f;
@@ -1769,6 +2127,7 @@ namespace Gridroam.Editor
 
             MissionCatalog catalog = CreateOrLoadAsset<MissionCatalog>($"{MissionDir}/MissionCatalog.asset");
             catalog.missions = new List<MissionData> { m01, m02, m03, m04, m05 };
+            AppendChapterTwoMissions(catalog); // Missions 6-10 (Bölüm 2)
             EditorUtility.SetDirty(catalog);
             return catalog;
         }
@@ -1784,27 +2143,41 @@ namespace Gridroam.Editor
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // --- Morning 09:00 Default Coastal Skybox & Sunlight (managed dynamically by DayNightCycle) ---
+            // --- Realistic Natural Daylight Skybox, Trilight Ambient Bounce, Soft Shadows & Atmospheric Depth ---
             RenderSettings.skybox = mats.EveningSkybox;
-            RenderSettings.ambientMode = AmbientMode.Skybox;
-            RenderSettings.ambientIntensity = 1.12f;
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.62f, 0.74f, 0.88f);
+            RenderSettings.ambientEquatorColor = new Color(0.76f, 0.74f, 0.70f);
+            RenderSettings.ambientGroundColor = new Color(0.36f, 0.35f, 0.30f);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
-            RenderSettings.reflectionIntensity = 1.0f;
+            RenderSettings.reflectionIntensity = 1.15f;
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.62f, 0.70f, 0.78f);
-            RenderSettings.fogDensity = 0.0016f;
+            RenderSettings.fogColor = new Color(0.72f, 0.79f, 0.87f);
+            RenderSettings.fogDensity = 0.0020f;
 
             GameObject sunObj = new GameObject("Sun_CoastalDirectional");
             Light sun = sunObj.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1.0f, 0.94f, 0.84f);
-            sun.intensity = 1.85f;
+            sun.color = new Color(1.0f, 0.95f, 0.86f);
+            sun.intensity = 1.95f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.75f;
-            sunObj.transform.rotation = Quaternion.Euler(34f, -38f, 0f);
+            sun.shadowStrength = 0.64f;
+            sunObj.transform.rotation = Quaternion.Euler(36f, -38f, 0f);
             RenderSettings.sun = sun;
+
+            // Sultanbeyli / Hamidiye Mahallesi Environment Reflection Probe
+            GameObject probeObj = new GameObject("Town_EnvironmentReflectionProbe");
+            probeObj.transform.position = new Vector3(0f, 18f, 0f);
+            ReflectionProbe envProbe = probeObj.AddComponent<ReflectionProbe>();
+            envProbe.mode = ReflectionProbeMode.Realtime;
+            envProbe.refreshMode = ReflectionProbeRefreshMode.OnAwake;
+            envProbe.timeSlicingMode = ReflectionProbeTimeSlicingMode.NoTimeSlicing;
+            envProbe.resolution = 256;
+            envProbe.size = new Vector3(360f, 90f, 360f);
+            envProbe.intensity = 1.15f;
+            envProbe.hdr = true;
 
             GameObject volObj = new GameObject("GlobalVolume_EveningCoastal");
             Volume vol = volObj.AddComponent<Volume>();
@@ -1839,137 +2212,57 @@ namespace Gridroam.Editor
             camData.renderPostProcessing = true;
             ThirdPersonCameraRig camRig = camObj.AddComponent<ThirdPersonCameraRig>();
 
-            // --- World Environment (Single 900m x 900m solid meadow foundation — zero fake sea, zero fake mountains, impossible to fall!) ---
+            // --- SULTANBEYLİ / HAMİDİYE MAHALLESİ SOLID BEDROCK FOUNDATION (ZERO ABYSS!) ---
             GameObject env = new GameObject("--- WORLD_ENVIRONMENT ---");
 
             CreateTiledBox(
-                "Ground_SolidMeadowFoundation",
+                "Ground_SultanbeyliBedrock",
                 env.transform,
-                new Vector3(0f, -3.0f, 80f),
-                new Vector3(900f, 6.0f, 900f),
+                new Vector3(0f, -3.0f, 0f),
+                new Vector3(820f, 6.0f, 820f),
                 Quaternion.identity,
                 mats.TownGrass,
                 metersPerTile: 3.5f,
                 collider: true);
 
-            // --- REPAIR GARAGE (Tamirhane, south of Güney Yolu z = -24, facing North +Z onto the street) ---
-            GameObject garageRoot = new GameObject("Zone_RepairGarage");
-            garageRoot.transform.SetParent(env.transform, false);
-            CreateTiledBox("Garage_Pad", garageRoot.transform, new Vector3(1.0f, 0.014f, -35.0f), new Vector3(30f, 0.028f, 14f), Quaternion.identity, mats.HarborDock, 3.0f, collider: false);
-            CreateStaticBlock("Garage_BackWall", garageRoot.transform, new Vector3(-3.0f, 3.0f, -41.0f), new Vector3(15f, 6f, 1f), mats.GarageBrick);
-            CreateStaticBlock("Garage_SideWallL", garageRoot.transform, new Vector3(-10.0f, 3.0f, -36.0f), new Vector3(1f, 6f, 11f), mats.GarageBrick);
-            CreateStaticBlock("Garage_SideWallR", garageRoot.transform, new Vector3(4.0f, 3.0f, -38.0f), new Vector3(1f, 6f, 7f), mats.GarageBrick);
-            CreateStaticBlock("Garage_Roof", garageRoot.transform, new Vector3(-3.0f, 6.2f, -36.0f), new Vector3(16.0f, 0.6f, 12.0f), mats.GarageRoofMetal);
-
-            GameObject garageFascia = CreateStaticBlock("Garage_SignFascia", garageRoot.transform, new Vector3(-3.0f, 6.5f, -30.1f), new Vector3(12f, 0.8f, 0.35f), mats.SedanTrimDark, addCollider: false);
-            CreateWorldSignText(
-                "TAMİRHANE",
-                garageRoot.transform,
-                new Vector3(-3.0f, 6.5f, -29.88f),
-                Quaternion.Euler(0f, 180f, 0f),
-                new Vector2(10.5f, 0.65f),
-                new Color(1.0f, 0.86f, 0.48f, 1f));
-            MarkStaticPaintable(garageFascia);
-
-            PlacePrefabInstance(prefabs.RollerShutterDoor, garageRoot.transform, new Vector3(-3.0f, 0.03f, -40.3f), Quaternion.identity);
-            PlacePrefabInstance(prefabs.ToolCart, garageRoot.transform, new Vector3(-6.8f, 0.03f, -35.5f), Quaternion.Euler(0f, 25f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-8.6f, 0.03f, -38.8f), Quaternion.Euler(0f, 20f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, garageRoot.transform, new Vector3(-7.6f, 0.03f, -39.2f), Quaternion.Euler(0f, 115f, 0f));
-            PlacePrefabInstance(prefabs.OldTyre, garageRoot.transform, new Vector3(-8.8f, 0.03f, -32.2f), Quaternion.identity);
-            PlacePrefabInstance(prefabs.OldTyre, garageRoot.transform, new Vector3(-8.8f, 0.31f, -32.2f), Quaternion.Euler(0f, 40f, 0f));
-            PlacePrefabInstance(prefabs.WoodenCrate, garageRoot.transform, new Vector3(2.8f, 0.03f, -39.2f), Quaternion.Euler(0f, 12f, 0f));
-            PlacePrefabInstance(prefabs.FloodLights, garageRoot.transform, new Vector3(4.6f, 0.03f, -34.0f), Quaternion.Euler(0f, -45f, 0f));
-            CreatePointLamp("Lamp_GarageBay", garageRoot.transform, new Vector3(-3.0f, 5.2f, -35.0f), new Color(1f, 0.78f, 0.45f), 22f, 3.4f);
-
-            // --- CLEAN WALKABLE SMALL TOWN ("Çınarlı Kasabası") & WOODEN COUNTRY FENCE ---
-            List<TrafficStopLine> stopLines = BuildSmallTown(env.transform, mats, prefabs);
-            BuildWorldBoundary(env.transform, mats);
-
-            // Street Lamps cleanly along Cumhuriyet Caddesi (x = +30.8) & Çınar Caddesi (x = -30.8)
-            float[] lampZs = { -8f, 26f, 62f, 98f, 136f, 170f };
-            for (int i = 0; i < lampZs.Length; i++)
-            {
-                float lz = lampZs[i];
-                PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(30.8f, 0.02f, lz), Quaternion.Euler(0f, -90f, 0f));
-                CreatePointLamp($"StreetLight_Main_{lz:0}", env.transform, new Vector3(29.4f, 5.2f, lz), new Color(1.0f, 0.78f, 0.44f), 20f, 2.2f);
-
-                if (i % 2 == 0)
-                {
-                    PlacePrefabInstance(prefabs.StreetLamp, env.transform, new Vector3(-30.8f, 0.02f, lz), Quaternion.Euler(0f, 90f, 0f));
-                    CreatePointLamp($"StreetLight_West_{lz:0}", env.transform, new Vector3(-29.4f, 5.2f, lz), new Color(1.0f, 0.76f, 0.42f), 18f, 1.9f);
-                }
-            }
-
-            // --- NORTH CARGO DEPOT (Kuzey Kargo Deposu, north of Kuzey Yolu z = +184, facing South -Z onto the street) ---
-            GameObject depotRoot = new GameObject("Zone_CargoDepot");
-            depotRoot.transform.SetParent(env.transform, false);
-            CreateTiledBox("Depot_ConcreteYard", depotRoot.transform, new Vector3(5.0f, 0.014f, 196.0f), new Vector3(52f, 0.028f, 15f), Quaternion.identity, mats.HarborDock, 3.0f, collider: false);
-
-            // Flush yellow delivery bay lines centered at (10.5, 0.03, 193.5)
-            CreateStaticBlock("DeliveryBay_North", depotRoot.transform, new Vector3(10.5f, 0.03f, 197.0f), new Vector3(9.5f, 0.015f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("DeliveryBay_South", depotRoot.transform, new Vector3(10.5f, 0.03f, 190.0f), new Vector3(9.5f, 0.015f, 0.3f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("DeliveryBay_West", depotRoot.transform, new Vector3(5.75f, 0.03f, 193.5f), new Vector3(0.3f, 0.015f, 7.3f), mats.RoadMarkingYellow, addCollider: false);
-            CreateStaticBlock("DeliveryBay_East", depotRoot.transform, new Vector3(15.25f, 0.03f, 193.5f), new Vector3(0.3f, 0.015f, 7.3f), mats.RoadMarkingYellow, addCollider: false);
-
-            CreateStaticBlock("Depot_Warehouse", depotRoot.transform, new Vector3(-10.5f, 3.8f, 198.5f), new Vector3(15f, 7.6f, 8.0f), mats.GarageBrick);
-            CreateStaticBlock("Depot_WarehouseRoof", depotRoot.transform, new Vector3(-10.5f, 7.9f, 198.5f), new Vector3(16f, 0.6f, 8.8f), mats.GarageRoofMetal);
-            PlacePrefabInstance(prefabs.RollerShutterDoor, depotRoot.transform, new Vector3(-10.5f, 0.03f, 194.35f), Quaternion.Euler(0f, 180f, 0f));
-
-            CreateStaticBlock("Depot_SignFascia", depotRoot.transform, new Vector3(-10.5f, 6.6f, 194.3f), new Vector3(12f, 0.8f, 0.30f), mats.SedanTrimDark, addCollider: false);
-            CreateWorldSignText(
-                "KARGO DEPOSU",
-                depotRoot.transform,
-                new Vector3(-10.5f, 6.6f, 194.10f),
-                Quaternion.identity,
-                new Vector2(11.0f, 0.62f),
-                new Color(0.96f, 0.96f, 0.94f, 1f));
-
-            CreateBlenderShippingContainer("Depot_Container_01", depotRoot.transform, new Vector3(21.0f, 0.03f, 198.5f), Quaternion.Euler(0f, 180f, 0f), mats.ContainerRed, mats);
-            CreateBlenderShippingContainer("Depot_Container_02", depotRoot.transform, new Vector3(25.0f, 0.03f, 198.5f), Quaternion.Euler(0f, 180f, 0f), mats.ContainerBlue, mats);
-            CreateBlenderShippingContainer("Depot_Container_03", depotRoot.transform, new Vector3(23.0f, 3.03f, 198.5f), Quaternion.Euler(0f, 180f, 0f), mats.ContainerOchre, mats);
-
-            PlacePrefabInstance(prefabs.WoodenCrate, depotRoot.transform, new Vector3(3.8f, 0.03f, 196.2f), Quaternion.Euler(0f, 14f, 0f));
-            PlacePrefabInstance(prefabs.WoodenCrate, depotRoot.transform, new Vector3(5.0f, 0.03f, 196.5f), Quaternion.Euler(0f, -8f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, depotRoot.transform, new Vector3(-1.8f, 0.03f, 197.6f), Quaternion.Euler(0f, 45f, 0f));
-            PlacePrefabInstance(prefabs.OilBarrel, depotRoot.transform, new Vector3(-0.8f, 0.03f, 198.0f), Quaternion.Euler(0f, 120f, 0f));
-            PlacePrefabInstance(prefabs.FloodLights, depotRoot.transform, new Vector3(17.2f, 0.03f, 196.5f), Quaternion.Euler(0f, 145f, 0f));
-            CreatePointLamp("Lamp_CargoDepot", depotRoot.transform, new Vector3(10.5f, 7.6f, 193.5f), new Color(1f, 0.82f, 0.50f), 30f, 3.8f);
+            // --- AUTHENTIC REAL-OSM SULTANBEYLİ · SELMAN SOKAĞI & HAMİDİYE MAHALLESİ ---
+            List<TrafficStopLine> stopLines = BuildSultanbeyliSelmanSokagiWorld(env.transform, mats, prefabs);
 
             // Render top-down orthographic TownMap.png from the completed environment before adding dynamic actors
             Texture2D townMapTexture = RenderAndSaveTownMapTexture(sun);
 
-            // --- WORLD ANCHORS & SPAWNS (Missions 1-5) ---
+            // --- WORLD ANCHORS & SPAWNS (Player spawns right in front of 48 Selman Sokağı matching the Street View angle!) ---
             GameObject anchorsRoot = new GameObject("--- WORLD_ANCHORS ---");
-            CreateWorldAnchor("Spawn_GarageFoot", "spawn_garage_foot", anchorsRoot.transform, new Vector3(-3.0f, 0.12f, -21.5f), Quaternion.Euler(0f, 180f, 0f), 2f);
-            CreateWorldAnchor("Spawn_GarageSedan", "spawn_garage_sedan", anchorsRoot.transform, new Vector3(9.5f, 0.28f, -32.5f), Quaternion.identity, 3.5f);
-            CreateWorldAnchor("Harbor_DeliveryZone", "harbor_delivery_zone", anchorsRoot.transform, new Vector3(10.5f, 0.10f, 193.5f), Quaternion.identity, 7.5f);
-            CreateWorldAnchor("MissingCar_SearchZone", "missing_car_zone", anchorsRoot.transform, new Vector3(-35.5f, 0.10f, 19.25f), Quaternion.identity, 14f);
-            CreateWorldAnchor("Tail_StartLookoutZone", "tail_start_zone", anchorsRoot.transform, new Vector3(21.4f, 0.10f, 173.0f), Quaternion.Euler(0f, 180f, 0f), 11f);
-            CreateWorldAnchor("Spawn_HarborTailStart", "spawn_harbor_tail_start", anchorsRoot.transform, new Vector3(21.4f, 0.28f, 177.5f), Quaternion.Euler(0f, 180f, 0f), 4f);
-            CreateWorldAnchor("Neighborhood_ReturnZone", "neighborhood_return_zone", anchorsRoot.transform, new Vector3(0f, 0.10f, 44.0f), Quaternion.identity, 16f);
+            CreateWorldAnchor("Spawn_GarageFoot", "spawn_garage_foot", anchorsRoot.transform, new Vector3(-68.0f, 0.12f, -2.2f), Quaternion.identity, 2f);
+            CreateWorldAnchor("Spawn_GarageSedan", "spawn_garage_sedan", anchorsRoot.transform, new Vector3(-56.5f, 0.28f, -1.8f), Quaternion.Euler(0f, 90f, 0f), 3.5f);
+            CreateWorldAnchor("Harbor_DeliveryZone", "harbor_delivery_zone", anchorsRoot.transform, new Vector3(46.0f, 0.10f, 0.0f), Quaternion.identity, 7.5f);
+            CreateWorldAnchor("MissingCar_SearchZone", "missing_car_zone", anchorsRoot.transform, new Vector3(-10.5f, 0.10f, -12.0f), Quaternion.identity, 14f);
+            CreateWorldAnchor("Tail_StartLookoutZone", "tail_start_zone", anchorsRoot.transform, new Vector3(12.0f, 0.10f, 0.0f), Quaternion.Euler(0f, 90f, 0f), 11f);
+            CreateWorldAnchor("Spawn_HarborTailStart", "spawn_harbor_tail_start", anchorsRoot.transform, new Vector3(6.0f, 0.28f, -1.6f), Quaternion.Euler(0f, 90f, 0f), 4f);
+            CreateWorldAnchor("Neighborhood_ReturnZone", "neighborhood_return_zone", anchorsRoot.transform, new Vector3(-65.0f, 0.10f, 0.0f), Quaternion.identity, 16f);
 
-            // --- ACTORS (Player, Sedan, Story NPCs, Mission 3-5 Actors, Taxi Passenger) ---
+            // --- ACTORS (Player facing 48 Selman Sokağı, Sedan on street, Marco at No:73 Oto Tamir, Elena at No:66) ---
             GameObject actorsRoot = new GameObject("--- ACTORS ---");
-            GameObject playerObj = PlacePrefabInstance(prefabs.Player, actorsRoot.transform, new Vector3(-3.0f, 0.12f, -21.5f), Quaternion.Euler(0f, 180f, 0f));
-            GameObject sedanObj = PlacePrefabInstance(prefabs.PlayerSedan, actorsRoot.transform, new Vector3(9.5f, 0.28f, -32.5f), Quaternion.identity);
-            PlacePrefabInstance(prefabs.NpcMechanic, actorsRoot.transform, new Vector3(-2.5f, 0.04f, -32.2f), Quaternion.identity);
-            PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(1.5f, 0.04f, 194.2f), Quaternion.Euler(0f, 155f, 0f));
+            GameObject playerObj = PlacePrefabInstance(prefabs.Player, actorsRoot.transform, new Vector3(-68.0f, 0.12f, -2.2f), Quaternion.identity);
+            GameObject sedanObj = PlacePrefabInstance(prefabs.PlayerSedan, actorsRoot.transform, new Vector3(-56.5f, 0.28f, -1.8f), Quaternion.Euler(0f, 90f, 0f));
+            PlacePrefabInstance(prefabs.NpcMechanic, actorsRoot.transform, new Vector3(24.5f, 0.04f, 5.2f), Quaternion.Euler(0f, 180f, 0f));
+            PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(46.0f, 0.04f, -5.0f), Quaternion.identity);
 
-            // Mission 3: Missing Dark Sedan parked in open residential courtyard lane with manifest clue
-            GameObject missingCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(-35.5f, 0.04f, 19.25f), Quaternion.Euler(0f, 85f, 0f));
+            // Mission 3: Missing Dark Sedan parked in Çiçekçi Sokağı mouth
+            GameObject missingCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(-10.5f, 0.04f, -14.0f), Quaternion.identity);
             missingCarObj.name = "Mission03_MissingDarkSedan";
             WorldAnchor missingCarAnchor = missingCarObj.AddComponent<WorldAnchor>();
             missingCarAnchor.Configure("missing_car_clue", 4.2f, new Vector3(0f, 2.2f, 0f));
             InteractableTrigger missingCarTrig = missingCarObj.AddComponent<InteractableTrigger>();
             missingCarTrig.Configure(InteractableKind.InspectObject, "missing_car_clue", "ui.btn.inspect", 4.2f);
 
-            // Mission 4: Courier Tail Vehicle + Dropped Package on West Street
-            GameObject tailCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(21.4f, 0.04f, 156.0f), Quaternion.Euler(0f, 180f, 0f));
+            // Mission 4: Courier Tail Vehicle cruising along Selman Sokağı
+            GameObject tailCarObj = PlacePrefabInstance(prefabs.TrafficVehicle, actorsRoot.transform, new Vector3(22.0f, 0.04f, -1.6f), Quaternion.Euler(0f, 90f, 0f));
             tailCarObj.name = "Mission04_TailCourierCar";
             WorldAnchor tailCarAnchor = tailCarObj.AddComponent<WorldAnchor>();
             tailCarAnchor.Configure("tail_target_car", 5.0f, new Vector3(0f, 2.4f, 0f));
 
-            GameObject droppedPkgObj = PlacePrefabInstance(prefabs.WoodenCrate, actorsRoot.transform, new Vector3(-62.5f, 0.06f, 121.5f), Quaternion.Euler(0f, 25f, 0f));
+            GameObject droppedPkgObj = PlacePrefabInstance(prefabs.WoodenCrate, actorsRoot.transform, new Vector3(82.0f, 0.06f, 4.8f), Quaternion.Euler(0f, 25f, 0f));
             droppedPkgObj.name = "Mission04_DroppedPackage";
             droppedPkgObj.transform.localScale = new Vector3(0.65f, 0.65f, 0.65f);
             GameObjectUtility.SetStaticEditorFlags(droppedPkgObj, 0);
@@ -1981,17 +2274,17 @@ namespace Gridroam.Editor
             TailTargetVehicleController tailCtrl = tailCarObj.AddComponent<TailTargetVehicleController>();
             List<Vector3> tailRoute = new List<Vector3>
             {
-                new Vector3(21.4f, 0.04f, 156.0f),
-                new Vector3(21.4f, 0.04f, 116.0f),
-                new Vector3(21.4f, 0.04f, 44.0f),
-                new Vector3(-24.0f, 0.04f, 44.0f),
-                new Vector3(-24.0f, 0.04f, 116.0f),
-                new Vector3(-64.0f, 0.04f, 116.0f)
+                new Vector3(22.0f, 0.04f, -1.6f),
+                new Vector3(76.0f, 0.04f, -1.6f),
+                new Vector3(76.0f, 0.04f,  1.6f),
+                new Vector3(-72.0f, 0.04f, 1.6f),
+                new Vector3(-72.0f, 0.04f, -1.6f),
+                new Vector3(78.0f, 0.04f, -1.6f)
             };
             tailCtrl.Configure(tailRoute, droppedPkgObj);
 
-            // Mission 5: Elena also waits at the Town Square fountain so player can choose Marco (Garage) OR Elena (Square)
-            GameObject elenaSquareObj = PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(6.8f, 0.04f, 77.5f), Quaternion.Euler(0f, -110f, 0f));
+            // Mission 5: Elena waits outside 66 Selman Sokağı
+            GameObject elenaSquareObj = PlacePrefabInstance(prefabs.NpcHarborReceiver, actorsRoot.transform, new Vector3(48.5f, 0.04f, 4.8f), Quaternion.Euler(0f, 180f, 0f));
             elenaSquareObj.name = "NPC_Elena_TownSquare";
             WorldAnchor elenaSqAnchor = elenaSquareObj.GetComponent<WorldAnchor>();
             if (elenaSqAnchor != null) elenaSqAnchor.Configure("npc_elena_neighborhood", 3.6f, new Vector3(0f, 2.3f, 0f));
@@ -2029,20 +2322,18 @@ namespace Gridroam.Editor
             jobBeacon.SetVisible(false);
             jobManager.Configure(jobBeacon, taxiPassengerObj, taxiHum, mats.ContainerOchre, mats.TownFabricTeal);
 
-            // --- Pooled Ambient Traffic along Cumhuriyet Caddesi (stops at red lights & yields via SphereCast) ---
+            // --- Pooled Ambient Traffic cruising back and forth cleanly along Selman Sokağı ---
             GameObject trafficRoot = new GameObject("AmbientTrafficManager");
             AmbientTrafficManager trafficMgr = trafficRoot.AddComponent<AmbientTrafficManager>();
             List<Transform> waypoints = new List<Transform>();
             Vector3[] wpCoords =
             {
-                new Vector3(26.6f, 0.05f, -18f),
-                new Vector3(26.6f, 0.05f, 44f),
-                new Vector3(26.6f, 0.05f, 116f),
-                new Vector3(26.6f, 0.05f, 178f),
-                new Vector3(21.4f, 0.05f, 178f),
-                new Vector3(21.4f, 0.05f, 116f),
-                new Vector3(21.4f, 0.05f, 44f),
-                new Vector3(21.4f, 0.05f, -18f)
+                new Vector3(-84.0f, 0.05f, -1.1f),
+                new Vector3(0.0f,   0.05f, -1.1f),
+                new Vector3(84.0f,  0.05f, -1.1f),
+                new Vector3(84.0f,  0.05f,  1.1f),
+                new Vector3(0.0f,   0.05f,  1.1f),
+                new Vector3(-84.0f, 0.05f,  1.1f)
             };
             for (int i = 0; i < wpCoords.Length; i++)
             {
@@ -2051,14 +2342,106 @@ namespace Gridroam.Editor
                 wp.transform.position = wpCoords[i];
                 waypoints.Add(wp.transform);
             }
-            trafficMgr.Configure(prefabs.TrafficVehicle, waypoints, stopLines);
+            trafficMgr.Configure(prefabs.TrafficVehicle, waypoints, stopLines, prefabs.TownCarGreenSedan);
 
             // --- Calm Modern HUD, Minimap, Shop Panel, Paint Palette & Phone/Map ---
             BuildHudCanvas(uiSprites, townMapTexture, needsController);
 
+            ValidateBuiltScene(scene, catalog);
             DynamicGI.UpdateEnvironment();
             EditorSceneManager.SaveScene(scene, TestScenePath);
             RegisterSceneInBuildSettings(TestScenePath);
+        }
+
+        private static void ValidateBuiltScene(Scene scene, MissionCatalog catalog)
+        {
+            int issues = 0;
+
+            // 1. Check for MISSING scripts across the entire scene hierarchy
+            int missingScripts = 0;
+            foreach (GameObject rootObj in scene.GetRootGameObjects())
+            {
+                Transform[] all = rootObj.GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < all.Length; i++)
+                {
+                    int c = GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(all[i].gameObject);
+                    if (c > 0)
+                    {
+                        missingScripts += c;
+                        Debug.LogError($"[GRIDROAM Validate] MISSING script ({c}) on '{all[i].name}'!");
+                    }
+                }
+            }
+            issues += missingScripts;
+
+            // 2. Verify singleton managers are present exactly once (no duplicate controllers across rebuilds)
+            void CheckSingleton<T>(string label) where T : Component
+            {
+                T[] found = Object.FindObjectsByType<T>(FindObjectsInactive.Include);
+                if (found.Length != 1)
+                {
+                    issues++;
+                    Debug.LogError($"[GRIDROAM Validate] Expected 1 {label}, found {found.Length}!");
+                }
+            }
+            CheckSingleton<SaveManager>("SaveManager");
+            CheckSingleton<PlayerModeController>("PlayerModeController");
+            CheckSingleton<JobManager>("JobManager");
+            CheckSingleton<MissionManager>("MissionManager");
+            CheckSingleton<DayNightCycle>("DayNightCycle");
+            CheckSingleton<GameHUDController>("GameHUDController");
+
+            // 3. Check duplicate WorldAnchor IDs & validate every MissionCatalog step anchor exists!
+            WorldAnchor[] anchors = Object.FindObjectsByType<WorldAnchor>(FindObjectsInactive.Include);
+            HashSet<string> anchorIds = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < anchors.Length; i++)
+            {
+                if (anchors[i] == null || string.IsNullOrEmpty(anchors[i].AnchorId)) continue;
+                if (!anchorIds.Add(anchors[i].AnchorId))
+                {
+                    issues++;
+                    Debug.LogError($"[GRIDROAM Validate] Duplicate WorldAnchor ID '{anchors[i].AnchorId}' on '{anchors[i].name}'!");
+                }
+            }
+            if (catalog != null && catalog.missions != null)
+            {
+                foreach (MissionData m in catalog.missions)
+                {
+                    if (m == null || m.steps == null) continue;
+                    foreach (MissionStepData step in m.steps)
+                    {
+                        if (!string.IsNullOrEmpty(step.targetAnchorId) && !anchorIds.Contains(step.targetAnchorId))
+                        {
+                            issues++;
+                            Debug.LogError($"[GRIDROAM Validate] Mission '{m.missionId}' targetAnchorId '{step.targetAnchorId}' not found in scene!");
+                        }
+                        if (!string.IsNullOrEmpty(step.secondaryTargetAnchorId) && !anchorIds.Contains(step.secondaryTargetAnchorId))
+                        {
+                            issues++;
+                            Debug.LogError($"[GRIDROAM Validate] Mission '{m.missionId}' secondaryTargetAnchorId '{step.secondaryTargetAnchorId}' not found in scene!");
+                        }
+                    }
+                }
+            }
+
+            // 4. Verify JobBoards, PaintableHouses, and FuelPumps are inside Selman Sokağı playable bounds
+            JobBoardPoint[] boards = Object.FindObjectsByType<JobBoardPoint>(FindObjectsInactive.Include);
+            if (boards.Length != 4)
+            {
+                issues++;
+                Debug.LogWarning($"[GRIDROAM Validate] Expected 4 JobBoardPoints, found {boards.Length}.");
+            }
+            PaintableHouse[] houses = Object.FindObjectsByType<PaintableHouse>(FindObjectsInactive.Include);
+            if (houses.Length < 5)
+            {
+                issues++;
+                Debug.LogWarning($"[GRIDROAM Validate] Expected >= 5 PaintableHouses for Pizza & Painting variety, found {houses.Length}.");
+            }
+            StreetFootball[] balls = Object.FindObjectsByType<StreetFootball>(FindObjectsInactive.Include);
+            AtmTerminalInteractable[] atms = Object.FindObjectsByType<AtmTerminalInteractable>(FindObjectsInactive.Include);
+            MosquePrayerInteractable[] mosqueSpots = Object.FindObjectsByType<MosquePrayerInteractable>(FindObjectsInactive.Include);
+
+            Debug.Log($"[GRIDROAM Validate] Scene audit complete — Issues: {issues} | Anchors: {anchorIds.Count} | JobBoards: {boards.Length} | PaintableHouses: {houses.Length} | Footballs: {balls.Length} | ATMs: {atms.Length} | MosqueSpots: {mosqueSpots.Length}");
         }
 
         private static ObjectiveBeacon BuildObjectiveBeacon(string objectName, Material beaconMat)
@@ -2212,17 +2595,39 @@ namespace Gridroam.Editor
         private static void RegisterSceneInBuildSettings(string scenePath)
         {
             List<EditorBuildSettingsScene> scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
-            foreach (EditorBuildSettingsScene s in scenes)
+            bool foundMain = false;
+            for (int i = 0; i < scenes.Count; i++)
             {
+                EditorBuildSettingsScene s = scenes[i];
+                if (s == null) continue;
                 if (s.path == scenePath)
                 {
                     s.enabled = true;
-                    EditorBuildSettings.scenes = scenes.ToArray();
-                    return;
+                    foundMain = true;
+                }
+                else if (s.path == "Assets/Scenes/SampleScene.unity")
+                {
+                    // Prevent Unity's default template SampleScene from ever shipping as a build entry scene
+                    s.enabled = false;
                 }
             }
 
-            scenes.Insert(0, new EditorBuildSettingsScene(scenePath, true));
+            if (!foundMain)
+            {
+                scenes.Insert(0, new EditorBuildSettingsScene(scenePath, true));
+            }
+            else
+            {
+                // Ensure GRIDROAM main scene is always at build index 0
+                int idx = scenes.FindIndex(s => s != null && s.path == scenePath);
+                if (idx > 0)
+                {
+                    EditorBuildSettingsScene mainScene = scenes[idx];
+                    scenes.RemoveAt(idx);
+                    scenes.Insert(0, mainScene);
+                }
+            }
+
             EditorBuildSettings.scenes = scenes.ToArray();
         }
 

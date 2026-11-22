@@ -15,7 +15,7 @@ MonoBehaviour:
   missionId: m04_night_tail
   titleKey: m04.title
   summaryKey: m04.summary
-  rewardMoney: 200
+  rewardMoney: 350
   nextMissionId: m05_end_of_shift
   autoStartNextMission: 1
   retryPlayerAnchorId: spawn_harbor_tail_start

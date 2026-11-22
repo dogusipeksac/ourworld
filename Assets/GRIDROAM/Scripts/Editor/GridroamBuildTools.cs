@@ -20,7 +20,75 @@ namespace Gridroam.Editor
     public static class GridroamBuildTools
     {
         private const string AndroidBuildDir = "Builds/Android";
-        private const string IosBuildDir = "Builds/iOS/GRIDROAM_Xcode";
+        private const string IosBuildDir = "Builds/iOS/OurWorld_Xcode";
+
+        [MenuItem("GRIDROAM/Build/0. Store Readiness Pre-Flight Check (v1.0.0)", priority = 19)]
+        public static void RunStoreReadinessCheck()
+        {
+            GridroamPrototypeSetup.ConfigureCrossPlatformMobileSettings();
+            List<string> ok = new List<string>();
+            List<string> warn = new List<string>();
+
+            string androidId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
+            string iosId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.iOS);
+            if (!string.IsNullOrEmpty(androidId) && androidId == iosId && !androidId.Contains("Default"))
+                ok.Add($"Bundle ID: {androidId}");
+            else
+                warn.Add($"Bundle ID tutarsız: Android={androidId}, iOS={iosId}");
+
+            if (!string.IsNullOrEmpty(PlayerSettings.companyName) && PlayerSettings.companyName != "DefaultCompany")
+                ok.Add($"Şirket / Geliştirici: {PlayerSettings.companyName}");
+            else
+                warn.Add("companyName hâlâ 'DefaultCompany'!");
+
+            ok.Add($"Sürüm: {PlayerSettings.bundleVersion} (Android VC={PlayerSettings.Android.bundleVersionCode}, iOS Build={PlayerSettings.iOS.buildNumber})");
+
+            if (File.Exists(GridroamPrototypeSetup.AppIconAssetPath))
+                ok.Add("Uygulama İkonu (1024x1024 RGB PNG): Mevcut ve PlayerSettings'e atandı.");
+            else
+                warn.Add($"Uygulama İkonu eksik: {GridroamPrototypeSetup.AppIconAssetPath}");
+
+            if (File.Exists("Assets/Plugins/iOS/PrivacyInfo.xcprivacy"))
+                ok.Add("iOS Privacy Manifest (PrivacyInfo.xcprivacy): Mevcut.");
+            else
+                warn.Add("iOS PrivacyInfo.xcprivacy eksik!");
+
+            if (File.Exists("Docs/privacy_policy.html"))
+                ok.Add("Gizlilik Politikası (Docs/privacy_policy.html): Mevcut.");
+            else
+                warn.Add("Gizlilik Politikası HTML dosyası eksik!");
+
+            // Player feedback -> Firebase (Resources/FirebaseConfig.json)
+            TextAsset fbConfig = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/GRIDROAM/Resources/FirebaseConfig.json");
+            if (fbConfig != null && fbConfig.text.Contains("\"projectId\": \"\"") == false && fbConfig.text.Contains("\"apiKey\": \"\"") == false)
+                ok.Add("Firebase öneri sistemi: FirebaseConfig.json dolu.");
+            else
+                warn.Add("Firebase öneri sistemi yapılandırılmadı: Assets/GRIDROAM/Resources/FirebaseConfig.json (projectId + apiKey). Öneriler yalnızca cihazda bekler!");
+
+            // Mission catalog size (store v1 = 10 missions)
+            Gridroam.Missions.MissionCatalog catalog = AssetDatabase.LoadAssetAtPath<Gridroam.Missions.MissionCatalog>("Assets/GRIDROAM/Data/Missions/MissionCatalog.asset");
+            if (catalog != null && catalog.missions.Count >= 10)
+                ok.Add($"Görev kataloğu: {catalog.missions.Count} görev.");
+            else
+                warn.Add($"Görev kataloğu eksik: {(catalog != null ? catalog.missions.Count : 0)}/10 (GRIDROAM > Görevler > Bölüm 2 Görevlerini Oluştur).");
+
+            string[] scenes = GetEnabledScenes();
+            if (scenes.Length == 1 && scenes[0] == GridroamPrototypeSetup.TestScenePath)
+                ok.Add($"Giriş Sahnesi: {scenes[0]} (SampleScene devre dışı).");
+            else
+                warn.Add($"Build Settings sahnelerini kontrol et (etkin sayı: {scenes.Length}).");
+
+            if (PlayerSettings.Android.useCustomKeystore)
+                ok.Add("Android Release Keystore: Etkin.");
+            else
+                warn.Add("Android Release Keystore henüz seçilmedi (Google Play AAB yüklemesi için Publishing Settings'ten keystore oluştur/seç).");
+
+            string summary = "=== OURWORLD (v1.0.0) STORE HAZIRLIK RAPORU ===\n\n" +
+                             "HAZIR (" + ok.Count + "):\n- " + string.Join("\n- ", ok) +
+                             (warn.Count > 0 ? "\n\nDİKKAT / EKSİK (" + warn.Count + "):\n- " + string.Join("\n- ", warn) : "\n\nTüm otomatik kontroller geçti!");
+            Debug.Log(summary);
+            EditorUtility.DisplayDialog("OurWorld — Store Readiness", summary, "Tamam");
+        }
 
         [MenuItem("GRIDROAM/Build/Android - Build Test APK (Development)", priority = 20)]
         public static void BuildAndroidTestApk()
@@ -29,7 +97,7 @@ namespace Gridroam.Editor
             string[] scenes = GetEnabledScenes();
             if (scenes.Length == 0)
             {
-                EditorUtility.DisplayDialog("GRIDROAM Build", "No enabled scenes found. Run 'GRIDROAM -> 1. Build Garage-Harbor Prototype (Missions 1-2)' first.", "OK");
+                EditorUtility.DisplayDialog("GRIDROAM Build", "Etkin sahne bulunamadı. Önce 'GRIDROAM -> 1. Build Sultanbeyli Selman Sokağı (Görevler 1-5 + Yan İşler)' komutunu çalıştır.", "Tamam");
                 return;
             }
 
@@ -37,7 +105,7 @@ namespace Gridroam.Editor
             EditorUserBuildSettings.buildAppBundle = false;
             EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
 
-            string outputPath = Path.Combine(AndroidBuildDir, "GRIDROAM_Test.apk");
+            string outputPath = Path.Combine(AndroidBuildDir, "OurWorld_Test.apk");
             BuildPlayerOptions options = new BuildPlayerOptions
             {
                 scenes = scenes,
@@ -56,7 +124,7 @@ namespace Gridroam.Editor
             string[] scenes = GetEnabledScenes();
             if (scenes.Length == 0)
             {
-                EditorUtility.DisplayDialog("GRIDROAM Build", "No enabled scenes found. Run 'GRIDROAM -> 1. Build Garage-Harbor Prototype (Missions 1-2)' first.", "OK");
+                EditorUtility.DisplayDialog("GRIDROAM Build", "Etkin sahne bulunamadı. Önce 'GRIDROAM -> 1. Build Sultanbeyli Selman Sokağı (Görevler 1-5 + Yan İşler)' komutunu çalıştır.", "Tamam");
                 return;
             }
 
@@ -74,7 +142,7 @@ namespace Gridroam.Editor
             EditorUserBuildSettings.buildAppBundle = true;
             EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
 
-            string outputPath = Path.Combine(AndroidBuildDir, "GRIDROAM_GooglePlay.aab");
+            string outputPath = Path.Combine(AndroidBuildDir, "OurWorld_GooglePlay.aab");
             BuildPlayerOptions options = new BuildPlayerOptions
             {
                 scenes = scenes,
@@ -93,7 +161,7 @@ namespace Gridroam.Editor
             string[] scenes = GetEnabledScenes();
             if (scenes.Length == 0)
             {
-                EditorUtility.DisplayDialog("GRIDROAM Build", "No enabled scenes found. Run 'GRIDROAM -> 1. Build Garage-Harbor Prototype (Missions 1-2)' first.", "OK");
+                EditorUtility.DisplayDialog("GRIDROAM Build", "Etkin sahne bulunamadı. Önce 'GRIDROAM -> 1. Build Sultanbeyli Selman Sokağı (Görevler 1-5 + Yan İşler)' komutunu çalıştır.", "Tamam");
                 return;
             }
 
@@ -115,7 +183,7 @@ namespace Gridroam.Editor
             List<string> enabled = new List<string>();
             foreach (EditorBuildSettingsScene s in EditorBuildSettings.scenes)
             {
-                if (s != null && s.enabled && !string.IsNullOrEmpty(s.path))
+                if (s != null && s.enabled && !string.IsNullOrEmpty(s.path) && s.path != "Assets/Scenes/SampleScene.unity")
                 {
                     enabled.Add(s.path);
                 }
@@ -170,12 +238,13 @@ namespace Gridroam.Editor
             plist.ReadFromFile(plistPath);
             PlistElementDict root = plist.root;
 
-            // Avoid repeated manual export compliance prompts on TestFlight uploads.
+            // Avoid repeated manual export compliance prompts on TestFlight / App Store uploads.
+            root.SetString("CFBundleDisplayName", "OurWorld");
             root.SetBoolean("ITSAppUsesNonExemptEncryption", false);
             root.SetBoolean("UIRequiresFullScreen", true);
 
             plist.WriteToFile(plistPath);
-            Debug.Log("[GRIDROAM iOS Postprocess] Updated Info.plist (ITSAppUsesNonExemptEncryption=false, UIRequiresFullScreen=true).");
+            Debug.Log("[OurWorld iOS Postprocess] Updated Info.plist (CFBundleDisplayName=OurWorld, ITSAppUsesNonExemptEncryption=false, UIRequiresFullScreen=true).");
         }
     }
 #endif

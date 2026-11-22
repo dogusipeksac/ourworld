@@ -14,11 +14,20 @@ namespace Gridroam.Editor
     public static class GridroamAutoSetup
     {
         private const string VersionKey = "GRIDROAM_SceneBuildVersion";
-        private const string CurrentBuildVersion = "v12_living_town_and_combat";
+        private const string CurrentBuildVersion = "v26_hardened_audit_jobs_save_audio";
 
         static GridroamAutoSetup()
         {
             EditorApplication.delayCall += EnsurePrototypeReady;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+        }
+
+        private static void OnPlayModeChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.EnteredEditMode)
+            {
+                EditorApplication.delayCall += EnsurePrototypeReady;
+            }
         }
 
         private static void EnsurePrototypeReady()
@@ -31,23 +40,44 @@ namespace Gridroam.Editor
                 return;
             }
 
+            Scene active = SceneManager.GetActiveScene();
             string builtVersion = EditorPrefs.GetString(VersionKey, string.Empty);
             bool needsRebuild = !File.Exists(GridroamPrototypeSetup.TestScenePath) || builtVersion != CurrentBuildVersion;
 
             if (needsRebuild)
             {
-                EditorPrefs.SetString(VersionKey, CurrentBuildVersion);
-                Debug.Log($"[GRIDROAM] Upgrading scene to {CurrentBuildVersion} (100% walkable Çınarlı Kasabası 4x4 town grid, procedural 3D skybox, zero fake sea/backdrops, solid 900x900 ground)...");
-                GridroamPrototypeSetup.BuildFullPrototype(showDialog: false);
+                if (active.IsValid() && active.isDirty)
+                {
+                    Debug.LogWarning($"[GRIDROAM] Açık sahnede ('{active.name}') kaydedilmemiş değişiklikler olduğu için {CurrentBuildVersion} otomatik kurulumu ertelendi. Sahneyi kaydettikten sonra 'GRIDROAM -> 1. Build Sultanbeyli Selman Sokağı' menüsünden yeniden oluşturabilirsin.");
+                    return;
+                }
+
+                try
+                {
+                    Debug.Log($"[GRIDROAM] Sahne {CurrentBuildVersion} sürümüne güncelleniyor (Sultanbeyli · Selman Sokağı · Görevler 1-5 · Yan İşler · Hz. Osman Camii)...");
+                    GridroamPrototypeSetup.BuildFullPrototype(showDialog: false);
+                    if (File.Exists(GridroamPrototypeSetup.TestScenePath))
+                    {
+                        EditorPrefs.SetString(VersionKey, CurrentBuildVersion);
+                        Debug.Log($"[GRIDROAM] Sahne {CurrentBuildVersion} sürümü başarıyla üretildi ve doğrulandı.");
+                    }
+                    else
+                    {
+                        Debug.LogError($"[GRIDROAM] Sahne üretiminden sonra '{GridroamPrototypeSetup.TestScenePath}' bulunamadı; sürüm anahtarı işaretlenmedi.");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[GRIDROAM] Sahne üretimi ({CurrentBuildVersion}) başarısız oldu; sürüm anahtarı işaretlenmedi.\n{ex}");
+                }
                 return;
             }
 
-            Scene active = SceneManager.GetActiveScene();
             if (!active.isDirty &&
                 (string.IsNullOrEmpty(active.path) || active.path == "Assets/Scenes/SampleScene.unity"))
             {
                 EditorSceneManager.OpenScene(GridroamPrototypeSetup.TestScenePath, OpenSceneMode.Single);
-                Debug.Log("[GRIDROAM] Opened GRIDROAM_GarageHarbor_Test.unity automatically — press Play to start!");
+                Debug.Log("[GRIDROAM] GRIDROAM_GarageHarbor_Test.unity otomatik açıldı — Play'e basarak oynayabilirsin!");
             }
         }
     }

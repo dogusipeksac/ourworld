@@ -9,6 +9,7 @@ using Gridroam.UI;
 using Gridroam.Vehicle;
 using Gridroam.World;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Gridroam.Player
 {
@@ -265,11 +266,13 @@ namespace Gridroam.Player
                 SedanVehicleController targetCar = FindVehicleBySaveId(data.savedVehicleId);
                 if (targetCar != null && (targetCar != playerSedan || HasVehicleKeys))
                 {
-                    Vector3 vPos = new Vector3(
-                        Mathf.Clamp(data.savedVehiclePosX, -95f, 95f),
-                        Mathf.Max(0.24f, data.savedVehiclePosY),
-                        Mathf.Clamp(data.savedVehiclePosZ, -36f, 194f));
-                    Quaternion vRot = Quaternion.Euler(0f, data.savedVehicleRotY, 0f);
+                    bool carPosValid = data.savedVehiclePosX >= -112f && data.savedVehiclePosX <= 124f &&
+                                       data.savedVehiclePosZ >= -54f && data.savedVehiclePosZ <= 32f &&
+                                       data.savedVehiclePosY >= -0.5f && data.savedVehiclePosY <= 12f;
+                    Vector3 vPos = carPosValid
+                        ? new Vector3(data.savedVehiclePosX, Mathf.Max(0.24f, data.savedVehiclePosY), data.savedVehiclePosZ)
+                        : targetCar.transform.position;
+                    Quaternion vRot = carPosValid ? Quaternion.Euler(0f, data.savedVehicleRotY, 0f) : targetCar.transform.rotation;
                     targetCar.TeleportAndReset(vPos, vRot);
                     targetCar.SetFuel(data.savedVehicleFuel);
                     TryEnterVehicle(targetCar, snapCamera: true);
@@ -279,11 +282,13 @@ namespace Gridroam.Player
 
             if (footController != null)
             {
-                Vector3 fPos = new Vector3(
-                    Mathf.Clamp(data.playerPosX, -95f, 95f),
-                    Mathf.Max(0.10f, data.playerPosY),
-                    Mathf.Clamp(data.playerPosZ, -36f, 194f));
-                Quaternion fRot = Quaternion.Euler(0f, data.playerRotY, 0f);
+                bool footPosValid = data.playerPosX >= -112f && data.playerPosX <= 124f &&
+                                    data.playerPosZ >= -54f && data.playerPosZ <= 32f &&
+                                    data.playerPosY >= -0.5f && data.playerPosY <= 12f;
+                Vector3 fPos = footPosValid
+                    ? new Vector3(data.playerPosX, Mathf.Max(0.10f, data.playerPosY), data.playerPosZ)
+                    : new Vector3(-68.0f, 0.12f, -2.2f);
+                Quaternion fRot = footPosValid ? Quaternion.Euler(0f, data.playerRotY, 0f) : Quaternion.identity;
                 footController.TeleportTo(fPos, fRot);
             }
 
@@ -305,8 +310,47 @@ namespace Gridroam.Player
             return null;
         }
 
+        private int _fastTravelIndex;
+
+        private static readonly (string label, Vector3 pos, float yaw)[] FastTravelSpots =
+        {
+            ("Hz. Osman Camii Avlusu",           new Vector3( 82.0f, 0.12f, -24.0f), 180f),
+            ("No:58 Selman Bakkal & ATM",        new Vector3(  6.5f, 0.12f,   4.5f),   0f),
+            ("Gürsu Sk. Mahalle Futbol Sahası",  new Vector3(-41.0f, 0.12f,  -8.5f), 180f),
+            ("No:73 Oto Tamir",                  new Vector3( 24.0f, 0.12f,   4.2f),   0f),
+            ("No:48 Selman Sokağı Evim",         new Vector3(-62.0f, 0.12f,   4.5f),   0f)
+        };
+
         private void Update()
         {
+            if (!IsModalLocked && Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame && DayNightCycle.Instance != null)
+            {
+                float h = DayNightCycle.Instance.CurrentHour;
+                float nextHour;
+                string label;
+                if (h < 11.5f) { nextHour = 13.0f; label = "Öğle (13:00 · Güneşli İstanbul)"; }
+                else if (h < 17.5f) { nextHour = 18.75f; label = "Gün Batımı (18:45 · Altın Saat)"; }
+                else if (h < 20.5f) { nextHour = 21.5f; label = "İstanbul Gecesi (21:30 · Sokak Lambaları)"; }
+                else { nextHour = 9.0f; label = "Sabah (09:00 · Taze Sultanbeyli Sabahı)"; }
+
+                DayNightCycle.Instance.SetTimeOfDay(nextHour);
+                GameFeelAudio.PlayUiClick();
+                RaiseStatusMessage($"Saat değiştirildi: {label}");
+            }
+
+            // Quick Fast-Travel (G key on foot) between Selman Sokağı's 5 iconic spots!
+            if (!IsModalLocked && CurrentMode == ControlMode.OnFoot && !MosquePrayerInteractable.IsPlayerPraying &&
+                footController != null && Keyboard.current != null && Keyboard.current.gKey.wasPressedThisFrame)
+            {
+                CarryableProp.DropHeldPropIfAny();
+                var spot = FastTravelSpots[_fastTravelIndex % FastTravelSpots.Length];
+                _fastTravelIndex = (_fastTravelIndex + 1) % FastTravelSpots.Length;
+                footController.TeleportTo(spot.pos, Quaternion.Euler(0f, spot.yaw, 0f));
+                GameFeelAudio.PlayUiClick();
+                GameFeelAudio.SpawnBurst(spot.pos + Vector3.up * 1.1f, new Color(0.32f, 0.84f, 0.80f), count: 10, spread: 0.55f);
+                RaiseStatusMessage($"Hızlı Geçiş: {spot.label}");
+            }
+
             if (CurrentMode == ControlMode.Seated)
             {
                 _closestWithin4m = null;
@@ -377,8 +421,13 @@ namespace Gridroam.Player
             }
 
             Vector3 playerPos = footController.transform.position;
+            Vector3 playerChest = playerPos + Vector3.up * 1.15f;
+            Vector3 playerFwd = footController.transform.forward;
+            playerFwd.y = 0f;
+            if (playerFwd.sqrMagnitude > 0.001f) playerFwd.Normalize();
+
             InteractableTrigger best = null;
-            float bestDistSq = float.MaxValue;
+            float bestScore = float.MaxValue;
             InteractableTrigger bestLook4m = null;
             float bestLookDistSq = 16.0f; // 4.0 m squared
 
@@ -388,7 +437,12 @@ namespace Gridroam.Player
                 // FuelPump is only interacted with while driving a vehicle
                 if (trigger.Kind == InteractableKind.FuelPump) continue;
 
-                float distSq = (trigger.transform.position - playerPos).sqrMagnitude;
+                Vector3 trigPos = trigger.transform.position;
+                Vector3 delta = trigPos - playerPos;
+                // Ignore interactables on another floor (> 2.3 m vertical gap)
+                if (Mathf.Abs(delta.y) > 2.3f) continue;
+
+                float distSq = delta.sqrMagnitude;
                 if (distSq <= bestLookDistSq)
                 {
                     bestLook4m = trigger;
@@ -396,10 +450,45 @@ namespace Gridroam.Player
                 }
 
                 float radius = trigger.InteractionRadius;
-                if (distSq <= radius * radius && distSq < bestDistSq)
+                if (distSq <= radius * radius)
                 {
-                    best = trigger;
-                    bestDistSq = distSq;
+                    // Prevent selecting triggers behind solid walls (except doors & vehicles which have large colliders)
+                    bool checkLos = trigger.Kind != InteractableKind.Door &&
+                                    trigger.Kind != InteractableKind.PlayerVehicle &&
+                                    trigger.Kind != InteractableKind.TownVehicle &&
+                                    trigger.Kind != InteractableKind.PaintableHouse;
+                    if (checkLos && distSq > 0.45f)
+                    {
+                        Vector3 trigProbe = trigPos + Vector3.up * 0.85f;
+                        if (Physics.Linecast(playerChest, trigProbe, out RaycastHit wallHit, ~0, QueryTriggerInteraction.Ignore))
+                        {
+                            Transform hitTr = wallHit.transform;
+                            if (hitTr != null &&
+                                hitTr != footController.transform &&
+                                !hitTr.IsChildOf(footController.transform) &&
+                                hitTr != trigger.transform &&
+                                !hitTr.IsChildOf(trigger.transform) &&
+                                !trigger.transform.IsChildOf(hitTr))
+                            {
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Facing-weighted score: prefers interactables in front of player when two overlap
+                    Vector3 flatDir = new Vector3(delta.x, 0f, delta.z);
+                    float facingBonus = 0f;
+                    if (flatDir.sqrMagnitude > 0.04f)
+                    {
+                        float dot = Vector3.Dot(playerFwd, flatDir.normalized);
+                        facingBonus = (1f - dot) * 0.55f;
+                    }
+                    float score = Mathf.Sqrt(distSq) + facingBonus;
+                    if (score < bestScore)
+                    {
+                        best = trigger;
+                        bestScore = score;
+                    }
                 }
             }
 
@@ -425,6 +514,20 @@ namespace Gridroam.Player
             {
                 _interactConsumedFrame = Time.frameCount;
                 TryStandUp();
+                return;
+            }
+
+            if (MosquePrayerInteractable.IsPlayerPraying)
+            {
+                _interactConsumedFrame = Time.frameCount;
+                MosquePrayerInteractable.CancelActivePrayerIfAny();
+                return;
+            }
+
+            if (CurrentMode == ControlMode.OnFoot && CarryableProp.IsHoldingProp)
+            {
+                _interactConsumedFrame = Time.frameCount;
+                CarryableProp.CurrentlyHeld.ToggleCarry(this);
                 return;
             }
 
@@ -469,6 +572,10 @@ namespace Gridroam.Player
                 case InteractableKind.TownVehicle:
                 {
                     SedanVehicleController vehicle = _nearestInteractable.GetComponentInParent<SedanVehicleController>();
+                    if (vehicle == null && _nearestInteractable.Kind == InteractableKind.TownVehicle && AmbientTrafficManager.Instance != null)
+                    {
+                        vehicle = AmbientTrafficManager.Instance.TryHijackTrafficCar(_nearestInteractable.gameObject);
+                    }
                     if (vehicle == null && _nearestInteractable.Kind == InteractableKind.PlayerVehicle)
                     {
                         vehicle = playerSedan;
@@ -554,6 +661,66 @@ namespace Gridroam.Player
                     return;
                 }
 
+                case InteractableKind.HomeAppliance:
+                {
+                    HomeApplianceInteractable appliance = _nearestInteractable.GetComponentInParent<HomeApplianceInteractable>();
+                    if (appliance != null)
+                    {
+                        appliance.Use(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.MosquePrayer:
+                {
+                    MosquePrayerInteractable prayer = _nearestInteractable.GetComponentInParent<MosquePrayerInteractable>();
+                    if (prayer != null)
+                    {
+                        prayer.Interact(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.StreetCat:
+                {
+                    StreetCatController cat = _nearestInteractable.GetComponentInParent<StreetCatController>();
+                    if (cat != null)
+                    {
+                        cat.Pet(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.Football:
+                {
+                    StreetFootball ball = _nearestInteractable.GetComponentInParent<StreetFootball>();
+                    if (ball != null)
+                    {
+                        ball.KickFromPlayer(this, 1.05f);
+                    }
+                    return;
+                }
+
+                case InteractableKind.CarryableProp:
+                {
+                    CarryableProp prop = _nearestInteractable.GetComponentInParent<CarryableProp>();
+                    if (prop != null)
+                    {
+                        prop.ToggleCarry(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.AtmTerminal:
+                {
+                    AtmTerminalInteractable atm = _nearestInteractable.GetComponentInParent<AtmTerminalInteractable>();
+                    if (atm != null)
+                    {
+                        atm.Use(this);
+                    }
+                    return;
+                }
+
                 case InteractableKind.InspectObject:
                 {
                     if (!string.IsNullOrEmpty(_nearestInteractable.InteractableId) &&
@@ -593,16 +760,6 @@ namespace Gridroam.Player
         {
             if (v == null) return;
 
-            InteractableTrigger trig = v.GetComponent<InteractableTrigger>();
-            bool requiresKeys = (trig != null && trig.Kind == InteractableKind.PlayerVehicle) ||
-                                (trig == null && v == playerSedan);
-
-            if (requiresKeys && !HasVehicleKeys)
-            {
-                OnStatusMessage?.Invoke(LocalizationService.Tr("ui.hud.keys_locked"));
-                return;
-            }
-
             ClearActiveSeatImmediate();
 
             if (_currentVehicle != null && _currentVehicle != v)
@@ -640,6 +797,7 @@ namespace Gridroam.Player
 
             if (activeVeh.SpeedKmh > vehicleExitMaxSpeedKmh)
             {
+                RaiseStatusMessage("Araçtan inmek için önce yavaşla!");
                 return;
             }
 

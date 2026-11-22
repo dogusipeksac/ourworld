@@ -15,7 +15,7 @@ MonoBehaviour:
   missionId: m03_missing_car
   titleKey: m03.title
   summaryKey: m03.summary
-  rewardMoney: 150
+  rewardMoney: 220
   nextMissionId: m04_night_tail
   autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot

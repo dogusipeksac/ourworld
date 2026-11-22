@@ -53,16 +53,17 @@ namespace Gridroam.Jobs
             "Antrasit"
         };
 
+        // Validated Sultanbeyli · Selman Sokağı sidewalk pickup points (X in [-70..+92], Z in [-24..+5])
         private static readonly Vector3[] TaxiPickupSpots =
         {
-            new Vector3(17.5f, 0.08f, 14f),
-            new Vector3(17.5f, 0.08f, 72f),
-            new Vector3(17.5f, 0.08f, 142f),
-            new Vector3(-17.5f, 0.08f, 18f),
-            new Vector3(-17.5f, 0.08f, 88f),
-            new Vector3(-30.5f, 0.08f, 64f),
-            new Vector3(-30.5f, 0.08f, 150f),
-            new Vector3(30.5f, 0.08f, 82f)
+            new Vector3(-64.0f, 0.08f,  4.7f), // No:48 Selman Sk. Önü
+            new Vector3(-42.0f, 0.08f,  4.7f), // No:52 & Gürsu Sk. Karşısı
+            new Vector3(  6.0f, 0.08f,  4.7f), // No:58 Selman Bakkal
+            new Vector3( 38.0f, 0.08f, -4.7f), // No:66S Hafsa Tesisat
+            new Vector3( 56.0f, 0.08f,  4.7f), // Nutuk Sk. Köşesi
+            new Vector3( 71.5f, 0.08f, -4.7f), // No:81S Mavi Apartman
+            new Vector3( 91.0f, 0.08f,  4.7f), // No:95 Çay Ocağı
+            new Vector3( 82.0f, 0.08f, -23.5f) // Hz. Osman Camii Avlusu
         };
 
         private struct TaxiDestination
@@ -72,27 +73,30 @@ namespace Gridroam.Jobs
             public Vector3 WorldPos;
         }
 
+        // Validated drivable Sultanbeyli · Selman Sokağı dropoff points with safe sidewalk exit!
         private static readonly TaxiDestination[] TaxiDestinations =
         {
-            new TaxiDestination { NameKey = "job.taxi.dest.square", FallbackTr = "Kasaba Meydanı", WorldPos = new Vector3(16.0f, 0.08f, 80f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.harbor", FallbackTr = "Kuzey Kargo Deposu", WorldPos = new Vector3(8.0f, 0.08f, 184f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.garage", FallbackTr = "Tamirhane", WorldPos = new Vector3(0.0f, 0.08f, -24f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.park", FallbackTr = "Çınarlı Parkı", WorldPos = new Vector3(0.0f, 0.08f, 148f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.north", FallbackTr = "Akaryakıt İstasyonu", WorldPos = new Vector3(46.0f, 0.08f, 150f) }
+            new TaxiDestination { NameKey = "job.taxi.dest.seyyidkutup", FallbackTr = "Seyyid Kutup Cd. Kavşağı", WorldPos = new Vector3(-85.0f, 0.08f,  0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.bakkal58",    FallbackTr = "No:58 Selman Bakkal",      WorldPos = new Vector3(  8.0f, 0.08f,  0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.ototamir",    FallbackTr = "No:73 Oto Tamir",          WorldPos = new Vector3( 25.0f, 0.08f,  0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.nutuk",       FallbackTr = "Nutuk Sokağı Girişi",      WorldPos = new Vector3( 59.2f, 0.08f, 11.5f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.camii",       FallbackTr = "Hz. Osman Camii",          WorldPos = new Vector3( 98.5f, 0.08f, -31.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.fuel",        FallbackTr = "Akaryakıt İstasyonu",      WorldPos = new Vector3(-84.5f, 0.08f,  9.5f) }
         };
 
+        // 10 safe sidewalk/pocket litter points along Selman Sokağı (never forcing pedestrians into fast traffic!)
         private static readonly Vector3[] LitterSpawnPoints =
         {
-            new Vector3(7.5f, 0.08f, 72.0f),
-            new Vector3(-7.5f, 0.08f, 74.0f),
-            new Vector3(-6.5f, 0.08f, 92.0f),
-            new Vector3(8.5f, 0.08f, 90.0f),
-            new Vector3(0.0f, 0.08f, 64.0f),
-            new Vector3(16.2f, 0.08f, 24.0f),
-            new Vector3(16.2f, 0.08f, 102.0f),
-            new Vector3(-16.2f, 0.08f, 80.0f),
-            new Vector3(0.0f, 0.08f, 136.0f),
-            new Vector3(5.5f, 0.08f, 156.0f)
+            new Vector3(-70.0f, 0.08f,  4.9f),
+            new Vector3(-54.0f, 0.08f, -4.9f),
+            new Vector3(-34.0f, 0.08f,  4.9f),
+            new Vector3(-16.0f, 0.08f, -4.9f),
+            new Vector3(  2.0f, 0.08f,  4.9f),
+            new Vector3( 18.0f, 0.08f, -4.9f),
+            new Vector3( 36.0f, 0.08f,  4.9f),
+            new Vector3( 54.0f, 0.08f, -4.9f),
+            new Vector3( 74.0f, 0.08f,  4.9f),
+            new Vector3( 86.0f, 0.08f, -24.5f)
         };
 
         private JobType _activeJob = JobType.None;
@@ -113,6 +117,7 @@ namespace Gridroam.Jobs
         private const int MaxPizzaChain = 5;
         private int _pizzaChainIndex;
         private PaintableHouse _pizzaTargetHouse;
+        private float _lastPizzaRewardTime = -99f;
 
         // Taxi state
         private bool _taxiPassengerAboard;
@@ -120,9 +125,11 @@ namespace Gridroam.Jobs
         private TaxiDestination _taxiCurrentDest;
         private int _taxiHardCollisions;
         private float _taxiWaveTimer;
+        private float _lastTaxiWarningTime = -99f;
 
         // Street Cleanup state
         private readonly List<LitterPickup> _spawnedLitter = new List<LitterPickup>();
+        private readonly HashSet<LitterPickup> _awardedLitter = new HashSet<LitterPickup>();
         private int _litterCollected;
         private int _litterTotal;
 
@@ -431,6 +438,7 @@ namespace Gridroam.Jobs
                 }
             }
             _spawnedLitter.Clear();
+            _awardedLitter.Clear();
         }
 
         // =====================================================================
@@ -490,15 +498,26 @@ namespace Gridroam.Jobs
 
             RefreshJobHudText();
 
-            if (!mode.IsDriving || mode.CurrentVehicle == null)
+            if (Time.time - _lastPizzaRewardTime < 0.8f) return;
+
+            // Accept delivery when stopped cleanly by vehicle near the street front OR walking right up to the front door
+            bool delivered = false;
+            if (mode.IsDriving && mode.CurrentVehicle != null)
             {
-                return;
+                Vector3 diff = mode.CurrentVehicle.transform.position - _pizzaTargetHouse.FrontDoorWorldPosition;
+                diff.y = 0f;
+                delivered = diff.magnitude <= 6.5f && mode.CurrentVehicle.SpeedKmh < 5.5f;
+            }
+            else if (mode.CurrentMode == ControlMode.OnFoot)
+            {
+                Vector3 diff = mode.ActiveWorldPosition - _pizzaTargetHouse.FrontDoorWorldPosition;
+                diff.y = 0f;
+                delivered = diff.magnitude <= 3.6f;
             }
 
-            Vector3 diff = mode.CurrentVehicle.transform.position - _pizzaTargetHouse.FrontDoorWorldPosition;
-            diff.y = 0f;
-            if (diff.magnitude <= 6.0f && mode.CurrentVehicle.SpeedKmh < 5.0f)
+            if (delivered)
             {
+                _lastPizzaRewardTime = Time.time;
                 int timeBonus = Mathf.Clamp(Mathf.RoundToInt(_jobRemainingTime * 0.35f), 0, 30);
                 int reward = 40 + timeBonus;
 
@@ -509,6 +528,7 @@ namespace Gridroam.Jobs
                 }
 
                 PlayBlip();
+                GameFeelAudio.PlayCoinChime();
 
                 if (_pizzaChainIndex < MaxPizzaChain)
                 {
@@ -522,6 +542,7 @@ namespace Gridroam.Jobs
                 {
                     string allFmt = LocalizationService.Tr("job.pizza.all_done", "5/5 Pizza vardiyası tamamlandı! +{0} ₺");
                     NotifyToast(string.Format(allFmt, reward));
+                    GameFeelAudio.PlayMilestoneFanfare();
                     FinishActiveJobCleanly();
                 }
             }
@@ -635,9 +656,23 @@ namespace Gridroam.Jobs
 
                 if (mode.IsDriving && mode.CurrentVehicle != null)
                 {
-                    Vector3 diff = mode.CurrentVehicle.transform.position - _taxiPickupPos;
+                    SedanVehicleController car = mode.CurrentVehicle;
+                    VehicleDamageSystem dmg = car.GetComponent<VehicleDamageSystem>();
+                    bool carUnusable = (dmg != null && dmg.IsStalled) || car.Fuel <= 0.01f || Vector3.Dot(car.transform.up, Vector3.up) < 0.5f;
+                    if (carUnusable && Time.time - _lastTaxiWarningTime > 6f)
+                    {
+                        _lastTaxiWarningTime = Time.time;
+                        if (dmg != null && dmg.IsStalled)
+                            NotifyToast("Araç ağır hasarlı — No:73 Oto Tamir'de veya ATM'den onar ya da başka bir araca bin!");
+                        else if (car.Fuel <= 0.01f)
+                            NotifyToast("Yakıt bitti — Seyyid Kutup benzin pompasından yakıt al ya da başka bir araca bin!");
+                        else
+                            NotifyToast("Araç devrilmiş — inip başka bir araca geçebilirsin.");
+                    }
+
+                    Vector3 diff = car.transform.position - _taxiPickupPos;
                     diff.y = 0f;
-                    if (diff.magnitude <= 6.2f && mode.CurrentVehicle.SpeedKmh < 5.0f)
+                    if (!carUnusable && diff.magnitude <= 6.5f && car.SpeedKmh < 5.5f)
                     {
                         _taxiPassengerAboard = true;
                         _taxiHardCollisions = 0;
@@ -646,13 +681,13 @@ namespace Gridroam.Jobs
                             taxiPassengerObject.SetActive(false);
                         }
 
-                        // Pick destination sufficiently far from pickup
+                        // Pick destination sufficiently far from pickup (>= 35 m along Selman Sokağı)
                         TaxiDestination bestDest = TaxiDestinations[0];
                         int startIdx = UnityEngine.Random.Range(0, TaxiDestinations.Length);
                         for (int i = 0; i < TaxiDestinations.Length; i++)
                         {
                             TaxiDestination cand = TaxiDestinations[(startIdx + i) % TaxiDestinations.Length];
-                            if ((cand.WorldPos - _taxiPickupPos).sqrMagnitude > 2500f)
+                            if ((cand.WorldPos - _taxiPickupPos).sqrMagnitude > 1225f)
                             {
                                 bestDest = cand;
                                 break;
@@ -794,10 +829,12 @@ namespace Gridroam.Jobs
 
         public void NotifyLitterCollected(LitterPickup pickup)
         {
-            if (_activeJob != JobType.StreetCleanup) return;
+            if (_activeJob != JobType.StreetCleanup || pickup == null) return;
+            if (!_awardedLitter.Add(pickup)) return; // Strict single-reward guard
 
             _litterCollected++;
             PlayBlip();
+            GameFeelAudio.PlayCoinChime();
 
             if (SaveManager.Instance != null)
             {
@@ -808,6 +845,7 @@ namespace Gridroam.Jobs
             if (_litterCollected >= _litterTotal)
             {
                 NotifyToast(LocalizationService.Tr("job.cleanup.done", "Sokaklar tertemiz! 10/10 çöp toplandı."));
+                GameFeelAudio.PlayMilestoneFanfare();
                 FinishActiveJobCleanly();
             }
             else
@@ -985,6 +1023,7 @@ namespace Gridroam.Jobs
                 }
             }
             _spawnedLitter.Clear();
+            _awardedLitter.Clear();
 
             _activeJob = JobType.None;
             _currentJobHudText = string.Empty;

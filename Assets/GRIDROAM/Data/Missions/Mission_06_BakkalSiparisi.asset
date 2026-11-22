@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_06_BakkalSiparisi
+  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  missionId: m06_bakkal_siparisi
+  titleKey: m06.title
+  summaryKey: m06.summary
+  rewardMoney: 300
+  nextMissionId: m07_kayip_kedi
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 0
+  steps:
+  - stepType: 1
+    objectiveKey: m06.step1.objective
+    targetAnchorId: npc_ayse_teyze
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: a4c75fe84cc8b4209839a4644e3e9bf2, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 5
+    objectiveKey: m06.step2.objective
+    targetAnchorId: m06_grocery_bag
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: df18e3a8e887742b09558b5d0c4de728, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 1
+    objectiveKey: m06.step3.objective
+    targetAnchorId: npc_ayse_teyze
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: ae9aa847a267141b687d1ef08498d79b, type: 2}
+    timeLimitSeconds: 150
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 

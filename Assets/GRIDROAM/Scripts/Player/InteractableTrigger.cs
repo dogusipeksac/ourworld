@@ -18,7 +18,13 @@ namespace Gridroam.Player
         Bed,
         FuelPump,
         VendingMachine,
-        TownCitizen
+        TownCitizen,
+        HomeAppliance,
+        MosquePrayer,
+        StreetCat,
+        Football,
+        CarryableProp,
+        AtmTerminal
     }
 
     /// <summary>

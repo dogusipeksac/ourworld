@@ -5,6 +5,7 @@ using Gridroam.Input;
 using Gridroam.Player;
 using Gridroam.World;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Gridroam.Vehicle
 {
@@ -84,6 +85,9 @@ namespace Gridroam.Vehicle
 
         private Rigidbody _rb;
         private InteractableTrigger _selfTrigger;
+        private VehicleDamageSystem _damageSystem;
+        private readonly Collider[] _pedOverlapBuffer = new Collider[8];
+        private float _rammedCoastTimer;
         private bool _isPlayerDriving;
         private bool _inputLocked;
         private bool _warnedEmptyFuel;
@@ -106,6 +110,13 @@ namespace Gridroam.Vehicle
         private bool _lastHeadlightOnVisual;
         private bool _headlightsInitialized;
         private bool _lightsCached;
+        private bool _headlightsManualOverride;
+        private bool _headlightsManualState;
+        private float _nitroCharge = 1.0f;
+        private float _nitroFxTimer;
+        private float _driftStreakSeconds;
+        private float _driftGraceTimer;
+        private bool _wasNitroEmptyWarned;
 
         private ProceduralHumanoid _seatedDriverHumanoid;
         private Light _headlightBeam;
@@ -192,8 +203,14 @@ namespace Gridroam.Vehicle
         {
             _rb = GetComponent<Rigidbody>();
             _selfTrigger = GetComponent<InteractableTrigger>();
+            _damageSystem = GetComponent<VehicleDamageSystem>();
+            if (_damageSystem == null)
+            {
+                _damageSystem = gameObject.AddComponent<VehicleDamageSystem>();
+            }
             _rb.centerOfMass = centerOfMassOffset;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
+            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             EngineRpm = idleRpm;
             CurrentGear = 0;
             fuel = Mathf.Clamp01(fuel);
@@ -202,6 +219,15 @@ namespace Gridroam.Vehicle
 
             CacheVisualReferences();
             UpdateSeatedDriverVisibility();
+        }
+
+        public void NotifyRammed(float coastSeconds = 1.4f)
+        {
+            _rammedCoastTimer = Mathf.Max(_rammedCoastTimer, coastSeconds);
+            if (_rb != null && _rb.IsSleeping())
+            {
+                _rb.WakeUp();
+            }
         }
 
         private void Start()
@@ -228,11 +254,56 @@ namespace Gridroam.Vehicle
 
         private void OnCollisionEnter(Collision collision)
         {
-            if (collision == null) return;
+            if (collision == null || collision.contactCount == 0) return;
+
+            ContactPoint contact = collision.GetContact(0);
+            float relSpeed = collision.relativeVelocity.magnitude;
             float impulse = collision.impulse.magnitude;
+
             if (impulse > 150f)
             {
                 OnCollisionImpulse?.Invoke(this, impulse);
+            }
+
+            // Pedestrian direct collision
+            TownPedestrian ped = collision.collider != null
+                ? collision.collider.GetComponentInParent<TownPedestrian>()
+                : null;
+            if (ped != null && SpeedKmh >= 7f)
+            {
+                ped.OnHitByVehicle(transform.position, _rb != null ? _rb.linearVelocity : transform.forward * 6f, SpeedKmh);
+                if (_damageSystem != null)
+                {
+                    _damageSystem.ApplyPedestrianHitFeedback(contact.point, -transform.forward, SpeedKmh, _isPlayerDriving);
+                }
+                return;
+            }
+
+            // Ignore gentle ground scrapes
+            if (contact.normal.y > 0.72f && relSpeed < 6.5f)
+            {
+                return;
+            }
+
+            // If ramming another parked/moving vehicle, release its parked brake so it physically shoves & spins!
+            if (collision.collider != null)
+            {
+                SedanVehicleController otherCar = collision.collider.GetComponentInParent<SedanVehicleController>();
+                if (otherCar != null && otherCar != this && relSpeed >= 3.2f)
+                {
+                    otherCar.NotifyRammed(1.6f);
+                }
+            }
+
+            if (relSpeed >= 3.2f && _damageSystem != null)
+            {
+                // Push vertices inward from impact face into the car chassis
+                Vector3 pushInward = contact.normal;
+                if (Vector3.Dot(pushInward, transform.position - contact.point) < 0f)
+                {
+                    pushInward = -pushInward;
+                }
+                _damageSystem.ApplyCrashImpact(contact.point, pushInward, relSpeed, _isPlayerDriving);
             }
         }
 
@@ -318,7 +389,7 @@ namespace Gridroam.Vehicle
         private void UpdateHeadlightState()
         {
             bool nightNow = DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
-            bool headlightsOn = _isPlayerDriving && nightNow;
+            bool headlightsOn = _isPlayerDriving && (_headlightsManualOverride ? _headlightsManualState : nightNow);
 
             if (_headlightBeam != null)
             {
@@ -346,6 +417,11 @@ namespace Gridroam.Vehicle
         public void SetPlayerDriving(bool driving)
         {
             _isPlayerDriving = driving;
+            TurkishCarRadio.SetDrivingActive(driving);
+            if (driving)
+            {
+                CarryableProp.DropHeldPropIfAny();
+            }
             UpdateSeatedDriverVisibility();
 
             if (!driving)
@@ -432,14 +508,71 @@ namespace Gridroam.Vehicle
             return Mathf.Lerp(200f, 140f, Mathf.InverseLerp(6200f, redlineRpm, rpm));
         }
 
+        private void Update()
+        {
+            if (!_isPlayerDriving || _inputLocked || Keyboard.current == null)
+            {
+                return;
+            }
+
+            if (Keyboard.current.hKey.wasPressedThisFrame)
+            {
+                if (GameFeelAudio.PlayCarHorn())
+                {
+                    StartleNearbyPedestriansFromHorn();
+                }
+            }
+
+            if (Keyboard.current.lKey.wasPressedThisFrame)
+            {
+                _headlightsManualOverride = true;
+                _headlightsManualState = !_lastHeadlightOnVisual;
+                UpdateHeadlightState();
+                GameFeelAudio.PlayUiClick();
+                if (PlayerModeController.Instance != null)
+                {
+                    PlayerModeController.Instance.RaiseStatusMessage(_headlightsManualState ? "Farlar açıldı." : "Farlar kapatıldı.");
+                }
+            }
+
+            if (Keyboard.current.rKey.wasPressedThisFrame)
+            {
+                string station = TurkishCarRadio.CycleStation();
+                GameFeelAudio.PlayUiClick();
+                if (PlayerModeController.Instance != null)
+                {
+                    PlayerModeController.Instance.RaiseStatusMessage($"Araç Radyosu: {station}");
+                }
+            }
+        }
+
+        private void StartleNearbyPedestriansFromHorn()
+        {
+            Vector3 probeCenter = transform.position + transform.forward * 7.5f;
+            Collider[] hits = Physics.OverlapSphere(probeCenter, 9.5f, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hits.Length; i++)
+            {
+                if (hits[i] == null) continue;
+                TownPedestrian ped = hits[i].GetComponentInParent<TownPedestrian>();
+                if (ped != null)
+                {
+                    ProceduralHumanoid hum = ped.GetComponentInChildren<ProceduralHumanoid>();
+                    if (hum != null)
+                    {
+                        hum.PlayStartled(1.25f);
+                    }
+                }
+            }
+        }
+
         private void FixedUpdate()
         {
-            if (transform.position.y < -2.0f)
+            if (transform.position.y < -3.5f)
             {
                 Vector3 safePos = new Vector3(
-                    Mathf.Clamp(transform.position.x, -95f, 95f),
+                    Mathf.Clamp(transform.position.x, -160f, 160f),
                     0.35f,
-                    Mathf.Clamp(transform.position.z, -36f, 194f));
+                    Mathf.Clamp(transform.position.z, -160f, 160f));
                 TeleportAndReset(safePos, Quaternion.Euler(0f, transform.eulerAngles.y, 0f));
                 return;
             }
@@ -449,8 +582,33 @@ namespace Gridroam.Vehicle
             }
 
             float dt = Time.fixedDeltaTime;
+            if (_rammedCoastTimer > 0f)
+            {
+                _rammedCoastTimer = Mathf.Max(0f, _rammedCoastTimer - dt);
+            }
+
             float speedKmh = SpeedKmh;
             float forwardMs = ForwardSpeedMs;
+
+            // Reliable high-speed pedestrian run-over & hood-launch physics sweep
+            if (speedKmh >= 8f)
+            {
+                CheckPedestrianSweep(speedKmh);
+            }
+
+            // Auto-repair damaged vehicle when stopped outside No:73 Selman Sokağı Oto Tamir (24.5, 4.5)
+            if (_isPlayerDriving && speedKmh < 3.5f && _damageSystem != null && _damageSystem.Health < 99f)
+            {
+                Vector3 p = transform.position;
+                if (p.x >= 18f && p.x <= 31f && p.z >= -4f && p.z <= 8f)
+                {
+                    _damageSystem.RepairFull();
+                    if (PlayerModeController.Instance != null)
+                    {
+                        PlayerModeController.Instance.RaiseStatusMessage("No:73 Oto Tamir: Araç tamamen onarıldı!");
+                    }
+                }
+            }
 
             float steerInput = 0f;
             float throttleInput = 0f;
@@ -640,9 +798,10 @@ namespace Gridroam.Vehicle
             }
 
             float perDrivenWheelTorque = 0f;
-            if (!parked && hasFuel && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
+            float damageTorqueMult = _damageSystem != null ? _damageSystem.EngineTorqueMultiplier : 1f;
+            if (!parked && hasFuel && damageTorqueMult > 0.01f && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
             {
-                float engineTorque = EvaluateEngineTorque(EngineRpm);
+                float engineTorque = EvaluateEngineTorque(EngineRpm) * damageTorqueMult;
                 if (SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasTurboKit)
                 {
                     engineTorque *= 1.28f;
@@ -705,7 +864,8 @@ namespace Gridroam.Vehicle
                 bool applyAbs = false;
                 if (parked)
                 {
-                    baseWheelBrake = parkedBrakeTorque;
+                    // Release parked brake briefly when rammed so parked cars physically shove & spin!
+                    baseWheelBrake = _rammedCoastTimer > 0f ? 140f : parkedBrakeTorque;
                 }
                 else if (handbrake && isRear)
                 {
@@ -732,6 +892,70 @@ namespace Gridroam.Vehicle
 
             MaxRearSidewaysSlip = maxRearSlip;
 
+            // --- Rechargeable Nitro Boost (Left Shift while driving) + Drift-to-Charge & Drift Cash Bonus! ---
+            if (_isPlayerDriving && !_inputLocked && fuel > 0.01f && (_damageSystem == null || !_damageSystem.IsStalled))
+            {
+                bool isDriftingNow = maxRearSlip > 0.34f && speedKmh > 20f;
+                if (isDriftingNow)
+                {
+                    _driftStreakSeconds += dt;
+                    _driftGraceTimer = 0.45f;
+                    _nitroCharge = Mathf.Min(1f, _nitroCharge + dt * 0.42f);
+                }
+                else
+                {
+                    if (_driftGraceTimer > 0f)
+                    {
+                        _driftGraceTimer -= dt;
+                    }
+                    else if (_driftStreakSeconds >= 1.1f)
+                    {
+                        int driftBonus = Mathf.Clamp(Mathf.RoundToInt(_driftStreakSeconds * 16f), 15, 65);
+                        if (SaveManager.Instance != null)
+                        {
+                            SaveManager.Instance.AddMoney(driftBonus);
+                        }
+                        GameFeelAudio.PlayCoinChime();
+                        if (PlayerModeController.Instance != null)
+                        {
+                            PlayerModeController.Instance.RaiseStatusMessage($"Harika Drift! (+{driftBonus} ₺ · Nitro: %{Mathf.RoundToInt(_nitroCharge * 100f)})");
+                        }
+                        _driftStreakSeconds = 0f;
+                    }
+                    else
+                    {
+                        _driftStreakSeconds = 0f;
+                    }
+                }
+
+                bool shiftHeld = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
+                if (shiftHeld && throttleInput > 0.1f && _nitroCharge > 0.04f)
+                {
+                    _wasNitroEmptyWarned = false;
+                    _nitroCharge = Mathf.Max(0f, _nitroCharge - dt * 0.40f);
+                    _rb.AddForce(transform.forward * (_rb.mass * 10.5f), ForceMode.Force);
+                    _nitroFxTimer -= dt;
+                    if (_nitroFxTimer <= 0f)
+                    {
+                        _nitroFxTimer = 0.11f;
+                        Vector3 exhaustPos = transform.TransformPoint(new Vector3(0f, 0.34f, -2.35f));
+                        GameFeelAudio.SpawnBurst(exhaustPos, new Color(0.26f, 0.78f, 1.0f), count: 4, spread: 0.28f);
+                    }
+                }
+                else
+                {
+                    if (shiftHeld && _nitroCharge <= 0.04f && !_wasNitroEmptyWarned)
+                    {
+                        _wasNitroEmptyWarned = true;
+                        if (PlayerModeController.Instance != null)
+                        {
+                            PlayerModeController.Instance.RaiseStatusMessage("Nitro bitti — Drift yaparak hızla doldur!");
+                        }
+                    }
+                    _nitroCharge = Mathf.Min(1f, _nitroCharge + dt * 0.11f);
+                }
+            }
+
             Vector3 vel = _rb.linearVelocity;
             float speedMs = vel.magnitude;
             if (speedMs > 0.05f)
@@ -743,6 +967,27 @@ namespace Gridroam.Vehicle
 
             _rb.AddForce(-transform.up * (downforceFactor * speedMs), ForceMode.Force);
             UpdateBodyRollPitch(vel, dt);
+        }
+
+        private void CheckPedestrianSweep(float speedKmh)
+        {
+            Vector3 boxCenter = transform.TransformPoint(new Vector3(0f, 0.85f, 0.15f));
+            Vector3 halfExtents = new Vector3(1.06f, 0.85f, 2.38f);
+            int count = Physics.OverlapBoxNonAlloc(boxCenter, halfExtents, _pedOverlapBuffer, transform.rotation, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                Collider col = _pedOverlapBuffer[i];
+                if (col == null) continue;
+                TownPedestrian ped = col.GetComponentInParent<TownPedestrian>();
+                if (ped == null) continue;
+
+                ped.OnHitByVehicle(transform.position, _rb.linearVelocity, speedKmh);
+                if (_damageSystem != null)
+                {
+                    Vector3 hitPt = col.ClosestPoint(transform.position + transform.forward * 1.8f + Vector3.up * 0.75f);
+                    _damageSystem.ApplyPedestrianHitFeedback(hitPt, -transform.forward, speedKmh, _isPlayerDriving);
+                }
+            }
         }
 
         private void LateUpdate()

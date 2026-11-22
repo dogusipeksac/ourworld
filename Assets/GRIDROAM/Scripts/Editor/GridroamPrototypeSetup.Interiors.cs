@@ -428,7 +428,8 @@ namespace Gridroam.Editor
                 intThick,
                 interiorMat,
                 mats,
-                houseRng);
+                houseRng,
+                houseSeed);
 
             GameObject roofAndTrim = new GameObject("ExteriorRoofAndDetails");
             roofAndTrim.transform.SetParent(root.transform, false);
@@ -449,6 +450,35 @@ namespace Gridroam.Editor
                 new Vector3(0f, height + 0.72f, 0f),
                 new Vector3(depthX * 0.54f, 1.44f, widthZ - 0.12f),
                 Quaternion.identity, mats.PlasterTrim, 2.5f, collider: false);
+
+            // Authentic Istanbul / Balat projected 2nd-floor wooden bay window (Cumba) + brackets!
+            Material cumbaWallMat = (Mathf.Abs(houseSeed) % 2 == 0) ? mats.TownInteriorPaintCream : mats.TownWood;
+            CreateLocalTiledBox("Istanbul_CumbaBox", roofAndTrim.transform,
+                new Vector3(hx + 0.42f, 4.42f, 0f),
+                new Vector3(0.84f, 2.25f, 3.65f),
+                Quaternion.identity, cumbaWallMat, 2.0f, collider: false);
+            CreateLocalTiledBox("Istanbul_CumbaCornice", roofAndTrim.transform,
+                new Vector3(hx + 0.46f, 5.60f, 0f),
+                new Vector3(0.96f, 0.14f, 3.88f),
+                Quaternion.identity, mats.TownDoorWood, 2.0f, collider: false);
+            CreateLocalTiledBox("Istanbul_CumbaSill", roofAndTrim.transform,
+                new Vector3(hx + 0.44f, 3.25f, 0f),
+                new Vector3(0.92f, 0.14f, 3.82f),
+                Quaternion.identity, mats.TownDoorWood, 2.0f, collider: false);
+            for (int bs = -1; bs <= 1; bs += 2)
+            {
+                CreateStaticPart($"Istanbul_CumbaBracket_{bs}", PrimitiveType.Cube, roofAndTrim.transform,
+                    new Vector3(hx + 0.34f, 2.92f, bs * 1.48f),
+                    Quaternion.Euler(0f, 0f, -38f), new Vector3(0.14f, 0.85f, 0.16f), mats.TownDoorWood);
+            }
+            for (int cw = -1; cw <= 1; cw++)
+            {
+                GameObject cWin = CreateLocalTiledBox($"Istanbul_CumbaWin_{cw}", roofAndTrim.transform,
+                    new Vector3(hx + 0.86f, 4.46f, cw * 1.05f),
+                    new Vector3(0.06f, 1.32f, 0.74f),
+                    Quaternion.identity, mats.WindowLitWarm, 2.0f, collider: false, staticBatch: false);
+                AttachWindowNightLight(cWin);
+            }
 
             Vector3[] winLocalPositions =
             {
@@ -882,7 +912,8 @@ namespace Gridroam.Editor
             float intThick,
             Material interiorWallMat,
             MaterialSet mats,
-            System.Random rng)
+            System.Random rng,
+            int houseSeed = 0)
         {
             float hx = depthX * 0.5f;
             float hz = widthZ * 0.5f;
@@ -891,23 +922,34 @@ namespace Gridroam.Editor
             float midY = floorTopY + innerH * 0.5f;
             float doorTopY = floorTopY + doorHeight;
 
-            GameObject intShell = new GameObject("InteriorWallsAndFloors");
+            int theme = Mathf.Abs(houseSeed) % 4;
+            // Theme 0: Modern Open-Plan Loft
+            // Theme 1: Classic Warm Family Home
+            // Theme 2: Artist & Music Atelier
+            // Theme 3: Home-Office & Fitness Studio
+            Material wallAccentMat = theme == 0
+                ? mats.TownFabricTeal
+                : (theme == 2 ? mats.TownAwningTerracotta : (theme == 3 ? mats.TownFabricGrey : interiorWallMat));
+            Material floorMat = theme == 0 ? mats.TownInteriorPaintPearl : mats.TownWoodFloor;
+
+            GameObject intShell = new GameObject($"InteriorWallsAndFloors_Theme{theme}");
             intShell.transform.SetParent(buildingRoot, false);
 
             CreateLocalTiledBox("InteriorFloor_Wood", intShell.transform,
                 new Vector3(0f, floorTopY * 0.5f, 0f),
                 new Vector3(depthX - 0.08f, floorTopY, widthZ - 0.08f),
-                Quaternion.identity, mats.TownWoodFloor, 1.8f, collider: true);
+                Quaternion.identity, floorMat, 1.8f, collider: true);
 
             CreateLocalTiledBox("InteriorCeiling", intShell.transform,
                 new Vector3(0f, ceilBottomY + 0.07f, 0f),
                 new Vector3(depthX - 0.08f, 0.14f, widthZ - 0.08f),
                 Quaternion.identity, interiorWallMat, 2.5f, collider: true);
 
+            // Accent back wall on themes 0, 2, 3 for instant visual distinctiveness upon opening door
             CreateLocalTiledBox("IntWall_Back", intShell.transform,
                 new Vector3(-hx + extThick + intThick * 0.5f, midY, 0f),
                 new Vector3(intThick, innerH, widthZ - wallTotalT * 2f),
-                Quaternion.identity, interiorWallMat, 2.5f, collider: false);
+                Quaternion.identity, wallAccentMat, 2.5f, collider: false);
 
             CreateLocalTiledBox("IntWall_South", intShell.transform,
                 new Vector3(0f, midY, -hz + extThick + intThick * 0.5f),
@@ -951,31 +993,50 @@ namespace Gridroam.Editor
             Vector3 PlacePos(float lx, float ly, float lz) => new Vector3(lx, ly, lz * zSign);
             Quaternion PlaceYaw(float deg) => Quaternion.Euler(0f, zSign > 0f ? deg : (180f - deg), 0f);
 
-            float partZ = 1.45f * zSign;
-            const float partThick = 0.14f;
-            const float partDoorWidth = 1.50f;
-            const float partDoorCenterX = 0.30f;
-            const float partDoorH = 2.30f;
-
             float innerHalfX = hx - wallTotalT;
-            float segBackLen = (partDoorCenterX - partDoorWidth * 0.5f) - (-innerHalfX);
-            float segFrontLen = innerHalfX - (partDoorCenterX + partDoorWidth * 0.5f);
-            float partLintelH = innerH - partDoorH;
+            float innerFrontX = hx - wallTotalT;
+            float innerBackX = -hx + wallTotalT;
+            float innerSouthZ = -hz + wallTotalT;
+            float innerNorthZ = hz - wallTotalT;
 
-            CreateLocalTiledBox("Partition_BackSeg", intShell.transform,
-                new Vector3(-innerHalfX + segBackLen * 0.5f, midY, partZ),
-                new Vector3(segBackLen, innerH, partThick),
-                Quaternion.identity, interiorWallMat, 2.5f, collider: true);
+            // Only Theme 1 (Classic Family Home) uses the full bedroom partition wall.
+            // Theme 2 uses a stylish short half-divider; Themes 0 & 3 are open-plan lofts/studios!
+            if (theme == 1)
+            {
+                float partZ = 1.45f * zSign;
+                const float partThick = 0.14f;
+                const float partDoorWidth = 1.50f;
+                const float partDoorCenterX = 0.30f;
+                const float partDoorH = 2.30f;
+                float segBackLen = (partDoorCenterX - partDoorWidth * 0.5f) - (-innerHalfX);
+                float segFrontLen = innerHalfX - (partDoorCenterX + partDoorWidth * 0.5f);
+                float partLintelH = innerH - partDoorH;
 
-            CreateLocalTiledBox("Partition_FrontSeg", intShell.transform,
-                new Vector3(innerHalfX - segFrontLen * 0.5f, midY, partZ),
-                new Vector3(segFrontLen, innerH, partThick),
-                Quaternion.identity, interiorWallMat, 2.5f, collider: true);
+                CreateLocalTiledBox("Partition_BackSeg", intShell.transform,
+                    new Vector3(-innerHalfX + segBackLen * 0.5f, midY, partZ),
+                    new Vector3(segBackLen, innerH, partThick),
+                    Quaternion.identity, interiorWallMat, 2.5f, collider: true);
 
-            CreateLocalTiledBox("Partition_Lintel", intShell.transform,
-                new Vector3(partDoorCenterX, floorTopY + partDoorH + partLintelH * 0.5f, partZ),
-                new Vector3(partDoorWidth, partLintelH, partThick),
-                Quaternion.identity, interiorWallMat, 2.5f, collider: true);
+                CreateLocalTiledBox("Partition_FrontSeg", intShell.transform,
+                    new Vector3(innerHalfX - segFrontLen * 0.5f, midY, partZ),
+                    new Vector3(segFrontLen, innerH, partThick),
+                    Quaternion.identity, interiorWallMat, 2.5f, collider: true);
+
+                CreateLocalTiledBox("Partition_Lintel", intShell.transform,
+                    new Vector3(partDoorCenterX, floorTopY + partDoorH + partLintelH * 0.5f, partZ),
+                    new Vector3(partDoorWidth, partLintelH, partThick),
+                    Quaternion.identity, interiorWallMat, 2.5f, collider: true);
+            }
+            else if (theme == 2)
+            {
+                // Half-width gallery divider separating sleeping corner from art atelier
+                float partZ = 1.65f * zSign;
+                float stubLen = depthX * 0.42f;
+                CreateLocalTiledBox("Atelier_GalleryDivider", intShell.transform,
+                    new Vector3(-innerHalfX + stubLen * 0.5f, midY, partZ),
+                    new Vector3(stubLen, innerH, 0.14f),
+                    Quaternion.identity, interiorWallMat, 2.5f, collider: true);
+            }
 
             BuildHingedDoor(
                 $"{buildingId}_front_door",
@@ -1002,65 +1063,492 @@ namespace Gridroam.Editor
                 mats.TownFabricTeal,
                 mats.TownFabricMustard
             };
-            Material mainFabric = fabrics[rng.Next(fabrics.Length)];
-            Material accentFabric = fabrics[(rng.Next(fabrics.Length) + 1) % fabrics.Length];
-
-            float innerFrontX = hx - wallTotalT;
-            float innerBackX = -hx + wallTotalT;
-            float innerSouthZ = -hz + wallTotalT;
-            float innerNorthZ = hz - wallTotalT;
+            Material mainFabric = fabrics[(theme + rng.Next(fabrics.Length)) % fabrics.Length];
+            Material accentFabric = fabrics[(theme + 1) % fabrics.Length];
 
             float livingCenterX = Mathf.Min(2.05f, innerFrontX - 1.35f);
             float sofaZ = innerSouthZ + 0.52f;
-
-            CreateRug("Living_Rug", furnRoot.transform,
-                PlacePos(livingCenterX, floorTopY, sofaZ + 1.52f),
-                new Vector2(2.55f, 1.85f), accentFabric, mats.PlasterTrim);
-
-            CreateSofa3Seat($"{buildingId}_sofa", furnRoot.transform,
-                PlacePos(livingCenterX, floorTopY, sofaZ),
-                PlaceYaw(0f), mainFabric, mats.TownFurnitureWood);
-
-            CreateCoffeeTable("Living_CoffeeTable", furnRoot.transform,
-                PlacePos(livingCenterX, floorTopY, sofaZ + 1.56f),
-                PlaceYaw(0f), mats.TownFurnitureWood);
-
-            CreateTvOnCabinet("Living_TVUnit", furnRoot.transform,
-                PlacePos(livingCenterX + 0.05f, floorTopY, 1.02f),
-                PlaceYaw(180f), mats);
-
-            CreateFloorLamp("Living_FloorLamp", furnRoot.transform,
-                PlacePos(innerFrontX - 0.28f, floorTopY, innerSouthZ + 0.34f),
-                mats);
-
-            CreateArmchair($"{buildingId}_armchair_1", furnRoot.transform,
-                PlacePos(livingCenterX - 1.55f, floorTopY, sofaZ + 0.55f),
-                PlaceYaw(45f), accentFabric, mats.TownFurnitureWood);
-
-            CreateKitchenCounter("Kitchen_Counter", furnRoot.transform,
-                PlacePos(innerBackX + 0.34f, floorTopY, innerSouthZ + 1.35f),
-                PlaceYaw(90f), mats);
-
-            CreateFridge("Kitchen_Fridge", furnRoot.transform,
-                PlacePos(innerBackX + 0.38f, floorTopY, innerSouthZ + 2.95f),
-                PlaceYaw(90f), mats);
-
-            CreateDiningTableWith4Chairs($"{buildingId}_dining", furnRoot.transform,
-                PlacePos(innerBackX + 1.95f, floorTopY, innerSouthZ + 2.30f),
-                PlaceYaw(0f), mats.TownFurnitureWood, mainFabric);
-
             float bedZ = Mathf.Min(innerNorthZ - 1.05f, 2.95f);
-            CreateDoubleBed("Bedroom_Bed", $"{buildingId}_bed", furnRoot.transform,
-                PlacePos(innerBackX + 1.08f, floorTopY, bedZ),
-                PlaceYaw(90f), accentFabric, mats);
 
-            CreateNightstand("Bedroom_Nightstand", furnRoot.transform,
-                PlacePos(innerBackX + 0.28f, floorTopY, bedZ - 1.12f),
-                PlaceYaw(90f), mats);
+            if (theme == 0)
+            {
+                // THEME 0: MODERN OPEN-PLAN LOFT (kitchen island, L-lounge, big TV, airy bed nook)
+                CreateRug("Loft_Rug", furnRoot.transform,
+                    PlacePos(1.35f, floorTopY, -1.65f),
+                    new Vector2(3.10f, 2.40f), mats.TownFabricTeal, mats.PlasterTrim);
 
-            CreateWardrobe("Bedroom_Wardrobe", furnRoot.transform,
-                PlacePos(innerFrontX - 1.20f, floorTopY, innerNorthZ - 0.32f),
-                PlaceYaw(180f), mats);
+                CreateSofa3Seat($"{buildingId}_sofa", furnRoot.transform,
+                    PlacePos(1.45f, floorTopY, innerSouthZ + 0.55f),
+                    PlaceYaw(0f), mats.TownFabricGrey, mats.SedanTrimDark);
+
+                CreateArmchair($"{buildingId}_armchair_loft", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.85f, floorTopY, innerSouthZ + 2.05f),
+                    PlaceYaw(-90f), mats.TownFabricMustard, mats.SedanTrimDark);
+
+                CreateCoffeeTable("Loft_CoffeeTable", furnRoot.transform,
+                    PlacePos(1.45f, floorTopY, innerSouthZ + 1.95f),
+                    PlaceYaw(0f), mats.SedanTrimDark);
+
+                CreateTvOnCabinet("Loft_TVUnit", furnRoot.transform,
+                    PlacePos(1.45f, floorTopY, innerNorthZ - 0.35f),
+                    PlaceYaw(180f), mats);
+
+                CreateKitchenCounter("Loft_KitchenCounter", furnRoot.transform,
+                    PlacePos(innerBackX + 0.36f, floorTopY, innerSouthZ + 1.55f),
+                    PlaceYaw(90f), mats);
+
+                CreateFridge("Loft_Fridge", furnRoot.transform,
+                    PlacePos(innerBackX + 0.40f, floorTopY, innerSouthZ + 3.20f),
+                    PlaceYaw(90f), mats);
+
+                CreateKitchenIsland($"{buildingId}_island", furnRoot.transform,
+                    PlacePos(innerBackX + 2.15f, floorTopY, innerSouthZ + 1.85f),
+                    PlaceYaw(90f), mats);
+
+                CreateDoubleBed("Loft_Bed", $"{buildingId}_bed", furnRoot.transform,
+                    PlacePos(innerBackX + 1.12f, floorTopY, bedZ),
+                    PlaceYaw(90f), mats.TownFabricTeal, mats);
+
+                CreateNightstand("Loft_Nightstand", furnRoot.transform,
+                    PlacePos(innerBackX + 0.30f, floorTopY, bedZ - 1.15f),
+                    PlaceYaw(90f), mats);
+
+                CreateFloorLamp("Loft_FloorLamp", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.34f, floorTopY, innerNorthZ - 0.40f),
+                    mats);
+
+                CreateWallPainting("Loft_Art", furnRoot.transform,
+                    PlacePos(innerBackX + 0.04f, floorTopY + 1.65f, 0.2f),
+                    PlaceYaw(90f), mats.TownFabricMustard, mats.SedanTrimDark);
+            }
+            else if (theme == 1)
+            {
+                // THEME 1: CLASSIC WARM FAMILY HOME (partitioned rooms, dining set, bookcase)
+                CreateRug("Living_Rug", furnRoot.transform,
+                    PlacePos(livingCenterX, floorTopY, sofaZ + 1.52f),
+                    new Vector2(2.55f, 1.85f), accentFabric, mats.PlasterTrim);
+
+                CreateSofa3Seat($"{buildingId}_sofa", furnRoot.transform,
+                    PlacePos(livingCenterX, floorTopY, sofaZ),
+                    PlaceYaw(0f), mainFabric, mats.TownFurnitureWood);
+
+                CreateCoffeeTable("Living_CoffeeTable", furnRoot.transform,
+                    PlacePos(livingCenterX, floorTopY, sofaZ + 1.56f),
+                    PlaceYaw(0f), mats.TownFurnitureWood);
+
+                CreateTvOnCabinet("Living_TVUnit", furnRoot.transform,
+                    PlacePos(livingCenterX + 0.05f, floorTopY, 1.02f),
+                    PlaceYaw(180f), mats);
+
+                CreateFloorLamp("Living_FloorLamp", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.28f, floorTopY, innerSouthZ + 0.34f),
+                    mats);
+
+                CreateArmchair($"{buildingId}_armchair_1", furnRoot.transform,
+                    PlacePos(livingCenterX - 1.55f, floorTopY, sofaZ + 0.55f),
+                    PlaceYaw(45f), accentFabric, mats.TownFurnitureWood);
+
+                CreateKitchenCounter("Kitchen_Counter", furnRoot.transform,
+                    PlacePos(innerBackX + 0.34f, floorTopY, innerSouthZ + 1.35f),
+                    PlaceYaw(90f), mats);
+
+                CreateFridge("Kitchen_Fridge", furnRoot.transform,
+                    PlacePos(innerBackX + 0.38f, floorTopY, innerSouthZ + 2.95f),
+                    PlaceYaw(90f), mats);
+
+                CreateDiningTableWith4Chairs($"{buildingId}_dining", furnRoot.transform,
+                    PlacePos(innerBackX + 1.95f, floorTopY, innerSouthZ + 2.30f),
+                    PlaceYaw(0f), mats.TownFurnitureWood, mainFabric);
+
+                CreateBookcase("Family_Bookcase", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.36f, floorTopY, innerNorthZ - 1.55f),
+                    PlaceYaw(-90f), mats);
+
+                CreateDoubleBed("Bedroom_Bed", $"{buildingId}_bed", furnRoot.transform,
+                    PlacePos(innerBackX + 1.08f, floorTopY, bedZ),
+                    PlaceYaw(90f), accentFabric, mats);
+
+                CreateNightstand("Bedroom_Nightstand", furnRoot.transform,
+                    PlacePos(innerBackX + 0.28f, floorTopY, bedZ - 1.12f),
+                    PlaceYaw(90f), mats);
+
+                CreateWardrobe("Bedroom_Wardrobe", furnRoot.transform,
+                    PlacePos(innerFrontX - 1.20f, floorTopY, innerNorthZ - 0.32f),
+                    PlaceYaw(180f), mats);
+            }
+            else if (theme == 2)
+            {
+                // THEME 2: ARTIST & MUSIC ATELIER (easels, framed canvases, piano, studio workbench)
+                CreateRug("Atelier_Rug", furnRoot.transform,
+                    PlacePos(0.45f, floorTopY, -1.65f),
+                    new Vector2(3.20f, 2.30f), mats.TownAwningTerracotta, mats.TownInteriorPaintCream);
+
+                CreateArtistEasel("Atelier_Easel_Main", furnRoot.transform,
+                    PlacePos(-0.85f, floorTopY, -1.95f),
+                    PlaceYaw(35f), mats.TownFabricTeal, mats);
+
+                CreateArtistEasel("Atelier_Easel_Small", furnRoot.transform,
+                    PlacePos(1.85f, floorTopY, -2.55f),
+                    PlaceYaw(-30f), mats.TownFabricMustard, mats);
+
+                CreateStudioWorkbench("Atelier_Workbench", furnRoot.transform,
+                    PlacePos(innerBackX + 0.55f, floorTopY, -1.65f),
+                    PlaceYaw(90f), mats);
+
+                CreatePianoDesk($"{buildingId}_piano", furnRoot.transform,
+                    PlacePos(1.55f, floorTopY, innerNorthZ - 0.42f),
+                    PlaceYaw(180f), mats);
+
+                CreateArmchair($"{buildingId}_atelier_chair", furnRoot.transform,
+                    PlacePos(1.65f, floorTopY, innerSouthZ + 0.72f),
+                    PlaceYaw(20f), mats.TownFabricMustard, mats.TownFurnitureWood);
+
+                CreateFloorLamp("Atelier_Lamp", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.35f, floorTopY, innerSouthZ + 0.38f),
+                    mats);
+
+                CreateDoubleBed("Atelier_Bed", $"{buildingId}_bed", furnRoot.transform,
+                    PlacePos(innerBackX + 1.08f, floorTopY, bedZ),
+                    PlaceYaw(90f), mats.TownAwningTerracotta, mats);
+
+                CreateBookcase("Atelier_Books", furnRoot.transform,
+                    PlacePos(innerBackX + 0.35f, floorTopY, 0.70f),
+                    PlaceYaw(90f), mats);
+
+                CreateWallPainting("Atelier_Canvas_1", furnRoot.transform,
+                    PlacePos(0.10f, floorTopY + 1.65f, innerSouthZ + 0.05f),
+                    PlaceYaw(0f), mats.TownFabricTeal, mats.TownFurnitureWood);
+
+                CreateWallPainting("Atelier_Canvas_2", furnRoot.transform,
+                    PlacePos(innerBackX + 0.05f, floorTopY + 1.72f, -0.45f),
+                    PlaceYaw(90f), mats.TownFabricMustard, mats.TownFurnitureWood);
+            }
+            else
+            {
+                // THEME 3: HOME-OFFICE & FITNESS STUDIO (dual-monitor PC desk, gym bench & barbell, modern lounge)
+                CreateHomeOfficeDesk($"{buildingId}_office", furnRoot.transform,
+                    PlacePos(1.35f, floorTopY, innerNorthZ - 0.65f),
+                    PlaceYaw(180f), mats);
+
+                CreateBookcase("Office_Bookcase", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.38f, floorTopY, innerNorthZ - 1.95f),
+                    PlaceYaw(-90f), mats);
+
+                CreateHomeGymCorner("Fitness_GymZone", furnRoot.transform,
+                    PlacePos(-0.85f, floorTopY, innerSouthZ + 1.45f),
+                    PlaceYaw(0f), mats);
+
+                CreateSofa3Seat($"{buildingId}_studio_sofa", furnRoot.transform,
+                    PlacePos(1.75f, floorTopY, innerSouthZ + 0.58f),
+                    PlaceYaw(0f), mats.TownFabricTeal, mats.SedanTrimDark);
+
+                CreateCoffeeTable("Studio_CoffeeTable", furnRoot.transform,
+                    PlacePos(1.75f, floorTopY, innerSouthZ + 1.85f),
+                    PlaceYaw(0f), mats.SedanTrimDark);
+
+                CreateFridge("Studio_MiniFridge", furnRoot.transform,
+                    PlacePos(innerBackX + 0.40f, floorTopY, 0.35f),
+                    PlaceYaw(90f), mats);
+
+                CreateDoubleBed("Studio_Bed", $"{buildingId}_bed", furnRoot.transform,
+                    PlacePos(innerBackX + 1.08f, floorTopY, bedZ),
+                    PlaceYaw(90f), mats.TownFabricGrey, mats);
+
+                CreateWardrobe("Studio_Wardrobe", furnRoot.transform,
+                    PlacePos(innerBackX + 0.36f, floorTopY, innerNorthZ - 0.72f),
+                    PlaceYaw(90f), mats);
+
+                CreateFloorLamp("Studio_Lamp", furnRoot.transform,
+                    PlacePos(innerFrontX - 0.32f, floorTopY, innerSouthZ + 0.36f),
+                    mats);
+            }
+        }
+
+        private static void CreateKitchenIsland(
+            string seatIdPrefix,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats)
+        {
+            GameObject island = new GameObject("KitchenIsland");
+            island.transform.SetParent(parent, false);
+            island.transform.localPosition = localPos;
+            island.transform.localRotation = localRot;
+
+            CreateStaticPart("IslandBody", PrimitiveType.Cube, island.transform,
+                new Vector3(0f, 0.44f, 0f), Quaternion.identity, new Vector3(1.85f, 0.88f, 0.72f), mats.TownFurnitureWood);
+            CreateStaticPart("IslandCounterTop", PrimitiveType.Cube, island.transform,
+                new Vector3(0f, 0.90f, 0.04f), Quaternion.identity, new Vector3(1.96f, 0.06f, 0.88f), mats.PlasterTrim);
+
+            BoxCollider col = island.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.46f, 0f);
+            col.size = new Vector3(1.96f, 0.92f, 0.88f);
+            MarkStaticEnvironment(island);
+
+            // Two bar stools on the overhang side
+            for (int i = 0; i < 2; i++)
+            {
+                float sx = i == 0 ? -0.48f : 0.48f;
+                GameObject stool = new GameObject($"BarStool_{i + 1}");
+                stool.transform.SetParent(island.transform, false);
+                stool.transform.localPosition = new Vector3(sx, 0f, 0.62f);
+                stool.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                CreateStaticPart("Post", PrimitiveType.Cylinder, stool.transform,
+                    new Vector3(0f, 0.32f, 0f), Quaternion.identity, new Vector3(0.06f, 0.32f, 0.06f), mats.SedanTrimDark);
+                CreateStaticPart("Base", PrimitiveType.Cylinder, stool.transform,
+                    new Vector3(0f, 0.02f, 0f), Quaternion.identity, new Vector3(0.32f, 0.02f, 0.32f), mats.SedanChrome);
+                CreateStaticPart("Seat", PrimitiveType.Cylinder, stool.transform,
+                    new Vector3(0f, 0.65f, 0f), Quaternion.identity, new Vector3(0.34f, 0.04f, 0.34f), mats.TownFabricMustard);
+                CreateSeatSlot($"StoolSlot_{i + 1}", $"{seatIdPrefix}_stool_{i + 1}", stool.transform,
+                    new Vector3(0f, 0.66f, 0f), Quaternion.identity, 1.35f);
+            }
+        }
+
+        private static void CreateBookcase(
+            string name,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats)
+        {
+            GameObject bc = new GameObject(name);
+            bc.transform.SetParent(parent, false);
+            bc.transform.localPosition = localPos;
+            bc.transform.localRotation = localRot;
+
+            CreateStaticPart("BackPanel", PrimitiveType.Cube, bc.transform,
+                new Vector3(0f, 0.96f, -0.15f), Quaternion.identity, new Vector3(1.10f, 1.92f, 0.04f), mats.TownFurnitureWood);
+            CreateStaticPart("SideL", PrimitiveType.Cube, bc.transform,
+                new Vector3(-0.53f, 0.96f, 0f), Quaternion.identity, new Vector3(0.04f, 1.92f, 0.34f), mats.TownFurnitureWood);
+            CreateStaticPart("SideR", PrimitiveType.Cube, bc.transform,
+                new Vector3(0.53f, 0.96f, 0f), Quaternion.identity, new Vector3(0.04f, 1.92f, 0.34f), mats.TownFurnitureWood);
+
+            Material[] bookMats = { mats.TownAwningTerracotta, mats.TownFabricTeal, mats.TownFabricMustard, mats.PedShirtRed };
+            for (int s = 0; s < 5; s++)
+            {
+                float sy = 0.08f + s * 0.44f;
+                CreateStaticPart($"Shelf_{s}", PrimitiveType.Cube, bc.transform,
+                    new Vector3(0f, sy, 0f), Quaternion.identity, new Vector3(1.06f, 0.035f, 0.32f), mats.TownFurnitureWood);
+                if (s < 4)
+                {
+                    CreateStaticPart($"BooksL_{s}", PrimitiveType.Cube, bc.transform,
+                        new Vector3(-0.24f, sy + 0.14f, 0f), Quaternion.identity, new Vector3(0.38f, 0.24f, 0.20f), bookMats[s % bookMats.Length]);
+                    CreateStaticPart($"BooksR_{s}", PrimitiveType.Cube, bc.transform,
+                        new Vector3(0.24f, sy + 0.13f, 0f), Quaternion.identity, new Vector3(0.32f, 0.22f, 0.20f), bookMats[(s + 2) % bookMats.Length]);
+                }
+            }
+
+            BoxCollider col = bc.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.96f, 0f);
+            col.size = new Vector3(1.12f, 1.92f, 0.36f);
+            MarkStaticEnvironment(bc);
+        }
+
+        private static void CreateArtistEasel(
+            string name,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            Material canvasColorMat,
+            MaterialSet mats)
+        {
+            GameObject easel = new GameObject(name);
+            easel.transform.SetParent(parent, false);
+            easel.transform.localPosition = localPos;
+            easel.transform.localRotation = localRot;
+
+            CreateStaticPart("LegL", PrimitiveType.Cube, easel.transform,
+                new Vector3(-0.26f, 0.80f, 0.04f), Quaternion.Euler(10f, 0f, -8f), new Vector3(0.05f, 1.66f, 0.05f), mats.TownFurnitureWood);
+            CreateStaticPart("LegR", PrimitiveType.Cube, easel.transform,
+                new Vector3(0.26f, 0.80f, 0.04f), Quaternion.Euler(10f, 0f, 8f), new Vector3(0.05f, 1.66f, 0.05f), mats.TownFurnitureWood);
+            CreateStaticPart("BackLeg", PrimitiveType.Cube, easel.transform,
+                new Vector3(0f, 0.72f, -0.32f), Quaternion.Euler(-22f, 0f, 0f), new Vector3(0.05f, 1.56f, 0.05f), mats.TownFurnitureWood);
+            CreateStaticPart("Ledge", PrimitiveType.Cube, easel.transform,
+                new Vector3(0f, 0.84f, 0.14f), Quaternion.identity, new Vector3(0.76f, 0.04f, 0.12f), mats.TownFurnitureWood);
+            CreateStaticPart("CanvasFrame", PrimitiveType.Cube, easel.transform,
+                new Vector3(0f, 1.24f, 0.08f), Quaternion.Euler(10f, 0f, 0f), new Vector3(0.72f, 0.78f, 0.04f), mats.PlasterTrim);
+            CreateStaticPart("CanvasArt", PrimitiveType.Cube, easel.transform,
+                new Vector3(0f, 1.24f, 0.105f), Quaternion.Euler(10f, 0f, 0f), new Vector3(0.62f, 0.68f, 0.015f), canvasColorMat);
+
+            BoxCollider col = easel.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.82f, 0f);
+            col.size = new Vector3(0.74f, 1.64f, 0.64f);
+            MarkStaticEnvironment(easel);
+        }
+
+        private static void CreateStudioWorkbench(
+            string name,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats)
+        {
+            GameObject wb = new GameObject(name);
+            wb.transform.SetParent(parent, false);
+            wb.transform.localPosition = localPos;
+            wb.transform.localRotation = localRot;
+
+            CreateStaticPart("Top", PrimitiveType.Cube, wb.transform,
+                new Vector3(0f, 0.78f, 0f), Quaternion.identity, new Vector3(1.90f, 0.06f, 0.76f), mats.TownFurnitureWood);
+            Vector2[] legs = { new Vector2(-0.84f, -0.30f), new Vector2(0.84f, -0.30f), new Vector2(-0.84f, 0.30f), new Vector2(0.84f, 0.30f) };
+            for (int i = 0; i < 4; i++)
+            {
+                CreateStaticPart($"Leg_{i}", PrimitiveType.Cube, wb.transform,
+                    new Vector3(legs[i].x, 0.38f, legs[i].y), Quaternion.identity, new Vector3(0.06f, 0.76f, 0.06f), mats.SedanTrimDark);
+            }
+            // Paint jars & palette on top
+            CreateStaticPart("PaintJar1", PrimitiveType.Cylinder, wb.transform,
+                new Vector3(-0.55f, 0.89f, -0.10f), Quaternion.identity, new Vector3(0.14f, 0.09f, 0.14f), mats.TownAwningTerracotta);
+            CreateStaticPart("PaintJar2", PrimitiveType.Cylinder, wb.transform,
+                new Vector3(-0.34f, 0.89f, 0.06f), Quaternion.identity, new Vector3(0.12f, 0.09f, 0.12f), mats.TownFabricTeal);
+            CreateStaticPart("Sketchbook", PrimitiveType.Cube, wb.transform,
+                new Vector3(0.32f, 0.825f, 0.04f), Quaternion.Euler(0f, 12f, 0f), new Vector3(0.42f, 0.03f, 0.32f), mats.PlasterTrim);
+
+            BoxCollider col = wb.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.42f, 0f);
+            col.size = new Vector3(1.90f, 0.84f, 0.78f);
+            MarkStaticEnvironment(wb);
+        }
+
+        private static void CreatePianoDesk(
+            string seatId,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats)
+        {
+            GameObject piano = new GameObject("AcousticPiano");
+            piano.transform.SetParent(parent, false);
+            piano.transform.localPosition = localPos;
+            piano.transform.localRotation = localRot;
+
+            CreateStaticPart("Body", PrimitiveType.Cube, piano.transform,
+                new Vector3(0f, 0.62f, -0.06f), Quaternion.identity, new Vector3(1.48f, 1.24f, 0.56f), mats.SedanTrimDark);
+            CreateStaticPart("KeyBed", PrimitiveType.Cube, piano.transform,
+                new Vector3(0f, 0.73f, 0.24f), Quaternion.identity, new Vector3(1.44f, 0.10f, 0.28f), mats.SedanTrimDark);
+            CreateStaticPart("WhiteKeys", PrimitiveType.Cube, piano.transform,
+                new Vector3(0f, 0.79f, 0.26f), Quaternion.identity, new Vector3(1.32f, 0.03f, 0.18f), mats.PlasterTrim);
+            CreateStaticPart("BlackKeys", PrimitiveType.Cube, piano.transform,
+                new Vector3(0f, 0.81f, 0.21f), Quaternion.identity, new Vector3(1.24f, 0.025f, 0.08f), mats.SedanTrimDark);
+
+            BoxCollider col = piano.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.62f, 0.05f);
+            col.size = new Vector3(1.48f, 1.24f, 0.76f);
+            MarkStaticEnvironment(piano);
+
+            // Piano bench
+            GameObject bench = new GameObject("PianoBench");
+            bench.transform.SetParent(piano.transform, false);
+            bench.transform.localPosition = new Vector3(0f, 0f, 0.72f);
+            bench.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            CreateStaticPart("BenchTop", PrimitiveType.Cube, bench.transform,
+                new Vector3(0f, 0.46f, 0f), Quaternion.identity, new Vector3(0.76f, 0.08f, 0.34f), mats.SedanTrimDark);
+            CreateStaticPart("BenchLegs", PrimitiveType.Cube, bench.transform,
+                new Vector3(0f, 0.22f, 0f), Quaternion.identity, new Vector3(0.68f, 0.44f, 0.28f), mats.TownFurnitureWood);
+            CreateSeatSlot("PianoBenchSlot", seatId, bench.transform,
+                new Vector3(0f, 0.49f, 0f), Quaternion.identity, 1.35f);
+        }
+
+        private static void CreateHomeOfficeDesk(
+            string seatId,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats)
+        {
+            GameObject office = new GameObject("HomeOfficeSetup");
+            office.transform.SetParent(parent, false);
+            office.transform.localPosition = localPos;
+            office.transform.localRotation = localRot;
+
+            CreateStaticPart("DeskTop", PrimitiveType.Cube, office.transform,
+                new Vector3(0f, 0.74f, 0f), Quaternion.identity, new Vector3(1.68f, 0.05f, 0.78f), mats.TownFurnitureWood);
+            CreateStaticPart("PedestalL", PrimitiveType.Cube, office.transform,
+                new Vector3(-0.62f, 0.36f, 0f), Quaternion.identity, new Vector3(0.42f, 0.72f, 0.68f), mats.SedanTrimDark);
+            CreateStaticPart("LegR", PrimitiveType.Cube, office.transform,
+                new Vector3(0.76f, 0.36f, 0f), Quaternion.identity, new Vector3(0.06f, 0.72f, 0.68f), mats.SedanTrimDark);
+
+            // Dual Monitors + Keyboard + PC Tower
+            CreateStaticPart("MonitorL", PrimitiveType.Cube, office.transform,
+                new Vector3(-0.34f, 1.04f, -0.18f), Quaternion.Euler(0f, 12f, 0f), new Vector3(0.60f, 0.36f, 0.04f), mats.SedanTrimDark);
+            CreateStaticPart("ScreenL", PrimitiveType.Cube, office.transform,
+                new Vector3(-0.34f, 1.04f, -0.155f), Quaternion.Euler(0f, 12f, 0f), new Vector3(0.55f, 0.31f, 0.01f), mats.SedanGlass);
+            CreateStaticPart("MonitorR", PrimitiveType.Cube, office.transform,
+                new Vector3(0.32f, 1.04f, -0.18f), Quaternion.Euler(0f, -12f, 0f), new Vector3(0.60f, 0.36f, 0.04f), mats.SedanTrimDark);
+            CreateStaticPart("ScreenR", PrimitiveType.Cube, office.transform,
+                new Vector3(0.32f, 1.04f, -0.155f), Quaternion.Euler(0f, -12f, 0f), new Vector3(0.55f, 0.31f, 0.01f), mats.SedanGlass);
+            CreateStaticPart("Keyboard", PrimitiveType.Cube, office.transform,
+                new Vector3(-0.02f, 0.775f, 0.14f), Quaternion.identity, new Vector3(0.46f, 0.02f, 0.16f), mats.SedanTrimDark);
+            CreateStaticPart("PcTower", PrimitiveType.Cube, office.transform,
+                new Vector3(0.64f, 0.98f, -0.10f), Quaternion.identity, new Vector3(0.22f, 0.44f, 0.44f), mats.SedanTrimDark);
+
+            BoxCollider col = office.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.44f, 0f);
+            col.size = new Vector3(1.70f, 0.88f, 0.80f);
+            MarkStaticEnvironment(office);
+
+            CreateDiningChair("OfficeChair", $"{seatId}_chair", office.transform,
+                new Vector3(0f, 0f, 0.68f), Quaternion.Euler(0f, 180f, 0f), mats.SedanTrimDark, mats.TownFabricTeal);
+        }
+
+        private static void CreateHomeGymCorner(
+            string name,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats)
+        {
+            GameObject gym = new GameObject(name);
+            gym.transform.SetParent(parent, false);
+            gym.transform.localPosition = localPos;
+            gym.transform.localRotation = localRot;
+
+            // Rubber workout mat
+            CreateStaticPart("RubberMat", PrimitiveType.Cube, gym.transform,
+                new Vector3(0f, 0.01f, 0f), Quaternion.identity, new Vector3(2.30f, 0.02f, 1.85f), mats.SedanTrimDark);
+
+            // Weight bench
+            CreateStaticPart("BenchPad", PrimitiveType.Cube, gym.transform,
+                new Vector3(-0.25f, 0.44f, 0f), Quaternion.identity, new Vector3(1.24f, 0.09f, 0.36f), mats.PedShirtRed);
+            CreateStaticPart("BenchFrame", PrimitiveType.Cube, gym.transform,
+                new Vector3(-0.25f, 0.21f, 0f), Quaternion.identity, new Vector3(1.02f, 0.38f, 0.22f), mats.SedanTrimDark);
+
+            // Barbell rack + chrome bar + plates
+            CreateStaticPart("RackPostL", PrimitiveType.Cube, gym.transform,
+                new Vector3(-0.76f, 0.62f, -0.44f), Quaternion.identity, new Vector3(0.06f, 1.22f, 0.06f), mats.SedanTrimDark);
+            CreateStaticPart("RackPostR", PrimitiveType.Cube, gym.transform,
+                new Vector3(-0.76f, 0.62f, 0.44f), Quaternion.identity, new Vector3(0.06f, 1.22f, 0.06f), mats.SedanTrimDark);
+            CreateStaticPart("BarbellShaft", PrimitiveType.Cylinder, gym.transform,
+                new Vector3(-0.76f, 1.12f, 0f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.032f, 0.84f, 0.032f), mats.SedanChrome);
+            CreateStaticPart("PlateL", PrimitiveType.Cylinder, gym.transform,
+                new Vector3(-0.76f, 1.12f, -0.68f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.36f, 0.04f, 0.36f), mats.SedanTrimDark);
+            CreateStaticPart("PlateR", PrimitiveType.Cylinder, gym.transform,
+                new Vector3(-0.76f, 1.12f, 0.68f), Quaternion.Euler(90f, 0f, 0f), new Vector3(0.36f, 0.04f, 0.36f), mats.SedanTrimDark);
+
+            BoxCollider col = gym.AddComponent<BoxCollider>();
+            col.center = new Vector3(-0.35f, 0.46f, 0f);
+            col.size = new Vector3(1.45f, 0.92f, 1.15f);
+            MarkStaticEnvironment(gym);
+        }
+
+        private static void CreateWallPainting(
+            string name,
+            Transform parent,
+            Vector3 localPos,
+            Quaternion localRot,
+            Material artMat,
+            Material frameMat)
+        {
+            GameObject art = new GameObject(name);
+            art.transform.SetParent(parent, false);
+            art.transform.localPosition = localPos;
+            art.transform.localRotation = localRot;
+
+            CreateStaticPart("Frame", PrimitiveType.Cube, art.transform,
+                Vector3.zero, Quaternion.identity, new Vector3(1.16f, 0.78f, 0.04f), frameMat);
+            CreateStaticPart("Artwork", PrimitiveType.Cube, art.transform,
+                new Vector3(0f, 0f, 0.022f), Quaternion.identity, new Vector3(1.04f, 0.66f, 0.015f), artMat);
         }
 
         // =====================================================================
@@ -1530,19 +2018,20 @@ namespace Gridroam.Editor
             GameObject boundaryRoot = new GameObject("World_CountryFencePerimeter");
             boundaryRoot.transform.SetParent(envParent, false);
 
-            // Clean wooden post-and-rail country fence enclosing the walkable 204m x 250m town
-            // (Resting on a massive 900m x 900m solid ground collider — zero fake backdrops, zero abyss!)
+            // Clean wooden & stone perimeter enclosing the full 2-continent Istanbul map (Avrupa -102..+78, Boğaz +78..+148, Anadolu +148..+216)
             const float minX = -102f;
-            const float maxX = 102f;
+            const float maxX = 216f;
             const float minZ = -44f;
             const float maxZ = 206f;
 
             BuildWoodenFenceRun("Fence_West", boundaryRoot.transform, new Vector3(minX, 0f, minZ), new Vector3(minX, 0f, maxZ), mats);
-            BuildWoodenFenceRun("Fence_East", boundaryRoot.transform, new Vector3(maxX, 0f, minZ), new Vector3(maxX, 0f, maxZ), mats);
-            BuildWoodenFenceRun("Fence_South", boundaryRoot.transform, new Vector3(minX, 0f, minZ), new Vector3(maxX, 0f, minZ), mats);
-            BuildWoodenFenceRun("Fence_North", boundaryRoot.transform, new Vector3(minX, 0f, maxZ), new Vector3(maxX, 0f, maxZ), mats);
+            BuildWoodenFenceRun("Fence_East_Anadolu", boundaryRoot.transform, new Vector3(maxX, 0f, minZ), new Vector3(maxX, 0f, maxZ), mats);
+            BuildWoodenFenceRun("Fence_South_Avrupa", boundaryRoot.transform, new Vector3(minX, 0f, minZ), new Vector3(77f, 0f, minZ), mats);
+            BuildWoodenFenceRun("Fence_South_Anadolu", boundaryRoot.transform, new Vector3(149f, 0f, minZ), new Vector3(maxX, 0f, minZ), mats);
+            BuildWoodenFenceRun("Fence_North_Avrupa", boundaryRoot.transform, new Vector3(minX, 0f, maxZ), new Vector3(77f, 0f, maxZ), mats);
+            BuildWoodenFenceRun("Fence_North_Anadolu", boundaryRoot.transform, new Vector3(149f, 0f, maxZ), new Vector3(maxX, 0f, maxZ), mats);
 
-            // Natural grove trees along the outside of the wooden fence
+            // Natural grove trees along the outside of Avrupa & Anadolu perimeters (skipping the open Bosphorus Strait x=78..148!)
             int treeIdx = 0;
             for (float z = minZ - 4f; z <= maxZ + 4f; z += 26f)
             {
@@ -1554,6 +2043,7 @@ namespace Gridroam.Editor
             }
             for (float x = minX + 14f; x <= maxX - 14f; x += 28f)
             {
+                if (x > 70f && x < 156f) continue; // Keep the Bosphorus Strait open water!
                 CreateTownTree($"PerimeterTree_S_{treeIdx}", boundaryRoot.transform,
                     new Vector3(x, 0f, minZ - 6.5f - (treeIdx % 2) * 3f), mats, 1.05f + (treeIdx % 3) * 0.14f, treeIdx + 120);
                 CreateTownTree($"PerimeterTree_N_{treeIdx}", boundaryRoot.transform,

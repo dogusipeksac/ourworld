@@ -24,19 +24,19 @@ namespace Gridroam.World
 
         [Header("Citizen Identity & Social Interaction")]
         [SerializeField] private string citizenName = "Mahalleli";
-        [SerializeField] private string citizenRole = "Çınarlı Sakini";
+        [SerializeField] private string citizenRole = "Selman Sokağı Sakini";
         [SerializeField] private string vendorShopId = string.Empty;
         [SerializeField] private bool isBrave;
         [SerializeField] private string[] chatLines;
 
         private static readonly string[] DefaultChatLinesTr =
         {
-            "Merhaba! Bugün Çınarlı Kasabası oldukça sakin, değil mi?",
-            "Tamirhanedeki Marco işinin ehlidir, aracınla bir derdin olursa ona uğra.",
-            "Meydandaki Kerem'in tezgâhında iyi koşu ayakkabıları ve ceketler var.",
-            "Kuzey Kargo Deposu akşamüstü çok yoğun oluyor, dikkatli sür.",
-            "Çınar Kafe'nin kahvesi yorgunluğu hemen alıyor, tavsiye ederim.",
-            "Geçen gece batı sokaklarda garip koyu renkli bir sedan dolaşıyordu."
+            "Hoş geldin komşu! Hamidiye Mahallesi Selman Sokağı bugün pek huzurlu.",
+            "73 numaradaki Oto Tamir'e uğra, aracında hasar varsa hemen hallediyorlar.",
+            "58 numaradaki Selman Bakkal'da sabah ekmeği ve sıcak tost bulabilirsin.",
+            "66 numaranın karşısındaki Hafsa Tesisat mahallenin tüm kombi ve petek işlerine bakar.",
+            "Hafta sonu Sultanbeyli Gölet'e ya da Aydos Ormanı'na yürüyüşe çıkıyoruz.",
+            "Çiçekçi Sokağı ağzındaki kasise dikkat et, hızlı girersen altı sürter!"
         };
 
         private static readonly string[] HitReactionsTr =
@@ -61,12 +61,17 @@ namespace Gridroam.World
         private Quaternion _preSitRotation = Quaternion.identity;
         private float _sitTimer;
 
-        // Startled / combat reaction state
+        // Startled / combat / vehicle-impact ballistic state
         private float _startledCooldown;
         private float _hitCooldown;
+        private float _vehicleHitCooldown;
+        private float _knockdownTimer;
+        private int _hitCount;
         private float _fleeTimer;
         private Vector3 _fleeDirection = Vector3.forward;
         private Vector3 _stumbleVelocity;
+        private Vector3 _airVelocity;
+        private bool _isAirborne;
         private bool _droppedPocketMoney;
 
         public void ConfigureCitizen(string displayName, string role, string[] lines, bool brave = false, string shopId = "")
@@ -119,10 +124,9 @@ namespace Gridroam.World
             }
         }
 
-        public void OnPunchedByPlayer(Vector3 attackerPos, Vector3 punchDir)
+        public void OnPunchedByPlayer(Vector3 attackerPos, Vector3 punchDir, int comboStep = 1)
         {
-            if (_hitCooldown > 0f) return;
-            _hitCooldown = 0.65f;
+            if (_hitCooldown > 0f || _knockdownTimer > 0f) return;
 
             ReleaseBenchIfSeated();
 
@@ -135,15 +139,39 @@ namespace Gridroam.World
             }
             knockDir = knockDir.sqrMagnitude > 0.001f ? knockDir.normalized : Vector3.forward;
 
-            _stumbleVelocity = knockDir * 5.6f;
+            _hitCount++;
             _idleTimer = 0f;
 
-            if (humanoid != null)
-            {
-                humanoid.PlayHitReact();
-            }
+            bool triggerKnockdown = comboStep >= 2 || _hitCount >= 3;
+            string react;
 
-            string react = string.Format(HitReactionsTr[Random.Range(0, HitReactionsTr.Length)], citizenName);
+            if (triggerKnockdown)
+            {
+                _hitCooldown = 0.85f;
+                _knockdownTimer = 2.65f;
+                _hitCount = 0;
+                _stumbleVelocity = knockDir * 7.4f;
+                transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+
+                if (humanoid != null)
+                {
+                    humanoid.PlayKnockdown();
+                }
+
+                react = $"{citizenName}: Ah! Yere serildi!";
+            }
+            else
+            {
+                _hitCooldown = 0.22f;
+                _stumbleVelocity = knockDir * (comboStep == 0 ? 3.8f : 5.6f);
+
+                if (humanoid != null)
+                {
+                    humanoid.PlayHitReact();
+                }
+
+                react = string.Format(HitReactionsTr[Random.Range(0, HitReactionsTr.Length)], citizenName);
+            }
 
             // Occasionally drop loose pocket change once per citizen
             if (!_droppedPocketMoney && string.IsNullOrEmpty(vendorShopId) && Random.value < 0.45f && SaveManager.Instance != null)
@@ -154,7 +182,7 @@ namespace Gridroam.World
                 react += $" (+{coins} ₺ düştü)";
             }
 
-            if (isBrave)
+            if (isBrave && !triggerKnockdown)
             {
                 // Brave citizen turns and shoves back briefly!
                 transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
@@ -167,7 +195,7 @@ namespace Gridroam.World
             }
             else
             {
-                // Non-brave citizen panics and sprints away from the player
+                // Panics and sprints away from the player (after getting up if knocked down)
                 _fleeTimer = 6.5f;
                 _fleeDirection = knockDir;
             }
@@ -175,6 +203,70 @@ namespace Gridroam.World
             if (PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.RaiseStatusMessage(react);
+            }
+        }
+
+        /// <summary>
+        /// Realistic ballistic launch, mid-air tumble, ground bounce, asphalt slide & recovery
+        /// when struck or run over by a moving vehicle.
+        /// </summary>
+        public void OnHitByVehicle(Vector3 carPos, Vector3 carVelocity, float carSpeedKmh)
+        {
+            if (_vehicleHitCooldown > 0f) return;
+            _vehicleHitCooldown = 0.70f;
+            _hitCooldown = 1.0f;
+
+            ReleaseBenchIfSeated();
+
+            Vector3 impactDir = carVelocity;
+            impactDir.y = 0f;
+            Vector3 awayFromCar = transform.position - carPos;
+            awayFromCar.y = 0f;
+            if (impactDir.sqrMagnitude < 0.04f)
+            {
+                impactDir = awayFromCar;
+            }
+            else if (awayFromCar.sqrMagnitude > 0.01f)
+            {
+                // Blend car momentum with natural lateral deflection off the hood/fender
+                impactDir = (impactDir.normalized * 0.72f + awayFromCar.normalized * 0.28f);
+            }
+            impactDir = impactDir.sqrMagnitude > 0.001f ? impactDir.normalized : Vector3.forward;
+
+            float horizSpeed = Mathf.Clamp(carSpeedKmh * 0.34f, 5.5f, 18.5f);
+            float upSpeed = Mathf.Clamp(carSpeedKmh * 0.14f, 2.4f, 7.6f);
+
+            _airVelocity = impactDir * horizSpeed + Vector3.up * upSpeed;
+            _isAirborne = true;
+            _stumbleVelocity = Vector3.zero;
+            _idleTimer = 0f;
+
+            float downDuration = Mathf.Clamp(3.4f + carSpeedKmh * 0.045f, 3.6f, 6.0f);
+            _knockdownTimer = downDuration;
+            _fleeTimer = 7.5f;
+            _fleeDirection = impactDir;
+
+            transform.rotation = Quaternion.LookRotation(-impactDir, Vector3.up);
+            if (humanoid != null)
+            {
+                humanoid.PlayKnockdown(downDuration);
+            }
+
+            string msg = carSpeedKmh >= 38f
+                ? $"{citizenName} şiddetli çarpışmayla havaya savruldu!"
+                : $"{citizenName} araba çarpmasıyla yere serildi!";
+
+            if (!_droppedPocketMoney && string.IsNullOrEmpty(vendorShopId) && Random.value < 0.50f && SaveManager.Instance != null)
+            {
+                _droppedPocketMoney = true;
+                int coins = Random.Range(15, 31);
+                SaveManager.Instance.AddMoney(coins);
+                msg += $" (+{coins} ₺ düştü)";
+            }
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.RaiseStatusMessage(msg);
             }
         }
 
@@ -249,6 +341,10 @@ namespace Gridroam.World
             {
                 _hitCooldown -= dt;
             }
+            if (_vehicleHitCooldown > 0f)
+            {
+                _vehicleHitCooldown -= dt;
+            }
 
             // Seated bench break
             if (_occupiedSeat != null)
@@ -268,14 +364,57 @@ namespace Gridroam.World
                 return;
             }
 
+            // Ballistic air-launch, gravity & asphalt bounce after vehicle strike
+            if (_isAirborne)
+            {
+                _airVelocity.y -= 21.0f * dt;
+                Vector3 nextAir = transform.position + _airVelocity * dt;
+                nextAir.x = Mathf.Clamp(nextAir.x, -160f, 160f);
+                nextAir.z = Mathf.Clamp(nextAir.z, -160f, 160f);
+
+                if (nextAir.y <= 0.02f)
+                {
+                    nextAir.y = 0.02f;
+                    if (_airVelocity.y < -3.6f)
+                    {
+                        // Realistic damped asphalt bounce
+                        _airVelocity.y = -_airVelocity.y * 0.28f;
+                        _airVelocity.x *= 0.62f;
+                        _airVelocity.z *= 0.62f;
+                    }
+                    else
+                    {
+                        _isAirborne = false;
+                        _stumbleVelocity = new Vector3(_airVelocity.x * 0.55f, 0f, _airVelocity.z * 0.55f);
+                        _airVelocity = Vector3.zero;
+                    }
+                }
+
+                transform.position = nextAir;
+                if (_knockdownTimer > 0f) _knockdownTimer -= dt;
+                if (humanoid != null) humanoid.SetLocomotion(0f, grounded: false, verticalVelocity: _airVelocity.y);
+                return;
+            }
+
             // Apply knockback / stumble displacement (clamped cleanly inside town bounds)
             if (_stumbleVelocity.sqrMagnitude > 0.01f)
             {
                 Vector3 nextPos = transform.position + _stumbleVelocity * dt;
-                nextPos.x = Mathf.Clamp(nextPos.x, -96f, 96f);
-                nextPos.z = Mathf.Clamp(nextPos.z, -38f, 198f);
+                nextPos.x = Mathf.Clamp(nextPos.x, -160f, 160f);
+                nextPos.z = Mathf.Clamp(nextPos.z, -160f, 160f);
                 transform.position = nextPos;
-                _stumbleVelocity = Vector3.MoveTowards(_stumbleVelocity, Vector3.zero, 11f * dt);
+                _stumbleVelocity = Vector3.MoveTowards(_stumbleVelocity, Vector3.zero, (_knockdownTimer > 0f ? 9.5f : 11f) * dt);
+            }
+
+            // Knocked flat on the ground recovering before fleeing
+            if (_knockdownTimer > 0f)
+            {
+                _knockdownTimer -= dt;
+                if (humanoid != null)
+                {
+                    humanoid.SetLocomotion(0f, grounded: true, verticalVelocity: 0f);
+                }
+                return;
             }
 
             // Panic flee sprint when punched
@@ -287,8 +426,8 @@ namespace Gridroam.World
                     Quaternion fleeRot = Quaternion.LookRotation(_fleeDirection, Vector3.up);
                     transform.rotation = Quaternion.Slerp(transform.rotation, fleeRot, 1f - Mathf.Exp(-10f * dt));
                     Vector3 fleeNext = transform.position + transform.forward * (4.6f * dt);
-                    fleeNext.x = Mathf.Clamp(fleeNext.x, -96f, 96f);
-                    fleeNext.z = Mathf.Clamp(fleeNext.z, -38f, 198f);
+                    fleeNext.x = Mathf.Clamp(fleeNext.x, -160f, 160f);
+                    fleeNext.z = Mathf.Clamp(fleeNext.z, -160f, 160f);
                     transform.position = fleeNext;
                 }
                 if (humanoid != null)
@@ -434,35 +573,19 @@ namespace Gridroam.World
 
             float carKmh = car.SpeedKmh;
 
-            // Startled pose & stumble back if fast car (>15 km/h) comes very close
-            if (dist < 2.9f && carKmh > 15f && _startledCooldown <= 0f)
+            // Fast cars (>= 18 km/h) do NOT get magically dodged so real collisions & run-overs happen!
+            if (carKmh >= 18f)
             {
-                _startledCooldown = 2.2f;
-                _idleTimer = 1.1f;
-                Vector3 pushDir = dist > 0.05f ? (toPed / dist) : transform.right;
-                pushDir.y = 0f;
-                _stumbleVelocity = pushDir.normalized * 2.6f;
-
-                if (humanoid != null)
-                {
-                    humanoid.PlayStartled(1.15f);
-                }
-                return true;
+                return false;
             }
 
-            // Step aside / stop if player car is within 4 m in front of pedestrian or approaching them
+            // Politely pause/step aside only for slow cars (< 18 km/h)
             Vector3 toCar = -toPed;
-            bool inFrontOfPed = dist <= 4.2f && Vector3.Dot(transform.forward, toCar.normalized) > 0.25f;
-            bool carHeadingTowardPed = dist <= 4.6f && carKmh > 3f && Vector3.Dot(car.transform.forward, toPed.normalized) > 0.55f;
+            bool inFrontOfPed = dist <= 3.6f && Vector3.Dot(transform.forward, toCar.normalized) > 0.35f;
+            bool carHeadingTowardPed = dist <= 4.0f && carKmh > 2.5f && Vector3.Dot(car.transform.forward, toPed.normalized) > 0.65f;
 
             if (inFrontOfPed || carHeadingTowardPed)
             {
-                Vector3 awayFromLane = dist > 0.05f ? (toPed / dist) : transform.right;
-                awayFromLane.y = 0f;
-                if (dist < 3.4f)
-                {
-                    transform.position += awayFromLane.normalized * (0.9f * dt);
-                }
                 return true;
             }
 

@@ -15,7 +15,7 @@ MonoBehaviour:
   missionId: m02_last_delivery
   titleKey: m02.title
   summaryKey: m02.summary
-  rewardMoney: 150
+  rewardMoney: 250
   nextMissionId: m03_missing_car
   autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot

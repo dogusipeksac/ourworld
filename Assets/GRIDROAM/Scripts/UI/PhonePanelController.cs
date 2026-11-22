@@ -23,8 +23,8 @@ namespace Gridroam.UI
     {
         public static PhonePanelController Instance { get; private set; }
 
-        public const float ViewWorldMinX = -112f;
-        public const float ViewWorldMinZ = -44f;
+        public const float ViewWorldMinX = -120f;
+        public const float ViewWorldMinZ = -120f;
         public const float ViewWorldSpan = 248f;
 
         [Header("Root & Tabs")]
@@ -72,9 +72,15 @@ namespace Gridroam.UI
         [SerializeField] private Text[] statNameTexts = new Text[7];
         [SerializeField] private Text[] statValueTexts = new Text[7];
 
+        // Runtime-built "Öneri / Ideas" tab (player feedback -> Firebase)
+        private FeedbackTabView _feedbackView;
+        private Button _tabFeedbackButton;
+        private Text _tabFeedbackLabel;
+
         private static readonly Color ActiveTabColor = new Color(0.31f, 0.70f, 0.66f, 0.90f);
         private static readonly Color InactiveTabColor = new Color(0.11f, 0.14f, 0.19f, 0.75f);
-        private static readonly Vector3 GasStationWorldPos = new Vector3(46.0f, 0.2f, 150.0f);
+        private static readonly Vector3 DefaultGasStationWorldPos = new Vector3(-84.5f, 0.04f, 12.0f);
+        private Vector3 _resolvedGasStationPos = DefaultGasStationWorldPos;
 
         private SedanVehicleController[] _cachedVehicles;
         private int _activeTabIndex;
@@ -136,6 +142,17 @@ namespace Gridroam.UI
         {
             _cachedVehicles = FindObjectsByType<SedanVehicleController>(FindObjectsInactive.Include);
 
+            // Resolve real FuelPump world position from the active Sultanbeyli scene
+            InteractableTrigger[] allTriggers = FindObjectsByType<InteractableTrigger>(FindObjectsInactive.Include);
+            for (int i = 0; i < allTriggers.Length; i++)
+            {
+                if (allTriggers[i] != null && allTriggers[i].Kind == InteractableKind.FuelPump)
+                {
+                    _resolvedGasStationPos = allTriggers[i].transform.position;
+                    break;
+                }
+            }
+
             if (townMapRawImage != null)
             {
                 float u0 = (ViewWorldMinX - MinimapController.MapWorldMinX) / MinimapController.MapWorldSpan;
@@ -157,6 +174,7 @@ namespace Gridroam.UI
             if (tabMapButton != null) tabMapButton.onClick.AddListener(() => SelectTab(0));
             if (tabJobsButton != null) tabJobsButton.onClick.AddListener(() => SelectTab(1));
             if (tabStatsButton != null) tabStatsButton.onClick.AddListener(() => SelectTab(2));
+            BuildFeedbackTab();
             if (closeButton != null) closeButton.onClick.AddListener(Close);
             if (languageButton != null)
             {
@@ -284,16 +302,58 @@ namespace Gridroam.UI
             _animRoutine = StartCoroutine(AnimateRoutine(opening: false));
         }
 
+        /// <summary>
+        /// Adds a 4th "Öneri" tab next to the existing ones by cloning the Stats tab button,
+        /// and re-spaces the tab row so it fits between the title and the language button.
+        /// </summary>
+        private void BuildFeedbackTab()
+        {
+            if (_feedbackView != null || panelRoot == null || tabStatsButton == null) return;
+
+            GameObject clone = Instantiate(tabStatsButton.gameObject, tabStatsButton.transform.parent);
+            clone.name = "Btn_Tab_Feedback";
+            _tabFeedbackButton = clone.GetComponent<Button>();
+            _tabFeedbackButton.onClick = new Button.ButtonClickedEvent();
+            _tabFeedbackButton.onClick.AddListener(() => SelectTab(3));
+            _tabFeedbackLabel = clone.GetComponentInChildren<Text>(true);
+
+            Button[] row = { tabMapButton, tabJobsButton, tabStatsButton, _tabFeedbackButton };
+            const float width = 140f;
+            const float spacing = 150f;
+            for (int i = 0; i < row.Length; i++)
+            {
+                if (row[i] == null) continue;
+                RectTransform rt = (RectTransform)row[i].transform;
+                rt.sizeDelta = new Vector2(width, rt.sizeDelta.y);
+                rt.anchoredPosition = new Vector2((i - 1.5f) * spacing, rt.anchoredPosition.y);
+            }
+
+            if (headerTitleText != null)
+            {
+                RectTransform hrt = headerTitleText.rectTransform;
+                hrt.sizeDelta = new Vector2(Mathf.Min(hrt.sizeDelta.x, 290f), hrt.sizeDelta.y);
+                headerTitleText.resizeTextForBestFit = true;
+                headerTitleText.resizeTextMinSize = 20;
+                headerTitleText.resizeTextMaxSize = headerTitleText.fontSize;
+            }
+
+            Font font = tabStatsLabel != null ? tabStatsLabel.font : null;
+            Image btnImg = tabStatsButton.GetComponent<Image>();
+            _feedbackView = FeedbackTabView.Create(panelRoot.transform, font, btnImg != null ? btnImg.sprite : null);
+        }
+
         public void SelectTab(int tabIdx)
         {
-            _activeTabIndex = Mathf.Clamp(tabIdx, 0, 2);
+            _activeTabIndex = Mathf.Clamp(tabIdx, 0, _feedbackView != null ? 3 : 2);
             if (mapTabRoot != null) mapTabRoot.SetActive(_activeTabIndex == 0);
             if (jobsTabRoot != null) jobsTabRoot.SetActive(_activeTabIndex == 1);
             if (statsTabRoot != null) statsTabRoot.SetActive(_activeTabIndex == 2);
+            if (_feedbackView != null) _feedbackView.gameObject.SetActive(_activeTabIndex == 3);
 
             SetTabButtonStyle(tabMapButton, _activeTabIndex == 0);
             SetTabButtonStyle(tabJobsButton, _activeTabIndex == 1);
             SetTabButtonStyle(tabStatsButton, _activeTabIndex == 2);
+            SetTabButtonStyle(_tabFeedbackButton, _activeTabIndex == 3);
 
             RefreshAllTexts();
         }
@@ -317,9 +377,9 @@ namespace Gridroam.UI
         {
             HasCustomWaypoint = true;
             CustomWaypointPosition = new Vector3(
-                Mathf.Clamp(worldPos.x, -76f, 36f),
+                Mathf.Clamp(worldPos.x, -160f, 160f),
                 0.2f,
-                Mathf.Clamp(worldPos.z, -46f, 294f));
+                Mathf.Clamp(worldPos.z, -160f, 160f));
 
             if (!string.IsNullOrEmpty(label) && PlayerModeController.Instance != null)
             {
@@ -368,12 +428,21 @@ namespace Gridroam.UI
             }
         }
 
-        private Vector2 WorldToViewportAnchored(Vector3 worldPos)
+        private bool _warnedOutOfBoundsMarker;
+
+        private Vector2 WorldToViewportAnchored(Vector3 worldPos, string markerDebugName = null)
         {
             if (mapViewportRect == null) return Vector2.zero;
             Rect r = mapViewportRect.rect;
-            float nx = Mathf.Clamp01((worldPos.x - ViewWorldMinX) / ViewWorldSpan);
-            float ny = Mathf.Clamp01((worldPos.z - ViewWorldMinZ) / ViewWorldSpan);
+            float rawNx = (worldPos.x - ViewWorldMinX) / ViewWorldSpan;
+            float rawNy = (worldPos.z - ViewWorldMinZ) / ViewWorldSpan;
+            if ((rawNx < 0f || rawNx > 1f || rawNy < 0f || rawNy > 1f) && !_warnedOutOfBoundsMarker)
+            {
+                _warnedOutOfBoundsMarker = true;
+                Debug.LogWarning($"[PhonePanelController] Map marker '{markerDebugName ?? "unknown"}' at {worldPos} lies outside Phone map bounds [{ViewWorldMinX}..{ViewWorldMinX + ViewWorldSpan}].");
+            }
+            float nx = Mathf.Clamp01(rawNx);
+            float ny = Mathf.Clamp01(rawNy);
             return new Vector2((nx - 0.5f) * r.width, (ny - 0.5f) * r.height);
         }
 
@@ -428,7 +497,7 @@ namespace Gridroam.UI
 
             if (mapGasStationMarker != null)
             {
-                mapGasStationMarker.anchoredPosition = WorldToViewportAnchored(GasStationWorldPos);
+                mapGasStationMarker.anchoredPosition = WorldToViewportAnchored(_resolvedGasStationPos, "FuelPump");
             }
 
             if (JobManager.Instance != null && mapJobMarkers != null)
@@ -493,12 +562,15 @@ namespace Gridroam.UI
             if (tabMapLabel != null) tabMapLabel.text = LocalizationService.Tr("ui.phone.tab_map", "Harita");
             if (tabJobsLabel != null) tabJobsLabel.text = LocalizationService.Tr("ui.phone.tab_jobs", "İşler");
             if (tabStatsLabel != null) tabStatsLabel.text = LocalizationService.Tr("ui.phone.tab_stats", "İstatistik");
+            if (_tabFeedbackLabel != null) _tabFeedbackLabel.text = LocalizationService.Tr("ui.tab.feedback", "Öneri");
+            if (_feedbackView != null) _feedbackView.RefreshTexts();
             if (closeLabel != null) closeLabel.text = LocalizationService.Tr("ui.btn.close", "Kapat");
 
             if (languageLabel != null)
             {
                 string code = LocalizationService.Instance != null ? LocalizationService.Instance.CurrentLanguage.ToUpperInvariant() : "TR";
-                languageLabel.text = $"Dil: {code}";
+                string prefix = LocalizationService.Tr("ui.phone.lang_prefix", "Dil");
+                languageLabel.text = $"{prefix}: {code}";
             }
 
             if (clearWaypointLabel != null) clearWaypointLabel.text = LocalizationService.Tr("ui.phone.clear_wp", "İşareti Kaldır");

@@ -479,6 +479,11 @@ namespace Gridroam.Editor
                 new Vector2(-196f, 52f), new Vector2(114f, 114f), new Color(0.58f, 0.20f, 0.18f, 0.88f), 22, sliced: false);
             attackBtn.gameObject.AddComponent<TouchAttackButtonBinder>();
 
+            var (jumpBtn, _) = CreateStyledButton("Btn_Jump", onFootRoot.transform, uiSprites.Circle, uiFont, "Atla",
+                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-56f, 198f), new Vector2(114f, 114f), UiAccentTeal, 22, sliced: false);
+            jumpBtn.gameObject.AddComponent<TouchJumpButtonBinder>();
+
             // =================================================================
             // 5. DRIVING CONTROLS (◀ ▶ Steer, GAZ/FREN/El Freni, Circular Speedometer)
             // =================================================================
