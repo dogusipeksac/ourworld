@@ -1,5 +1,9 @@
 {
-  "projectId": "",
-  "apiKey": "",
+  "projectId": "ourworld-dd8dc",
+  "apiKey": "AIzaSyBVR6MehIHftdUUNf1KkaynBQDWK0iiaOU",
+  "androidApiKey": "AIzaSyBVR6MehIHftdUUNf1KkaynBQDWK0iiaOU",
+  "iosApiKey": "AIzaSyB9F6DFvWHXyNwh_8uxUB6D-f-vNfbyaaM",
+  "androidAppId": "1:765240788931:android:ce8aed787b607e3df99f76",
+  "iosAppId": "1:765240788931:ios:27deb7a08a963d22f99f76",
   "collection": "feedback"
 }

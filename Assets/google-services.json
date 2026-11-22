@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "765240788931",
+    "project_id": "ourworld-dd8dc",
+    "storage_bucket": "ourworld-dd8dc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:765240788931:android:ce8aed787b607e3df99f76",
+        "android_client_info": {
+          "package_name": "com.dogusipeksac.ourworld"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVR6MehIHftdUUNf1KkaynBQDWK0iiaOU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:765240788931:android:c20e2be08bd4025cf99f76",
+        "android_client_info": {
+          "package_name": "com.dogusstore.ourworld"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVR6MehIHftdUUNf1KkaynBQDWK0iiaOU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

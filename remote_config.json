@@ -1,0 +1,103 @@
+{
+  "conditions": [],
+  "parameters": {
+    "maintenance_android_enabled": {
+      "defaultValue": { "value": "false" },
+      "description": "Android bakım ekranını açar/kapatır",
+      "valueType": "BOOLEAN"
+    },
+    "maintenance_ios_enabled": {
+      "defaultValue": { "value": "false" },
+      "description": "iOS bakım ekranını açar/kapatır",
+      "valueType": "BOOLEAN"
+    },
+    "update_android_latest_version_code": {
+      "defaultValue": { "value": "1" },
+      "description": "Google Play'deki en güncel Android versionCode",
+      "valueType": "NUMBER"
+    },
+    "update_android_min_required_version_code": {
+      "defaultValue": { "value": "1" },
+      "description": "Android zorunlu güncelleme alt sınırı (current < min && force=true -> Force Update)",
+      "valueType": "NUMBER"
+    },
+    "update_android_force_update": {
+      "defaultValue": { "value": "false" },
+      "description": "true olduğunda Android min_required altındaki sürümler zorunlu güncelleme görür",
+      "valueType": "BOOLEAN"
+    },
+    "update_android_store_url": {
+      "defaultValue": { "value": "https://play.google.com/store/apps/details?id=com.dogusipeksac.ourworld" },
+      "description": "OurWorld Google Play mağaza bağlantısı",
+      "valueType": "STRING"
+    },
+    "update_ios_latest_version_code": {
+      "defaultValue": { "value": "1" },
+      "description": "App Store'daki en güncel iOS buildNumber",
+      "valueType": "NUMBER"
+    },
+    "update_ios_min_required_version_code": {
+      "defaultValue": { "value": "1" },
+      "description": "iOS zorunlu güncelleme alt sınırı (current < min && force=true -> Force Update)",
+      "valueType": "NUMBER"
+    },
+    "update_ios_force_update": {
+      "defaultValue": { "value": "false" },
+      "description": "true olduğunda iOS min_required altındaki sürümler zorunlu güncelleme görür",
+      "valueType": "BOOLEAN"
+    },
+    "update_ios_store_url": {
+      "defaultValue": { "value": "https://apps.apple.com/search?term=OurWorld" },
+      "description": "OurWorld App Store mağaza bağlantısı (App Store ID çıkınca idXXXXXXXXXX ile güncelle)",
+      "valueType": "STRING"
+    },
+    "update_title_tr": {
+      "defaultValue": { "value": "Yeni sürüm hazır" },
+      "valueType": "STRING"
+    },
+    "update_title_en": {
+      "defaultValue": { "value": "Update available" },
+      "valueType": "STRING"
+    },
+    "update_message_tr": {
+      "defaultValue": { "value": "OurWorld için yeni bir sürüm yayınlandı. Oyuncuların istediği yenilikler için hemen güncelleyin." },
+      "valueType": "STRING"
+    },
+    "update_message_en": {
+      "defaultValue": { "value": "A new version of OurWorld is available. Update now for the latest community improvements." },
+      "valueType": "STRING"
+    },
+    "update_confirm_tr": {
+      "defaultValue": { "value": "Güncelle" },
+      "valueType": "STRING"
+    },
+    "update_confirm_en": {
+      "defaultValue": { "value": "Update" },
+      "valueType": "STRING"
+    },
+    "update_cancel_tr": {
+      "defaultValue": { "value": "Sonra" },
+      "valueType": "STRING"
+    },
+    "update_cancel_en": {
+      "defaultValue": { "value": "Later" },
+      "valueType": "STRING"
+    },
+    "maintenance_title_tr": {
+      "defaultValue": { "value": "Bakım çalışması" },
+      "valueType": "STRING"
+    },
+    "maintenance_title_en": {
+      "defaultValue": { "value": "Maintenance" },
+      "valueType": "STRING"
+    },
+    "maintenance_message_tr": {
+      "defaultValue": { "value": "OurWorld kısa süreli bakımda. Lütfen birkaç dakika sonra tekrar deneyin." },
+      "valueType": "STRING"
+    },
+    "maintenance_message_en": {
+      "defaultValue": { "value": "OurWorld is temporarily under maintenance. Please try again in a few minutes." },
+      "valueType": "STRING"
+    }
+  }
+}

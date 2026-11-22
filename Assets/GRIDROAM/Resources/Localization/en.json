@@ -289,7 +289,20 @@
     { "key": "feedback.empty", "value": "Please write at least 5 characters." },
     { "key": "feedback.too_soon", "value": "Please wait a moment, you just sent one." },
     { "key": "feedback.error", "value": "Couldn't send, we'll retry later." },
-    { "key": "feedback.privacy", "value": "Only your text, game version and device model are sent anonymously." },
+    { "key": "feedback.privacy", "value": "Your nickname, message and game version are saved anonymously to Firestore." },
+    { "key": "feedback.name_placeholder", "value": "Nickname (optional)" },
+    { "key": "feedback.feed_title", "value": "Live Player Messages" },
+    { "key": "feedback.refresh", "value": "Refresh" },
+    { "key": "update.maintenance_eyebrow", "value": "MAINTENANCE" },
+    { "key": "update.force_eyebrow", "value": "REQUIRED UPDATE" },
+    { "key": "update.soft_eyebrow", "value": "NEW VERSION" },
+    { "key": "update.retry", "value": "TRY AGAIN" },
+    { "key": "whatsnew.btn", "value": "What's New" },
+    { "key": "whatsnew.skip", "value": "SKIP  ✕" },
+    { "key": "whatsnew.next", "value": "NEXT  →" },
+    { "key": "whatsnew.play", "value": "LET'S PLAY!" },
+    { "key": "whatsnew.suggest", "value": "SUGGEST AN IDEA" },
+    { "key": "whatsnew.swipe_hint", "value": "←  Swipe to browse new features  →" },
     { "key": "ui.btn.attack", "value": "Punch" }
   ]
 }

@@ -1,3 +1,4 @@
+using Gridroam.Core;
 using Gridroam.Player;
 using UnityEngine;
 
@@ -78,6 +79,7 @@ namespace Gridroam.World
 
             bool wasEmpty = string.IsNullOrEmpty(_currentStreet);
             _currentStreet = bestName;
+            CrashlyticsService.SetKey("current_street", bestName);
 
             if (!wasEmpty && Time.time - _lastAnnounceTime >= 2.2f)
             {

@@ -6,7 +6,7 @@
 - **App Store Subtitle (EN — max 30 chars):** `You Wish It, We Build It!` *(25 chars)*
 - **App Store Subtitle (TR — max 30 chars):** `Sen Hayal Et, Biz Kuralım!` *(26 chars)*
 - **Home Screen Icon Name (`productName` / `CFBundleDisplayName`):** `OurWorld`
-- **Package / Bundle ID:** `com.dogusstore.ourworld`
+- **Package / Bundle ID:** `com.dogusipeksac.ourworld`
 - **Developer / Company Name:** `Dogus Store`
 - **Version:** `1.0.0` (Android `versionCode: 1`, iOS `buildNumber: 1`)
 - **Category:** Games → Simulation (Secondary: Adventure / Action)

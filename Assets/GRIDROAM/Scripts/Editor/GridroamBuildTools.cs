@@ -4,8 +4,13 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+#if UNITY_ANDROID
+using UnityEditor.Android;
+#endif
 #if UNITY_EDITOR_OSX
+using System.Diagnostics;
 using UnityEditor.iOS.Xcode;
+using Debug = UnityEngine.Debug;
 #endif
 
 namespace Gridroam.Editor
@@ -58,12 +63,37 @@ namespace Gridroam.Editor
             else
                 warn.Add("Gizlilik Politikası HTML dosyası eksik!");
 
-            // Player feedback -> Firebase (Resources/FirebaseConfig.json)
+            // Player feedback & mobile Firebase configs
             TextAsset fbConfig = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/GRIDROAM/Resources/FirebaseConfig.json");
             if (fbConfig != null && fbConfig.text.Contains("\"projectId\": \"\"") == false && fbConfig.text.Contains("\"apiKey\": \"\"") == false)
-                ok.Add("Firebase öneri sistemi: FirebaseConfig.json dolu.");
+                ok.Add("Firebase öneri sistemi: FirebaseConfig.json dolu (ourworld-dd8dc).");
             else
                 warn.Add("Firebase öneri sistemi yapılandırılmadı: Assets/GRIDROAM/Resources/FirebaseConfig.json (projectId + apiKey). Öneriler yalnızca cihazda bekler!");
+
+            if (File.Exists("Assets/google-services.json"))
+                ok.Add("Firebase Android config (Assets/google-services.json): Mevcut.");
+            else
+                warn.Add("Firebase Android config (Assets/google-services.json) eksik!");
+
+            if (File.Exists("Assets/GoogleService-Info.plist"))
+                ok.Add("Firebase iOS config (Assets/GoogleService-Info.plist): Mevcut.");
+            else
+                warn.Add("Firebase iOS config (Assets/GoogleService-Info.plist) eksik!");
+
+            if (File.Exists("Assets/Plugins/Android/launcherTemplate.gradle") && File.Exists("Assets/Plugins/iOS/OurWorldCrashlytics.mm"))
+                ok.Add("Firebase Crashlytics (Android NDK Gradle + iOS SPM/ObjC++ + C# köprüsü): Hazır.");
+            else
+                warn.Add("Firebase Crashlytics native köprü dosyaları eksik!");
+
+            if (File.Exists("firestore.rules"))
+                ok.Add("Cloud Firestore güvenlik kuralları (firestore.rules): Mevcut.");
+            else
+                warn.Add("firestore.rules eksik!");
+
+            if (File.Exists("remote_config.json") && File.Exists("Assets/GRIDROAM/Resources/OurWorldBuildInfo.txt"))
+                ok.Add("Force / Soft Update & Bakım (Firebase Remote Config + OurWorldBuildInfo): Hazır.");
+            else
+                warn.Add("Force / Soft Update (remote_config.json / OurWorldBuildInfo.txt) eksik!");
 
             // Mission catalog size (store v1 = 10 missions)
             Gridroam.Missions.MissionCatalog catalog = AssetDatabase.LoadAssetAtPath<Gridroam.Missions.MissionCatalog>("Assets/GRIDROAM/Data/Missions/MissionCatalog.asset");
@@ -213,12 +243,49 @@ namespace Gridroam.Editor
         }
     }
 
+#if UNITY_ANDROID
+    /// <summary>
+    /// Automatically copies Assets/google-services.json into the exported Android Gradle launcher module
+    /// so Firebase Google Services & Crashlytics NDK plugins link cleanly on every APK/AAB build.
+    /// </summary>
+    public class GridroamAndroidPostprocess : IPostGenerateGradleAndroidProject
+    {
+        public int callbackOrder => 100;
+
+        public void OnPostGenerateGradleAndroidProject(string unityLibraryPath)
+        {
+            string src = Path.GetFullPath("Assets/google-services.json");
+            if (!File.Exists(src))
+            {
+                Debug.LogWarning("[OurWorld Android Postprocess] Assets/google-services.json not found — Firebase Crashlytics will be skipped.");
+                return;
+            }
+
+            DirectoryInfo parent = Directory.GetParent(unityLibraryPath);
+            if (parent == null) return;
+
+            string launcherDir = Path.Combine(parent.FullName, "launcher");
+            if (Directory.Exists(launcherDir))
+            {
+                string dst = Path.Combine(launcherDir, "google-services.json");
+                File.Copy(src, dst, overwrite: true);
+                Debug.Log($"[OurWorld Android Postprocess] Copied google-services.json -> {dst}");
+            }
+        }
+    }
+#endif
+
 #if UNITY_EDITOR_OSX
     /// <summary>
-    /// Automatically configures exported iOS Xcode Info.plist for TestFlight & notched iPhone landscape safety.
+    /// Automatically configures exported iOS Xcode Info.plist, GoogleService-Info.plist,
+    /// Firebase Crashlytics SPM dependencies (FirebaseCore, FirebaseCrashlytics, FirebaseAnalytics),
+    /// -ObjC linker flags, DWARF with dSYM, and the Crashlytics dSYM upload Run Script phase.
     /// </summary>
     public class GridroamIosPostprocess : IPostprocessBuildWithReport
     {
+        private const string FirebaseIosSdkUrl = "https://github.com/firebase/firebase-ios-sdk";
+        private const string FirebaseIosSdkVersion = "13.2.0";
+
         public int callbackOrder => 100;
 
         public void OnPostprocessBuild(BuildReport report)
@@ -244,7 +311,105 @@ namespace Gridroam.Editor
             root.SetBoolean("UIRequiresFullScreen", true);
 
             plist.WriteToFile(plistPath);
-            Debug.Log("[OurWorld iOS Postprocess] Updated Info.plist (CFBundleDisplayName=OurWorld, ITSAppUsesNonExemptEncryption=false, UIRequiresFullScreen=true).");
+
+            // Copy GoogleService-Info.plist into exported Xcode project
+            string firebasePlistSrc = Path.GetFullPath("Assets/GoogleService-Info.plist");
+            string firebasePlistDst = Path.Combine(report.summary.outputPath, "GoogleService-Info.plist");
+            bool hasFirebasePlist = File.Exists(firebasePlistSrc);
+            if (hasFirebasePlist)
+            {
+                File.Copy(firebasePlistSrc, firebasePlistDst, overwrite: true);
+            }
+
+            string pbxPath = PBXProject.GetPBXProjectPath(report.summary.outputPath);
+            if (File.Exists(pbxPath))
+            {
+                PBXProject pbx = new PBXProject();
+                pbx.ReadFromFile(pbxPath);
+                string mainTarget = pbx.GetUnityMainTargetGuid();
+                string frameworkTarget = pbx.GetUnityFrameworkTargetGuid();
+
+                if (hasFirebasePlist)
+                {
+                    string fileGuid = pbx.AddFile("GoogleService-Info.plist", "GoogleService-Info.plist", PBXSourceTree.Source);
+                    pbx.AddFileToBuild(mainTarget, fileGuid);
+                }
+
+                // Mandatory Firebase static framework linker flag (-ObjC) & dSYM generation for Crashlytics
+                pbx.AddBuildProperty(mainTarget, "OTHER_LDFLAGS", "-ObjC");
+                pbx.AddBuildProperty(frameworkTarget, "OTHER_LDFLAGS", "-ObjC");
+                pbx.SetBuildProperty(mainTarget, "DEBUG_INFORMATION_FORMAT", "dwarf-with-dsym");
+                pbx.SetBuildProperty(frameworkTarget, "DEBUG_INFORMATION_FORMAT", "dwarf-with-dsym");
+
+                // Official Firebase Crashlytics dSYM upload Run Script Build Phase
+                pbx.AddShellScriptBuildPhase(
+                    mainTarget,
+                    "Firebase Crashlytics dSYM Upload",
+                    "/bin/sh",
+                    "\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"",
+                    new List<string>
+                    {
+                        "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+                        "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+                        "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+                        "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+                        "$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+                        "$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)"
+                    });
+
+                pbx.WriteToFile(pbxPath);
+            }
+
+            // Wire FirebaseCore + FirebaseCrashlytics + FirebaseAnalytics via Swift Package Manager helper if available
+            TryAttachFirebaseSpm(report.summary.outputPath, hasFirebasePlist ? firebasePlistDst : null);
+
+            Debug.Log("[OurWorld iOS Postprocess] Configured Info.plist, GoogleService-Info.plist, -ObjC, dSYM upload phase, and FirebaseCrashlytics SPM.");
+        }
+
+        private static void TryAttachFirebaseSpm(string xcodeOutputDir, string plistPath)
+        {
+            string xcodeProj = Path.Combine(xcodeOutputDir, "Unity-iPhone.xcodeproj");
+            string spmToolDir = Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+                ".gemini/config/plugins/firebase/skills/xcode_project_setup/scripts/xcode_spm_setup");
+
+            if (!Directory.Exists(xcodeProj) || !Directory.Exists(spmToolDir))
+            {
+                return;
+            }
+
+            string plistArg = !string.IsNullOrEmpty(plistPath) ? $" --plist \"{plistPath}\"" : string.Empty;
+            string args = $"run --package-path \"{spmToolDir}\" xcode_spm_setup \"{xcodeProj}\" {FirebaseIosSdkUrl} {FirebaseIosSdkVersion}{plistArg} FirebaseCore FirebaseCrashlytics FirebaseAnalytics";
+
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo("swift", args)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+                using (Process proc = Process.Start(psi))
+                {
+                    if (proc == null) return;
+                    string stdout = proc.StandardOutput.ReadToEnd();
+                    string stderr = proc.StandardError.ReadToEnd();
+                    proc.WaitForExit(120000);
+                    if (proc.ExitCode == 0)
+                    {
+                        Debug.Log($"[OurWorld iOS Postprocess] Swift Package FirebaseCrashlytics linked successfully.\n{stdout}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[OurWorld iOS Postprocess] xcode_spm_setup exited with {proc.ExitCode}: {stderr}");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[OurWorld iOS Postprocess] Swift SPM setup skipped: {ex.Message}");
+            }
         }
     }
 #endif

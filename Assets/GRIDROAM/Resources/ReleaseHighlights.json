@@ -1,0 +1,44 @@
+{
+  "version": "1.0.0",
+  "buildCode": 1,
+  "headerTr": "YENİ SÜRÜMDE EKLENDİ · v1.0.0",
+  "headerEn": "NEW IN THIS UPDATE · v1.0.0",
+  "items": [
+    {
+      "id": "hamidiye_8_avenues",
+      "category": "world",
+      "requestedBy": "OurWorld Topluluğu",
+      "titleTr": "8 Ana Cadde & Saat Kulesi Meydanı",
+      "titleEn": "8 Main Avenues & Clock Tower Plaza",
+      "descriptionTr": "Fatih Bulvarı, Atatürk Cd., Petrol Yolu, Aziziye, Eyyubi, Mürşit, Seyyid Kutup ve Zübeyde Hanım caddeleri gerçek sokak görünümüyle oyuna eklendi!",
+      "descriptionEn": "8 real-inspired avenues including Fatih Boulevard's iconic Clock Tower Plaza, commercial strips, and live GPS street announcements are now open to explore!"
+    },
+    {
+      "id": "mosque_interiors_life",
+      "category": "mechanic",
+      "requestedBy": "İlk Test Oyuncuları",
+      "titleTr": "Girilebilir Hz. Osman Camii, Sokak Futbolu & Kediler",
+      "titleEn": "Walk-In Landmarks, Street Football & Cats",
+      "descriptionTr": "Evlere, dükkânlara ve Hz. Osman Camii'ne yürüyerek gir; mahalle sahasında gol at, İstanbul sokak kedilerini sev ve gün/gece ışıklarını keşfet!",
+      "descriptionEn": "Walk straight into homes, shops & landmarks, score goals on the street pitch, pet friendly street cats, and cruise under glowing night streetlamps!"
+    },
+    {
+      "id": "cars_drift_radio",
+      "category": "vehicle",
+      "requestedBy": "Sürüş Tutkunları",
+      "titleTr": "Drift ile Nitro, Türkçe Radyo & Araç Hasarı",
+      "titleEn": "Drift-to-Nitro, Car Radio & Crash Physics",
+      "descriptionTr": "İstediğin araca bin, drift yaparak nitro doldur, korna çal, farları yak ve 3 kanallı araç radyosunu dinleyerek sokakları turla!",
+      "descriptionEn": "Hop into any parked car, drift to charge your nitro boost, honk the horn, toggle headlights, and switch between 3 car radio stations!"
+    },
+    {
+      "id": "your_name_next",
+      "category": "community",
+      "requestedBy": "Sıradaki İsim SEN Olabilirsin!",
+      "titleTr": "İsteğini Yaz, Yeni Sürümde İsmin Burada Görünsün!",
+      "titleEn": "Suggest a Feature, See Your Name Here Next!",
+      "descriptionTr": "Telefonundaki Öneri sekmesinden oyunda görmek istediğin özelliği ve takma adını yaz. Eklediğimiz her özellikte isteyen oyuncunun adı burada yer alacak!",
+      "descriptionEn": "Open the Phone's Ideas tab and share what you want built next. Every shipped community idea credits the player who requested it right on this screen!"
+    }
+  ]
+}

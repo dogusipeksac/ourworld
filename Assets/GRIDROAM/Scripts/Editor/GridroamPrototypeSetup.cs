@@ -93,7 +93,7 @@ namespace Gridroam.Editor
 
         public static void ConfigureCrossPlatformMobileSettings()
         {
-            const string bundleId = "com.dogusstore.ourworld";
+            const string bundleId = "com.dogusipeksac.ourworld";
 
             PlayerSettings.companyName = "Dogus Store";
             PlayerSettings.productName = "OurWorld";
@@ -132,6 +132,21 @@ namespace Gridroam.Editor
             PlayerSettings.iOS.requiresFullScreen = true;
 
             ApplyStoreAppIcons();
+            SyncBuildInfoResource();
+        }
+
+        private static void SyncBuildInfoResource()
+        {
+            string buildInfoPath = $"{RootDir}/Resources/OurWorldBuildInfo.txt";
+            string dir = Path.GetDirectoryName(buildInfoPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            int androidCode = Mathf.Max(1, PlayerSettings.Android.bundleVersionCode);
+            string iosBuild = string.IsNullOrWhiteSpace(PlayerSettings.iOS.buildNumber) ? "1" : PlayerSettings.iOS.buildNumber.Trim();
+            string content = $"android={androidCode}\nios={iosBuild}\n";
+            if (!File.Exists(buildInfoPath) || File.ReadAllText(buildInfoPath) != content)
+            {
+                File.WriteAllText(buildInfoPath, content);
+            }
         }
 
         public static void ApplyStoreAppIcons()

@@ -273,6 +273,12 @@ namespace Gridroam.UI
             Open();
         }
 
+        public void OpenFeedbackTab()
+        {
+            if (!IsOpen) Open();
+            SelectTab(3);
+        }
+
         public void Open()
         {
             if (panelRoot == null) return;

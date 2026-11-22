@@ -289,7 +289,20 @@
     { "key": "feedback.empty", "value": "Lütfen en az 5 karakterlik bir öneri yaz." },
     { "key": "feedback.too_soon", "value": "Biraz bekle, az önce öneri gönderdin." },
     { "key": "feedback.error", "value": "Gönderilemedi, daha sonra tekrar denenecek." },
-    { "key": "feedback.privacy", "value": "Yalnızca yazdığın metin, oyun sürümü ve cihaz modeli anonim olarak gönderilir." },
+    { "key": "feedback.privacy", "value": "Takma adın, mesajın ve oyun sürümün anonim olarak Firestore'a kaydedilir." },
+    { "key": "feedback.name_placeholder", "value": "Adın / Takma ad (isteğe bağlı)" },
+    { "key": "feedback.feed_title", "value": "Canlı Oyuncu Mesajları" },
+    { "key": "feedback.refresh", "value": "Yenile" },
+    { "key": "update.maintenance_eyebrow", "value": "BAKIM ÇALIŞMASI" },
+    { "key": "update.force_eyebrow", "value": "ZORUNLU GÜNCELLEME" },
+    { "key": "update.soft_eyebrow", "value": "YENİ SÜRÜM" },
+    { "key": "update.retry", "value": "TEKRAR DENE" },
+    { "key": "whatsnew.btn", "value": "Yenilikler" },
+    { "key": "whatsnew.skip", "value": "ATLA  ✕" },
+    { "key": "whatsnew.next", "value": "SONRAKİ  →" },
+    { "key": "whatsnew.play", "value": "OYUNA BAŞLA!" },
+    { "key": "whatsnew.suggest", "value": "SEN DE FİKİR YAZ" },
+    { "key": "whatsnew.swipe_hint", "value": "←  Kaydırarak diğer özellikleri gör  →" },
     { "key": "ui.btn.attack", "value": "Vur" }
   ]
 }
