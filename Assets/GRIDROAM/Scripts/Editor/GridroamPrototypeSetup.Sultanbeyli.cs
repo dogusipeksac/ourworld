@@ -64,7 +64,10 @@ namespace Gridroam.Editor
             // 9. Interactive Gameplay Mechanics: Street Football Pitch, Mahalle ATMs & Grab/Throw Damacana Props!
             BuildSelmanInteractiveMechanics(root.transform, mats);
 
-            // 10. Clean perimeter bounds framing the completed Selman Sokağı corridor
+            // 10. Photo-Matched 1-to-1 Google Street View Expansion: Hamidiye Mahallesi's 8 Main Avenues!
+            BuildHamidiyeEightMainAvenues(root.transform, mats, seats);
+
+            // 11. Clean perimeter bounds framing Hamidiye Mahallesi's 8 main avenues & Selman Sokağı core
             BuildSelmanCorridorBoundary(root.transform, mats);
 
             return stopLines;
@@ -1772,13 +1775,13 @@ namespace Gridroam.Editor
 
         private static void BuildSelmanCorridorBoundary(Transform parent, MaterialSet mats)
         {
-            GameObject boundRoot = new GameObject("Selman_CorridorPerimeter");
+            GameObject boundRoot = new GameObject("Hamidiye_DistrictPerimeter");
             boundRoot.transform.SetParent(parent, false);
 
-            CreateStaticBlock("Bound_North", boundRoot.transform, new Vector3(6f, 1.2f, 36f), new Vector3(256f, 2.4f, 0.8f), mats.TownHedge);
-            CreateStaticBlock("Bound_South", boundRoot.transform, new Vector3(6f, 1.2f, -58f), new Vector3(256f, 2.4f, 0.8f), mats.TownHedge);
-            CreateStaticBlock("Bound_West", boundRoot.transform, new Vector3(-118f, 1.2f, -11f), new Vector3(0.8f, 2.4f, 96f), mats.TownHedge);
-            CreateStaticBlock("Bound_East", boundRoot.transform, new Vector3(130f, 1.2f, -11f), new Vector3(0.8f, 2.4f, 96f), mats.TownHedge);
+            CreateStaticBlock("Bound_North", boundRoot.transform, new Vector3(-8f, 1.2f, 174f), new Vector3(390f, 2.4f, 0.8f), mats.TownHedge);
+            CreateStaticBlock("Bound_South", boundRoot.transform, new Vector3(-8f, 1.2f, -170f), new Vector3(390f, 2.4f, 0.8f), mats.TownHedge);
+            CreateStaticBlock("Bound_West", boundRoot.transform, new Vector3(-202f, 1.2f, 2f), new Vector3(0.8f, 2.4f, 346f), mats.TownHedge);
+            CreateStaticBlock("Bound_East", boundRoot.transform, new Vector3(186f, 1.2f, 2f), new Vector3(0.8f, 2.4f, 346f), mats.TownHedge);
         }
 
         private static GameObject PlaceSelmanModel(

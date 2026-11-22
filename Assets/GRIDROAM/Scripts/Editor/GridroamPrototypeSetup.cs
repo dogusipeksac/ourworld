@@ -2191,6 +2191,7 @@ namespace Gridroam.Editor
             systems.AddComponent<InputHub>();
             systems.AddComponent<PerformanceMonitor>();
             systems.AddComponent<DayNightCycle>();
+            systems.AddComponent<StreetNameTracker>();
 
             GraphicsProfileManager gfxMgr = systems.AddComponent<GraphicsProfileManager>();
             gfxMgr.ConfigureAssets(lowUrp, medUrp);

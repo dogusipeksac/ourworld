@@ -266,8 +266,8 @@ namespace Gridroam.Player
                 SedanVehicleController targetCar = FindVehicleBySaveId(data.savedVehicleId);
                 if (targetCar != null && (targetCar != playerSedan || HasVehicleKeys))
                 {
-                    bool carPosValid = data.savedVehiclePosX >= -112f && data.savedVehiclePosX <= 124f &&
-                                       data.savedVehiclePosZ >= -54f && data.savedVehiclePosZ <= 32f &&
+                    bool carPosValid = data.savedVehiclePosX >= -196f && data.savedVehiclePosX <= 180f &&
+                                       data.savedVehiclePosZ >= -166f && data.savedVehiclePosZ <= 170f &&
                                        data.savedVehiclePosY >= -0.5f && data.savedVehiclePosY <= 12f;
                     Vector3 vPos = carPosValid
                         ? new Vector3(data.savedVehiclePosX, Mathf.Max(0.24f, data.savedVehiclePosY), data.savedVehiclePosZ)
@@ -282,8 +282,8 @@ namespace Gridroam.Player
 
             if (footController != null)
             {
-                bool footPosValid = data.playerPosX >= -112f && data.playerPosX <= 124f &&
-                                    data.playerPosZ >= -54f && data.playerPosZ <= 32f &&
+                bool footPosValid = data.playerPosX >= -196f && data.playerPosX <= 180f &&
+                                    data.playerPosZ >= -166f && data.playerPosZ <= 170f &&
                                     data.playerPosY >= -0.5f && data.playerPosY <= 12f;
                 Vector3 fPos = footPosValid
                     ? new Vector3(data.playerPosX, Mathf.Max(0.10f, data.playerPosY), data.playerPosZ)
@@ -314,7 +314,10 @@ namespace Gridroam.Player
 
         private static readonly (string label, Vector3 pos, float yaw)[] FastTravelSpots =
         {
+            ("Fatih Bulvarı · Saat Kulesi",      new Vector3(  0.0f, 0.18f, 134.0f),   0f),
             ("Hz. Osman Camii Avlusu",           new Vector3( 82.0f, 0.12f, -24.0f), 180f),
+            ("Petrol Yolu Caddesi",              new Vector3(-18.0f, 0.12f, -78.0f),  90f),
+            ("Aziziye Cd. · İlkokul",            new Vector3(-16.0f, 0.12f,-114.0f), 180f),
             ("No:58 Selman Bakkal & ATM",        new Vector3(  6.5f, 0.12f,   4.5f),   0f),
             ("Gürsu Sk. Mahalle Futbol Sahası",  new Vector3(-41.0f, 0.12f,  -8.5f), 180f),
             ("No:73 Oto Tamir",                  new Vector3( 24.0f, 0.12f,   4.2f),   0f),

@@ -23,9 +23,9 @@ namespace Gridroam.UI
     {
         public static PhonePanelController Instance { get; private set; }
 
-        public const float ViewWorldMinX = -120f;
-        public const float ViewWorldMinZ = -120f;
-        public const float ViewWorldSpan = 248f;
+        public const float ViewWorldMinX = -198f;
+        public const float ViewWorldMinZ = -188f;
+        public const float ViewWorldSpan = 380f;
 
         [Header("Root & Tabs")]
         [SerializeField] private GameObject panelRoot;
