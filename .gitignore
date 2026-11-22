@@ -58,3 +58,4 @@ Thumbs.db
 # Firebase admin credentials & feedback tooling
 *-firebase-adminsdk-*.json
 .venv/
+*.blend1

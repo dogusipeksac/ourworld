@@ -289,6 +289,7 @@
     { "key": "feedback.empty", "value": "Lütfen en az 5 karakterlik bir öneri yaz." },
     { "key": "feedback.too_soon", "value": "Biraz bekle, az önce öneri gönderdin." },
     { "key": "feedback.error", "value": "Gönderilemedi, daha sonra tekrar denenecek." },
-    { "key": "feedback.privacy", "value": "Yalnızca yazdığın metin, oyun sürümü ve cihaz modeli anonim olarak gönderilir." }
+    { "key": "feedback.privacy", "value": "Yalnızca yazdığın metin, oyun sürümü ve cihaz modeli anonim olarak gönderilir." },
+    { "key": "ui.btn.attack", "value": "Vur" }
   ]
 }

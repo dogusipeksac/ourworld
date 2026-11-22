@@ -289,6 +289,7 @@
     { "key": "feedback.empty", "value": "Please write at least 5 characters." },
     { "key": "feedback.too_soon", "value": "Please wait a moment, you just sent one." },
     { "key": "feedback.error", "value": "Couldn't send, we'll retry later." },
-    { "key": "feedback.privacy", "value": "Only your text, game version and device model are sent anonymously." }
+    { "key": "feedback.privacy", "value": "Only your text, game version and device model are sent anonymously." },
+    { "key": "ui.btn.attack", "value": "Punch" }
   ]
 }

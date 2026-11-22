@@ -271,35 +271,46 @@ def build_torso_mesh(mats, variant="male"):
     is_female = (variant == "female")
     is_worker = (variant == "worker")
 
-    waist_w = 0.144 if is_female else 0.162
-    chest_w = 0.184 if is_female else 0.214
-    shldr_w = 0.188 if is_female else 0.216
-    chest_f = 0.146 if is_female else 0.150
-    chest_b = 0.124 if is_female else 0.136
+    # v13: anatomical V-taper — narrow waist, full chest, sloped trapezius rolling into the
+    # shoulder pivot (x≈0.20 male / 0.174 female at z=0.382) so arms read as attached, not boxy.
+    def torso_profile(inflate):
+        if is_female:
+            base = [
+                (-0.050, 0.150, 0.118, 0.124, -0.002),
+                (0.040,  0.128, 0.108, 0.112, 0.000),   # natural waist
+                (0.140,  0.140, 0.118, 0.116, 0.003),
+                (0.230,  0.160, 0.148, 0.120, 0.008),   # bust
+                (0.300,  0.168, 0.150, 0.124, 0.008),
+                (0.350,  0.176, 0.128, 0.122, 0.004),
+                (0.392,  0.172, 0.108, 0.110, 0.002),
+                (0.425,  0.132, 0.090, 0.096, 0.000),
+                (0.455,  0.094, 0.078, 0.084, -0.002),
+                (0.480,  0.068, 0.066, 0.072, -0.003),
+            ]
+        else:
+            base = [
+                (-0.050, 0.162, 0.124, 0.130, -0.002),
+                (0.050,  0.152, 0.120, 0.122, 0.000),   # waist
+                (0.150,  0.166, 0.130, 0.126, 0.003),
+                (0.240,  0.188, 0.142, 0.132, 0.006),   # lower chest
+                (0.310,  0.200, 0.150, 0.138, 0.008),   # pecs
+                (0.355,  0.206, 0.138, 0.134, 0.004),
+                (0.395,  0.200, 0.118, 0.120, 0.002),   # deltoid / acromion
+                (0.428,  0.150, 0.098, 0.104, 0.000),   # trapezius slope
+                (0.456,  0.108, 0.084, 0.090, -0.002),
+                (0.480,  0.076, 0.074, 0.080, -0.003),
+            ]
+        return [(z, rx + inflate, f + inflate, b + inflate, y, 0.0) for (z, rx, f, b, y) in base]
 
     # Inner undershirt core (full realistic ribcage depth — zero cardboard-thin silhouette!)
-    inner_specs = [
-        (-0.005, waist_w - 0.005, 0.108, 0.112, 0.0, 0.0),
-        (0.14,   waist_w + 0.006, 0.126, 0.118, 0.004, 0.0),
-        (0.29,   chest_w - 0.014, chest_f + 0.002, chest_b - 0.010, 0.006, 0.0),
-        (0.39,   shldr_w - 0.036, 0.106, 0.104, 0.002, 0.0),
-        (0.44,   0.104, 0.086, 0.088, 0.0, 0.0),
-        (0.475,  0.072, 0.070, 0.072, 0.0, 0.0),
-    ]
+    inner_specs = torso_profile(-0.012)
     inner_mat = mats["CharShirt"] if is_worker else mats["CharUndershirt"]
-    parts.append(loft_oval_rings("Torso_Inner", inner_specs, 18, inner_mat, smooth_angle=68.0, subsurf_levels=1))
+    parts.append(loft_oval_rings("Torso_Inner", inner_specs, 16 if not is_worker else 20, inner_mat, smooth_angle=68.0, subsurf_levels=0 if not is_worker else 1))
+    chest_f = inner_specs[4][2] + 0.012
 
     # Main outer sculpted jacket / shirt shell with natural sloped trapezius shoulders & clean hem
     if is_worker:
-        jacket_specs = [
-            (-0.022, waist_w + 0.020, 0.130, 0.134, 0.0, 0.0),
-            (0.06,   waist_w + 0.016, 0.130, 0.130, 0.002, 0.0),
-            (0.19,   (waist_w + chest_w) * 0.5 + 0.010, 0.142, 0.136, 0.005, 0.0),
-            (0.31,   chest_w + 0.010, chest_f + 0.010, chest_b + 0.010, 0.006, 0.0),
-            (0.388,  shldr_w + 0.008, 0.122, 0.122, 0.002, 0.0),
-            (0.438,  0.122, 0.098, 0.102, 0.0, 0.0),
-            (0.474,  0.090, 0.084, 0.086, -0.003, 0.0),
-        ]
+        jacket_specs = torso_profile(0.010)
         parts.append(loft_oval_rings("Torso_WorkJacket", jacket_specs, 20, mats["CharShirt"], smooth_angle=68.0, subsurf_levels=1))
         parts.append(add_bevel_box("Work_ZipPlacket", (0.0, chest_f + 0.010, 0.21), (0.024, 0.014, 0.41), mats["CharBelt"], bevel=0.004, segments=1))
         for sx in (-1.0, 1.0):
@@ -308,16 +319,9 @@ def build_torso_mesh(mats, variant="male"):
     else:
         # Open-front casual jacket: sculpted lapel drape & rich athletic chest volume
         bm = bmesh.new()
-        segs = 22
-        ring_specs = [
-            (-0.052, waist_w + 0.026, 0.136, 0.144, -0.002, 0.0),
-            (0.03,   waist_w + 0.020, 0.132, 0.136, 0.0, 0.0),
-            (0.16,   (waist_w + chest_w) * 0.5 + 0.010, 0.140, 0.136, 0.004, 0.0),
-            (0.30,   chest_w + 0.010, chest_f + 0.012, chest_b + 0.012, 0.006, 0.0),
-            (0.388,  shldr_w + 0.006, 0.122, 0.122, 0.002, 0.0),
-            (0.438,  0.120, 0.098, 0.102, 0.0, 0.0),
-            (0.474,  0.090, 0.084, 0.088, -0.004, 0.0),
-        ]
+        segs = 20
+        ring_specs = torso_profile(0.012)
+        ring_specs[0] = (ring_specs[0][0] - 0.004, ring_specs[0][1] + 0.010, ring_specs[0][2] + 0.008, ring_specs[0][3] + 0.010, ring_specs[0][4], 0.0)  # relaxed hem flare
         jacket_angles = [math.radians(108.0 + (s / (segs - 1)) * 324.0) for s in range(segs)]
         out_rings, in_rings = [], []
         thick = 0.015
@@ -354,12 +358,14 @@ def build_torso_mesh(mats, variant="male"):
 
 
 def build_neck_mesh(mats):
+    # v13: sturdier neck flaring into the trapezius so it no longer reads as a thin stalk
     specs = [
-        (-0.010, 0.062, 0.062, 0.060, 0.0, 0.0),
-        (0.035,  0.052, 0.054, 0.054, 0.002, 0.0),
-        (0.095,  0.056, 0.058, 0.058, 0.004, 0.0),
+        (-0.030, 0.080, 0.070, 0.078, -0.004, 0.0),
+        (0.005,  0.066, 0.062, 0.066, 0.0, 0.0),
+        (0.040,  0.058, 0.058, 0.060, 0.002, 0.0),
+        (0.095,  0.058, 0.060, 0.060, 0.004, 0.0),
     ]
-    return loft_oval_rings("Neck_Mesh", specs, 14, mats["CharSkin"], smooth_angle=65.0)
+    return loft_oval_rings("Neck_Mesh", specs, 16, mats["CharSkin"], smooth_angle=65.0)
 
 
 def build_head_mesh(mats, variant="male"):
@@ -373,9 +379,11 @@ def build_head_mesh(mats, variant="male"):
     z_shift = -0.022  # Natural proportional neck length!
 
     # Anatomically lofted head & jaw silhouette
+    # v13: rounder, defined chin instead of a pointed tip
     head_specs = [
-        (0.002 + z_shift, 0.026, 0.046, 0.022, 0.024, 0.0),
-        (0.026 + z_shift, jaw_w * 0.82, 0.078, 0.052, 0.016, 0.0),
+        (-0.004 + z_shift, 0.030, 0.040, 0.024, 0.040, 0.0),
+        (0.010 + z_shift, jaw_w * 0.62, 0.070, 0.040, 0.022, 0.0),
+        (0.026 + z_shift, jaw_w * 0.86, 0.082, 0.056, 0.016, 0.0),
         (0.056 + z_shift, jaw_w, 0.092, 0.076, 0.012, 0.0),
         (0.092 + z_shift, cheek_w, 0.102, 0.096, 0.008, 0.0),
         (0.128 + z_shift, brow_w, 0.105, 0.106, 0.004, 0.0),
@@ -484,27 +492,42 @@ def build_head_mesh(mats, variant="male"):
             (0.224 + z_shift, 0.050, 0.058, 0.064, 0.000, 0.0),
         ]
         parts.append(loft_oval_rings("Hair_MaleBase", hair_specs, 20, mats["CharHair"], smooth_angle=68.0, subsurf_levels=1))
-        parts.append(add_ellipsoid("Hair_MaleTopSweep", (0.010, 0.042, 0.204 + z_shift), (0.068, 0.058, 0.026), mats["CharHair"], segs=14, rings=8, rot_euler=(-0.14, 0.10, -0.14)))
+        # v13: fuller textured quiff + side-swept fringe + sideburns (breaks the helmet silhouette)
+        parts.append(add_ellipsoid("Hair_MaleTopSweep", (0.012, 0.030, 0.214 + z_shift), (0.078, 0.084, 0.034), mats["CharHair"], segs=16, rings=10, rot_euler=(-0.10, 0.08, -0.12)))
+        parts.append(add_ellipsoid("Hair_MaleQuiff", (0.020, 0.074, 0.206 + z_shift), (0.060, 0.034, 0.030), mats["CharHair"], segs=14, rings=8, rot_euler=(-0.45, 0.12, -0.20)))
+        for sx in (-1.0, 1.0):
+            parts.append(add_ellipsoid(f"Hair_MaleTuft_{sx}", (sx * 0.050, 0.010, 0.214 + z_shift), (0.036, 0.060, 0.022), mats["CharHair"], segs=10, rings=6, rot_euler=(0.0, sx * 0.30, 0.0)))
+            parts.append(add_bevel_box(f"Hair_Sideburn_{sx}", (sx * 0.086, 0.020, 0.112 + z_shift), (0.010, 0.020, 0.044), mats["CharHair"], bevel=0.004, segments=1))
 
-    return join_parts_at_origin(parts, "Head_Mesh")
+    head = join_parts_at_origin(parts, "Head_Mesh")
+    # v13: slightly larger head for natural adult proportions next to the broader torso
+    head.scale = Vector((1.07, 1.07, 1.07))
+    bpy.ops.object.select_all(action="DESELECT")
+    head.select_set(True)
+    bpy.context.view_layer.objects.active = head
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return head
 
 
 def build_upper_arm_mesh(mats, is_female=False):
     parts = []
-    r_sh = 0.056 if is_female else 0.064
-    r_mid = 0.050 if is_female else 0.058
-    r_el = 0.047 if is_female else 0.054
+    r_sh = 0.052 if is_female else 0.058
+    r_mid = 0.047 if is_female else 0.054
+    r_el = 0.044 if is_female else 0.050
     # Smooth overlapping elbow/shoulder ends (no sausage pinch under Subsurf!)
+    # v13: fuller elbow overlap so the joint never shows a gap when the forearm bends
     specs = [
-        (-0.325, r_el * 0.88, r_el * 0.88, r_el * 0.88, 0.0, 0.0),
-        (-0.295, r_el,        r_el,        r_el,        0.0, 0.0),
-        (-0.265, r_el * 1.02, r_el * 1.02, r_el * 1.02, 0.0, 0.0),
-        (-0.145, r_mid,       r_mid * 1.04, r_mid * 1.02, 0.0, 0.0),
-        (-0.040, r_sh,        r_sh * 1.02, r_sh * 1.02, 0.0, 0.0),
-        (0.005,  r_sh * 0.96, r_sh * 0.96, r_sh * 0.96, 0.0, 0.0),
-        (0.038,  r_sh * 0.72, r_sh * 0.74, r_sh * 0.74, 0.0, 0.0),
+        (-0.335, r_el * 0.94, r_el * 0.94, r_el * 0.94, 0.0, 0.0),
+        (-0.300, r_el,        r_el,        r_el * 1.02, 0.0, 0.0),
+        (-0.250, r_el * 1.02, r_el * 1.02, r_el * 1.04, 0.0, 0.0),
+        (-0.150, r_mid,       r_mid * 1.08, r_mid * 1.02, 0.002, 0.0),   # biceps
+        (-0.060, r_sh,        r_sh * 1.04, r_sh * 1.04, 0.0, 0.0),
+        (0.000,  r_sh * 0.98, r_sh * 0.98, r_sh * 0.98, 0.0, 0.0),
+        (0.036,  r_sh * 0.74, r_sh * 0.76, r_sh * 0.76, 0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("UpperArm_Sleeve", specs, 16, mats["CharShirt"], smooth_angle=70.0, subsurf_levels=1))
+    parts.append(loft_oval_rings("UpperArm_Sleeve", specs, 14, mats["CharShirt"], smooth_angle=70.0, subsurf_levels=1))
+    # v13: rounded deltoid cap — blends the arm into the sloped torso shoulder
+    parts.append(add_ellipsoid("UpperArm_Deltoid", (0.0, 0.0, -0.045), (r_sh * 1.05, r_sh * 1.06, 0.070), mats["CharShirt"], segs=12, rings=8))
     return join_parts_at_origin(parts, "UpperArm_Mesh")
 
 
@@ -512,15 +535,17 @@ def build_forearm_and_hand_mesh(mats, side_sign=1.0, is_female=False):
     parts = []
     r_el = 0.047 if is_female else 0.054
     r_wr = 0.032 if is_female else 0.037
+    r_el = 0.043 if is_female else 0.049
     sleeve_specs = [
-        (-0.225, r_wr + 0.009, r_wr + 0.009, r_wr + 0.009, 0.0, 0.0),
-        (-0.205, r_wr + 0.011, r_wr + 0.011, r_wr + 0.011, 0.0, 0.0),
-        (-0.100, r_el * 0.90,  r_el * 0.92,  r_el * 0.90,  0.0, 0.0),
-        (-0.015, r_el * 1.00,  r_el * 1.00,  r_el * 1.00,  0.0, 0.0),
-        (0.018,  r_el * 0.96,  r_el * 0.96,  r_el * 0.96,  0.0, 0.0),
-        (0.042,  r_el * 0.72,  r_el * 0.72,  r_el * 0.72,  0.0, 0.0),
+        (-0.228, r_wr + 0.008, r_wr + 0.008, r_wr + 0.008, 0.0, 0.0),
+        (-0.212, r_wr + 0.012, r_wr + 0.012, r_wr + 0.012, 0.0, 0.0),   # rolled cuff
+        (-0.150, r_wr + 0.012, r_wr + 0.013, r_wr + 0.012, 0.0, 0.0),
+        (-0.070, r_el * 0.96,  r_el * 0.98,  r_el * 0.96,  0.0, 0.0),   # forearm muscle
+        (-0.010, r_el * 1.00,  r_el * 1.00,  r_el * 1.02,  0.0, 0.0),
+        (0.025,  r_el * 0.98,  r_el * 0.98,  r_el * 0.98,  0.0, 0.0),
+        (0.050,  r_el * 0.82,  r_el * 0.82,  r_el * 0.82,  0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Forearm_Sleeve", sleeve_specs, 14, mats["CharShirt"], smooth_angle=66.0, subsurf_levels=1))
+    parts.append(loft_oval_rings("Forearm_Sleeve", sleeve_specs, 12, mats["CharShirt"], smooth_angle=66.0, subsurf_levels=1))
 
     wrist_specs = [
         (-0.258, r_wr * 0.92, r_wr * 0.82, r_wr * 0.82, 0.004, 0.0),
@@ -528,25 +553,34 @@ def build_forearm_and_hand_mesh(mats, side_sign=1.0, is_female=False):
     ]
     parts.append(loft_oval_rings("Wrist_Skin", wrist_specs, 12, mats["CharSkin"], smooth_angle=62.0, subsurf_levels=0))
 
-    palm_x = 0.026 if is_female else 0.030
-    palm_y = 0.068 if is_female else 0.076
-    parts.append(add_bevel_box("Hand_Palm", (0.0, 0.006, -0.292), (palm_x, palm_y, 0.076), mats["CharSkin"], bevel=0.010, segments=2))
-    parts.append(add_bevel_box(
-        "Hand_Fingers",
-        (-side_sign * 0.005, 0.008, -0.352),
-        (palm_x * 0.80, palm_y * 0.92, 0.070),
-        mats["CharSkin"],
-        bevel=0.008, segments=2,
-        rot_euler=(0.0, side_sign * 0.14, 0.0),
-    ))
-    parts.append(add_bevel_box(
-        "Hand_Thumb",
-        (-side_sign * 0.008, 0.046, -0.305),
-        (0.019, 0.022, 0.054),
-        mats["CharSkin"],
-        bevel=0.006, segments=1,
-        rot_euler=(-0.38, side_sign * 0.15, 0.0),
-    ))
+    # v13: sculpted relaxed hand — lofted palm, softly curled finger block with knuckle
+    # ridges and an opposed thumb (palm faces the body: thickness on X, width on Y).
+    k = 0.90 if is_female else 1.0
+    inward = -side_sign  # direction toward the body (palm side)
+    palm_specs = [
+        (-0.240, 0.017 * k, 0.026 * k, 0.026 * k, 0.000, 0.0),
+        (-0.270, 0.019 * k, 0.038 * k, 0.036 * k, 0.002, 0.0),
+        (-0.305, 0.019 * k, 0.044 * k, 0.042 * k, 0.003, inward * 0.002),
+        (-0.330, 0.017 * k, 0.044 * k, 0.042 * k, 0.003, inward * 0.004),
+    ]
+    parts.append(loft_oval_rings("Hand_Palm", palm_specs, 10, mats["CharSkin"], smooth_angle=66.0, subsurf_levels=1))
+    finger_specs = [
+        (-0.326, 0.016 * k, 0.043 * k, 0.041 * k, 0.003, inward * 0.004),
+        (-0.355, 0.015 * k, 0.041 * k, 0.039 * k, 0.003, inward * 0.010),
+        (-0.385, 0.013 * k, 0.037 * k, 0.034 * k, 0.002, inward * 0.019),
+        (-0.405, 0.010 * k, 0.028 * k, 0.026 * k, 0.001, inward * 0.027),
+    ]
+    parts.append(loft_oval_rings("Hand_Fingers", finger_specs, 10, mats["CharSkin"], smooth_angle=66.0, subsurf_levels=1))
+    for fi in range(3):  # subtle finger separation ridges across the knuckles
+        fy = (-0.024 + fi * 0.024) * k + 0.003
+        parts.append(add_ellipsoid(f"Hand_Knuckle_{fi}", (inward * -0.010, fy, -0.332), (0.006, 0.010 * k, 0.007), mats["CharSkin"], segs=6, rings=4))
+    thumb_specs = [
+        (-0.262, 0.012 * k, 0.014 * k, 0.014 * k, 0.034 * k, inward * 0.004),
+        (-0.292, 0.011 * k, 0.012 * k, 0.012 * k, 0.046 * k, inward * 0.010),
+        (-0.318, 0.009 * k, 0.010 * k, 0.010 * k, 0.050 * k, inward * 0.016),
+        (-0.334, 0.006 * k, 0.007 * k, 0.007 * k, 0.050 * k, inward * 0.019),
+    ]
+    parts.append(loft_oval_rings("Hand_Thumb", thumb_specs, 8, mats["CharSkin"], smooth_angle=66.0, subsurf_levels=0))
     return join_parts_at_origin(parts, "ForearmHand_Mesh")
 
 
@@ -554,16 +588,18 @@ def build_thigh_mesh(mats, is_female=False):
     r_top = 0.092 if is_female else 0.098
     r_mid = 0.084 if is_female else 0.090
     r_kn = 0.066 if is_female else 0.071
+    # v13: knee end stays full-width (no visible seam at the knee) + gentle quad/hamstring shape
     specs = [
-        (-0.468, r_kn * 0.86, r_kn * 0.88, r_kn * 0.86, 0.0, 0.0),
-        (-0.432, r_kn,        r_kn * 1.04, r_kn * 1.00, 0.002, 0.0),
-        (-0.395, r_kn * 1.02, r_kn * 1.06, r_kn * 1.02, 0.002, 0.0),
-        (-0.230, r_mid,       r_mid * 1.10, r_mid * 1.06, 0.004, 0.0),
-        (-0.060, r_top,       r_top * 1.06, r_top * 1.10, 0.0, 0.0),
-        (0.015,  r_top * 0.94, r_top * 0.96, r_top * 0.98, 0.0, 0.0),
-        (0.060,  r_top * 0.68, r_top * 0.70, r_top * 0.70, 0.0, 0.0),
+        (-0.478, r_kn * 0.94, r_kn * 0.98, r_kn * 0.94, 0.0, 0.0),
+        (-0.440, r_kn,        r_kn * 1.06, r_kn * 1.00, 0.002, 0.0),
+        (-0.380, r_kn * 1.04, r_kn * 1.08, r_kn * 1.02, 0.002, 0.0),
+        (-0.250, r_mid * 0.98, r_mid * 1.12, r_mid * 1.04, 0.006, 0.0),
+        (-0.120, r_mid * 1.04, r_mid * 1.12, r_mid * 1.10, 0.004, 0.0),
+        (-0.040, r_top,       r_top * 1.06, r_top * 1.12, 0.0, 0.0),
+        (0.020,  r_top * 0.94, r_top * 0.96, r_top * 0.98, 0.0, 0.0),
+        (0.062,  r_top * 0.70, r_top * 0.72, r_top * 0.72, 0.0, 0.0),
     ]
-    return loft_oval_rings("Thigh_Mesh", specs, 16, mats["CharPants"], smooth_angle=68.0, subsurf_levels=1)
+    return loft_oval_rings("Thigh_Mesh", specs, 14, mats["CharPants"], smooth_angle=68.0, subsurf_levels=1)
 
 
 def build_shin_mesh(mats, is_female=False):
@@ -576,10 +612,10 @@ def build_shin_mesh(mats, is_female=False):
         (-0.340, r_hem * 1.04, r_hem * 1.06, r_hem * 1.08, -0.002, 0.0),
         (-0.180, r_calf,       r_calf * 0.98, r_calf * 1.14, -0.006, 0.0),
         (-0.025, r_kn,         r_kn * 1.04,   r_kn * 1.00,   0.002, 0.0),
-        (0.020,  r_kn * 0.98,  r_kn * 1.00,   r_kn * 0.98,   0.0, 0.0),
-        (0.052,  r_kn * 0.76,  r_kn * 0.78,   r_kn * 0.76,   0.0, 0.0),
+        (0.025,  r_kn * 0.99,  r_kn * 1.02,   r_kn * 0.98,   0.0, 0.0),
+        (0.060,  r_kn * 0.86,  r_kn * 0.88,   r_kn * 0.86,   0.0, 0.0),
     ]
-    parts.append(loft_oval_rings("Shin_Trouser", specs, 16, mats["CharPants"], smooth_angle=68.0, subsurf_levels=1))
+    parts.append(loft_oval_rings("Shin_Trouser", specs, 14, mats["CharPants"], smooth_angle=68.0, subsurf_levels=1))
     sock_specs = [
         (-0.435, 0.042, 0.046, 0.046, 0.0, 0.0),
         (-0.385, 0.045, 0.049, 0.049, 0.0, 0.0),
@@ -591,20 +627,56 @@ def build_shin_mesh(mats, is_female=False):
 def build_foot_shoe_mesh(mats, is_worker=False):
     parts = []
     # Ankle pivot is at world z = 0.08 -> shoe sole bottom sits flat at local z = -0.080!
+    # v13: lofted sneaker / boot (rounded toe box, heel counter, padded collar) instead of stacked boxes
     sole_mat = mats["CharBelt"] if is_worker else mats["CharShoeSole"]
-    parts.append(add_bevel_box("Shoe_Sole", (0.0, 0.054, -0.069), (0.096, 0.244, 0.022), sole_mat, bevel=0.008, segments=2))
-    parts.append(add_bevel_box("Shoe_UpperMain", (0.0, 0.046, -0.037), (0.092, 0.224, 0.048), mats["CharShoes"], bevel=0.018, segments=2))
-    parts.append(add_ellipsoid("Shoe_ToeCap", (0.0, 0.140, -0.045), (0.044, 0.040, 0.023), mats["CharShoes"], segs=12, rings=8))
-    parts.append(add_bevel_box("Shoe_AnkleCollar", (0.0, -0.006, -0.003), (0.088, 0.104, 0.054), mats["CharShoes"], bevel=0.016, segments=2))
-    parts.append(add_bevel_box("Shoe_Tongue", (0.0, 0.064, -0.009), (0.058, 0.042, 0.020), sole_mat, bevel=0.007, segments=1, rot_euler=(-0.55, 0.0, 0.0)))
+    w = 1.06 if is_worker else 1.0
+    upper = [  # (y, half-width, z_bottom, z_top)
+        (-0.078, 0.030 * w, -0.068, -0.030),
+        (-0.068, 0.042 * w, -0.070, 0.006 if is_worker else -0.004),
+        (-0.035, 0.048 * w, -0.070, 0.022 if is_worker else 0.012),
+        (0.010,  0.049 * w, -0.070, 0.016 if is_worker else 0.006),
+        (0.060,  0.050 * w, -0.070, -0.016),
+        (0.110,  0.050 * w, -0.070, -0.032),
+        (0.150,  0.046 * w, -0.070, -0.040),
+        (0.180,  0.036 * w, -0.070, -0.047),
+        (0.196,  0.018 * w, -0.068, -0.054),
+    ]
+    parts.append(loft_superellipse_y("Shoe_Upper", upper, 14, mats["CharShoes"], exponent=2.4))
+    sole = [(y, hw + 0.004, -0.081, -0.064) for (y, hw, _, _) in upper[1:-1]]
+    sole = [(-0.080, 0.032 * w, -0.080, -0.064)] + sole + [(0.200, 0.022 * w, -0.078, -0.064)]
+    parts.append(loft_superellipse_y("Shoe_Sole", sole, 12, sole_mat, exponent=3.0, subsurf_levels=0))
+    parts.append(add_bevel_box("Shoe_Tongue", (0.0, 0.050, -0.006), (0.054, 0.050, 0.016), sole_mat if not is_worker else mats["CharShoes"], bevel=0.006, segments=1, rot_euler=(-0.42, 0.0, 0.0)))
     for li in range(3):
         parts.append(add_bevel_box(
             f"Shoe_Lace_{li}",
-            (0.0, 0.070 + li * 0.023, -0.015 - li * 0.008),
-            (0.054, 0.009, 0.007),
-            sole_mat, bevel=0.002, segments=1,
+            (0.0, 0.040 + li * 0.022, -0.004 - li * 0.009),
+            (0.058, 0.007, 0.006),
+            mats["CharShoeSole"], bevel=0.002, segments=1, rot_euler=(-0.42, 0.0, 0.0),
         ))
     return join_parts_at_origin(parts, "Foot_Shoe")
+
+
+def loft_superellipse_y(name, specs, segments, mat, exponent=2.5, subsurf_levels=1):
+    """Loft a closed rounded-rectangle tube along +Y. Each spec: (y, half_width, z_bottom, z_top)."""
+    bm = bmesh.new()
+    rings = []
+    for (y, hw, zb, zt) in specs:
+        zc, hz = (zb + zt) * 0.5, (zt - zb) * 0.5
+        ring = []
+        for s in range(segments):
+            a = 2.0 * math.pi * s / segments
+            ca, sa = math.cos(a), math.sin(a)
+            x = hw * math.copysign(abs(ca) ** (2.0 / exponent), ca)
+            z = zc + hz * math.copysign(abs(sa) ** (2.0 / exponent), sa)
+            ring.append(bm.verts.new(Vector((x, y, z))))
+        rings.append(ring)
+    for i in range(len(rings) - 1):
+        for s in range(segments):
+            sn = (s + 1) % segments
+            bm.faces.new((rings[i][s], rings[i][sn], rings[i + 1][sn], rings[i + 1][s]))
+    bm.faces.new(list(reversed(rings[0])))
+    bm.faces.new(rings[-1])
+    return make_obj_from_bm(name, bm, mat, smooth_angle=60.0, subsurf_levels=subsurf_levels)
 
 
 # ---------------------------------------------------------------------------
@@ -755,7 +827,11 @@ def render_character_showcase():
     bg = world.node_tree.nodes.get("Background")
     if bg:
         bg.inputs["Color"].default_value = (0.60, 0.72, 0.86, 1.0)
-        bg.inputs["Strength"].default_value = 0.85
+        bg.inputs["Strength"].default_value = 0.45
+    try:
+        bpy.context.scene.view_settings.view_transform = "AgX"
+    except TypeError:
+        pass
 
     sun1_d = bpy.data.lights.new("KeySun", type="SUN")
     sun1_d.energy = 3.2
