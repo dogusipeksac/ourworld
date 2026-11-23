@@ -269,6 +269,20 @@ namespace Gridroam.Editor
                 dirty = true;
             }
 
+            if (assetPath.Contains("/Weathering/"))
+            {
+                if (importer.maxTextureSize != 512)
+                {
+                    importer.maxTextureSize = 512;
+                    dirty = true;
+                }
+                if (!importer.alphaIsTransparency)
+                {
+                    importer.alphaIsTransparency = true;
+                    dirty = true;
+                }
+            }
+
             TextureImporterType targetType = isNormal ? TextureImporterType.NormalMap : TextureImporterType.Default;
             if (importer.textureType != targetType)
             {
@@ -535,6 +549,11 @@ namespace Gridroam.Editor
             public Material CharHairBlonde;
             public Material CharPantsDenim;
             public Material CharPantsKhaki;
+            public Material WeatherManholeGrime;
+            public Material WeatherAsphaltPatch;
+            public Material WeatherGutterStreak;
+            public Material WindowGlassBlue;
+            public Material WindowCurtain;
         }
 
         private enum BlenderCharacterVariant
@@ -566,21 +585,21 @@ namespace Gridroam.Editor
             MaterialSet set = new MaterialSet
             {
                 EveningSkybox = skyMat,
-                RoadAsphaltMain = CreatePbrMaterial("MAT_Road_Asphalt012", urpLit, "Asphalt012", new Color(0.72f, 0.72f, 0.76f), 0.34f, 0f, new Vector2(2f, 36f), 0.9f),
-                RoadAsphaltCross = CreatePbrMaterial("MAT_Road_Asphalt012_Cross", urpLit, "Asphalt012", new Color(0.72f, 0.72f, 0.76f), 0.34f, 0f, new Vector2(26f, 2f), 0.9f),
-                RoadMarkingWhite = CreateOrLoadMaterial("MAT_Road_Marking_White", urpLit, new Color(0.88f, 0.88f, 0.86f), 0.18f),
-                RoadMarkingYellow = CreateOrLoadMaterial("MAT_Road_Marking_Yellow", urpLit, new Color(0.92f, 0.72f, 0.18f), 0.22f),
-                Ground = CreatePbrMaterial("MAT_Ground_Urban", urpLit, "Concrete034", new Color(0.55f, 0.55f, 0.57f), 0.14f, 0f, new Vector2(22f, 64f), 0.7f),
-                Sidewalk = CreatePbrMaterial("MAT_Sidewalk_Paving", urpLit, "PavingStones070", new Color(0.84f, 0.82f, 0.80f), 0.18f, 0f, new Vector2(2f, 44f), 0.85f),
+                RoadAsphaltMain = CreatePbrMaterial("MAT_Road_Asphalt012", urpLit, "Asphalt012", new Color(0.58f, 0.59f, 0.62f), 0.13f, 0f, Vector2.one, 0.68f),
+                RoadAsphaltCross = CreatePbrMaterial("MAT_Road_Asphalt012_Cross", urpLit, "Asphalt012", new Color(0.58f, 0.59f, 0.62f), 0.13f, 0f, Vector2.one, 0.68f),
+                RoadMarkingWhite = CreateOrLoadMaterial("MAT_Road_Marking_White", urpLit, new Color(0.84f, 0.84f, 0.82f), 0.12f),
+                RoadMarkingYellow = CreateOrLoadMaterial("MAT_Road_Marking_Yellow", urpLit, new Color(0.86f, 0.68f, 0.20f), 0.14f),
+                Ground = CreatePbrMaterial("MAT_Ground_Urban", urpLit, "Concrete034", new Color(0.55f, 0.55f, 0.57f), 0.12f, 0f, new Vector2(22f, 64f), 0.7f),
+                Sidewalk = CreatePbrMaterial("MAT_Sidewalk_Paving", urpLit, "PavingStones070", new Color(0.80f, 0.78f, 0.76f), 0.12f, 0f, new Vector2(2f, 44f), 0.85f),
                 SeaWater = CreateOrLoadMaterial("MAT_Sea_Evening", urpLit, new Color(0.06f, 0.19f, 0.30f), 0.92f, 0.16f),
-                HarborDock = CreatePbrMaterial("MAT_Harbor_Dock", urpLit, "Concrete034", new Color(0.74f, 0.73f, 0.72f), 0.22f, 0f, new Vector2(10f, 6f), 0.95f),
-                GarageBrick = CreatePbrMaterial("MAT_Garage_Bricks", urpLit, "Bricks059", new Color(0.88f, 0.84f, 0.82f), 0.18f, 0f, new Vector2(3.5f, 2f), 1.0f),
+                HarborDock = CreatePbrMaterial("MAT_Harbor_Dock", urpLit, "Concrete034", new Color(0.74f, 0.73f, 0.72f), 0.16f, 0f, new Vector2(10f, 6f), 0.95f),
+                GarageBrick = CreatePbrMaterial("MAT_Garage_Bricks", urpLit, "Bricks059", new Color(0.84f, 0.80f, 0.78f), 0.14f, 0f, new Vector2(3.5f, 2f), 1.0f),
                 GarageRoofMetal = CreatePbrMaterial("MAT_Garage_RoofMetal", urpLit, "CorrugatedSteel005", new Color(0.52f, 0.55f, 0.58f), 0.42f, 0.55f, new Vector2(4f, 3f), 0.9f),
-                PlasterTrim = CreatePbrMaterial("MAT_Plaster_Trim", urpLit, "Plaster003", new Color(0.80f, 0.77f, 0.72f), 0.14f, 0f, new Vector2(3f, 2f), 0.7f),
-                BuildingFacadeA = CreatePbrMaterial("MAT_Building_FacadeA", urpLit, "Facade005", new Color(0.92f, 0.88f, 0.84f), 0.28f, 0.08f, new Vector2(2f, 2f), 0.95f),
-                BuildingFacadeB = CreatePbrMaterial("MAT_Building_FacadeB", urpLit, "Facade006", new Color(0.88f, 0.90f, 0.94f), 0.30f, 0.10f, new Vector2(2f, 2f), 0.95f),
-                BuildingFacadeC = CreatePbrMaterial("MAT_Building_FacadeC", urpLit, "Facade018A", new Color(0.94f, 0.86f, 0.82f), 0.26f, 0.08f, new Vector2(2f, 2f), 0.95f),
-                Concrete = CreatePbrMaterial("MAT_Concrete_Props", urpLit, "Concrete034", new Color(0.76f, 0.76f, 0.74f), 0.16f, 0f, new Vector2(3f, 1f), 0.85f),
+                PlasterTrim = CreatePbrMaterial("MAT_Plaster_Trim", urpLit, "Plaster003", new Color(0.78f, 0.75f, 0.70f), 0.09f, 0f, new Vector2(3.2f, 2.8f), 0.82f),
+                BuildingFacadeA = CreatePbrMaterial("MAT_Building_FacadeA", urpLit, "Facade005", new Color(0.92f, 0.88f, 0.84f), 0.24f, 0.08f, new Vector2(2f, 2f), 0.95f),
+                BuildingFacadeB = CreatePbrMaterial("MAT_Building_FacadeB", urpLit, "Facade006", new Color(0.88f, 0.90f, 0.94f), 0.24f, 0.10f, new Vector2(2f, 2f), 0.95f),
+                BuildingFacadeC = CreatePbrMaterial("MAT_Building_FacadeC", urpLit, "Facade018A", new Color(0.94f, 0.86f, 0.82f), 0.22f, 0.08f, new Vector2(2f, 2f), 0.95f),
+                Concrete = CreatePbrMaterial("MAT_Concrete_Props", urpLit, "Concrete034", new Color(0.68f, 0.68f, 0.66f), 0.10f, 0f, new Vector2(3.5f, 1.5f), 0.88f),
                 ContainerRed = CreatePbrMaterial("MAT_Container_Rust", urpLit, "CorrugatedSteel005", new Color(0.68f, 0.22f, 0.17f), 0.35f, 0.48f, new Vector2(3f, 1f), 1.0f),
                 ContainerBlue = CreatePbrMaterial("MAT_Container_Navy", urpLit, "CorrugatedSteel005", new Color(0.18f, 0.34f, 0.56f), 0.35f, 0.48f, new Vector2(3f, 1f), 1.0f),
                 ContainerOchre = CreatePbrMaterial("MAT_Container_Ochre", urpLit, "CorrugatedSteel005", new Color(0.76f, 0.56f, 0.18f), 0.35f, 0.48f, new Vector2(3f, 1f), 1.0f),
@@ -630,9 +649,9 @@ namespace Gridroam.Editor
                 PedShirtBurgundy = CreateOrLoadMaterial("MAT_Ped_Shirt_Burgundy", urpLit, new Color(0.44f, 0.14f, 0.24f), 0.20f),
                 TownWoodFloor = CreateOrLoadMaterial("MAT_Town_WoodFloor", urpLit, new Color(0.45f, 0.30f, 0.18f), 0.35f),
                 TownDoorWood = CreateOrLoadMaterial("MAT_Town_DoorWood", urpLit, new Color(0.28f, 0.17f, 0.10f), 0.32f),
-                TownInteriorPaintWarm = CreatePbrMaterial("MAT_Town_InteriorPaint_WarmWhite", urpLit, "Plaster003", new Color(0.95f, 0.93f, 0.88f), 0.14f, 0f, Vector2.one, 0.35f),
-                TownInteriorPaintCream = CreatePbrMaterial("MAT_Town_InteriorPaint_Cream", urpLit, "Plaster003", new Color(0.94f, 0.90f, 0.82f), 0.14f, 0f, Vector2.one, 0.35f),
-                TownInteriorPaintPearl = CreatePbrMaterial("MAT_Town_InteriorPaint_Pearl", urpLit, "Plaster003", new Color(0.91f, 0.92f, 0.90f), 0.14f, 0f, Vector2.one, 0.35f),
+                TownInteriorPaintWarm = CreatePbrMaterial("MAT_Town_InteriorPaint_WarmWhite", urpLit, "Plaster003", new Color(0.93f, 0.91f, 0.86f), 0.10f, 0f, new Vector2(2.6f, 2.6f), 0.48f),
+                TownInteriorPaintCream = CreatePbrMaterial("MAT_Town_InteriorPaint_Cream", urpLit, "Plaster003", new Color(0.90f, 0.86f, 0.78f), 0.09f, 0f, new Vector2(3.0f, 3.0f), 0.65f),
+                TownInteriorPaintPearl = CreatePbrMaterial("MAT_Town_InteriorPaint_Pearl", urpLit, "Plaster003", new Color(0.89f, 0.90f, 0.88f), 0.10f, 0f, new Vector2(2.6f, 2.6f), 0.48f),
                 TownFabricGrey = CreateOrLoadMaterial("MAT_Town_Fabric_Grey", urpLit, new Color(0.42f, 0.43f, 0.46f), 0.12f),
                 TownFabricTeal = CreateOrLoadMaterial("MAT_Town_Fabric_Teal", urpLit, new Color(0.18f, 0.44f, 0.46f), 0.12f),
                 TownFabricMustard = CreateOrLoadMaterial("MAT_Town_Fabric_Mustard", urpLit, new Color(0.76f, 0.58f, 0.20f), 0.12f),
@@ -654,24 +673,26 @@ namespace Gridroam.Editor
                 IstanbulGoldBrass = CreateOrLoadMaterial("MAT_Istanbul_GoldBrass", urpLit, new Color(0.88f, 0.70f, 0.22f), 0.84f, 0.90f),
                 IstanbulFerryHull = CreateOrLoadMaterial("MAT_Istanbul_FerryHull", urpLit, new Color(0.10f, 0.14f, 0.20f), 0.55f, 0.22f),
                 IstanbulBosphorusWater = CreateOrLoadMaterial("MAT_Istanbul_BosphorusWater", urpLit, new Color(0.06f, 0.34f, 0.50f, 0.78f), 0.94f, 0.14f),
-                KilitParke = CreateOrLoadMaterial("MAT_Sultanbeyli_KilitParke", urpLit, Color.white, 0.18f, 0.0f),
-                RawBrick = CreateOrLoadMaterial("MAT_Sultanbeyli_RawBrick", urpLit, new Color(0.95f, 0.92f, 0.90f), 0.14f, 0.0f),
-                RedPlaster = CreatePbrMaterial("MAT_Sultanbeyli_RedPlaster", urpLit, "Plaster003", new Color(0.68f, 0.21f, 0.16f), 0.14f, 0f, new Vector2(2f, 2f), 0.65f),
-                SagePlaster = CreatePbrMaterial("MAT_Sultanbeyli_SagePlaster", urpLit, "Plaster003", new Color(0.66f, 0.69f, 0.58f), 0.14f, 0f, new Vector2(2f, 2f), 0.65f),
-                YellowPlaster = CreatePbrMaterial("MAT_Sultanbeyli_YellowPlaster", urpLit, "Plaster003", new Color(0.88f, 0.80f, 0.56f), 0.15f, 0f, new Vector2(3f, 3f), 0.65f),
-                OrangeStripe = CreatePbrMaterial("MAT_Sultanbeyli_OrangeStripe", urpLit, "Plaster003", new Color(0.76f, 0.43f, 0.21f), 0.16f, 0f, new Vector2(2f, 3f), 0.65f),
-                OliveFacade = CreatePbrMaterial("MAT_Sultanbeyli_OliveFacade", urpLit, "Plaster003", new Color(0.35f, 0.44f, 0.31f), 0.18f, 0f, new Vector2(2f, 3f), 0.65f),
-                FenceBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_FenceBlue", urpLit, new Color(0.40f, 0.57f, 0.74f), 0.58f, 0.52f),
-                WhitePVC = CreateOrLoadMaterial("MAT_Sultanbeyli_WhitePVC", urpLit, new Color(0.94f, 0.94f, 0.93f), 0.62f, 0.05f),
-                DarkInterior = CreateOrLoadMaterial("MAT_Sultanbeyli_DarkInterior", urpLit, new Color(0.05f, 0.05f, 0.06f), 0.08f, 0.0f),
-                RustSteel = CreateOrLoadMaterial("MAT_Sultanbeyli_RustSteel", urpLit, new Color(0.38f, 0.24f, 0.17f), 0.26f, 0.55f),
+                KilitParke = CreateOrLoadMaterial("MAT_Sultanbeyli_KilitParke", urpLit, new Color(0.75f, 0.74f, 0.73f), 0.10f, 0.0f),
+                RawBrick = CreateOrLoadMaterial("MAT_Sultanbeyli_RawBrick", urpLit, new Color(0.80f, 0.73f, 0.68f), 0.10f, 0.0f),
+                RedPlaster = CreatePbrMaterial("MAT_Sultanbeyli_RedPlaster", urpLit, "Plaster003", new Color(0.65f, 0.22f, 0.17f), 0.09f, 0f, new Vector2(3.2f, 3.2f), 0.82f),
+                SagePlaster = CreatePbrMaterial("MAT_Sultanbeyli_SagePlaster", urpLit, "Plaster003", new Color(0.64f, 0.67f, 0.56f), 0.09f, 0f, new Vector2(3.2f, 3.2f), 0.82f),
+                YellowPlaster = CreatePbrMaterial("MAT_Sultanbeyli_YellowPlaster", urpLit, "Plaster003", new Color(0.84f, 0.76f, 0.54f), 0.09f, 0f, new Vector2(3.4f, 3.4f), 0.82f),
+                OrangeStripe = CreatePbrMaterial("MAT_Sultanbeyli_OrangeStripe", urpLit, "Plaster003", new Color(0.73f, 0.41f, 0.21f), 0.10f, 0f, new Vector2(3.0f, 3.2f), 0.82f),
+                OliveFacade = CreatePbrMaterial("MAT_Sultanbeyli_OliveFacade", urpLit, "Plaster003", new Color(0.34f, 0.42f, 0.30f), 0.10f, 0f, new Vector2(3.0f, 3.2f), 0.82f),
+                FenceBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_FenceBlue", urpLit, new Color(0.38f, 0.54f, 0.70f), 0.52f, 0.52f),
+                WhitePVC = CreateOrLoadMaterial("MAT_Sultanbeyli_WhitePVC", urpLit, new Color(0.90f, 0.90f, 0.88f), 0.44f, 0.04f),
+                DarkInterior = CreateOrLoadMaterial("MAT_Sultanbeyli_DarkInterior", urpLit, new Color(0.13f, 0.22f, 0.30f), 0.88f, 0.28f),
+                WindowGlassBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_WindowGlass", urpLit, new Color(0.20f, 0.34f, 0.48f), 0.94f, 0.36f),
+                WindowCurtain = CreateOrLoadMaterial("MAT_Sultanbeyli_WindowCurtain", urpLit, new Color(0.76f, 0.81f, 0.85f), 0.14f, 0.0f),
+                RustSteel = CreateOrLoadMaterial("MAT_Sultanbeyli_RustSteel", urpLit, new Color(0.38f, 0.24f, 0.17f), 0.24f, 0.55f),
                 VineBrown = CreateOrLoadMaterial("MAT_Sultanbeyli_VineBrown", urpLit, new Color(0.30f, 0.21f, 0.15f), 0.10f, 0.0f),
-                DoorTeal = CreateOrLoadMaterial("MAT_Sultanbeyli_DoorTeal", urpLit, new Color(0.11f, 0.29f, 0.38f), 0.52f, 0.22f),
+                DoorTeal = CreateOrLoadMaterial("MAT_Sultanbeyli_DoorTeal", urpLit, new Color(0.11f, 0.29f, 0.38f), 0.48f, 0.22f),
                 StreetSignBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_StreetSignBlue", urpLit, new Color(0.08f, 0.24f, 0.58f), 0.48f, 0.15f),
-                PeachPlaster = CreatePbrMaterial("MAT_Sultanbeyli_PeachPlaster", urpLit, "Plaster003", new Color(0.88f, 0.74f, 0.65f), 0.15f, 0f, new Vector2(2f, 2f), 0.65f),
-                CoralPlaster = CreatePbrMaterial("MAT_Sultanbeyli_CoralPlaster", urpLit, "Plaster003", new Color(0.77f, 0.43f, 0.40f), 0.15f, 0f, new Vector2(2f, 2f), 0.65f),
-                PinkPlaster = CreatePbrMaterial("MAT_Sultanbeyli_PinkPlaster", urpLit, "Plaster003", new Color(0.83f, 0.63f, 0.65f), 0.15f, 0f, new Vector2(2f, 3f), 0.65f),
-                PowderBlue = CreatePbrMaterial("MAT_Sultanbeyli_PowderBlue", urpLit, "Plaster003", new Color(0.58f, 0.69f, 0.78f), 0.16f, 0f, new Vector2(2f, 3f), 0.65f),
+                PeachPlaster = CreatePbrMaterial("MAT_Sultanbeyli_PeachPlaster", urpLit, "Plaster003", new Color(0.84f, 0.71f, 0.62f), 0.09f, 0f, new Vector2(3.2f, 3.2f), 0.82f),
+                CoralPlaster = CreatePbrMaterial("MAT_Sultanbeyli_CoralPlaster", urpLit, "Plaster003", new Color(0.74f, 0.42f, 0.39f), 0.09f, 0f, new Vector2(3.2f, 3.2f), 0.82f),
+                PinkPlaster = CreatePbrMaterial("MAT_Sultanbeyli_PinkPlaster", urpLit, "Plaster003", new Color(0.80f, 0.61f, 0.63f), 0.09f, 0f, new Vector2(3.2f, 3.4f), 0.82f),
+                PowderBlue = CreatePbrMaterial("MAT_Sultanbeyli_PowderBlue", urpLit, "Plaster003", new Color(0.56f, 0.66f, 0.75f), 0.09f, 0f, new Vector2(3.2f, 3.4f), 0.82f),
                 MeshGreen = CreatePbrMaterial("MAT_Sultanbeyli_MeshGreen", urpLit, "Grass001", new Color(0.14f, 0.30f, 0.17f), 0.12f, 0f, new Vector2(4f, 2f), 0.60f),
                 CobaltBlue = CreateOrLoadMaterial("MAT_Sultanbeyli_CobaltBlue", urpLit, new Color(0.09f, 0.38f, 0.78f), 0.55f, 0.35f),
                 LilacGate = CreateOrLoadMaterial("MAT_Sultanbeyli_LilacGate", urpLit, new Color(0.66f, 0.58f, 0.78f), 0.48f, 0.42f),
@@ -773,8 +794,14 @@ namespace Gridroam.Editor
             Texture2D kilitNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/KilitParke_NormalGL.png");
             Texture2D rawBrickCol = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/RawBrick_Color.png");
             Texture2D rawBrickNrm = AssetDatabase.LoadAssetAtPath<Texture2D>($"{pbrDir}/RawBrick_NormalGL.png");
-            ApplyPbrDetailMaps(set.KilitParke, kilitCol, kilitNrm, Vector2.one, 0.85f, 0.18f);
-            ApplyPbrDetailMaps(set.RawBrick, rawBrickCol, rawBrickNrm, new Vector2(1.4f, 1.4f), 0.90f, 0.14f);
+            ApplyPbrDetailMaps(set.KilitParke, kilitCol, kilitNrm, Vector2.one, 0.78f, 0.10f);
+            ApplyPbrDetailMaps(set.RawBrick, rawBrickCol, rawBrickNrm, new Vector2(2.1f, 2.1f), 0.85f, 0.10f);
+
+            // Shared lightweight 512px street weathering overlay materials (zero extra lights, GPU instanced!)
+            string weatherDir = $"{TexturesDir}/Weathering";
+            set.WeatherManholeGrime = CreateWeatherOverlayMaterial("MAT_Weather_ManholeGrime", urpLit, $"{weatherDir}/Weather_ManholeGrime.png", new Color(0.28f, 0.27f, 0.26f, 0.72f), 0.05f);
+            set.WeatherAsphaltPatch = CreateWeatherOverlayMaterial("MAT_Weather_AsphaltPatch", urpLit, $"{weatherDir}/Weather_AsphaltPatch.png", new Color(0.26f, 0.27f, 0.29f, 0.76f), 0.08f);
+            set.WeatherGutterStreak = CreateWeatherOverlayMaterial("MAT_Weather_GutterStreak", urpLit, $"{weatherDir}/Weather_GutterAndStreak.png", new Color(0.24f, 0.23f, 0.22f, 0.68f), 0.04f);
 
             // Automotive glossy metallic clearcoat across all 6 vehicle paint materials!
             Material[] carPaintMats =
@@ -813,6 +840,190 @@ namespace Gridroam.Editor
                 mat.SetFloat("_Smoothness", smoothness);
             }
             EditorUtility.SetDirty(mat);
+        }
+
+        private static Material CreateWeatherOverlayMaterial(
+            string matName,
+            Shader shader,
+            string texturePath,
+            Color tint,
+            float smoothness)
+        {
+            Material mat = CreateOrLoadMaterial(matName, shader, tint, smoothness, 0f);
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (tex != null && mat.HasProperty("_BaseMap"))
+            {
+                mat.SetTexture("_BaseMap", tex);
+                mat.SetTextureScale("_BaseMap", Vector2.one);
+            }
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
+            mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)RenderQueue.Transparent;
+            mat.enableInstancing = true;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        private static GameObject CreateWeatherDecalQuad(
+            string name,
+            Transform parent,
+            Vector3 worldPos,
+            Quaternion worldRot,
+            Vector2 size,
+            Material mat)
+        {
+            if (mat == null) return null;
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(worldPos, worldRot);
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            Renderer r = go.GetComponent<Renderer>();
+            if (r != null)
+            {
+                r.sharedMaterial = mat;
+                r.shadowCastingMode = ShadowCastingMode.Off;
+                r.receiveShadows = true;
+            }
+            MarkStaticEnvironment(go);
+            return go;
+        }
+
+        private static void DisableShadowCasting(GameObject go)
+        {
+            if (go == null) return;
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
+            {
+                r.shadowCastingMode = ShadowCastingMode.Off;
+            }
+        }
+
+        /// <summary>
+        /// Mounts a crisp, low-poly Turkish PVC residential/shop window flush on any building wall
+        /// (local +Z faces outward from the wall). All sub-meshes use GPU-instanced shared materials,
+        /// zero colliders, and ShadowCastingMode.Off to keep mobile 30+ FPS completely unaffected.
+        /// </summary>
+        private static GameObject AddTurkishWindowFrame(
+            Transform parent,
+            string name,
+            Vector3 localPos,
+            Quaternion localRot,
+            float width,
+            float height,
+            MaterialSet mats,
+            bool warmLit = false,
+            bool withCurtains = true,
+            bool withTransom = true)
+        {
+            GameObject root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            root.transform.localPosition = localPos;
+            root.transform.localRotation = localRot;
+
+            Material glassMat = warmLit && mats.WindowLitWarm != null
+                ? mats.WindowLitWarm
+                : (mats.WindowGlassBlue != null ? mats.WindowGlassBlue : mats.SedanGlass);
+
+            // 1. Outer crisp white PVC frame backing
+            CreatePrimitiveChild("Frame", PrimitiveType.Cube, root.transform,
+                new Vector3(0f, 0f, 0.032f), new Vector3(width, height, 0.064f), mats.WhitePVC, removeCollider: true);
+
+            // 2. Reflective sky-blue architectural glass (or warm cozy lit pane for select living rooms)
+            float glassW = Mathf.Max(0.24f, width - 0.15f);
+            float glassH = Mathf.Max(0.24f, height - 0.15f);
+            CreatePrimitiveChild("Glass", PrimitiveType.Cube, root.transform,
+                new Vector3(0f, 0f, 0.066f), new Vector3(glassW, glassH, 0.018f), glassMat, removeCollider: true);
+
+            // 3. Subtle recessed sheer curtain drapes at left & right edges (seen behind mullions!)
+            if (withCurtains && !warmLit && mats.WindowCurtain != null && glassW >= 0.72f)
+            {
+                float drapeW = glassW * 0.17f;
+                float drapeX = (glassW * 0.5f) - (drapeW * 0.5f) - 0.02f;
+                CreatePrimitiveChild("CurtainL", PrimitiveType.Cube, root.transform,
+                    new Vector3(-drapeX, 0f, 0.074f), new Vector3(drapeW, glassH - 0.04f, 0.010f), mats.WindowCurtain, removeCollider: true);
+                CreatePrimitiveChild("CurtainR", PrimitiveType.Cube, root.transform,
+                    new Vector3(drapeX, 0f, 0.074f), new Vector3(drapeW, glassH - 0.04f, 0.010f), mats.WindowCurtain, removeCollider: true);
+            }
+
+            // 4. Vertical center PVC mullion & optional upper transom sash bar
+            CreatePrimitiveChild("MullionV", PrimitiveType.Cube, root.transform,
+                new Vector3(0f, 0f, 0.082f), new Vector3(0.06f, glassH + 0.04f, 0.042f), mats.WhitePVC, removeCollider: true);
+
+            if (withTransom && height >= 1.10f)
+            {
+                CreatePrimitiveChild("TransomH", PrimitiveType.Cube, root.transform,
+                    new Vector3(0f, height * 0.22f, 0.082f), new Vector3(glassW + 0.04f, 0.052f, 0.042f), mats.WhitePVC, removeCollider: true);
+            }
+
+            // 5. Projecting concrete/marble window sill
+            CreatePrimitiveChild("Sill", PrimitiveType.Cube, root.transform,
+                new Vector3(0f, -height * 0.5f - 0.032f, 0.068f), new Vector3(width + 0.14f, 0.075f, 0.16f), mats.Concrete, removeCollider: true);
+
+            DisableShadowCasting(root);
+            MarkStaticEnvironment(root);
+            return root;
+        }
+
+        private static void AddSideWallWindowGrid(
+            Transform parent,
+            string prefix,
+            float wallX,
+            bool facePosX,
+            float[] localZs,
+            float[] floorYs,
+            float width,
+            float height,
+            MaterialSet mats,
+            int warmLitIndex = -1)
+        {
+            Quaternion rot = facePosX ? Quaternion.Euler(0f, 90f, 0f) : Quaternion.Euler(0f, -90f, 0f);
+            int idx = 0;
+            for (int f = 0; f < floorYs.Length; f++)
+            {
+                for (int c = 0; c < localZs.Length; c++)
+                {
+                    bool warm = (idx == warmLitIndex);
+                    AddTurkishWindowFrame(
+                        parent,
+                        $"{prefix}_F{f}_C{c}",
+                        new Vector3(wallX, floorYs[f], localZs[c]),
+                        rot,
+                        width,
+                        height,
+                        mats,
+                        warmLit: warm);
+                    idx++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Mounts one of the handcrafted Blender 5.3 Turkish balconies (ClassicIron, CamBalkon, MasonryCorner)
+        /// flush onto an upper-floor building wall (+Z in FBX local space cantilevers outward from the wall).
+        /// Uses GPU-instanced shared URP materials and ShadowCastingMode.Off to protect mobile 30+ FPS.
+        /// </summary>
+        private static GameObject MountBlenderBalcony(
+            Transform parent,
+            string fbxFileName,
+            string instanceName,
+            Vector3 localPos,
+            Quaternion localRot,
+            MaterialSet mats,
+            float uniformScale = 1f)
+        {
+            GameObject go = InstantiateBlenderModel(fbxFileName, instanceName, parent, mats);
+            if (go == null) return null;
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = localRot;
+            go.transform.localScale = Vector3.one * uniformScale;
+            DisableShadowCasting(go);
+            MarkStaticEnvironment(go);
+            return go;
         }
 
         private static void ApplyAutomotiveClearcoat(Material mat)
@@ -1245,6 +1456,7 @@ namespace Gridroam.Editor
             }
 
             // Remap Blender material slots cleanly to our URP Lit PBR MaterialSet (zero Standard/pink materials!)
+            bool isBuildingMesh = fbxFileName.StartsWith("Sultanbeyli_") || fbxFileName.StartsWith("Hamidiye_");
             foreach (Renderer r in inst.GetComponentsInChildren<Renderer>(true))
             {
                 Material[] srcMats = r.sharedMaterials;
@@ -1252,7 +1464,7 @@ namespace Gridroam.Editor
                 for (int i = 0; i < srcMats.Length; i++)
                 {
                     string slotName = srcMats[i] != null ? srcMats[i].name : string.Empty;
-                    mapped[i] = ResolveBlenderUrpMaterial(slotName, mats, bodyPaintOverride, foliageAOverride, foliageBOverride);
+                    mapped[i] = ResolveBlenderUrpMaterial(slotName, mats, bodyPaintOverride, foliageAOverride, foliageBOverride, isBuildingMesh);
                 }
                 r.sharedMaterials = mapped;
             }
@@ -1265,7 +1477,8 @@ namespace Gridroam.Editor
             MaterialSet mats,
             Material bodyPaintOverride,
             Material foliageAOverride,
-            Material foliageBOverride)
+            Material foliageBOverride,
+            bool isBuildingMesh = false)
         {
             if (string.IsNullOrEmpty(slotName)) return mats.Concrete;
 
@@ -1273,7 +1486,7 @@ namespace Gridroam.Editor
             if (slotName.StartsWith("ContainerPaint")) return bodyPaintOverride != null ? bodyPaintOverride : mats.ContainerRed;
             if (slotName.StartsWith("TrimDark") || slotName.StartsWith("InteriorDark")) return mats.SedanTrimDark;
             if (slotName.StartsWith("Chrome")) return mats.SedanChrome;
-            if (slotName.StartsWith("Glass")) return mats.SedanGlass;
+            if (slotName.StartsWith("Glass")) return (isBuildingMesh && mats.WindowGlassBlue != null) ? mats.WindowGlassBlue : mats.SedanGlass;
             if (slotName.StartsWith("Headlight")) return mats.LampGlow;
             if (slotName.StartsWith("Taillight")) return mats.TaillightGlow;
             if (slotName.StartsWith("ReverseLight")) return mats.ReverseLightOff;
@@ -2338,18 +2551,26 @@ namespace Gridroam.Editor
             jobBeacon.SetVisible(false);
             jobManager.Configure(jobBeacon, taxiPassengerObj, taxiHum, mats.ContainerOchre, mats.TownFabricTeal);
 
-            // --- Pooled Ambient Traffic cruising back and forth cleanly along Selman Sokağı ---
+            // --- Pooled Ambient Traffic cruising across ALL of Hamidiye Mahallesi (Selman Sk. + Main Avenues Grand Loop!) ---
             GameObject trafficRoot = new GameObject("AmbientTrafficManager");
             AmbientTrafficManager trafficMgr = trafficRoot.AddComponent<AmbientTrafficManager>();
             List<Transform> waypoints = new List<Transform>();
             Vector3[] wpCoords =
             {
-                new Vector3(-84.0f, 0.05f, -1.1f),
-                new Vector3(0.0f,   0.05f, -1.1f),
-                new Vector3(84.0f,  0.05f, -1.1f),
-                new Vector3(84.0f,  0.05f,  1.1f),
-                new Vector3(0.0f,   0.05f,  1.1f),
-                new Vector3(-84.0f, 0.05f,  1.1f)
+                new Vector3(-83.5f, 0.05f,  -1.2f), // Selman Sk. West -> East
+                new Vector3(  0.0f, 0.05f,  -1.2f), // Selman Bakkal front
+                new Vector3( 97.5f, 0.05f,  -1.2f), // Abdülkadir Udeh corner
+                new Vector3( 97.5f, 0.05f,  46.0f), // North to Mürşit Cd.
+                new Vector3( 97.5f, 0.05f, 136.0f), // North to Fatih Bulvarı South Lane
+                new Vector3(  0.0f, 0.05f, 136.0f), // Fatih Bulvarı · Saat Kulesi
+                new Vector3(-86.5f, 0.05f, 136.0f), // West to Seyyid Kutup Cd.
+                new Vector3(-86.5f, 0.05f,  46.0f), // South along Seyyid Kutup Cd.
+                new Vector3(-86.5f, 0.05f, -79.5f), // South to Petrol Yolu Cd.
+                new Vector3(  0.0f, 0.05f, -79.5f), // East along Petrol Yolu Cd.
+                new Vector3(100.5f, 0.05f, -79.5f), // East to Abdülkadir Udeh
+                new Vector3(100.5f, 0.05f,   1.2f), // North back to Selman Sk.
+                new Vector3(  0.0f, 0.05f,   1.2f), // Selman Sk. East -> West
+                new Vector3(-83.5f, 0.05f,   1.2f)
             };
             for (int i = 0; i < wpCoords.Length; i++)
             {

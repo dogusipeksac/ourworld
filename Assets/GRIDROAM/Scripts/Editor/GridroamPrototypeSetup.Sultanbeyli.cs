@@ -40,6 +40,9 @@ namespace Gridroam.Editor
             // 1. Complete Selman Sokağı Roadway, Kilit Parke Sidewalks, Yellow-White Corner Curbs & All 5 Real Cross-Streets
             BuildSelmanStreetRoadway(root.transform, mats, prefabs);
 
+            // 1b. Grounded Street Weathering (manhole grime, asphalt patches, curb gutter wear & facade rain streaks)
+            BuildSelmanStreetWeathering(root.transform, mats);
+
             // 2. North Side (West -> East: No:46 Garden, No:48, No:52, No:54, No:63, No:58 Bakkal, No:73 Oto Tamir, No:66 Yellow, Nutuk Sk., No:81 Rose, No:95 Çay Ocağı, East White Villa — ALL ENTERABLE!)
             BuildSelmanNorthSideBuildings(root.transform, mats, prefabs);
 
@@ -64,8 +67,8 @@ namespace Gridroam.Editor
             // 9. Interactive Gameplay Mechanics: Street Football Pitch, Mahalle ATMs & Grab/Throw Damacana Props!
             BuildSelmanInteractiveMechanics(root.transform, mats);
 
-            // 10. Photo-Matched 1-to-1 Google Street View Expansion: Hamidiye Mahallesi's 8 Main Avenues!
-            BuildHamidiyeEightMainAvenues(root.transform, mats, seats);
+            // 10. Full 8-Avenue Hamidiye Mahallesi Living District (Sidewalks, Balconies, Shops, Jobs, Cars, Citizens, Cats!)
+            BuildHamidiyeEightMainAvenues(root.transform, mats, prefabs, seats);
 
             // 11. Clean perimeter bounds framing Hamidiye Mahallesi's 8 main avenues & Selman Sokağı core
             BuildSelmanCorridorBoundary(root.transform, mats);
@@ -79,23 +82,25 @@ namespace Gridroam.Editor
             roadRoot.transform.SetParent(parent, false);
 
             // Complete Selman Sokağı asphalt ribbon: X = -112 .. +124 (236m long), Z = -3.8 .. +3.8 (7.6m wide)
-            CreateTiledBox(
+            DisableShadowCasting(CreateTiledBox(
                 "Selman_AsphaltMain",
                 roadRoot.transform,
                 new Vector3(6f, 0.012f, 0f),
                 new Vector3(238f, 0.024f, 7.6f),
                 Quaternion.identity,
                 mats.RoadAsphaltMain,
-                metersPerTile: 3.4f,
-                collider: false);
+                metersPerTile: 5.8f,
+                collider: false));
 
             // Authentic worn asphalt manhole covers along Selman Sokağı
             float[] manholeXs = { -84f, -44f, -11f, 22f, 58f, 96f };
             for (int i = 0; i < manholeXs.Length; i++)
             {
+                float mz = i % 2 == 0 ? 1.1f : -1.2f;
                 GameObject mh = CreatePrimitiveChild($"Manhole_{i}", PrimitiveType.Cylinder, roadRoot.transform,
-                    new Vector3(manholeXs[i], 0.026f, i % 2 == 0 ? 1.1f : -1.2f),
+                    new Vector3(manholeXs[i], 0.026f, mz),
                     new Vector3(0.75f, 0.008f, 0.75f), mats.SedanTrimDark, removeCollider: true);
+                DisableShadowCasting(mh);
                 MarkStaticEnvironment(mh);
             }
 
@@ -113,15 +118,15 @@ namespace Gridroam.Editor
             {
                 float sx0 = northSegments[i].x0;
                 float sx1 = northSegments[i].x1;
-                CreateTiledBox(
+                DisableShadowCasting(CreateTiledBox(
                     $"Selman_KilitParke_North_{i}",
                     roadRoot.transform,
                     new Vector3((sx0 + sx1) * 0.5f, 0.032f, 4.85f),
                     new Vector3(sx1 - sx0, 0.064f, 2.10f),
                     Quaternion.identity,
                     mats.KilitParke,
-                    metersPerTile: 1.50f,
-                    collider: false);
+                    metersPerTile: 0.90f,
+                    collider: false));
                 BuildCurbRun(roadRoot.transform, $"NorthCurb_{i}", sx0, sx1, 3.82f, mats, northSegments[i].yellowCurb);
             }
 
@@ -140,44 +145,44 @@ namespace Gridroam.Editor
             {
                 float sx0 = southSegments[i].x0;
                 float sx1 = southSegments[i].x1;
-                CreateTiledBox(
+                DisableShadowCasting(CreateTiledBox(
                     $"Selman_KilitParke_South_{i}",
                     roadRoot.transform,
                     new Vector3((sx0 + sx1) * 0.5f, 0.032f, -4.85f),
                     new Vector3(sx1 - sx0, 0.064f, 2.10f),
                     Quaternion.identity,
                     mats.KilitParke,
-                    metersPerTile: 1.50f,
-                    collider: false);
+                    metersPerTile: 0.90f,
+                    collider: false));
                 BuildCurbRun(roadRoot.transform, $"SouthCurb_{i}", sx0, sx1, -3.82f, mats, southSegments[i].yellowCurb);
             }
 
             // All 5 Real Cross-Street Openings surveyed on Google Street View!
             // 1. Seyyid Kutup Caddesi (West cross-street, X = -85)
-            CreateTiledBox("CrossStreet_SeyyidKutup", roadRoot.transform,
+            DisableShadowCasting(CreateTiledBox("CrossStreet_SeyyidKutup", roadRoot.transform,
                 new Vector3(-85.0f, 0.015f, 0f), new Vector3(8.2f, 0.030f, 54f),
-                Quaternion.identity, mats.RoadAsphaltMain, 3.4f, collider: false);
+                Quaternion.identity, mats.RoadAsphaltMain, 5.8f, collider: false));
             // 2. Gürsu Sokağı (South Kilit-Parke opening, X = -41)
-            CreateTiledBox("SideStreet_GursuSk", roadRoot.transform,
+            DisableShadowCasting(CreateTiledBox("SideStreet_GursuSk", roadRoot.transform,
                 new Vector3(-41.0f, 0.018f, -15.0f), new Vector3(6.2f, 0.036f, 24f),
-                Quaternion.identity, mats.KilitParke, 1.8f, collider: false);
+                Quaternion.identity, mats.KilitParke, 1.10f, collider: false));
             // 3. Çiçekçi Sokağı (South Kilit-Parke opening, X = -10.6)
-            CreateTiledBox("SideStreet_CicekciSk", roadRoot.transform,
+            DisableShadowCasting(CreateTiledBox("SideStreet_CicekciSk", roadRoot.transform,
                 new Vector3(-10.6f, 0.018f, -15.5f), new Vector3(6.8f, 0.036f, 25f),
-                Quaternion.identity, mats.KilitParke, 1.8f, collider: false);
+                Quaternion.identity, mats.KilitParke, 1.10f, collider: false));
             // 4. Nutuk Sokağı (North asphalt opening right beside 66 Yellow House, X = +59.2 — exact from step 1358!)
-            CreateTiledBox("SideStreet_NutukSk", roadRoot.transform,
+            DisableShadowCasting(CreateTiledBox("SideStreet_NutukSk", roadRoot.transform,
                 new Vector3(59.2f, 0.016f, 16.5f), new Vector3(7.0f, 0.032f, 27f),
-                Quaternion.identity, mats.RoadAsphaltMain, 3.4f, collider: false);
+                Quaternion.identity, mats.RoadAsphaltMain, 5.8f, collider: false));
             // Red Fire Hydrant right on the corner of 66 Yellow House & Nutuk Sokağı (exact from step 1358!)
             if (prefabs.FireHydrant != null)
             {
                 PlacePrefabInstance(prefabs.FireHydrant, roadRoot.transform, new Vector3(54.8f, 0.04f, 5.2f), Quaternion.identity);
             }
             // 5. Abdülkadir Udeh Sokağı (East cross-street at No:95 leading South toward Hz. Osman Camii, X = +99 — exact from step 1359/1370!)
-            CreateTiledBox("CrossStreet_AbdulkadirUdeh", roadRoot.transform,
+            DisableShadowCasting(CreateTiledBox("CrossStreet_AbdulkadirUdeh", roadRoot.transform,
                 new Vector3(99.0f, 0.015f, -10f), new Vector3(8.8f, 0.030f, 84f),
-                Quaternion.identity, mats.RoadAsphaltMain, 3.4f, collider: false);
+                Quaternion.identity, mats.RoadAsphaltMain, 5.8f, collider: false));
 
             // Speed bump (Kasis) right across Selman Sokağı near Çiçekçi Sk. corner
             GameObject kasis = CreatePrimitiveChild("Selman_SpeedBump", PrimitiveType.Cube, roadRoot.transform,
@@ -192,6 +197,137 @@ namespace Gridroam.Editor
             CreateIstanbulRedStreetSign(roadRoot.transform, "NUTUK SOKAĞI", new Vector3(55.0f, 0f, 4.4f), 90f, mats);
             CreateIstanbulRedStreetSign(roadRoot.transform, "ABDÜLKADİR UDEH SK.", new Vector3(94.2f, 0f, 4.3f), 90f, mats);
             CreateIstanbulRedStreetSign(roadRoot.transform, "SELMAN SOKAĞI", new Vector3(104.5f, 0f, 4.3f), 0f, mats);
+        }
+
+        private static void BuildSelmanStreetWeathering(Transform parent, MaterialSet mats)
+        {
+            GameObject weatherRoot = new GameObject("Selman_StreetWeathering_SharedLowCost");
+            weatherRoot.transform.SetParent(parent, false);
+
+            Quaternion flatUp = Quaternion.Euler(90f, 0f, 0f);
+            Quaternion flatUpFlip = Quaternion.Euler(90f, 180f, 0f);
+
+            // 1. Darkened oil/grime rings around every Selman Sokağı manhole cover + Oto Tamir No:73 bay drip
+            float[] manholeXs = { -84f, -44f, -11f, 22f, 58f, 96f };
+            for (int i = 0; i < manholeXs.Length; i++)
+            {
+                float mz = i % 2 == 0 ? 1.1f : -1.2f;
+                CreateWeatherDecalQuad(
+                    $"ManholeGrime_{i}",
+                    weatherRoot.transform,
+                    new Vector3(manholeXs[i], 0.0255f, mz),
+                    Quaternion.Euler(90f, i * 47f, 0f),
+                    new Vector2(2.15f, 2.15f),
+                    mats.WeatherManholeGrime);
+            }
+            // Extra mechanic oil/tire grime outside No:73 Oto Tamir & No:63 Rust Garage
+            CreateWeatherDecalQuad("OilStain_No73_Bay", weatherRoot.transform,
+                new Vector3(24.5f, 0.026f, 2.75f), Quaternion.Euler(90f, 18f, 0f), new Vector2(3.6f, 2.4f), mats.WeatherManholeGrime);
+            CreateWeatherDecalQuad("OilStain_No63_Garage", weatherRoot.transform,
+                new Vector3(-16.5f, 0.026f, 2.65f), Quaternion.Euler(90f, -12f, 0f), new Vector2(2.8f, 2.0f), mats.WeatherManholeGrime);
+
+            // 2. Realistic repaired tarmac utility patches at natural road-wear zones along Selman Sokağı
+            (float x, float z, float w, float h, float yaw)[] patches =
+            {
+                (-60.5f,  0.65f, 4.4f, 1.9f,  2f),  // Utility trench outside No:48 / No:52
+                (-38.0f, -1.35f, 3.8f, 2.2f, -3f),  // Gürsu Sokağı corner turn wear
+                (-14.5f,  0.40f, 4.8f, 2.0f,  1f),  // Approach to Çiçekçi speed bump
+                (  6.8f,  1.25f, 4.2f, 2.1f, -2f),  // Delivery stop zone in front of No:58 Selman Bakkal
+                ( 14.5f, -0.85f, 5.2f, 1.8f,  3f),  // Mid-street utility patch between Bakkal & Oto Tamir
+                ( 32.0f,  0.90f, 4.0f, 2.3f, -1f),  // Near No:73 Oto Tamir & No:66 Yellow House
+                ( 78.0f, -0.60f, 4.5f, 2.0f,  2f)   // East stretch approaching No:95 Çay Ocağı
+            };
+            for (int i = 0; i < patches.Length; i++)
+            {
+                var p = patches[i];
+                CreateWeatherDecalQuad(
+                    $"AsphaltPatch_{i}",
+                    weatherRoot.transform,
+                    new Vector3(p.x, 0.0252f, p.z),
+                    Quaternion.Euler(90f, p.yaw, 0f),
+                    new Vector2(p.w, p.h),
+                    mats.WeatherAsphaltPatch);
+            }
+
+            // 3. Curb gutter drainage & wear shadow lines hugging North & South curbs (eliminates sharp CG road-curb seam!)
+            (float x0, float x1)[] northGutterRuns = { (-78f, -45f), (-45f, -10f), (-10f, 24f), (24f, 55f), (63.5f, 94f) };
+            for (int i = 0; i < northGutterRuns.Length; i++)
+            {
+                float len = northGutterRuns[i].x1 - northGutterRuns[i].x0;
+                float cx = (northGutterRuns[i].x0 + northGutterRuns[i].x1) * 0.5f;
+                CreateWeatherDecalQuad(
+                    $"CurbGutter_North_{i}",
+                    weatherRoot.transform,
+                    new Vector3(cx, 0.0258f, 3.34f),
+                    flatUp,
+                    new Vector2(len, 0.92f),
+                    mats.WeatherGutterStreak);
+            }
+
+            (float x0, float x1)[] southGutterRuns = { (-78f, -46f), (-36f, -15f), (-6f, 26f), (26f, 60f), (60f, 94f) };
+            for (int i = 0; i < southGutterRuns.Length; i++)
+            {
+                float len = southGutterRuns[i].x1 - southGutterRuns[i].x0;
+                float cx = (southGutterRuns[i].x0 + southGutterRuns[i].x1) * 0.5f;
+                CreateWeatherDecalQuad(
+                    $"CurbGutter_South_{i}",
+                    weatherRoot.transform,
+                    new Vector3(cx, 0.0258f, -3.34f),
+                    flatUpFlip,
+                    new Vector2(len, 0.92f),
+                    mats.WeatherGutterStreak);
+            }
+
+            // 4. Sidewalk foot-traffic scuff wear at busy shop & house thresholds (on top of Kilit Parke y=0.064)
+            (float x, float z, float w, float h)[] sidewalkScuffs =
+            {
+                (-65.5f,  4.95f, 2.4f, 1.5f), // No:48 entrance
+                (  6.8f,  5.05f, 3.4f, 1.6f), // No:58 Selman Bakkal & Manav front
+                ( 24.5f,  4.95f, 3.6f, 1.8f), // No:73 Oto Tamir entrance
+                ( 45.2f,  4.95f, 2.2f, 1.4f), // No:66 Yellow House
+                ( 88.0f,  4.95f, 2.8f, 1.5f), // No:95 Çay Ocağı corner
+                ( 14.0f, -4.95f, 2.6f, 1.5f)  // South side Hafsa Tesisat / shop front
+            };
+            for (int i = 0; i < sidewalkScuffs.Length; i++)
+            {
+                var sc = sidewalkScuffs[i];
+                CreateWeatherDecalQuad(
+                    $"SidewalkWear_{i}",
+                    weatherRoot.transform,
+                    new Vector3(sc.x, 0.066f, sc.z),
+                    Quaternion.Euler(90f, i * 25f, 0f),
+                    new Vector2(sc.w, sc.h),
+                    mats.WeatherManholeGrime);
+            }
+
+            // 5. Subtle rainwater sill streaks & lower-plinth damp wash on hero Selman Sokağı facades!
+            // North facades face South (quad normal -Z -> Quaternion.identity faces -Z in Unity Quad!)
+            Quaternion faceSouthWall = Quaternion.identity;
+            Quaternion faceNorthWall = Quaternion.Euler(0f, 180f, 0f);
+            (string id, Vector3 pos, Quaternion rot, Vector2 size)[] facadeStreaks =
+            {
+                // No:58 Selman Bakkal & Manav left orange pier & top signboard runoff (strictly on solid Bakkal facade, clear of arch gate!)
+                ("Streak_Bakkal_Sign", new Vector3( 0.4f, 2.35f, 6.08f), faceSouthWall, new Vector2(2.6f, 0.95f)),
+                // No:73 Oto Tamir side plaster drip
+                ("Streak_OtoTamir_L",  new Vector3(21.4f, 2.35f, 6.18f), faceSouthWall, new Vector2(2.1f, 1.15f)),
+                ("Streak_OtoTamir_R",  new Vector3(27.5f, 2.35f, 6.18f), faceSouthWall, new Vector2(2.1f, 1.15f)),
+                // No:66 Yellow House upper windows sill runoff
+                ("Streak_No66_Win1",   new Vector3(44.2f, 4.10f, 5.95f), faceSouthWall, new Vector2(1.8f, 1.05f)),
+                ("Streak_No66_Win2",   new Vector3(47.2f, 4.10f, 5.95f), faceSouthWall, new Vector2(1.8f, 1.05f)),
+                // No:52 & No:54 North-side window runoff
+                ("Streak_No52_Win1",   new Vector3(-48.0f, 2.45f, 6.20f), faceSouthWall, new Vector2(1.9f, 1.10f)),
+                ("Streak_No52_Win2",   new Vector3(-44.6f, 2.45f, 6.20f), faceSouthWall, new Vector2(1.9f, 1.10f)),
+                ("Streak_No54_Win1",   new Vector3(-32.5f, 2.55f, 6.32f), faceSouthWall, new Vector2(2.4f, 1.15f)),
+                // South-side facades opposite Bakkal & No:48 (facing North)
+                ("Streak_South_01",    new Vector3(-56.0f, 2.20f, -6.08f), faceNorthWall, new Vector2(2.4f, 1.10f)),
+                ("Streak_South_02",    new Vector3( 10.5f, 2.40f, -6.02f), faceNorthWall, new Vector2(2.6f, 1.15f)),
+                ("Streak_South_03",    new Vector3( 19.5f, 2.40f, -6.02f), faceNorthWall, new Vector2(2.4f, 1.10f))
+            };
+            for (int i = 0; i < facadeStreaks.Length; i++)
+            {
+                var fs = facadeStreaks[i];
+                CreateWeatherDecalQuad(fs.id, weatherRoot.transform, fs.pos, fs.rot, fs.size, mats.WeatherGutterStreak);
+            }
         }
 
         private static void BuildCurbRun(Transform parent, string name, float x0, float x1, float z, MaterialSet mats, bool yellowWhitePainted)
@@ -268,6 +404,8 @@ namespace Gridroam.Editor
                     Quaternion.Euler(0f, 180f, 0f), new Vector2(0.38f, 0.20f), Color.white);
 
                 FurnishSelmanHomeInterior(house48.transform, new Vector3(0.2f, 0.09f, -2.8f), SelmanFloorPlan.Flat_1_1, 8.2f, 6.6f, mats);
+                AddSideWallWindowGrid(house48.transform, "No48_WinW", 4.60f, true, new[] { -1.7f, -4.5f }, new[] { 1.92f }, 1.25f, 1.30f, mats, warmLitIndex: 0);
+                AddSideWallWindowGrid(house48.transform, "No48_WinE", -4.20f, false, new[] { -2.2f, -4.8f }, new[] { 1.92f }, 1.25f, 1.30f, mats);
                 AttachSelmanPaintableAddress(house48, "selman_home_48", "Selman Sokağı No: 48", new Vector3(-68.0f, 0.12f, 4.9f));
                 SpawnSelmanResidentNpc(
                     "NPC_EmineTeyze_No48", "Emine Teyze", "48 Selman Sk. Ev Sahibi",
@@ -282,8 +420,8 @@ namespace Gridroam.Editor
                     },
                     mats);
             }
-            CreateTiledBox("No48_Driveway", northRoot.transform, new Vector3(-61.4f, 0.036f, 7.2f),
-                new Vector3(4.5f, 0.072f, 4.2f), Quaternion.identity, mats.KilitParke, 1.35f, collider: false);
+            DisableShadowCasting(CreateTiledBox("No48_Driveway", northRoot.transform, new Vector3(-61.4f, 0.036f, 7.2f),
+                new Vector3(4.5f, 0.072f, 4.2f), Quaternion.identity, mats.KilitParke, 0.95f, collider: false));
             if (prefabs.TownCarWhitePickup != null)
             {
                 PlacePrefabInstance(prefabs.TownCarWhitePickup, northRoot.transform, new Vector3(-61.4f, 0.22f, 10.2f), faceSouth);
@@ -297,6 +435,10 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(backYel, -5.3f, 5.3f, -4.9f, 4.9f, 3.25f, 0.26f, doorX: 0f, doorW: 1.70f);
                 FurnishSelmanHomeInterior(backYel.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 9.8f, 9.0f, mats);
+                AddSideWallWindowGrid(backYel.transform, "BackYel_WinW_Gnd", 5.30f, true, new[] { -2.1f, 2.1f }, new[] { 1.95f }, 1.35f, 1.38f, mats);
+                MountBlenderBalcony(backYel.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "BackYel_BalcW_F2", new Vector3(5.30f, 3.32f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(backYel.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "BackYel_BalcW_F3", new Vector3(5.30f, 6.32f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                AddSideWallWindowGrid(backYel.transform, "BackYel_WinE", -5.30f, false, new[] { -2.1f, 2.1f }, new[] { 1.95f, 4.95f, 7.95f }, 1.35f, 1.38f, mats);
             }
             PlaceSelmanModel("Sultanbeyli_BrickConstruction.fbx", "Selman_No48_Backdrop_BrickConstruction",
                 northRoot.transform, new Vector3(-56.0f, 0f, 20.5f), faceSouth, Vector3.one,
@@ -308,6 +450,11 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(backMod, -5.9f, 5.9f, -5.1f, 5.1f, 3.30f, 0.26f, doorX: 0f, doorW: 1.80f);
                 FurnishSelmanHomeInterior(backMod.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 10.8f, 9.4f, mats);
+                AddSideWallWindowGrid(backMod.transform, "BackMod_WinW_Gnd", 5.60f, true, new[] { -2.3f, 2.3f }, new[] { 2.0f }, 1.45f, 1.45f, mats);
+                MountBlenderBalcony(backMod.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "BackMod_CamBalcW_F2", new Vector3(5.60f, 3.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(backMod.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "BackMod_CamBalcW_F3", new Vector3(5.60f, 6.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(backMod.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "BackMod_CamBalcW_F4", new Vector3(5.60f, 9.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                AddSideWallWindowGrid(backMod.transform, "BackMod_WinE", -5.60f, false, new[] { -2.3f, 2.3f }, new[] { 2.0f, 5.0f, 8.0f, 11.0f }, 1.45f, 1.45f, mats);
             }
 
             // 2. 52 SELMAN SK. / 1 GÜRSU SK. — 1+1 Daire!
@@ -318,6 +465,12 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(no52, -4.6f, 4.6f, -6.8f, 0.80f, 3.50f, 0.24f, doorX: -2.8f, doorW: 1.55f);
                 FurnishSelmanHomeInterior(no52.transform, new Vector3(0.0f, 0.09f, -3.0f), SelmanFloorPlan.Flat_1_1, 8.6f, 7.0f, mats);
+                // Crisp 3D Turkish PVC windows + Blender ClassicIron balcony on upper West side!
+                AddSideWallWindowGrid(no52.transform, "No52_WinW_Gnd", 4.60f, true, new[] { -1.6f, -4.7f }, new[] { 1.92f }, 1.32f, 1.34f, mats, warmLitIndex: 0);
+                MountBlenderBalcony(no52.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "No52_BalcW_Up", new Vector3(4.60f, 3.50f, -3.1f), Quaternion.Euler(0f, 90f, 0f), mats);
+                AddSideWallWindowGrid(no52.transform, "No52_WinE", -4.60f, false, new[] { -1.8f, -4.7f }, new[] { 1.92f, 4.82f }, 1.32f, 1.34f, mats);
+                AddTurkishWindowFrame(no52.transform, "No52_FrontUpL", new Vector3(2.8f, 4.85f, 0.885f), Quaternion.identity, 1.42f, 1.44f, mats, warmLit: false);
+                AddTurkishWindowFrame(no52.transform, "No52_FrontUpC", new Vector3(0.4f, 4.85f, 0.885f), Quaternion.identity, 1.42f, 1.44f, mats, warmLit: true);
                 AttachSelmanPaintableAddress(no52, "selman_home_52", "Selman Sokağı No: 52", new Vector3(-46.5f, 0.12f, 4.9f));
             }
 
@@ -329,6 +482,8 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(no54, -3.8f, 3.8f, -5.8f, 1.00f, 3.55f, 0.22f, doorX: -2.4f, doorW: 1.50f);
                 FurnishSelmanHomeInterior(no54.transform, new Vector3(0.0f, 0.09f, -2.4f), SelmanFloorPlan.Studio_1_0, 7.0f, 6.2f, mats);
+                AddSideWallWindowGrid(no54.transform, "No54_WinW", 3.80f, true, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats, warmLitIndex: 0);
+                AddSideWallWindowGrid(no54.transform, "No54_WinE", -3.80f, false, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats);
                 AttachSelmanPaintableAddress(no54, "selman_home_54", "Selman Sokağı No: 54", new Vector3(-32.5f, 0.12f, 4.9f));
             }
 
@@ -343,9 +498,16 @@ namespace Gridroam.Editor
                 PlaceInteriorModel("Interior_PlumberBench.fbx", "No63_Bench", no63.transform, new Vector3(1.2f, 0.09f, -3.7f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.95f, 0.75f));
                 CreateInteriorLight("No63_Light", no63.transform, new Vector3(0f, 2.95f, -2.2f), new Color(1.0f, 0.88f, 0.65f), 9f, 2.2f);
             }
-            PlaceSelmanModel("Sultanbeyli_PinkApartman.fbx", "Selman_No63_Backdrop_PinkApt",
+            GameObject pinkApt = PlaceSelmanModel("Sultanbeyli_PinkApartman.fbx", "Selman_No63_Backdrop_PinkApt",
                 northRoot.transform, new Vector3(-9.0f, 0f, 18.2f), faceSouth, Vector3.one,
                 new Vector3(8.6f, 10.0f, 9.0f), new Vector3(0f, 5.0f, 0f), mats);
+            if (pinkApt != null)
+            {
+                AddSideWallWindowGrid(pinkApt.transform, "PinkApt_WinW_Gnd", 4.20f, true, new[] { -1.9f, 1.9f }, new[] { 1.85f }, 1.30f, 1.35f, mats);
+                MountBlenderBalcony(pinkApt.transform, "Sultanbeyli_Balcony_MasonryCorner.fbx", "PinkApt_BalcW_F2", new Vector3(4.20f, 3.25f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(pinkApt.transform, "Sultanbeyli_Balcony_MasonryCorner.fbx", "PinkApt_BalcW_F3", new Vector3(4.20f, 6.30f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                AddSideWallWindowGrid(pinkApt.transform, "PinkApt_WinE", -4.20f, false, new[] { -1.9f, 1.9f }, new[] { 1.85f, 4.90f, 7.95f }, 1.30f, 1.35f, mats);
+            }
 
             // 5. 58 SELMAN SK. — FULL REALISTIC 'SELMAN BAKKAL & MANAV' (Manav Reyonu, Şarküteri, Dondurma Dolabı, Kasa Bandı, İçecek Dolabı & Hüseyin Abi!)
             GameObject shop58 = PlaceSelmanModel("Sultanbeyli_Shop58_ArchGate.fbx", "Selman_No58_OrangeShop_ArchGate",
@@ -357,6 +519,12 @@ namespace Gridroam.Editor
                 AddLocalBoxCollider(shop58, new Vector3(-2.2f, 1.05f, 0.45f), new Vector3(3.2f, 2.1f, 0.24f));
                 CreateWorldSignText("SELMAN BAKKAL & MANAV · 58", shop58.transform, new Vector3(4.0f, 3.05f, 0.86f),
                     Quaternion.Euler(0f, 180f, 0f), new Vector2(6.8f, 0.60f), new Color(0.14f, 0.16f, 0.20f, 1f));
+
+                // Framed Turkish Bakkal storefront display window (replaces flat dark hole) + side windows!
+                AddTurkishWindowFrame(shop58.transform, "Bakkal_VitrinFront", new Vector3(1.65f, 1.25f, 0.655f),
+                    Quaternion.identity, 2.06f, 2.04f, mats, warmLit: false, withCurtains: false, withTransom: true);
+                AddSideWallWindowGrid(shop58.transform, "Bakkal_WinW", 7.50f, true, new[] { -1.8f, -4.4f }, new[] { 1.95f }, 1.35f, 1.25f, mats);
+                AddSideWallWindowGrid(shop58.transform, "Bakkal_WinE", 0.50f, false, new[] { -1.8f, -4.4f }, new[] { 1.95f }, 1.35f, 1.25f, mats);
 
                 // Outside-front realistic MANAV REYONU (tomatoes, peppers, oranges, lemons!) — directly interactive!
                 GameObject manav = PlaceInteriorModel("Market_ManavReyonu.fbx", "Bakkal_ManavReyonu", shop58.transform,
@@ -412,6 +580,8 @@ namespace Gridroam.Editor
                 PlaceInteriorModel("Interior_PlumberBench.fbx", "Garage73_Bench", garage73.transform, new Vector3(1.5f, 0.09f, -4.5f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.95f, 0.75f));
                 CreateInteriorLight("Lamp_Garage73_Inside", garage73.transform, new Vector3(0f, 3.05f, -2.6f), new Color(1f, 0.86f, 0.58f), 11f, 2.8f);
                 CreatePointLamp("Lamp_Garage73", northRoot.transform, new Vector3(24.5f, 3.6f, 5.5f), new Color(1f, 0.80f, 0.45f), 16f, 2.4f);
+                AddSideWallWindowGrid(garage73.transform, "Garage73_WinW", 3.20f, true, new[] { -1.5f, -4.1f }, new[] { 2.02f }, 1.45f, 1.12f, mats);
+                AddSideWallWindowGrid(garage73.transform, "Garage73_WinE", -3.20f, false, new[] { -1.5f, -4.1f }, new[] { 2.02f }, 1.45f, 1.12f, mats);
             }
 
             // 7. 66 SELMAN SOKAĞI — HOLLOW WALK-IN YELLOW 2-STORY HOUSE + Emekli Mehmet Amca!
@@ -427,6 +597,10 @@ namespace Gridroam.Editor
                     Quaternion.Euler(0f, 180f, 0f), new Vector2(0.46f, 0.16f), Color.white);
 
                 FurnishSelmanHomeInterior(house66.transform, new Vector3(1.0f, 0.09f, -2.8f), SelmanFloorPlan.Family_2_1, 6.0f, 6.0f, mats);
+                AddSideWallWindowGrid(house66.transform, "No66_WinW_Gnd", 4.20f, true, new[] { -1.5f, -4.3f }, new[] { 1.95f }, 1.35f, 1.32f, mats);
+                MountBlenderBalcony(house66.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "No66_BalcW_Up", new Vector3(4.20f, 3.46f, -2.8f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(house66.transform, "Sultanbeyli_Balcony_MasonryCorner.fbx", "No66_BalcE_Up", new Vector3(-4.00f, 3.46f, -2.8f), Quaternion.Euler(0f, -90f, 0f), mats);
+                AddSideWallWindowGrid(house66.transform, "No66_WinE_Gnd", -2.20f, false, new[] { -1.6f, -4.3f }, new[] { 1.95f }, 1.25f, 1.25f, mats);
                 AttachSelmanPaintableAddress(house66, "selman_home_66", "Selman Sokağı No: 66 (Sarı Ev)", new Vector3(45.5f, 0.12f, 4.9f));
                 SpawnSelmanResidentNpc(
                     "NPC_MehmetAmca_No66", "Mehmet Amca", "66 Selman Sk. Emekli Sakini",
@@ -451,6 +625,9 @@ namespace Gridroam.Editor
                 AddHollowRoomColliders(no81, -4.6f, 4.6f, -8.6f, -0.40f, 3.25f, 0.24f, doorX: 0f, doorW: 1.60f);
                 AddLocalBoxCollider(no81, new Vector3(-6.8f, 1.25f, -0.4f), new Vector3(3.8f, 2.5f, 5.4f));
                 FurnishSelmanHomeInterior(no81.transform, new Vector3(0f, 0.09f, -4.5f), SelmanFloorPlan.Family_2_1, 8.6f, 7.6f, mats);
+                AddSideWallWindowGrid(no81.transform, "No81_WinW_Gnd", 4.60f, true, new[] { -2.7f, -6.1f }, new[] { 1.85f }, 1.35f, 1.32f, mats);
+                MountBlenderBalcony(no81.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "No81_BalcW_Up", new Vector3(4.60f, 3.25f, -4.4f), Quaternion.Euler(0f, 90f, 0f), mats);
+                AddSideWallWindowGrid(no81.transform, "No81_WinE", -4.60f, false, new[] { -2.7f, -6.1f }, new[] { 1.85f, 4.75f }, 1.35f, 1.32f, mats);
                 AttachSelmanPaintableAddress(no81, "selman_home_81n", "Selman Sokağı No: 81", new Vector3(71.5f, 0.12f, 4.9f));
             }
             CreateTownTree("Selman_No81_FrontYardTree", northRoot.transform, new Vector3(75.5f, 0.04f, 7.8f), mats, 1.15f, 811);
@@ -470,6 +647,8 @@ namespace Gridroam.Editor
                 PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "CayOcagi_Table1", no95.transform, new Vector3(1.6f, 0.09f, -2.6f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
                 PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "CayOcagi_Table2", no95.transform, new Vector3(1.6f, 0.09f, -4.2f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
                 CreateInteriorLight("CayOcagi_Light", no95.transform, new Vector3(0f, 3.0f, -2.4f), new Color(1.0f, 0.92f, 0.75f), 10f, 2.6f);
+                AddSideWallWindowGrid(no95.transform, "No95_WinE", -4.20f, false, new[] { -1.4f, -3.9f }, new[] { 1.85f }, 1.50f, 1.35f, mats, warmLitIndex: 0);
+                AddSideWallWindowGrid(no95.transform, "No95_WinW", 4.20f, true, new[] { -1.4f, -3.9f }, new[] { 1.85f }, 1.45f, 1.30f, mats);
 
                 SpawnSelmanResidentNpc(
                     "NPC_CayciRiza_No95", "Rıza Abi", "95 Selman Çay Ocağı",
@@ -494,6 +673,9 @@ namespace Gridroam.Editor
                 AddLocalBoxCollider(whiteVilla, new Vector3(3.8f, 0.92f, 4.1f), new Vector3(4.2f, 1.84f, 0.28f));
                 AddLocalBoxCollider(whiteVilla, new Vector3(-3.8f, 0.92f, 4.1f), new Vector3(4.2f, 1.84f, 0.28f));
                 FurnishSelmanHomeInterior(whiteVilla.transform, new Vector3(0f, 0.09f, -2.6f), SelmanFloorPlan.Grand_3_1, 9.8f, 7.2f, mats);
+                AddSideWallWindowGrid(whiteVilla.transform, "WhiteVilla_WinW_Gnd", 5.20f, true, new[] { -1.2f, -4.2f }, new[] { 1.85f }, 1.35f, 1.35f, mats);
+                MountBlenderBalcony(whiteVilla.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "WhiteVilla_CamBalcW_Up", new Vector3(5.20f, 3.22f, -2.7f), Quaternion.Euler(0f, 90f, 0f), mats);
+                AddSideWallWindowGrid(whiteVilla.transform, "WhiteVilla_WinE", -5.20f, false, new[] { -1.2f, -4.2f }, new[] { 1.85f, 4.65f }, 1.35f, 1.35f, mats);
             }
         }
 
@@ -515,6 +697,8 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(no46S, -4.5f, 4.5f, -6.5f, 0.80f, 3.10f, 0.24f, doorX: -1.6f, doorW: 1.50f);
                 FurnishSelmanHomeInterior(no46S.transform, new Vector3(0.0f, 0.09f, -2.85f), SelmanFloorPlan.Flat_1_1, 8.4f, 6.8f, mats);
+                AddSideWallWindowGrid(no46S.transform, "No46S_WinW", -4.50f, false, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
+                AddSideWallWindowGrid(no46S.transform, "No46S_WinE", 4.50f, true, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
             }
 
             // 1. 50 SELMAN SK. SOUTH — 1+0 Stüdyo Bahçe Evi!
@@ -527,6 +711,8 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(no50S, -3.8f, 3.8f, -5.8f, 1.00f, 3.55f, 0.22f, doorX: -2.4f, doorW: 1.50f);
                 FurnishSelmanHomeInterior(no50S.transform, new Vector3(0.0f, 0.09f, -2.4f), SelmanFloorPlan.Studio_1_0, 7.0f, 6.2f, mats);
+                AddSideWallWindowGrid(no50S.transform, "No50S_WinW", -3.80f, false, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats);
+                AddSideWallWindowGrid(no50S.transform, "No50S_WinE", 3.80f, true, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats);
             }
 
             // 2. GÜRSU SOKAĞI CORNER (X = -41): 1+1 Peach Corner House (West) + 3+1 Yellow Apt (East)!
@@ -537,6 +723,8 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(peachCorner, -4.7f, 4.7f, -6.1f, 1.10f, 3.65f, 0.24f, doorX: 0f, doorW: 1.60f);
                 FurnishSelmanHomeInterior(peachCorner.transform, new Vector3(0f, 0.09f, -2.5f), SelmanFloorPlan.Flat_1_1, 8.8f, 6.8f, mats);
+                AddSideWallWindowGrid(peachCorner.transform, "PeachCorner_WinW", -4.70f, false, new[] { -0.9f, -4.1f }, new[] { 2.02f }, 1.45f, 1.35f, mats, warmLitIndex: 0);
+                AddSideWallWindowGrid(peachCorner.transform, "PeachCorner_WinE", 4.70f, true, new[] { -0.9f, -4.1f }, new[] { 2.02f }, 1.45f, 1.35f, mats);
             }
             GameObject gursuEast = PlaceSelmanModel("Sultanbeyli_YellowApartman.fbx", "Selman_GursuCorner_EastApt",
                 southRoot.transform, new Vector3(-31.2f, 0f, -11.5f), faceNorth, Vector3.one,
@@ -545,6 +733,10 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(gursuEast, -5.3f, 5.3f, -4.9f, 4.9f, 3.25f, 0.26f, doorX: 0f, doorW: 1.70f);
                 FurnishSelmanHomeInterior(gursuEast.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 9.8f, 9.0f, mats);
+                AddSideWallWindowGrid(gursuEast.transform, "GursuEast_WinW_Gnd", -5.30f, false, new[] { -2.1f, 2.1f }, new[] { 1.95f }, 1.45f, 1.40f, mats);
+                MountBlenderBalcony(gursuEast.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "GursuEast_CamBalcW_F2", new Vector3(-5.30f, 3.32f, 0.0f), Quaternion.Euler(0f, -90f, 0f), mats);
+                MountBlenderBalcony(gursuEast.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "GursuEast_CamBalcW_F3", new Vector3(-5.30f, 6.32f, 0.0f), Quaternion.Euler(0f, -90f, 0f), mats);
+                AddSideWallWindowGrid(gursuEast.transform, "GursuEast_WinE", 5.30f, true, new[] { -2.1f, 2.1f }, new[] { 1.95f, 4.95f, 7.95f }, 1.45f, 1.40f, mats);
             }
 
             // 3. ÇİÇEKÇİ SOKAĞI JUNCTION (X = -10.6):
@@ -556,6 +748,11 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(cicekciWest, -5.9f, 5.9f, -5.1f, 5.1f, 3.30f, 0.26f, doorX: 0f, doorW: 1.80f);
                 FurnishSelmanHomeInterior(cicekciWest.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 10.8f, 9.4f, mats);
+                AddSideWallWindowGrid(cicekciWest.transform, "CicekciWest_WinW", -5.60f, false, new[] { -2.2f, 2.2f }, new[] { 2.0f, 5.0f, 8.0f, 11.0f }, 1.45f, 1.45f, mats);
+                AddSideWallWindowGrid(cicekciWest.transform, "CicekciWest_WinE_Gnd", 5.60f, true, new[] { -2.2f, 2.2f }, new[] { 2.0f }, 1.45f, 1.45f, mats);
+                MountBlenderBalcony(cicekciWest.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "CicekciWest_CamBalcE_F2", new Vector3(5.60f, 3.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(cicekciWest.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "CicekciWest_CamBalcE_F3", new Vector3(5.60f, 6.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
+                MountBlenderBalcony(cicekciWest.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "CicekciWest_CamBalcE_F4", new Vector3(5.60f, 9.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
             }
             // East corner (+3.0): Split yellow garden wall (walk-in opening!) + 2+1 Half-Brick House!
             CreateStaticBlock("CicekciCorner_YellowWallL", southRoot.transform, new Vector3(-1.8f, 0.78f, -6.4f), new Vector3(4.5f, 1.56f, 0.24f), mats.YellowPlaster, addCollider: true);
@@ -567,6 +764,10 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(cicekciEast, -4.6f, 4.6f, -6.8f, 0.80f, 3.50f, 0.24f, doorX: -2.8f, doorW: 1.55f);
                 FurnishSelmanHomeInterior(cicekciEast.transform, new Vector3(0.0f, 0.09f, -3.0f), SelmanFloorPlan.Family_2_1, 8.6f, 7.0f, mats);
+                AddSideWallWindowGrid(cicekciEast.transform, "CicekciEast_WinW", -4.60f, false, new[] { -1.6f, -4.6f }, new[] { 1.92f, 4.82f }, 1.32f, 1.34f, mats, warmLitIndex: 1);
+                AddSideWallWindowGrid(cicekciEast.transform, "CicekciEast_WinE", 4.60f, true, new[] { -1.6f, -4.6f }, new[] { 1.92f, 4.82f }, 1.32f, 1.34f, mats);
+                AddTurkishWindowFrame(cicekciEast.transform, "CicekciEast_FrontUpL", new Vector3(2.8f, 4.85f, 0.885f), Quaternion.identity, 1.42f, 1.44f, mats);
+                AddTurkishWindowFrame(cicekciEast.transform, "CicekciEast_FrontUpC", new Vector3(0.4f, 4.85f, 0.885f), Quaternion.identity, 1.42f, 1.44f, mats);
             }
 
             // 4. 62 SELMAN SOKAĞI — Full Enterable & Paintable Neighborhood Home!
@@ -584,6 +785,8 @@ namespace Gridroam.Editor
                 // Hollow colliders for Cobalt-Blue Door Family House (2+1 Aile Evi!)
                 AddHollowRoomColliders(house66S, -2.2f, 5.6f, -6.0f, 0.80f, 3.15f, 0.22f, doorX: 0.55f, doorW: 1.55f);
                 FurnishSelmanHomeInterior(house66S.transform, new Vector3(1.7f, 0.09f, -2.6f), SelmanFloorPlan.Family_2_1, 7.2f, 6.2f, mats);
+                AddSideWallWindowGrid(house66S.transform, "No66S_WinE", 5.60f, true, new[] { -1.4f, -4.2f }, new[] { 1.85f, 4.75f }, 1.35f, 1.30f, mats, warmLitIndex: 2);
+                MountBlenderBalcony(house66S.transform, "Sultanbeyli_Balcony_MasonryCorner.fbx", "No66S_BalcW_Up", new Vector3(-2.20f, 3.12f, -2.8f), Quaternion.Euler(0f, -90f, 0f), mats);
 
                 // Hollow colliders for HAFSA TESİSAT Workshop (X = -8.6..-3.8, open wide door at X = -6.2!)
                 AddHollowRoomColliders(house66S, -8.6f, -3.8f, -4.6f, 0.60f, 3.10f, 0.20f, doorX: -6.2f, doorW: 2.50f);
@@ -626,6 +829,9 @@ namespace Gridroam.Editor
                 AddLocalBoxCollider(blue81, new Vector3(4.5f, 1.05f, 4.2f), new Vector3(3.4f, 2.1f, 0.30f));
                 AddLocalBoxCollider(blue81, new Vector3(-4.8f, 1.05f, 4.2f), new Vector3(4.2f, 2.1f, 0.30f));
                 FurnishSelmanHomeInterior(blue81.transform, new Vector3(0f, 0.09f, -3.2f), SelmanFloorPlan.Grand_3_1, 8.2f, 7.6f, mats);
+                AddSideWallWindowGrid(blue81.transform, "Blue81_WinW_Gnd", -4.40f, false, new[] { -1.5f, -4.9f }, new[] { 1.85f }, 1.35f, 1.35f, mats);
+                MountBlenderBalcony(blue81.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "Blue81_BalcW_Up", new Vector3(-4.40f, 3.25f, -3.2f), Quaternion.Euler(0f, -90f, 0f), mats);
+                AddSideWallWindowGrid(blue81.transform, "Blue81_WinE", 4.40f, true, new[] { -1.5f, -4.9f }, new[] { 1.85f, 4.75f }, 1.35f, 1.35f, mats);
                 AttachSelmanPaintableAddress(blue81, "selman_home_81s", "Selman Sokağı No: 81 Güney", new Vector3(71.5f, 0.12f, -4.9f));
             }
 
@@ -639,6 +845,8 @@ namespace Gridroam.Editor
             {
                 AddHollowRoomColliders(seHouse, -4.5f, 4.5f, -6.5f, 0.80f, 3.10f, 0.24f, doorX: -1.6f, doorW: 1.50f);
                 FurnishSelmanHomeInterior(seHouse.transform, new Vector3(0.0f, 0.09f, -2.85f), SelmanFloorPlan.Family_2_1, 8.4f, 6.8f, mats);
+                AddSideWallWindowGrid(seHouse.transform, "SEHouse_WinW", -4.50f, false, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
+                AddSideWallWindowGrid(seHouse.transform, "SEHouse_WinE", 4.50f, true, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
             }
 
             // 8. FULL WALK-IN HZ. OSMAN CAMİİ COMPLEX down Abdülkadir Udeh Sokağı
@@ -948,11 +1156,10 @@ namespace Gridroam.Editor
             InteractableTrigger ballTrig = ballGo.AddComponent<InteractableTrigger>();
             ballTrig.Configure(InteractableKind.Football, "selman_football", "ui.btn.kick_ball", 2.4f);
 
-            // 2. TWO ILLUMINATED MAHALLE ATM KIOSKS (No:58 Selman Bakkal & No:95 Abdülkadir Udeh Corner)
+            // 2. MAHALLE ATM KIOSK (No:58 Selman Bakkal — other ATMs are distributed onto Fatih Bulvarı & Petrol Yolu Cd.!)
             (string id, string label, Vector3 pos, float yaw)[] atmSpots =
             {
-                ("atm_bakkal58", "Sultanbeyli Bank ATM · No:58", new Vector3(10.8f, 0.04f,  5.35f), 180f),
-                ("atm_kose95",   "Hamidiye ATM · No:95 Köşe",    new Vector3(93.6f, 0.04f, -5.35f),   0f)
+                ("atm_bakkal58", "Sultanbeyli Bank ATM · No:58", new Vector3(10.8f, 0.04f,  5.35f), 180f)
             };
             for (int i = 0; i < atmSpots.Length; i++)
             {
@@ -1453,17 +1660,12 @@ namespace Gridroam.Editor
                 mats.TownAwningTerracotta, BlenderCharacterVariant.CasualMale,
                 mats.PedShirtMustard, mats.CharPantsDenim, mats.CharSkinMedium, mats.CharHairBrown, mats);
 
-            // 4. Side-Job Start Rings
+            // 4. Side-Job Start Ring for Selman Sokağı (Pizza Delivery right outside Selman Bakkal —
+            //    Taxi, Street Cleanup & House Painting are now distributed across Fatih Bulvarı, Petrol Yolu Cd. & Zübeyde Hanım Cd.!)
             CreateJobStartRing("JobBoard_Pizza", "job_board_pizza", JobType.PizzaDelivery, "job.pizza.name", "job.pizza.loc",
                 propsRoot.transform, new Vector3(8.5f, 0.06f, 4.6f), 4.0f, mats.JobRingGlow);
-            CreateJobStartRing("JobBoard_Taxi", "job_board_taxi", JobType.Taxi, "job.taxi.name", "job.taxi.loc",
-                propsRoot.transform, new Vector3(-36.0f, 0.06f, -4.6f), 4.0f, mats.JobRingGlow);
-            CreateJobStartRing("JobBoard_Cleanup", "job_board_cleanup", JobType.StreetCleanup, "job.cleanup.name", "job.cleanup.loc",
-                propsRoot.transform, new Vector3(52.0f, 0.06f, 4.6f), 3.6f, mats.JobRingGlow);
-            CreateJobStartRing("JobBoard_HousePainting", "job_board_painting", JobType.HousePainting, "job.paint.name", "job.paint.loc",
-                propsRoot.transform, new Vector3(19.5f, 0.06f, -5.2f), 3.6f, mats.JobRingGlow);
 
-            // 5. Fuel Pump & Mailboxes/Vending
+            // 5. Fuel Pump & Mailboxes/Vending (additional Fuel Pump & Vending Machines live on Petrol Yolu, Fatih, Eyyubi & Mürşit!)
             CreateFuelPump("Selman_FuelPump", "fuel_pump_01", propsRoot.transform, new Vector3(-84.5f, 0.04f, 12.0f), mats);
             CreateMailbox("Selman_Mailbox_48", "mailbox_01", propsRoot.transform, new Vector3(-60.0f, 0.04f, 5.3f), Quaternion.Euler(0f, 180f, 0f), mats);
             CreateVendingMachine("Selman_Vending_58", "vending_selman_01", propsRoot.transform, new Vector3(12.2f, 0.04f, 5.4f), Quaternion.Euler(0f, 180f, 0f), mats);
@@ -1474,17 +1676,14 @@ namespace Gridroam.Editor
             GameObject carsRoot = new GameObject("Selman_PhotoMatched_DrivableCars");
             carsRoot.transform.SetParent(parent, false);
 
+            // Balanced 5 iconic cars on Selman Sokağı (8 more drivable cars are distributed across all 8 Hamidiye Avenues!)
             (GameObject prefab, Vector3 pos, float yaw, string label)[] spots =
             {
                 (prefabs.TownCarWhiteVan,          new Vector3(-44.0f, 0.25f,  2.4f),  90f, "Car_No52_WhiteDeliveryVan"),
                 (prefabs.TownCarRedHatchback,      new Vector3(-74.5f, 0.25f, -2.5f), 270f, "Car_No50_RedVanHatch"),
                 (prefabs.TownCarCharcoalSUV,       new Vector3(-2.5f,  0.25f,  2.4f),  90f, "Car_No58_MPV"),
-                (prefabs.TownCarGreenSedan,        new Vector3(-13.5f, 0.25f,  7.5f), 180f, "Car_No63_DrivewaySedan"),
                 (prefabs.TownCarBlueHatchback,     new Vector3(41.0f,  0.25f, -2.4f), 270f, "Car_No66S_HafsaHatchback"),
-                (prefabs.TownCarGreenSedan,        new Vector3(57.8f,  0.25f, 11.5f),   0f, "Car_NutukSk_SilverSedan"),
-                (prefabs.TownCarBlueSportsCoupe,   new Vector3(71.5f,  0.25f, -2.5f), 270f, "Car_No81S_DarkBlueSedan"),
-                (prefabs.TownCarCharcoalSUV,       new Vector3(92.5f,  0.25f, -2.6f), 270f, "Car_No95_DarkBlueSUV"),
-                (prefabs.TownCarYellowSportsCoupe, new Vector3(109.0f, 0.25f,  2.3f),  90f, "Car_SelmanEast_YellowCoupe")
+                (prefabs.TownCarBlueSportsCoupe,   new Vector3(71.5f,  0.25f, -2.5f), 270f, "Car_No81S_DarkBlueSedan")
             };
 
             for (int i = 0; i < spots.Length; i++)

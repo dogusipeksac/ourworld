@@ -117,6 +117,17 @@ namespace Gridroam.Player
         private float _smoothedLookYaw;
         private float _smoothedLookPitch;
 
+        // Shop shelf reach & drinking/eating animation state
+        private bool _hasShelfReach;
+        private Vector3 _shelfReachWorldPos;
+        private float _shelfReachWeight;
+        private int _consumeMode; // 0 = none, 1 = drink bottle/cup, 2 = eat food/cone
+        private float _consumeWeight;
+        private float _consumeCyclePhase;
+
+        public Transform HeadTransform => head;
+        public Transform RightForearm => rElbow;
+
         public bool IsSitting => isSitting;
         public event Action<float> OnFootstepContact;
         public event Action OnLanded;
@@ -1133,6 +1144,28 @@ namespace Gridroam.Player
                 targetSpineRot.y += 32f * Mathf.Clamp01(windup) - 37f * Mathf.Clamp01(follow);
             }
 
+            if (_hasShelfReach && _shelfReachWeight > 0.01f)
+            {
+                targetSpineRot.x += 9f * _shelfReachWeight;
+                targetSpineRot.y -= 10f * _shelfReachWeight;
+                targetHeadRot.x += 6f * _shelfReachWeight;
+            }
+            else if (_consumeMode == 1 && _consumeWeight > 0.01f)
+            {
+                // Realistic drinking tilt: gently tip head back on each sip
+                float sip = Mathf.Clamp01(_consumeCyclePhase);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -26f, sip * _consumeWeight);
+                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, -9f, sip * _consumeWeight);
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -4f, sip * _consumeWeight);
+            }
+            else if (_consumeMode == 2 && _consumeWeight > 0.01f)
+            {
+                // Realistic eating nod: lean slightly toward bite
+                float bite = Mathf.Clamp01(_consumeCyclePhase);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 14f, bite * _consumeWeight);
+                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 5f, bite * _consumeWeight);
+            }
+
             if (chestVisual != null)
             {
                 float breathScale = 1f + breathWave * 0.018f * (1f - moveBlend);
@@ -1225,6 +1258,25 @@ namespace Gridroam.Player
             }
 
             if (tennisStance) ApplyTennisRacketPose(swingTime);
+
+            // Shop shelf IK reach & drink/eat mouth-target IK overlay
+            if (!carrying && !petting && !tennisStance && !_isSwimming && rShoulder != null && rElbow != null)
+            {
+                if (_hasShelfReach && _shelfReachWeight > 0.01f)
+                {
+                    AimHand(rShoulder, rElbow, _shelfReachWorldPos, transform.right, _shelfReachWeight);
+                }
+                else if (_consumeMode > 0 && _consumeWeight > 0.01f && head != null)
+                {
+                    float phase = Mathf.Clamp01(_consumeCyclePhase);
+                    Vector3 holdPos = head.position + transform.forward * 0.28f + transform.right * 0.14f - transform.up * 0.24f;
+                    Vector3 mouthPos = _consumeMode == 1
+                        ? head.position + transform.forward * 0.17f + transform.right * 0.03f - transform.up * 0.01f
+                        : head.position + transform.forward * 0.19f + transform.right * 0.04f - transform.up * 0.06f;
+                    Vector3 handTarget = Vector3.Lerp(holdPos, mouthPos, phase);
+                    AimHand(rShoulder, rElbow, handTarget, transform.right, _consumeWeight);
+                }
+            }
         }
 
         private Vector3 ShoulderReach(Transform shoulder, Transform elbow, Vector3 target)
@@ -1462,6 +1514,20 @@ namespace Gridroam.Player
         {
             _tennisContactAt = float.NegativeInfinity;
             _tennisServing = false;
+        }
+
+        public void SetShelfReach(bool active, Vector3 worldPos, float weight)
+        {
+            _hasShelfReach = active;
+            _shelfReachWorldPos = worldPos;
+            _shelfReachWeight = active ? Mathf.Clamp01(weight) : 0f;
+        }
+
+        public void SetConsumePose(int mode, float weight, float cyclePhase)
+        {
+            _consumeMode = mode;
+            _consumeWeight = mode > 0 ? Mathf.Clamp01(weight) : 0f;
+            _consumeCyclePhase = Mathf.Clamp01(cyclePhase);
         }
 
         private void ApplyTennisRacketPose(float swingTime)

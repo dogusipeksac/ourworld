@@ -170,8 +170,23 @@ namespace Gridroam.Player
                 return;
             }
 
-            RestoreEnergy(8f);
-            OnNeedsMessage?.Invoke(LocalizationService.Tr("ui.vending.bought", "Soğuk içecek aldın! (+8 Enerji)"));
+            if (PlayerModeController.Instance != null &&
+                PlayerModeController.Instance.FootController != null &&
+                PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot)
+            {
+                OnNeedsMessage?.Invoke(LocalizationService.Tr("ui.vending.bought", "Soğuk su alındı, içiliyor..."));
+                PlayerConsumeAnimator.PlayPurchase(
+                    PlayerModeController.Instance.FootController,
+                    "vending",
+                    ConsumeAnimKind.DrinkWater,
+                    "Soğuk Su",
+                    8f);
+            }
+            else
+            {
+                RestoreEnergy(8f);
+                OnNeedsMessage?.Invoke(LocalizationService.Tr("ui.vending.bought", "Soğuk içecek aldın! (+8 Enerji)"));
+            }
         }
 
         public void TrySleepInBed()

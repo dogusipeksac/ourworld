@@ -40,96 +40,97 @@ namespace Gridroam.UI
             public int Price;
             public ShopOfferKind Kind;
             public float Param;
+            public ConsumeAnimKind ConsumeKind;
         }
 
         private static readonly ShopOffer[] FoodShopOffers =
         {
-            new ShopOffer { LabelTr = "Türk Kahvesi · 15 ₺ (+25 Enerji)",           Price = 15, Kind = ShopOfferKind.Energy, Param = 25f },
-            new ShopOffer { LabelTr = "Kaşarlı Tost · 25 ₺ (+40 Enerji)",           Price = 25, Kind = ShopOfferKind.Energy, Param = 40f },
-            new ShopOffer { LabelTr = "Sıcak Yemek / Pizza · 40 ₺ (+65 Enerji)",    Price = 40, Kind = ShopOfferKind.Energy, Param = 65f },
-            new ShopOffer { LabelTr = "Enerji İçeceği · 55 ₺ (Tam Enerji %100)",    Price = 55, Kind = ShopOfferKind.Energy, Param = 100f },
-            new ShopOffer { LabelTr = "Yol Kumanyası · 75 ₺ (Tam Enerji + Depo)",   Price = 75, Kind = ShopOfferKind.FuelCan, Param = 100f }
+            new ShopOffer { LabelTr = "Türk Kahvesi · 15 ₺ (+25 Enerji)",           Price = 15, Kind = ShopOfferKind.Energy, Param = 25f,  ConsumeKind = ConsumeAnimKind.DrinkHotCup },
+            new ShopOffer { LabelTr = "Soğuk Su (0.5L) · 6 ₺ (+18 Enerji)",         Price = 6,  Kind = ShopOfferKind.Energy, Param = 18f,  ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Kaşarlı Tost · 25 ₺ (+40 Enerji)",           Price = 25, Kind = ShopOfferKind.Energy, Param = 40f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Sıcak Yemek / Pizza · 40 ₺ (+65 Enerji)",    Price = 40, Kind = ShopOfferKind.Energy, Param = 65f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Enerji İçeceği · 55 ₺ (Tam Enerji %100)",    Price = 55, Kind = ShopOfferKind.Energy, Param = 100f, ConsumeKind = ConsumeAnimKind.DrinkWater }
         };
 
         private static readonly ShopOffer[] GearVendorOffers =
         {
-            new ShopOffer { LabelTr = "Koşu Ayakkabısı · 180 ₺ (Kalıcı +%22 Hız)",   Price = 180, Kind = ShopOfferKind.RunningShoes, Param = 0f },
-            new ShopOffer { LabelTr = "Bordo Deri Ceket · 220 ₺ (Kıyafet Değiştir)", Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 1f },
-            new ShopOffer { LabelTr = "Zeytin Parka · 220 ₺ (Kıyafet Değiştir)",     Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 2f },
-            new ShopOffer { LabelTr = "Antrasit Ceket · 220 ₺ (Kıyafet Değiştir)",   Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 3f },
-            new ShopOffer { LabelTr = "Soğuk Meyve Suyu · 20 ₺ (+30 Enerji)",        Price = 20,  Kind = ShopOfferKind.Energy,       Param = 30f }
+            new ShopOffer { LabelTr = "Koşu Ayakkabısı · 180 ₺ (Kalıcı +%22 Hız)",   Price = 180, Kind = ShopOfferKind.RunningShoes, Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Bordo Deri Ceket · 220 ₺ (Kıyafet Değiştir)", Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 1f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Zeytin Parka · 220 ₺ (Kıyafet Değiştir)",     Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 2f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Antrasit Ceket · 220 ₺ (Kıyafet Değiştir)",   Price = 220, Kind = ShopOfferKind.JacketColor,  Param = 3f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Soğuk Meyve Suyu · 20 ₺ (+30 Enerji)",        Price = 20,  Kind = ShopOfferKind.Energy,       Param = 30f, ConsumeKind = ConsumeAnimKind.DrinkWater }
         };
 
         private static readonly ShopOffer[] AutoVendorOffers =
         {
-            new ShopOffer { LabelTr = "Turbo Motor Kiti · 350 ₺ (Kalıcı +%28 Güç)",  Price = 350, Kind = ShopOfferKind.TurboKit,    Param = 0f },
-            new ShopOffer { LabelTr = "Acil Yakıt Bidonu · 60 ₺ (Depoyu Doldur)",    Price = 60,  Kind = ShopOfferKind.FuelCan,     Param = 0f },
-            new ShopOffer { LabelTr = "Klasik Lacivert Ceket · 120 ₺ (Kıyafet)",     Price = 120, Kind = ShopOfferKind.JacketColor, Param = 0f },
-            new ShopOffer { LabelTr = "Tamirci Kahvesi · 15 ₺ (+25 Enerji)",         Price = 15,  Kind = ShopOfferKind.Energy,      Param = 25f },
-            new ShopOffer { LabelTr = "Enerji Barı · 35 ₺ (+55 Enerji)",             Price = 35,  Kind = ShopOfferKind.Energy,      Param = 55f }
+            new ShopOffer { LabelTr = "Turbo Motor Kiti · 350 ₺ (Kalıcı +%28 Güç)",  Price = 350, Kind = ShopOfferKind.TurboKit,    Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Acil Yakıt Bidonu · 60 ₺ (Depoyu Doldur)",    Price = 60,  Kind = ShopOfferKind.FuelCan,     Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Klasik Lacivert Ceket · 120 ₺ (Kıyafet)",     Price = 120, Kind = ShopOfferKind.JacketColor, Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Tamirci Kahvesi · 15 ₺ (+25 Enerji)",         Price = 15,  Kind = ShopOfferKind.Energy,      Param = 25f, ConsumeKind = ConsumeAnimKind.DrinkHotCup },
+            new ShopOffer { LabelTr = "Enerji Barı · 35 ₺ (+55 Enerji)",             Price = 35,  Kind = ShopOfferKind.Energy,      Param = 55f, ConsumeKind = ConsumeAnimKind.EatFood }
         };
 
         private static readonly ShopOffer[] SimitVendorOffers =
         {
-            new ShopOffer { LabelTr = "Sıcak Susamlı Simit · 12 ₺ (+22 Enerji)",       Price = 12, Kind = ShopOfferKind.Energy,  Param = 22f },
-            new ShopOffer { LabelTr = "İnce Belli Demli Çay · 10 ₺ (+18 Enerji)",      Price = 10, Kind = ShopOfferKind.Energy,  Param = 18f },
-            new ShopOffer { LabelTr = "Sıcak Kaşarlı Poğaça · 18 ₺ (+32 Enerji)",      Price = 18, Kind = ShopOfferKind.Energy,  Param = 32f },
-            new ShopOffer { LabelTr = "Simit + Ayran Menüsü · 24 ₺ (+44 Enerji)",      Price = 24, Kind = ShopOfferKind.Energy,  Param = 44f },
-            new ShopOffer { LabelTr = "Büyük Termos Çay & Simit · 45 ₺ (+85 Enerji)",  Price = 45, Kind = ShopOfferKind.Energy,  Param = 85f }
+            new ShopOffer { LabelTr = "Sıcak Susamlı Simit · 12 ₺ (+22 Enerji)",       Price = 12, Kind = ShopOfferKind.Energy,  Param = 22f, ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "İnce Belli Demli Çay · 10 ₺ (+18 Enerji)",      Price = 10, Kind = ShopOfferKind.Energy,  Param = 18f, ConsumeKind = ConsumeAnimKind.DrinkHotCup },
+            new ShopOffer { LabelTr = "Sıcak Kaşarlı Poğaça · 18 ₺ (+32 Enerji)",      Price = 18, Kind = ShopOfferKind.Energy,  Param = 32f, ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Simit + Ayran Menüsü · 24 ₺ (+44 Enerji)",      Price = 24, Kind = ShopOfferKind.Energy,  Param = 44f, ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Büyük Termos Çay & Simit · 45 ₺ (+85 Enerji)",  Price = 45, Kind = ShopOfferKind.Energy,  Param = 85f, ConsumeKind = ConsumeAnimKind.DrinkHotCup }
         };
 
         private static readonly ShopOffer[] ManavOffers =
         {
-            new ShopOffer { LabelTr = "Taze Portakal & Mandalina · 18 ₺ (+30 Enerji)", Price = 18, Kind = ShopOfferKind.Energy,  Param = 30f },
-            new ShopOffer { LabelTr = "Tarla Domatesi & Biber · 22 ₺ (+35 Enerji)",    Price = 22, Kind = ShopOfferKind.Energy,  Param = 35f },
-            new ShopOffer { LabelTr = "Aydos Elması & Muz · 28 ₺ (+45 Enerji)",        Price = 28, Kind = ShopOfferKind.Energy,  Param = 45f },
-            new ShopOffer { LabelTr = "Karışık Vitamin Sepeti · 42 ₺ (+75 Enerji)",    Price = 42, Kind = ShopOfferKind.Energy,  Param = 75f },
-            new ShopOffer { LabelTr = "Aile Boyu Manav Kasası · 60 ₺ (%100 Enerji)",   Price = 60, Kind = ShopOfferKind.Energy,  Param = 100f }
+            new ShopOffer { LabelTr = "Taze Portakal & Mandalina · 18 ₺ (+30 Enerji)", Price = 18, Kind = ShopOfferKind.Energy,  Param = 30f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Tarla Domatesi & Biber · 22 ₺ (+35 Enerji)",    Price = 22, Kind = ShopOfferKind.Energy,  Param = 35f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Aydos Elması & Muz · 28 ₺ (+45 Enerji)",        Price = 28, Kind = ShopOfferKind.Energy,  Param = 45f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Karışık Vitamin Sepeti · 42 ₺ (+75 Enerji)",    Price = 42, Kind = ShopOfferKind.Energy,  Param = 75f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Aile Boyu Manav Kasası · 60 ₺ (%100 Enerji)",   Price = 60, Kind = ShopOfferKind.Energy,  Param = 100f, ConsumeKind = ConsumeAnimKind.EatFood }
         };
 
         private static readonly ShopOffer[] SarkuteriOffers =
         {
-            new ShopOffer { LabelTr = "Ezine Beyaz Peynir · 24 ₺ (+38 Enerji)",        Price = 24, Kind = ShopOfferKind.Energy,  Param = 38f },
-            new ShopOffer { LabelTr = "Gemlik Siyah Zeytin · 20 ₺ (+30 Enerji)",       Price = 20, Kind = ShopOfferKind.Energy,  Param = 30f },
-            new ShopOffer { LabelTr = "Kayseri Sucuklu Tost · 36 ₺ (+58 Enerji)",      Price = 36, Kind = ShopOfferKind.Energy,  Param = 58f },
-            new ShopOffer { LabelTr = "Taze Kaşar & Bal Kaymak · 48 ₺ (+80 Enerji)",   Price = 48, Kind = ShopOfferKind.Energy,  Param = 80f },
-            new ShopOffer { LabelTr = "Serpme Kahvaltı Paketi · 68 ₺ (%100 Enerji)",   Price = 68, Kind = ShopOfferKind.Energy,  Param = 100f }
+            new ShopOffer { LabelTr = "Ezine Beyaz Peynir · 24 ₺ (+38 Enerji)",        Price = 24, Kind = ShopOfferKind.Energy,  Param = 38f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Gemlik Siyah Zeytin · 20 ₺ (+30 Enerji)",       Price = 20, Kind = ShopOfferKind.Energy,  Param = 30f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Kayseri Sucuklu Tost · 36 ₺ (+58 Enerji)",      Price = 36, Kind = ShopOfferKind.Energy,  Param = 58f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Taze Kaşar & Bal Kaymak · 48 ₺ (+80 Enerji)",   Price = 48, Kind = ShopOfferKind.Energy,  Param = 80f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Serpme Kahvaltı Paketi · 68 ₺ (%100 Enerji)",   Price = 68, Kind = ShopOfferKind.Energy,  Param = 100f, ConsumeKind = ConsumeAnimKind.EatFood }
         };
 
         private static readonly ShopOffer[] DondurmaOffers =
         {
-            new ShopOffer { LabelTr = "Külah Dondurma · 15 ₺ (+24 Enerji)",            Price = 15, Kind = ShopOfferKind.Energy,  Param = 24f },
-            new ShopOffer { LabelTr = "Buz Gibi Yayık Ayran · 14 ₺ (+25 Enerji)",      Price = 14, Kind = ShopOfferKind.Energy,  Param = 25f },
-            new ShopOffer { LabelTr = "Soğuk Gazoz & Limonata · 18 ₺ (+32 Enerji)",    Price = 18, Kind = ShopOfferKind.Energy,  Param = 32f },
-            new ShopOffer { LabelTr = "Maraş Dondurma Kutusu · 38 ₺ (+65 Enerji)",     Price = 38, Kind = ShopOfferKind.Energy,  Param = 65f },
-            new ShopOffer { LabelTr = "Soğuk Enerji İçeceği · 50 ₺ (%100 Enerji)",     Price = 50, Kind = ShopOfferKind.Energy,  Param = 100f }
+            new ShopOffer { LabelTr = "Soğuk Su (0.5L) · 6 ₺ (+18 Enerji)",            Price = 6,  Kind = ShopOfferKind.Energy,  Param = 18f,  ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Külah Dondurma · 15 ₺ (+24 Enerji)",            Price = 15, Kind = ShopOfferKind.Energy,  Param = 24f,  ConsumeKind = ConsumeAnimKind.EatIceCream },
+            new ShopOffer { LabelTr = "Buz Gibi Yayık Ayran · 14 ₺ (+25 Enerji)",      Price = 14, Kind = ShopOfferKind.Energy,  Param = 25f,  ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Soğuk Gazoz & Limonata · 18 ₺ (+32 Enerji)",    Price = 18, Kind = ShopOfferKind.Energy,  Param = 32f,  ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Soğuk Enerji İçeceği · 50 ₺ (%100 Enerji)",     Price = 50, Kind = ShopOfferKind.Energy,  Param = 100f, ConsumeKind = ConsumeAnimKind.DrinkWater }
         };
 
         private static readonly ShopOffer[] CayOcagiOffers =
         {
-            new ShopOffer { LabelTr = "İnce Belli Demli Çay · 10 ₺ (+20 Enerji)",      Price = 10, Kind = ShopOfferKind.Energy,  Param = 20f },
-            new ShopOffer { LabelTr = "Közde Türk Kahvesi · 20 ₺ (+35 Enerji)",        Price = 20, Kind = ShopOfferKind.Energy,  Param = 35f },
-            new ShopOffer { LabelTr = "Oralet / Kuşburnu · 14 ₺ (+26 Enerji)",         Price = 14, Kind = ShopOfferKind.Energy,  Param = 26f },
-            new ShopOffer { LabelTr = "Kaşarlı Karışık Tost · 32 ₺ (+55 Enerji)",      Price = 32, Kind = ShopOfferKind.Energy,  Param = 55f },
-            new ShopOffer { LabelTr = "Esnaf Kahvaltı Tabağı · 55 ₺ (%100 Enerji)",    Price = 55, Kind = ShopOfferKind.Energy,  Param = 100f }
+            new ShopOffer { LabelTr = "İnce Belli Demli Çay · 10 ₺ (+20 Enerji)",      Price = 10, Kind = ShopOfferKind.Energy,  Param = 20f,  ConsumeKind = ConsumeAnimKind.DrinkHotCup },
+            new ShopOffer { LabelTr = "Közde Türk Kahvesi · 20 ₺ (+35 Enerji)",        Price = 20, Kind = ShopOfferKind.Energy,  Param = 35f,  ConsumeKind = ConsumeAnimKind.DrinkHotCup },
+            new ShopOffer { LabelTr = "Oralet / Kuşburnu · 14 ₺ (+26 Enerji)",         Price = 14, Kind = ShopOfferKind.Energy,  Param = 26f,  ConsumeKind = ConsumeAnimKind.DrinkHotCup },
+            new ShopOffer { LabelTr = "Kaşarlı Karışık Tost · 32 ₺ (+55 Enerji)",      Price = 32, Kind = ShopOfferKind.Energy,  Param = 55f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Esnaf Kahvaltı Tabağı · 55 ₺ (%100 Enerji)",    Price = 55, Kind = ShopOfferKind.Energy,  Param = 100f, ConsumeKind = ConsumeAnimKind.EatFood }
         };
 
         private static readonly ShopOffer[] SelmanBakkalOffers =
         {
-            new ShopOffer { LabelTr = "Taze Somun Ekmek & Peynir · 18 ₺ (+30 Enerji)", Price = 18, Kind = ShopOfferKind.Energy,  Param = 30f },
-            new ShopOffer { LabelTr = "Manav Meyve Sepeti · 25 ₺ (+42 Enerji)",        Price = 25, Kind = ShopOfferKind.Energy,  Param = 42f },
-            new ShopOffer { LabelTr = "Şarküteri Sucuklu Tost · 35 ₺ (+58 Enerji)",    Price = 35, Kind = ShopOfferKind.Energy,  Param = 58f },
-            new ShopOffer { LabelTr = "Buz Gibi Ayran & Dondurma · 30 ₺ (+50 Enerji)", Price = 30, Kind = ShopOfferKind.Energy,  Param = 50f },
-            new ShopOffer { LabelTr = "Haftalık Market Kumanyası · 68 ₺ (Enerji+Depo)",Price = 68, Kind = ShopOfferKind.FuelCan, Param = 100f }
+            new ShopOffer { LabelTr = "Soğuk Su (0.5L) · 6 ₺ (+18 Enerji)",            Price = 6,  Kind = ShopOfferKind.Energy,  Param = 18f,  ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Buz Gibi Ayran · 14 ₺ (+26 Enerji)",            Price = 14, Kind = ShopOfferKind.Energy,  Param = 26f,  ConsumeKind = ConsumeAnimKind.DrinkWater },
+            new ShopOffer { LabelTr = "Taze Somun Ekmek & Peynir · 18 ₺ (+32 Enerji)", Price = 18, Kind = ShopOfferKind.Energy,  Param = 32f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Şarküteri Sucuklu Tost · 35 ₺ (+58 Enerji)",    Price = 35, Kind = ShopOfferKind.Energy,  Param = 58f,  ConsumeKind = ConsumeAnimKind.EatFood },
+            new ShopOffer { LabelTr = "Haftalık Market Kumanyası · 68 ₺ (Enerji+Depo)",Price = 68, Kind = ShopOfferKind.FuelCan, Param = 100f, ConsumeKind = ConsumeAnimKind.EatFood }
         };
 
         private static readonly ShopOffer[] HafsaTesisatOffers =
         {
-            new ShopOffer { LabelTr = "Acil Yakıt Bidonu · 55 ₺ (Depoyu Doldur)",        Price = 55,  Kind = ShopOfferKind.FuelCan,      Param = 0f },
-            new ShopOffer { LabelTr = "Turbo & Tesisat Kiti · 320 ₺ (Kalıcı +%28 Güç)",  Price = 320, Kind = ShopOfferKind.TurboKit,     Param = 0f },
-            new ShopOffer { LabelTr = "Rahat Yürüyüş Ayakkabısı · 165 ₺ (+%22 Hız)",     Price = 165, Kind = ShopOfferKind.RunningShoes, Param = 0f },
-            new ShopOffer { LabelTr = "Zeytin İş Parkası · 200 ₺ (Kıyafet Değiştir)",    Price = 200, Kind = ShopOfferKind.JacketColor,  Param = 2f },
-            new ShopOffer { LabelTr = "Usta İkramı Çay & Kek · 12 ₺ (+22 Enerji)",       Price = 12,  Kind = ShopOfferKind.Energy,       Param = 22f }
+            new ShopOffer { LabelTr = "Acil Yakıt Bidonu · 55 ₺ (Depoyu Doldur)",        Price = 55,  Kind = ShopOfferKind.FuelCan,      Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Turbo & Tesisat Kiti · 320 ₺ (Kalıcı +%28 Güç)",  Price = 320, Kind = ShopOfferKind.TurboKit,     Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Rahat Yürüyüş Ayakkabısı · 165 ₺ (+%22 Hız)",     Price = 165, Kind = ShopOfferKind.RunningShoes, Param = 0f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Zeytin İş Parkası · 200 ₺ (Kıyafet Değiştir)",    Price = 200, Kind = ShopOfferKind.JacketColor,  Param = 2f,  ConsumeKind = ConsumeAnimKind.None },
+            new ShopOffer { LabelTr = "Usta İkramı Çay & Kek · 12 ₺ (+22 Enerji)",       Price = 12,  Kind = ShopOfferKind.Energy,       Param = 22f, ConsumeKind = ConsumeAnimKind.DrinkHotCup }
         };
 
         private ShopOffer[] GetActiveOffers()
@@ -312,14 +313,26 @@ namespace Gridroam.UI
             }
 
             string feedback = "Satın alındı!";
+            bool triggerConsumeAnim = false;
             switch (offer.Kind)
             {
                 case ShopOfferKind.Energy:
-                    if (PlayerNeedsController.Instance != null)
+                    if (offer.ConsumeKind != ConsumeAnimKind.None &&
+                        PlayerModeController.Instance != null &&
+                        PlayerModeController.Instance.FootController != null &&
+                        PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot)
                     {
-                        PlayerNeedsController.Instance.RestoreEnergy(offer.Param);
+                        triggerConsumeAnim = true;
+                        feedback = "Raftan alınıyor...";
                     }
-                    feedback = $"Afiyet olsun! +{Mathf.RoundToInt(offer.Param)} Enerji";
+                    else
+                    {
+                        if (PlayerNeedsController.Instance != null)
+                        {
+                            PlayerNeedsController.Instance.RestoreEnergy(offer.Param);
+                        }
+                        feedback = $"Afiyet olsun! +{Mathf.RoundToInt(offer.Param)} Enerji";
+                    }
                     break;
 
                 case ShopOfferKind.RunningShoes:
@@ -364,6 +377,18 @@ namespace Gridroam.UI
             if (PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.RaiseStatusMessage(feedback);
+            }
+
+            if (triggerConsumeAnim && PlayerModeController.Instance != null && PlayerModeController.Instance.FootController != null)
+            {
+                string capturedShopId = _activeShopId;
+                Close();
+                PlayerConsumeAnimator.PlayPurchase(
+                    PlayerModeController.Instance.FootController,
+                    capturedShopId,
+                    offer.ConsumeKind,
+                    offer.LabelTr,
+                    offer.Param);
             }
         }
 

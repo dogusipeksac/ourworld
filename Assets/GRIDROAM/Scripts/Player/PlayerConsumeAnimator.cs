@@ -1,0 +1,469 @@
+using System.Collections;
+using Gridroam.Core;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+namespace Gridroam.Player
+{
+    public enum ConsumeAnimKind
+    {
+        None = 0,
+        DrinkWater = 1,
+        DrinkHotCup = 2,
+        EatFood = 3,
+        EatIceCream = 4
+    }
+
+    /// <summary>
+    /// Realistic 3-stage shop purchase & consumption animation on the player character:
+    /// 1) Walks smoothly to the nearest matching shelf / fridge / counter inside the shop
+    /// 2) Reaches right arm onto the shelf with 2-bone IK and grabs a visible 3D item prop
+    /// 3) Raises the bottle / tea glass / ice-cream cone / snack to the mouth with realistic
+    ///    sipping or biting animations (while allowing the player to walk freely once grabbed!).
+    /// </summary>
+    public class PlayerConsumeAnimator : MonoBehaviour
+    {
+        private PlayerFootController _foot;
+        private CharacterController _cc;
+        private Coroutine _activeRoutine;
+        private GameObject _heldProp;
+        private bool _holdingModalLock;
+
+        private static readonly string[] DrinkPropNames = { "DrinkFridge", "Vending", "CayOcagi_Fridge", "CayOcagi_Counter", "Shelf" };
+        private static readonly string[] IceCreamPropNames = { "DondurmaDolabi", "DrinkFridge", "Shelf" };
+        private static readonly string[] ProducePropNames = { "ManavReyonu", "Shelf", "KasaBandi" };
+        private static readonly string[] DeliPropNames = { "Sarkuteri", "Shelf", "KasaBandi", "CayOcagi_Counter" };
+        private static readonly string[] HotCupPropNames = { "CayOcagi_Counter", "CayOcagi_Fridge", "KasaBandi", "Shelf" };
+
+        public bool IsPlaying => _activeRoutine != null;
+
+        public static void PlayPurchase(
+            PlayerFootController foot,
+            string shopId,
+            ConsumeAnimKind kind,
+            string itemLabel,
+            float energyToRestore)
+        {
+            if (foot == null || kind == ConsumeAnimKind.None)
+            {
+                if (energyToRestore > 0f && PlayerNeedsController.Instance != null)
+                {
+                    PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
+                }
+                return;
+            }
+
+            PlayerConsumeAnimator anim = foot.GetComponent<PlayerConsumeAnimator>();
+            if (anim == null)
+            {
+                anim = foot.gameObject.AddComponent<PlayerConsumeAnimator>();
+            }
+            anim.StartSequence(foot, shopId, kind, itemLabel, energyToRestore);
+        }
+
+        private void Awake()
+        {
+            _foot = GetComponent<PlayerFootController>();
+            _cc = GetComponent<CharacterController>();
+        }
+
+        private void OnDisable()
+        {
+            CancelActive();
+        }
+
+        private void OnDestroy()
+        {
+            CancelActive();
+        }
+
+        public void CancelActive()
+        {
+            if (_activeRoutine != null)
+            {
+                StopCoroutine(_activeRoutine);
+                _activeRoutine = null;
+            }
+            CleanupVisualsAndLocks();
+        }
+
+        private void StartSequence(PlayerFootController foot, string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore)
+        {
+            _foot = foot;
+            if (_cc == null) _cc = foot.GetComponent<CharacterController>();
+            CancelActive();
+            _activeRoutine = StartCoroutine(PurchaseAndConsumeRoutine(shopId ?? string.Empty, kind, itemLabel ?? string.Empty, energyToRestore));
+        }
+
+        private IEnumerator PurchaseAndConsumeRoutine(string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore)
+        {
+            ProceduralHumanoid hum = _foot != null ? _foot.Humanoid : null;
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (hum == null || mode == null || mode.CurrentMode != ControlMode.OnFoot)
+            {
+                if (energyToRestore > 0f && PlayerNeedsController.Instance != null)
+                    PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
+                _activeRoutine = null;
+                yield break;
+            }
+
+            // Lock player controls briefly during walk-to-shelf & grab (~1.1s total)
+            mode.SetModalLock(this, true);
+            _holdingModalLock = true;
+
+            // --- STAGE 1: Find nearest matching shelf / fridge / stand & walk up to it ---
+            Transform shelfTarget = FindBestShelfTarget(shopId, kind, _foot.transform.position);
+            Vector3 grabWorldPos;
+            Vector3 faceDir = _foot.transform.forward;
+
+            if (shelfTarget != null)
+            {
+                Vector3 shelfPos = shelfTarget.position;
+                Vector3 toPlayer = _foot.transform.position - shelfPos;
+                toPlayer.y = 0f;
+                if (toPlayer.sqrMagnitude < 0.04f) toPlayer = -_foot.transform.forward;
+                Vector3 standDir = toPlayer.normalized;
+                Vector3 standPos = new Vector3(shelfPos.x, _foot.transform.position.y, shelfPos.z) + standDir * 0.92f;
+
+                float walkElapsed = 0f;
+                const float maxWalkTime = 1.35f;
+                while (walkElapsed < maxWalkTime)
+                {
+                    if (mode.CurrentMode != ControlMode.OnFoot) break;
+                    Vector3 delta = standPos - _foot.transform.position;
+                    delta.y = 0f;
+                    float dist = delta.magnitude;
+                    if (dist <= 0.22f) break;
+
+                    float dt = Time.deltaTime;
+                    walkElapsed += dt;
+                    Vector3 dir = delta / Mathf.Max(0.001f, dist);
+                    Quaternion targetRot = Quaternion.LookRotation(dir, Vector3.up);
+                    _foot.transform.rotation = Quaternion.Slerp(_foot.transform.rotation, targetRot, 1f - Mathf.Exp(-10f * dt));
+
+                    float moveSpeed = Mathf.Min(2.8f, dist * 4.5f);
+                    if (_cc != null && _cc.enabled)
+                    {
+                        _cc.Move((dir * moveSpeed + Vector3.down * 4f) * dt);
+                    }
+                    hum.SetLocomotion(moveSpeed, true, 0f, dir);
+                    yield return null;
+                }
+
+                hum.SetLocomotion(0f, true, 0f, _foot.transform.forward);
+                Vector3 lookDelta = shelfPos - _foot.transform.position;
+                lookDelta.y = 0f;
+                if (lookDelta.sqrMagnitude > 0.01f) faceDir = lookDelta.normalized;
+
+                float grabY = kind == ConsumeAnimKind.EatIceCream ? 0.96f : 1.24f;
+                grabWorldPos = new Vector3(shelfPos.x, _foot.transform.position.y + grabY, shelfPos.z)
+                               - faceDir * 0.25f;
+            }
+            else
+            {
+                // Graceful fallback: reach cleanly forward to the counter/stand in front of player
+                grabWorldPos = _foot.transform.position + faceDir * 0.62f + Vector3.up * 1.18f;
+            }
+
+            // Turn smoothly to face the shelf/fridge
+            float turnT = 0f;
+            Quaternion shelfFaceRot = Quaternion.LookRotation(faceDir, Vector3.up);
+            while (turnT < 0.22f)
+            {
+                turnT += Time.deltaTime;
+                _foot.transform.rotation = Quaternion.Slerp(_foot.transform.rotation, shelfFaceRot, 1f - Mathf.Exp(-14f * Time.deltaTime));
+                hum.SetLocomotion(0f, true, 0f, faceDir);
+                yield return null;
+            }
+
+            // --- STAGE 2: Reach right arm onto the shelf with 2-bone IK & pick up 3D item ---
+            const float reachOutDur = 0.34f;
+            const float grabHoldDur = 0.18f;
+            const float pullBackDur = 0.26f;
+
+            float t = 0f;
+            while (t < reachOutDur)
+            {
+                t += Time.deltaTime;
+                float w = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / reachOutDur));
+                hum.SetShelfReach(true, grabWorldPos, w);
+                yield return null;
+            }
+
+            // Spawn the visible 3D item right in the player's right hand as fingers touch the shelf!
+            _heldProp = SpawnHandProp(hum.RightForearm, kind);
+            GameFeelAudio.PlayUiClick();
+            GameFeelAudio.SpawnBurst(grabWorldPos, new Color(0.45f, 0.88f, 0.96f), count: 6, spread: 0.25f);
+
+            t = 0f;
+            while (t < grabHoldDur)
+            {
+                t += Time.deltaTime;
+                hum.SetShelfReach(true, grabWorldPos, 1f);
+                yield return null;
+            }
+
+            t = 0f;
+            while (t < pullBackDur)
+            {
+                t += Time.deltaTime;
+                float w = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / pullBackDur));
+                hum.SetShelfReach(true, grabWorldPos, w);
+                yield return null;
+            }
+            hum.SetShelfReach(false, Vector3.zero, 0f);
+
+            // Unlock movement now so player can walk around while drinking/eating!
+            if (_holdingModalLock && PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.SetModalLock(this, false);
+                _holdingModalLock = false;
+            }
+
+            // --- STAGE 3: Drink water/cup or Eat snack/ice cream with realistic sips/bites ---
+            bool isDrink = kind == ConsumeAnimKind.DrinkWater || kind == ConsumeAnimKind.DrinkHotCup;
+            int poseMode = isDrink ? 1 : 2;
+            const float consumeTotal = 2.45f;
+            bool midEnergyApplied = false;
+
+            if (PlayerModeController.Instance != null)
+            {
+                string verb = kind == ConsumeAnimKind.DrinkWater ? "Su içiliyor..."
+                    : (kind == ConsumeAnimKind.DrinkHotCup ? "Sıcak içecek yudumlanıyor..."
+                    : (kind == ConsumeAnimKind.EatIceCream ? "Dondurma yeniyor..." : "Afiyetle yeniyor..."));
+                PlayerModeController.Instance.RaiseStatusMessage(verb);
+            }
+
+            t = 0f;
+            while (t < consumeTotal)
+            {
+                if (mode.CurrentMode != ControlMode.OnFoot) break;
+                t += Time.deltaTime;
+                float norm = Mathf.Clamp01(t / consumeTotal);
+
+                // Smooth entry & exit arm blend
+                float armWeight = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(norm / 0.16f)) *
+                                  (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.84f) / 0.16f)));
+
+                // Two distinct natural sips (for drinking) or two crisp bites (for eating)
+                float cycle;
+                if (isDrink)
+                {
+                    float sip1 = Mathf.Sin(Mathf.Clamp01((norm - 0.10f) / 0.34f) * Mathf.PI);
+                    float sip2 = Mathf.Sin(Mathf.Clamp01((norm - 0.50f) / 0.34f) * Mathf.PI);
+                    cycle = Mathf.Max(sip1, sip2);
+                }
+                else
+                {
+                    float bite1 = Mathf.Sin(Mathf.Clamp01((norm - 0.12f) / 0.30f) * Mathf.PI);
+                    float bite2 = Mathf.Sin(Mathf.Clamp01((norm - 0.50f) / 0.30f) * Mathf.PI);
+                    cycle = Mathf.Max(bite1, bite2);
+                }
+
+                hum.SetConsumePose(poseMode, armWeight, cycle);
+
+                // Tilt the held bottle/cup cleanly upward when sipping
+                if (_heldProp != null && isDrink)
+                {
+                    _heldProp.transform.localRotation = Quaternion.Euler(Mathf.Lerp(12f, -68f, cycle), 0f, 0f);
+                }
+
+                // Restore energy + sparkle at the first sip/bite climax
+                if (!midEnergyApplied && norm >= 0.45f)
+                {
+                    midEnergyApplied = true;
+                    if (energyToRestore > 0f && PlayerNeedsController.Instance != null)
+                    {
+                        PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
+                    }
+                    GameFeelAudio.PlayUiClick();
+                    Color fxColor = isDrink ? new Color(0.32f, 0.84f, 0.96f) : new Color(0.98f, 0.80f, 0.30f);
+                    Vector3 fxPos = hum.HeadTransform != null
+                        ? hum.HeadTransform.position + Vector3.up * 0.12f
+                        : _foot.transform.position + Vector3.up * 1.65f;
+                    GameFeelAudio.SpawnBurst(fxPos, fxColor, count: 10, spread: 0.35f);
+
+                    if (PlayerModeController.Instance != null && energyToRestore > 0f)
+                    {
+                        PlayerModeController.Instance.RaiseStatusMessage($"Afiyet olsun! +{Mathf.RoundToInt(energyToRestore)} Enerji");
+                    }
+                }
+
+                yield return null;
+            }
+
+            // Guarantee energy is always restored even if interrupted early
+            if (!midEnergyApplied && energyToRestore > 0f && PlayerNeedsController.Instance != null)
+            {
+                PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
+            }
+
+            CleanupVisualsAndLocks();
+            _activeRoutine = null;
+        }
+
+        private void CleanupVisualsAndLocks()
+        {
+            if (_foot != null && _foot.Humanoid != null)
+            {
+                _foot.Humanoid.SetShelfReach(false, Vector3.zero, 0f);
+                _foot.Humanoid.SetConsumePose(0, 0f, 0f);
+            }
+
+            if (_heldProp != null)
+            {
+                Destroy(_heldProp);
+                _heldProp = null;
+            }
+
+            if (_holdingModalLock && PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.SetModalLock(this, false);
+                _holdingModalLock = false;
+            }
+        }
+
+        private static Transform FindBestShelfTarget(string shopId, ConsumeAnimKind kind, Vector3 playerPos)
+        {
+            string lowerShop = shopId.ToLowerInvariant();
+            string[] preferred;
+            if (lowerShop.Contains("manav")) preferred = ProducePropNames;
+            else if (lowerShop.Contains("sarkuteri")) preferred = DeliPropNames;
+            else if (lowerShop.Contains("dondurma") || kind == ConsumeAnimKind.EatIceCream) preferred = IceCreamPropNames;
+            else if (kind == ConsumeAnimKind.DrinkWater) preferred = DrinkPropNames;
+            else if (kind == ConsumeAnimKind.DrinkHotCup) preferred = HotCupPropNames;
+            else preferred = DeliPropNames;
+
+            Transform best = null;
+            float bestScore = float.MaxValue;
+
+            // Search nearby shop props/triggers without expensive full-scene string churn
+            Collider[] nearby = Physics.OverlapSphere(playerPos, 11.5f);
+            for (int i = 0; i < nearby.Length; i++)
+            {
+                if (nearby[i] == null) continue;
+                Transform tr = nearby[i].transform;
+                string objName = tr.name;
+                int matchPriority = -1;
+                for (int p = 0; p < preferred.Length; p++)
+                {
+                    if (objName.IndexOf(preferred[p], System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        matchPriority = p;
+                        break;
+                    }
+                }
+                if (matchPriority < 0) continue;
+
+                float dist = Vector3.Distance(playerPos, tr.position);
+                if (dist > 10.5f) continue;
+
+                // Prioritize preferred prop category, then closest distance
+                float score = matchPriority * 4.5f + dist;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = tr;
+                }
+            }
+
+            return best;
+        }
+
+        private static GameObject SpawnHandProp(Transform rightForearm, ConsumeAnimKind kind)
+        {
+            if (rightForearm == null) return null;
+
+            GameObject root = new GameObject($"HeldConsumeProp_{kind}");
+            root.transform.SetParent(rightForearm, false);
+            // RightForearm pivot is at elbow; hand sits ~0.29m down along -Y
+            root.transform.localPosition = new Vector3(0.01f, -0.29f, 0.05f);
+            root.transform.localRotation = Quaternion.Euler(12f, 0f, 0f);
+
+            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
+            switch (kind)
+            {
+                case ConsumeAnimKind.DrinkWater:
+                {
+                    // Realistic 0.5L Turkish PET water bottle (clear-blue body + white label + blue cap)
+                    CreatePropPart("BottleBody", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.03f, 0f), new Vector3(0.068f, 0.095f, 0.068f),
+                        MakeSimpleMat(urpLit, new Color(0.56f, 0.84f, 0.96f), 0.88f, 0.08f));
+                    CreatePropPart("BottleLabel", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.025f, 0f), new Vector3(0.071f, 0.035f, 0.071f),
+                        MakeSimpleMat(urpLit, new Color(0.12f, 0.44f, 0.86f), 0.45f, 0.0f));
+                    CreatePropPart("BottleNeck", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.128f, 0f), new Vector3(0.032f, 0.024f, 0.032f),
+                        MakeSimpleMat(urpLit, new Color(0.70f, 0.90f, 0.98f), 0.88f, 0.05f));
+                    CreatePropPart("BottleCap", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.152f, 0f), new Vector3(0.036f, 0.014f, 0.036f),
+                        MakeSimpleMat(urpLit, new Color(0.08f, 0.36f, 0.84f), 0.50f, 0.0f));
+                    break;
+                }
+                case ConsumeAnimKind.DrinkHotCup:
+                {
+                    // Classic Turkish tea glass / hot coffee cup with warm amber tea
+                    CreatePropPart("CupBody", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.02f, 0f), new Vector3(0.072f, 0.056f, 0.072f),
+                        MakeSimpleMat(urpLit, new Color(0.92f, 0.89f, 0.82f), 0.65f, 0.05f));
+                    CreatePropPart("TeaLiquid", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.062f, 0f), new Vector3(0.064f, 0.012f, 0.064f),
+                        MakeSimpleMat(urpLit, new Color(0.46f, 0.16f, 0.05f), 0.85f, 0.05f));
+                    break;
+                }
+                case ConsumeAnimKind.EatIceCream:
+                {
+                    // Waffle cone + creamy vanilla scoop
+                    CreatePropPart("Cone", PrimitiveType.Cylinder, root.transform,
+                        new Vector3(0f, 0.01f, 0f), new Vector3(0.054f, 0.075f, 0.054f),
+                        MakeSimpleMat(urpLit, new Color(0.84f, 0.62f, 0.30f), 0.20f, 0.0f));
+                    CreatePropPart("Scoop", PrimitiveType.Sphere, root.transform,
+                        new Vector3(0f, 0.095f, 0f), new Vector3(0.085f, 0.082f, 0.085f),
+                        MakeSimpleMat(urpLit, new Color(0.98f, 0.92f, 0.84f), 0.32f, 0.0f));
+                    break;
+                }
+                default:
+                {
+                    // Warm golden Turkish simit / toasted sandwich snack
+                    CreatePropPart("SnackBody", PrimitiveType.Cube, root.transform,
+                        new Vector3(0f, 0.02f, 0.02f), new Vector3(0.11f, 0.055f, 0.095f),
+                        MakeSimpleMat(urpLit, new Color(0.86f, 0.60f, 0.24f), 0.18f, 0.0f));
+                    CreatePropPart("SnackFill", PrimitiveType.Cube, root.transform,
+                        new Vector3(0f, 0.02f, 0.02f), new Vector3(0.115f, 0.018f, 0.098f),
+                        MakeSimpleMat(urpLit, new Color(0.92f, 0.78f, 0.26f), 0.30f, 0.0f));
+                    break;
+                }
+            }
+
+            return root;
+        }
+
+        private static void CreatePropPart(string name, PrimitiveType type, Transform parent, Vector3 localPos, Vector3 localScale, Material mat)
+        {
+            GameObject part = GameObject.CreatePrimitive(type);
+            part.name = name;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPos;
+            part.transform.localScale = localScale;
+            Collider col = part.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+            Renderer r = part.GetComponent<Renderer>();
+            if (r != null)
+            {
+                r.sharedMaterial = mat;
+                r.shadowCastingMode = ShadowCastingMode.Off;
+            }
+        }
+
+        private static Material MakeSimpleMat(Shader shader, Color col, float smoothness, float metallic)
+        {
+            Material m = new Material(shader);
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", col);
+            if (m.HasProperty("_Color")) m.SetColor("_Color", col);
+            if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smoothness);
+            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", metallic);
+            return m;
+        }
+    }
+}

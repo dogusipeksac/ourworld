@@ -53,17 +53,21 @@ namespace Gridroam.Jobs
             "Antrasit"
         };
 
-        // Validated Sultanbeyli · Selman Sokağı sidewalk pickup points (X in [-70..+92], Z in [-24..+5])
+        // Validated Hamidiye Mahallesi district-wide sidewalk pickup points across Selman Sk. & all 8 avenues!
         private static readonly Vector3[] TaxiPickupSpots =
         {
-            new Vector3(-64.0f, 0.08f,  4.7f), // No:48 Selman Sk. Önü
-            new Vector3(-42.0f, 0.08f,  4.7f), // No:52 & Gürsu Sk. Karşısı
-            new Vector3(  6.0f, 0.08f,  4.7f), // No:58 Selman Bakkal
-            new Vector3( 38.0f, 0.08f, -4.7f), // No:66S Hafsa Tesisat
-            new Vector3( 56.0f, 0.08f,  4.7f), // Nutuk Sk. Köşesi
-            new Vector3( 71.5f, 0.08f, -4.7f), // No:81S Mavi Apartman
-            new Vector3( 91.0f, 0.08f,  4.7f), // No:95 Çay Ocağı
-            new Vector3( 82.0f, 0.08f, -23.5f) // Hz. Osman Camii Avlusu
+            new Vector3(-64.0f, 0.08f,    4.7f), // Selman Sk. No:48 Önü
+            new Vector3(  6.0f, 0.08f,    4.7f), // Selman Bakkal No:58
+            new Vector3( 82.0f, 0.08f,  -23.5f), // Hz. Osman Camii Avlusu
+            new Vector3( -8.0f, 0.08f,  132.2f), // Fatih Bulvarı · Saat Kulesi Meydanı
+            new Vector3( 42.0f, 0.08f,  132.2f), // Fatih Bulvarı Doğu Ticaret
+            new Vector3( 26.0f, 0.08f,   89.8f), // Atatürk Caddesi
+            new Vector3( 14.0f, 0.08f,   51.2f), // Mürşit Caddesi · Çay Köşesi
+            new Vector3(-153.2f,0.08f,  -18.0f), // 53 Eyyubi Mahalle Büfesi
+            new Vector3(-90.2f, 0.08f,   66.0f), // Seyyid Kutup Caddesi
+            new Vector3(-18.0f, 0.08f,  -71.8f), // Petrol Yolu Caddesi · Ticaret
+            new Vector3(-16.0f, 0.08f, -119.5f), // Aziziye Cd. · İTO İlkokulu
+            new Vector3( 14.0f, 0.08f, -151.2f)  // Zübeyde Hanım Caddesi
         };
 
         private struct TaxiDestination
@@ -73,30 +77,34 @@ namespace Gridroam.Jobs
             public Vector3 WorldPos;
         }
 
-        // Validated drivable Sultanbeyli · Selman Sokağı dropoff points with safe sidewalk exit!
+        // Validated drivable Hamidiye Mahallesi district-wide dropoff points across all avenues!
         private static readonly TaxiDestination[] TaxiDestinations =
         {
-            new TaxiDestination { NameKey = "job.taxi.dest.seyyidkutup", FallbackTr = "Seyyid Kutup Cd. Kavşağı", WorldPos = new Vector3(-85.0f, 0.08f,  0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.bakkal58",    FallbackTr = "No:58 Selman Bakkal",      WorldPos = new Vector3(  8.0f, 0.08f,  0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.ototamir",    FallbackTr = "No:73 Oto Tamir",          WorldPos = new Vector3( 25.0f, 0.08f,  0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.nutuk",       FallbackTr = "Nutuk Sokağı Girişi",      WorldPos = new Vector3( 59.2f, 0.08f, 11.5f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.camii",       FallbackTr = "Hz. Osman Camii",          WorldPos = new Vector3( 98.5f, 0.08f, -31.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.fuel",        FallbackTr = "Akaryakıt İstasyonu",      WorldPos = new Vector3(-84.5f, 0.08f,  9.5f) }
+            new TaxiDestination { NameKey = "job.taxi.dest.fatih",       FallbackTr = "Fatih Bulvarı · Saat Kulesi",   WorldPos = new Vector3(  0.0f, 0.08f,  135.5f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.ataturk",     FallbackTr = "Atatürk Caddesi",               WorldPos = new Vector3( 30.0f, 0.08f,   96.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.mursit",      FallbackTr = "Mürşit Caddesi",                WorldPos = new Vector3( 10.0f, 0.08f,   46.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.eyyubi",      FallbackTr = "53 Eyyubi Mahalle Büfesi",      WorldPos = new Vector3(-148.0f,0.08f,  -18.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.seyyidkutup", FallbackTr = "Seyyid Kutup Cd. Kavşağı",      WorldPos = new Vector3(-85.0f, 0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.bakkal58",    FallbackTr = "No:58 Selman Bakkal",           WorldPos = new Vector3(  8.0f, 0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.camii",       FallbackTr = "Hz. Osman Camii",               WorldPos = new Vector3( 98.5f, 0.08f,  -31.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.petrolyolu",  FallbackTr = "Petrol Yolu Cd. · Akaryakıt",   WorldPos = new Vector3(-18.0f, 0.08f,  -78.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.aziziye",     FallbackTr = "Aziziye Cd. · İTO İlkokulu",    WorldPos = new Vector3(-16.0f, 0.08f, -114.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.zubeyde",     FallbackTr = "Zübeyde Hanım Caddesi",         WorldPos = new Vector3( 14.0f, 0.08f, -146.0f) }
         };
 
-        // 10 safe sidewalk/pocket litter points along Selman Sokağı (never forcing pedestrians into fast traffic!)
+        // 10 safe sidewalk litter points distributed along Petrol Yolu Cd., Aziziye Cd. & Abdülkadir Udeh!
         private static readonly Vector3[] LitterSpawnPoints =
         {
-            new Vector3(-70.0f, 0.08f,  4.9f),
-            new Vector3(-54.0f, 0.08f, -4.9f),
-            new Vector3(-34.0f, 0.08f,  4.9f),
-            new Vector3(-16.0f, 0.08f, -4.9f),
-            new Vector3(  2.0f, 0.08f,  4.9f),
-            new Vector3( 18.0f, 0.08f, -4.9f),
-            new Vector3( 36.0f, 0.08f,  4.9f),
-            new Vector3( 54.0f, 0.08f, -4.9f),
-            new Vector3( 74.0f, 0.08f,  4.9f),
-            new Vector3( 86.0f, 0.08f, -24.5f)
+            new Vector3(-54.0f, 0.08f,  -71.8f),
+            new Vector3(-28.0f, 0.08f,  -71.8f),
+            new Vector3( -6.0f, 0.08f,  -84.2f),
+            new Vector3( 20.0f, 0.08f,  -71.8f),
+            new Vector3( 52.0f, 0.08f,  -84.2f),
+            new Vector3( 93.2f, 0.08f,  -62.0f),
+            new Vector3( 93.2f, 0.08f,  -96.0f),
+            new Vector3( 24.0f, 0.08f, -119.5f),
+            new Vector3(-16.0f, 0.08f, -119.5f),
+            new Vector3(-52.0f, 0.08f, -119.5f)
         };
 
         private JobType _activeJob = JobType.None;
