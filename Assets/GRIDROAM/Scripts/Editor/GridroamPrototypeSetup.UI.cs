@@ -263,6 +263,7 @@ namespace Gridroam.Editor
             canvasObj.AddComponent<GraphicRaycaster>();
 
             GameHUDController hud = canvasObj.AddComponent<GameHUDController>();
+            canvasObj.AddComponent<ResponsiveTabletLayout>();
             Font uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             // Root constrained to iPhone Notch / Android Safe Area

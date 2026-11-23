@@ -42,7 +42,7 @@ namespace Gridroam.UI
             if (InputHub.Instance != null)
             {
                 float dpi = Screen.dpi > 10f ? Screen.dpi : ReferenceDpi;
-                float dpiScale = ReferenceDpi / dpi;
+                float dpiScale = Mathf.Clamp(ReferenceDpi / dpi, 0.55f, 1.45f);
                 InputHub.Instance.AddTouchLookDelta(eventData.delta * dpiScale);
             }
         }

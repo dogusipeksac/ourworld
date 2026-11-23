@@ -111,6 +111,7 @@ namespace Gridroam.Editor
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.resizeableActivity = true; // Google Play Large Screen / Tablet & Foldable support
             PlayerSettings.Android.forceInternetPermission = true; // Player feedback -> Firebase (Öneri sekmesi)
             if (PlayerSettings.Android.bundleVersionCode < 1)
             {

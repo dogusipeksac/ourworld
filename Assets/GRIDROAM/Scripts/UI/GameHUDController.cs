@@ -920,7 +920,8 @@ namespace Gridroam.UI
                 if (interactButtonLabel != null)
                 {
                     string key = mode == ControlMode.Tennis ? "ui.btn.leave_tennis" : "ui.btn.stand";
-                    interactButtonLabel.text = $"E · {LocalizationService.Tr(key)}";
+                    string localized = LocalizationService.Tr(key);
+                    interactButtonLabel.text = Application.isMobilePlatform ? localized : $"E · {localized}";
                 }
                 return;
             }
@@ -932,7 +933,14 @@ namespace Gridroam.UI
                 if (!interactButton.gameObject.activeSelf) interactButton.gameObject.SetActive(true);
                 if (interactButtonLabel != null)
                 {
-                    interactButtonLabel.text = $"E · {trigger.GetLocalizedPrompt()}";
+                    string prompt = trigger.GetLocalizedPrompt();
+                    interactButtonLabel.text = Application.isMobilePlatform ? prompt : $"E · {prompt}";
+                    if (_interactRect != null)
+                    {
+                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 316f : 260f;
+                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 13.5f + 56f, minW, 470f);
+                        _interactRect.sizeDelta = new Vector2(desiredW, _interactRect.sizeDelta.y);
+                    }
                 }
             }
         }

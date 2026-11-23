@@ -196,9 +196,13 @@ namespace Gridroam.CameraSystem
             if (_camera == null) _camera = GetComponent<Camera>();
             if (_camera != null)
             {
-                float desiredFov = _isDrivingMode
+                float baseTargetFov = _isDrivingMode
                     ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor)
                     : (effectivelyIndoors ? 66f : baseFov);
+                // Preserve wide horizontal view on 4:3 iPads, 16:10 Android tablets & foldables
+                float aspect = _camera.aspect > 0.1f ? _camera.aspect : (16f / 9f);
+                float tabletFovBoost = aspect < 1.70f ? Mathf.Clamp((1.70f - aspect) * 26f, 0f, 12f) : 0f;
+                float desiredFov = baseTargetFov + tabletFovBoost;
                 _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, desiredFov, 1f - Mathf.Exp(-fovSmoothSpeed * Time.deltaTime));
             }
 
