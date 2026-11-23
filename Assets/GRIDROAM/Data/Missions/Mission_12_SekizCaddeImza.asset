@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_12_SekizCaddeImza
+  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  missionId: m12_sekiz_cadde_imza
+  titleKey: m12.title
+  summaryKey: m12.summary
+  rewardMoney: 650
+  nextMissionId: m13_havuz_senligi
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 1
+  steps:
+  - stepType: 5
+    objectiveKey: m12.step1.objective
+    targetAnchorId: m12_sig_eyyubi
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 3c3c50a931ef84c388d23a7b5036bbc7, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 5
+    objectiveKey: m12.step2.objective
+    targetAnchorId: m12_sig_aziziye
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: da8276274e2b94db2ab79104d55b7d21, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 5
+    objectiveKey: m12.step3.objective
+    targetAnchorId: m12_sig_petrol
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 4509d8364f7b149559d5c8c3c8425fe0, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+  - stepType: 1
+    objectiveKey: m12.step4.objective
+    targetAnchorId: npc_avukat_tarik
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 09e5270ace15447449fc6cc38c1dc8cb, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 

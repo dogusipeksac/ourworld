@@ -542,7 +542,27 @@ namespace Gridroam.Missions
                 {
                     SaveManager.Instance.AddMoney(finished.rewardMoney);
                 }
+                if (finished.missionId == "m14_hamidiye_zaferi")
+                {
+                    SaveManager.Instance.Data.chapterThreeCompleted = true;
+                }
                 SaveManager.Instance.MarkMissionCompleted(finished.missionId, finished.nextMissionId);
+            }
+
+            // Award Neighborhood Reputation XP & celebratory feedback
+            int repReward = finished.missionId == "m14_hamidiye_zaferi" ? 200 : 60;
+            NeighborhoodReputation.AddReputation(repReward);
+            if (finished.missionId == "m14_hamidiye_zaferi")
+            {
+                GameFeelAudio.PlayMilestoneFanfare();
+                if (PlayerModeController.Instance != null)
+                {
+                    GameFeelAudio.SpawnBurst(
+                        PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 1.6f,
+                        new Color(1.0f, 0.85f, 0.22f),
+                        count: 24,
+                        spread: 1.1f);
+                }
             }
 
             string title = LocalizationService.Tr(finished.titleKey, finished.missionId);

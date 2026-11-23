@@ -21,19 +21,22 @@ namespace Gridroam.Player
     /// 3) Raises the bottle / tea glass / ice-cream cone / snack to the mouth with realistic
     ///    sipping or biting animations (while allowing the player to walk freely once grabbed!).
     /// </summary>
+    [DefaultExecutionOrder(200)]
     public class PlayerConsumeAnimator : MonoBehaviour
     {
         private PlayerFootController _foot;
         private CharacterController _cc;
         private Coroutine _activeRoutine;
         private GameObject _heldProp;
+        private ConsumeAnimKind _heldKind;
+        private float _sipTiltPhase;
         private bool _holdingModalLock;
 
-        private static readonly string[] DrinkPropNames = { "DrinkFridge", "Vending", "CayOcagi_Fridge", "CayOcagi_Counter", "Shelf" };
+        private static readonly string[] DrinkPropNames = { "DrinkFridge", "Fridge", "Kitchen", "Vending", "CayOcagi_Fridge", "CayOcagi_Counter", "Shelf" };
         private static readonly string[] IceCreamPropNames = { "DondurmaDolabi", "DrinkFridge", "Shelf" };
         private static readonly string[] ProducePropNames = { "ManavReyonu", "Shelf", "KasaBandi" };
         private static readonly string[] DeliPropNames = { "Sarkuteri", "Shelf", "KasaBandi", "CayOcagi_Counter" };
-        private static readonly string[] HotCupPropNames = { "CayOcagi_Counter", "CayOcagi_Fridge", "KasaBandi", "Shelf" };
+        private static readonly string[] HotCupPropNames = { "TeaTable", "Kettle", "CayOcagi_Counter", "CayOcagi_Fridge", "KasaBandi", "Shelf" };
 
         public bool IsPlaying => _activeRoutine != null;
 
@@ -42,7 +45,8 @@ namespace Gridroam.Player
             string shopId,
             ConsumeAnimKind kind,
             string itemLabel,
-            float energyToRestore)
+            float energyToRestore,
+            Transform explicitTarget = null)
         {
             if (foot == null || kind == ConsumeAnimKind.None)
             {
@@ -58,7 +62,7 @@ namespace Gridroam.Player
             {
                 anim = foot.gameObject.AddComponent<PlayerConsumeAnimator>();
             }
-            anim.StartSequence(foot, shopId, kind, itemLabel, energyToRestore);
+            anim.StartSequence(foot, shopId, kind, itemLabel, energyToRestore, explicitTarget);
         }
 
         private void Awake()
@@ -87,15 +91,20 @@ namespace Gridroam.Player
             CleanupVisualsAndLocks();
         }
 
-        private void StartSequence(PlayerFootController foot, string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore)
+        private void StartSequence(PlayerFootController foot, string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore, Transform explicitTarget = null)
         {
             _foot = foot;
             if (_cc == null) _cc = foot.GetComponent<CharacterController>();
+            PlayerActionAnimator actionAnim = foot.GetComponent<PlayerActionAnimator>();
+            if (actionAnim != null && actionAnim.IsPlaying)
+            {
+                actionAnim.CancelActive();
+            }
             CancelActive();
-            _activeRoutine = StartCoroutine(PurchaseAndConsumeRoutine(shopId ?? string.Empty, kind, itemLabel ?? string.Empty, energyToRestore));
+            _activeRoutine = StartCoroutine(PurchaseAndConsumeRoutine(shopId ?? string.Empty, kind, itemLabel ?? string.Empty, energyToRestore, explicitTarget));
         }
 
-        private IEnumerator PurchaseAndConsumeRoutine(string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore)
+        private IEnumerator PurchaseAndConsumeRoutine(string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore, Transform explicitTarget)
         {
             ProceduralHumanoid hum = _foot != null ? _foot.Humanoid : null;
             PlayerModeController mode = PlayerModeController.Instance;
@@ -112,7 +121,7 @@ namespace Gridroam.Player
             _holdingModalLock = true;
 
             // --- STAGE 1: Find nearest matching shelf / fridge / stand & walk up to it ---
-            Transform shelfTarget = FindBestShelfTarget(shopId, kind, _foot.transform.position);
+            Transform shelfTarget = explicitTarget != null ? explicitTarget : FindBestShelfTarget(shopId, kind, _foot.transform.position);
             Vector3 grabWorldPos;
             Vector3 faceDir = _foot.transform.forward;
 
@@ -191,7 +200,10 @@ namespace Gridroam.Player
             }
 
             // Spawn the visible 3D item right in the player's right hand as fingers touch the shelf!
-            _heldProp = SpawnHandProp(hum.RightForearm, kind);
+            _heldKind = kind;
+            _sipTiltPhase = 0f;
+            _heldProp = SpawnHandProp(kind);
+            SyncHeldPropToPalm();
             GameFeelAudio.PlayUiClick();
             GameFeelAudio.SpawnBurst(grabWorldPos, new Color(0.45f, 0.88f, 0.96f), count: 6, spread: 0.25f);
 
@@ -262,11 +274,8 @@ namespace Gridroam.Player
 
                 hum.SetConsumePose(poseMode, armWeight, cycle);
 
-                // Tilt the held bottle/cup cleanly upward when sipping
-                if (_heldProp != null && isDrink)
-                {
-                    _heldProp.transform.localRotation = Quaternion.Euler(Mathf.Lerp(12f, -68f, cycle), 0f, 0f);
-                }
+                // Smoothly tilt the upright bottle/cup backward toward the mouth on each sip
+                _sipTiltPhase = isDrink ? cycle : 0f;
 
                 // Restore energy + sparkle at the first sip/bite climax
                 if (!midEnergyApplied && norm >= 0.45f)
@@ -370,15 +379,28 @@ namespace Gridroam.Player
             return best;
         }
 
-        private static GameObject SpawnHandProp(Transform rightForearm, ConsumeAnimKind kind)
+        private void LateUpdate()
         {
-            if (rightForearm == null) return null;
+            SyncHeldPropToPalm();
+        }
 
+        private void SyncHeldPropToPalm()
+        {
+            if (_heldProp == null || _foot == null || _foot.Humanoid == null || _foot.Humanoid.RightForearm == null) return;
+
+            // RightForearm pivot is at the elbow; palm sits -0.305 m along bone -Y.
+            // Orient in world space relative to the character (upright +Y) so bone rotation never flips props sideways/upside-down!
+            Vector3 palmWorld = _foot.Humanoid.RightForearm.TransformPoint(new Vector3(0f, -0.305f, 0f));
+            bool isDrink = _heldKind == ConsumeAnimKind.DrinkWater || _heldKind == ConsumeAnimKind.DrinkHotCup;
+            float tiltX = isDrink ? Mathf.Lerp(0f, -62f, _sipTiltPhase) : 0f;
+            _heldProp.transform.position = palmWorld - Vector3.up * 0.045f + _foot.transform.forward * 0.025f;
+            _heldProp.transform.rotation = _foot.transform.rotation * Quaternion.Euler(tiltX, 0f, 0f);
+        }
+
+        private static GameObject SpawnHandProp(ConsumeAnimKind kind)
+        {
             GameObject root = new GameObject($"HeldConsumeProp_{kind}");
-            root.transform.SetParent(rightForearm, false);
-            // RightForearm pivot is at elbow; hand sits ~0.29m down along -Y
-            root.transform.localPosition = new Vector3(0.01f, -0.29f, 0.05f);
-            root.transform.localRotation = Quaternion.Euler(12f, 0f, 0f);
+            root.transform.localRotation = Quaternion.identity;
 
             Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
 

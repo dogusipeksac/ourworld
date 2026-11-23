@@ -72,6 +72,8 @@ namespace Gridroam.World
 
         private void PerformAbdest(PlayerModeController mode)
         {
+            if (PlayerActionAnimator.IsBusyOn(mode)) return;
+
             if (Time.time - _lastAbdestTime < 8f && _hasAbdest)
             {
                 mode.RaiseStatusMessage("Abdestin zaten taze. Camiye girip safa durabilirsin.");
@@ -79,14 +81,15 @@ namespace Gridroam.World
             }
 
             _lastAbdestTime = Time.time;
-            _hasAbdest = true;
-            GameFeelAudio.PlayWaterSplash();
-            GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.1f, new Color(0.42f, 0.84f, 1.0f), count: 10, spread: 0.55f);
-            if (PlayerNeedsController.Instance != null)
+            PlayerActionAnimator.Play(mode, transform, PlayerActionKind.Abdest, onClimax: () =>
             {
-                PlayerNeedsController.Instance.RestoreEnergy(15f);
-            }
-            mode.RaiseStatusMessage("Şadırvanda abdest aldın, gönlün ferahladı! (+15 Enerji)");
+                _hasAbdest = true;
+                if (PlayerNeedsController.Instance != null)
+                {
+                    PlayerNeedsController.Instance.RestoreEnergy(15f);
+                }
+                mode.RaiseStatusMessage("Şadırvanda abdest aldın, gönlün ferahladı! (+15 Enerji)");
+            }, startStatus: "Şadırvanda abdest alınıyor (eller, yüz, kollar)...");
         }
 
         private void StartPrayer(PlayerModeController mode)
@@ -166,52 +169,58 @@ namespace Gridroam.World
                 humanoid.SetLocomotion(0f, true, 0f);
             }
 
-            // 1. Kıyam (Standing with hands folded)
-            if (humanoid != null) humanoid.SetPrayerPose(1, 0f);
+            // 1. İftitah Tekbiri (Raising hands respectfully beside ears)
+            if (humanoid != null) humanoid.SetPrayerPose(5, 0f);
             GameFeelAudio.PlayPrayerChime();
-            string kiyamMsg = _hasAbdest
-                ? "Allâhu Ekber · Kıyam (Ayakta kıraat)... (İptal: E / Esc)"
-                : "Allâhu Ekber · Kıyam (İstersen avludaki şadırvandan abdest de alabilirsin)";
-            mode.RaiseStatusMessage(kiyamMsg);
-            yield return new WaitForSeconds(2.4f);
+            string tekbirMsg = _hasAbdest
+                ? "Allâhu Ekber · İftitah Tekbiri... (İptal: E / Esc)"
+                : "Allâhu Ekber · İftitah Tekbiri (İstersen avludaki şadırvandan abdest alabilirsin)";
+            mode.RaiseStatusMessage(tekbirMsg);
+            yield return new WaitForSeconds(1.25f);
 
-            // 2. Rükû (Bowing with hands on knees)
+            // 2. Kıyam (Standing upright with right hand folded over left over abdomen)
+            if (humanoid != null) humanoid.SetPrayerPose(1, 0f);
+            mode.RaiseStatusMessage("Kıyam · Sübhâneke ve Fâtiha okunuyor...");
+            yield return new WaitForSeconds(2.3f);
+
+            // 3. Rükû (Crisp 90° flat back bow, both palms grasping knees)
             if (humanoid != null) humanoid.SetPrayerPose(2, 0f);
             mode.RaiseStatusMessage("Rükû · Sübhâne Rabbiye'l-azîm...");
-            yield return new WaitForSeconds(2.0f);
-
-            // 3. Kavme (Brief upright rise from Rükû)
-            if (humanoid != null) humanoid.SetPrayerPose(1, 0f);
-            mode.RaiseStatusMessage("Semiallâhu limen hamideh · Rabbenâ leke'l-hamd...");
-            yield return new WaitForSeconds(1.1f);
-
-            // 4. First Secde (Prostration on carpet)
-            if (humanoid != null) humanoid.SetPrayerPose(3, 0f);
-            mode.RaiseStatusMessage("Secde · Sübhâne Rabbiye'l-a'lâ...");
             yield return new WaitForSeconds(2.1f);
 
-            // 5. Celse (Brief calm sit between secdes)
-            if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
-            yield return new WaitForSeconds(1.0f);
+            // 4. Kavme (Upright rise from Rükû with arms relaxed cleanly at sides)
+            if (humanoid != null) humanoid.SetPrayerPose(6, 0f);
+            mode.RaiseStatusMessage("Semiallâhu limen hamideh · Rabbenâ leke'l-hamd...");
+            yield return new WaitForSeconds(1.2f);
 
-            // 6. Second Secde
+            // 5. First Secde (7-point prostration: forehead, palms, knees & toes on carpet)
+            if (humanoid != null) humanoid.SetPrayerPose(3, 0f);
+            mode.RaiseStatusMessage("Secde · Sübhâne Rabbiye'l-a'lâ...");
+            yield return new WaitForSeconds(2.2f);
+
+            // 6. Celse (Calm kneeling sit back on heels between secdes)
+            if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
+            mode.RaiseStatusMessage("Celse · İki secde arası oturuş...");
+            yield return new WaitForSeconds(1.1f);
+
+            // 7. Second Secde
             if (humanoid != null) humanoid.SetPrayerPose(3, 0f);
             mode.RaiseStatusMessage("İkinci Secde · Sübhâne Rabbiye'l-a'lâ...");
-            yield return new WaitForSeconds(2.0f);
+            yield return new WaitForSeconds(2.2f);
 
-            // 7. Ka'de / Tahiyyat (Seated prayer)
+            // 8. Ka'de / Tahiyyat (Seated prayer, palms on thighs)
             if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
             mode.RaiseStatusMessage("Tahiyyat · Ettehiyyâtü lillâhi ve's-salevâtü ve't-tayyibât...");
-            yield return new WaitForSeconds(1.8f);
+            yield return new WaitForSeconds(2.0f);
 
-            // 8. Selam to the right, then to the left
-            if (humanoid != null) humanoid.SetPrayerPose(4, 54f);
+            // 9. Selam to the right, then to the left
+            if (humanoid != null) humanoid.SetPrayerPose(4, 64f);
             mode.RaiseStatusMessage("Esselâmü aleyküm ve rahmetullah (Sağa selam)...");
-            yield return new WaitForSeconds(1.1f);
+            yield return new WaitForSeconds(1.2f);
 
-            if (humanoid != null) humanoid.SetPrayerPose(4, -54f);
+            if (humanoid != null) humanoid.SetPrayerPose(4, -64f);
             mode.RaiseStatusMessage("Esselâmü aleyküm ve rahmetullah (Sola selam)...");
-            yield return new WaitForSeconds(1.1f);
+            yield return new WaitForSeconds(1.2f);
 
             // Complete cleanly & restore full Energy
             if (humanoid != null) humanoid.SetPrayerPose(0, 0f);

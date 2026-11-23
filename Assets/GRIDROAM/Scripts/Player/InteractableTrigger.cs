@@ -27,13 +27,14 @@ namespace Gridroam.Player
         AtmTerminal,
         Bicycle,
         Tennis,
-        Motorcycle
+        Motorcycle,
+        ShopItem
     }
 
     /// <summary>
     /// Marks any world object the player can interact with
     /// (NPC, Vehicle, Clue, Package, Door, Seat, PaintableHouse, TownVehicle,
-    /// JobBoard, ShopCounter, Bed, FuelPump, VendingMachine).
+    /// JobBoard, ShopCounter, ShopItem, Bed, FuelPump, VendingMachine).
     /// </summary>
     public class InteractableTrigger : MonoBehaviour
     {
@@ -41,6 +42,7 @@ namespace Gridroam.Player
         [SerializeField] private string interactableId = "npc_mechanic";
         [SerializeField] private string promptLocalizationKey = "ui.btn.talk";
         [SerializeField] private float interactionRadius = 3.2f;
+        [SerializeField] private string customPromptText = string.Empty;
 
         public InteractableKind Kind => kind;
         public string InteractableId => interactableId;
@@ -55,8 +57,21 @@ namespace Gridroam.Player
             interactionRadius = radius;
         }
 
+        public void SetCustomPrompt(string text)
+        {
+            customPromptText = text ?? string.Empty;
+        }
+
         public string GetLocalizedPrompt()
         {
+            if (kind == InteractableKind.ShopCounter && PlayerShoppingCart.HasActiveItems)
+            {
+                return $"Kasada Öde · {PlayerShoppingCart.ActiveSummary}";
+            }
+            if (!string.IsNullOrEmpty(customPromptText))
+            {
+                return customPromptText;
+            }
             return LocalizationService.Tr(promptLocalizationKey, "Etkileş");
         }
 

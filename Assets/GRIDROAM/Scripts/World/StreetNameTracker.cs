@@ -22,6 +22,9 @@ namespace Gridroam.World
         {
             // Landmarks & Hero Streets (higher priority)
             new StreetZone { DisplayName = "Hz. Osman Camii Avlusu",            MinX =  68f, MaxX =  95f, MinZ = -54f, MaxZ = -21f, Priority = 3 },
+            new StreetZone { DisplayName = "Hamidiye Açık Yüzme Havuzu",        MinX =   4f, MaxX =  28f, MinZ = -50f, MaxZ = -29f, Priority = 3 },
+            new StreetZone { DisplayName = "Hamidiye Çay Bahçesi & Parkı",      MinX = -32f, MaxX =  -8f, MinZ =  62f, MaxZ =  78f, Priority = 3 },
+            new StreetZone { DisplayName = "Gürsu Sokağı · Tenis Kortu",        MinX = -50f, MaxX = -32f, MinZ = -58f, MaxZ = -26f, Priority = 3 },
             new StreetZone { DisplayName = "Fatih Bulvarı · Saat Kulesi Meydanı", MinX = -32f, MaxX =  32f, MinZ = 128f, MaxZ = 158f, Priority = 3 },
             new StreetZone { DisplayName = "Selman Sokağı",                      MinX = -82f, MaxX =  95f, MinZ =  -7f, MaxZ =   7f, Priority = 2 },
             new StreetZone { DisplayName = "Gürsu Sokağı · Mahalle Sahası",      MinX = -48f, MaxX = -34f, MinZ = -28f, MaxZ =  -7f, Priority = 2 },

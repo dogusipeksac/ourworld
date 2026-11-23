@@ -16,8 +16,8 @@ MonoBehaviour:
   titleKey: m10.title
   summaryKey: m10.summary
   rewardMoney: 1000
-  nextMissionId: 
-  autoStartNextMission: 0
+  nextMissionId: m11_saat_kulesi_dosyasi
+  autoStartNextMission: 1
   retryPlayerAnchorId: spawn_garage_foot
   retryVehicleAnchorId: spawn_garage_sedan
   retryStartInVehicle: 0

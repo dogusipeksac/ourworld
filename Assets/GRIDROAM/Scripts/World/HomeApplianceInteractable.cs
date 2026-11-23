@@ -58,35 +58,37 @@ namespace Gridroam.World
 
         public void Use(PlayerModeController mode)
         {
-            if (mode == null) return;
+            if (mode == null || PlayerActionAnimator.IsBusyOn(mode)) return;
 
             switch (applianceKind)
             {
                 case HomeApplianceKind.Television:
                 {
-                    GameFeelAudio.PlayUiClick();
-                    if (!_isTurnedOn)
+                    PlayerActionAnimator.Play(mode, transform, PlayerActionKind.UseTvRemote, onClimax: () =>
                     {
-                        _isTurnedOn = true;
-                        _channelIndex = 0;
-                        EnsureGlowLight(TvChannelColors[_channelIndex], 4.5f, 1.8f);
-                        mode.RaiseStatusMessage($"TV açıldı: {TvChannelNames[_channelIndex]} (Tekrar bas: Kanal değiştir)");
-                    }
-                    else
-                    {
-                        _channelIndex++;
-                        if (_channelIndex >= TvChannelNames.Length)
+                        if (!_isTurnedOn)
                         {
-                            _isTurnedOn = false;
-                            SetGlowEnabled(false);
-                            mode.RaiseStatusMessage("TV kapatıldı.");
+                            _isTurnedOn = true;
+                            _channelIndex = 0;
+                            EnsureGlowLight(TvChannelColors[_channelIndex], 4.5f, 1.8f);
+                            mode.RaiseStatusMessage($"TV açıldı: {TvChannelNames[_channelIndex]} (Tekrar bas: Kanal değiştir)");
                         }
                         else
                         {
-                            EnsureGlowLight(TvChannelColors[_channelIndex], 4.5f, 1.8f);
-                            mode.RaiseStatusMessage($"Kanal değiştirildi: {TvChannelNames[_channelIndex]}");
+                            _channelIndex++;
+                            if (_channelIndex >= TvChannelNames.Length)
+                            {
+                                _isTurnedOn = false;
+                                SetGlowEnabled(false);
+                                mode.RaiseStatusMessage("TV kapatıldı.");
+                            }
+                            else
+                            {
+                                EnsureGlowLight(TvChannelColors[_channelIndex], 4.5f, 1.8f);
+                                mode.RaiseStatusMessage($"Kanal değiştirildi: {TvChannelNames[_channelIndex]}");
+                            }
                         }
-                    }
+                    }, startStatus: "TV kumandasına basılıyor...");
                     break;
                 }
 
@@ -100,11 +102,25 @@ namespace Gridroam.World
                     _lastActionTime = Time.time;
                     GameFeelAudio.PlayWaterSplash();
                     GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.0f, new Color(0.95f, 0.56f, 0.24f), count: 8, spread: 0.35f);
-                    if (PlayerNeedsController.Instance != null)
+                    if (mode.FootController != null && mode.CurrentMode == ControlMode.OnFoot)
                     {
-                        PlayerNeedsController.Instance.RestoreEnergy(22f);
+                        mode.RaiseStatusMessage("Çaydanlıktan ince belli bardağa demli çay dolduruluyor...");
+                        PlayerConsumeAnimator.PlayPurchase(
+                            mode.FootController,
+                            "tea_kettle",
+                            ConsumeAnimKind.DrinkHotCup,
+                            "Demli Çay",
+                            22f,
+                            explicitTarget: transform);
                     }
-                    mode.RaiseStatusMessage("Çaydanlıktan taze ince belli demli çay içtin! (+22 Enerji)");
+                    else
+                    {
+                        if (PlayerNeedsController.Instance != null)
+                        {
+                            PlayerNeedsController.Instance.RestoreEnergy(22f);
+                        }
+                        mode.RaiseStatusMessage("Çaydanlıktan taze ince belli demli çay içtin! (+22 Enerji)");
+                    }
                     break;
                 }
 
@@ -118,11 +134,25 @@ namespace Gridroam.World
                     _lastActionTime = Time.time;
                     GameFeelAudio.PlayDoorLatch();
                     GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.1f, new Color(0.76f, 0.94f, 1.0f), count: 8, spread: 0.35f);
-                    if (PlayerNeedsController.Instance != null)
+                    if (mode.FootController != null && mode.CurrentMode == ControlMode.OnFoot)
                     {
-                        PlayerNeedsController.Instance.RestoreEnergy(28f);
+                        mode.RaiseStatusMessage("Buzdolabından soğuk ayran alınıyor...");
+                        PlayerConsumeAnimator.PlayPurchase(
+                            mode.FootController,
+                            "fridge",
+                            ConsumeAnimKind.DrinkWater,
+                            "Soğuk Ayran",
+                            28f,
+                            explicitTarget: transform);
                     }
-                    mode.RaiseStatusMessage("Buzdolabından soğuk ayran, beyaz peynir ve zeytin aldın! (+28 Enerji)");
+                    else
+                    {
+                        if (PlayerNeedsController.Instance != null)
+                        {
+                            PlayerNeedsController.Instance.RestoreEnergy(28f);
+                        }
+                        mode.RaiseStatusMessage("Buzdolabından soğuk ayran, beyaz peynir ve zeytin aldın! (+28 Enerji)");
+                    }
                     break;
                 }
 
@@ -130,71 +160,89 @@ namespace Gridroam.World
                 {
                     if (SaveManager.Instance != null && mode.FootController != null)
                     {
-                        int nextColor = (SaveManager.Instance.Data.playerJacketColorIndex + 1) % 4;
-                        SaveManager.Instance.Data.playerJacketColorIndex = nextColor;
-                        SaveManager.Instance.Save();
-                        mode.FootController.ApplyJacketColor(nextColor);
-                        GameFeelAudio.PlayDoorLatch();
-                        GameFeelAudio.SpawnBurst(mode.ActiveWorldPosition + Vector3.up * 1.15f, new Color(0.38f, 0.85f, 0.80f), count: 10, spread: 0.45f);
-                        string[] outfitNames = { "Klasik Lacivert Ceket", "Bordo Deri Ceket", "Zeytin Parka", "Antrasit Mont" };
-                        mode.RaiseStatusMessage($"Gardıroptan kıyafet değiştirdin: {outfitNames[nextColor]}");
+                        PlayerActionAnimator.Play(mode, transform, PlayerActionKind.ChangeOutfit, onClimax: () =>
+                        {
+                            if (SaveManager.Instance == null || mode.FootController == null) return;
+                            int nextColor = (SaveManager.Instance.Data.playerJacketColorIndex + 1) % 4;
+                            SaveManager.Instance.Data.playerJacketColorIndex = nextColor;
+                            SaveManager.Instance.Save();
+                            mode.FootController.ApplyJacketColor(nextColor);
+                            GameFeelAudio.SpawnBurst(mode.ActiveWorldPosition + Vector3.up * 1.15f, new Color(0.38f, 0.85f, 0.80f), count: 12, spread: 0.45f);
+                            string[] outfitNames = { "Klasik Lacivert Ceket", "Bordo Deri Ceket", "Zeytin Parka", "Antrasit Mont" };
+                            mode.RaiseStatusMessage($"Gardıroptan kıyafet değiştirdin: {outfitNames[nextColor]}");
+                        }, startStatus: "Gardırop açılıyor, yeni ceket giyiliyor...");
                     }
                     break;
                 }
 
                 case HomeApplianceKind.ComputerDesk:
                 {
-                    _isTurnedOn = !_isTurnedOn;
-                    if (_isTurnedOn)
+                    string startMsg = _isTurnedOn ? "Bilgisayar kapatılıyor..." : "Bilgisayar başına geçip klavyede çalışılıyor...";
+                    PlayerActionAnimator.Play(mode, transform, PlayerActionKind.TypeComputer, onClimax: () =>
                     {
-                        EnsureGlowLight(new Color(0.55f, 0.80f, 1.0f), 3.6f, 1.5f);
-                        if (Time.time - _lastActionTime >= 25f && SaveManager.Instance != null)
+                        _isTurnedOn = !_isTurnedOn;
+                        if (_isTurnedOn)
                         {
-                            _lastActionTime = Time.time;
-                            SaveManager.Instance.AddMoney(20);
-                            GameFeelAudio.PlayCoinChime();
-                            GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.0f, new Color(1.0f, 0.84f, 0.24f), count: 10, spread: 0.4f);
-                            mode.RaiseStatusMessage("Bilgisayardan küçük bir mahalle ilanı işi tamamladın! (+20 ₺)");
+                            EnsureGlowLight(new Color(0.55f, 0.80f, 1.0f), 3.6f, 1.5f);
+                            if (Time.time - _lastActionTime >= 25f && SaveManager.Instance != null)
+                            {
+                                _lastActionTime = Time.time;
+                                SaveManager.Instance.AddMoney(20);
+                                GameFeelAudio.PlayCoinChime();
+                                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.0f, new Color(1.0f, 0.84f, 0.24f), count: 10, spread: 0.4f);
+                                mode.RaiseStatusMessage("Bilgisayardan küçük bir mahalle ilanı işi tamamladın! (+20 ₺)");
+                            }
+                            else
+                            {
+                                GameFeelAudio.PlayUiClick();
+                                mode.RaiseStatusMessage("Bilgisayar açıldı: Selman Sokağı mahalle ilanlarına bakıyorsun.");
+                            }
                         }
                         else
                         {
-                            GameFeelAudio.PlayUiClick();
-                            mode.RaiseStatusMessage("Bilgisayar açıldı: Selman Sokağı mahalle ilanlarına bakıyorsun.");
+                            SetGlowEnabled(false);
+                            mode.RaiseStatusMessage("Bilgisayar kapatıldı.");
                         }
-                    }
-                    else
-                    {
-                        SetGlowEnabled(false);
-                        mode.RaiseStatusMessage("Bilgisayar kapatıldı.");
-                    }
+                    }, startStatus: startMsg);
                     break;
                 }
 
                 case HomeApplianceKind.WashingMachine:
                 {
-                    _isTurnedOn = !_isTurnedOn;
-                    if (_isTurnedOn)
+                    string startMsg = _isTurnedOn ? "Çamaşır makinesi durduruluyor..." : "Çamaşır makinesi doldurulup program seçiliyor...";
+                    PlayerActionAnimator.Play(mode, transform, PlayerActionKind.LoadWashingMachine, onClimax: () =>
                     {
-                        EnsureGlowLight(new Color(0.45f, 0.88f, 1.0f), 2.8f, 1.1f);
-                        mode.RaiseStatusMessage("Çamaşır makinesi 40°C pamuklu programında çalışmaya başladı!");
-                    }
-                    else
-                    {
-                        SetGlowEnabled(false);
-                        mode.RaiseStatusMessage("Çamaşır makinesi durduruldu, çamaşırlar mis gibi kokuyor.");
-                    }
+                        _isTurnedOn = !_isTurnedOn;
+                        if (_isTurnedOn)
+                        {
+                            EnsureGlowLight(new Color(0.45f, 0.88f, 1.0f), 2.8f, 1.1f);
+                            mode.RaiseStatusMessage("Çamaşır makinesi 40°C pamuklu programında çalışmaya başladı!");
+                        }
+                        else
+                        {
+                            SetGlowEnabled(false);
+                            mode.RaiseStatusMessage("Çamaşır makinesi durduruldu, çamaşırlar mis gibi kokuyor.");
+                        }
+                    }, startStatus: startMsg);
                     break;
                 }
 
                 case HomeApplianceKind.BathroomSink:
                 {
-                    GameFeelAudio.PlayWaterSplash();
-                    GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.95f, new Color(0.45f, 0.86f, 1.0f), count: 8, spread: 0.35f);
-                    if (PlayerNeedsController.Instance != null)
+                    if (Time.time - _lastActionTime < 5f)
                     {
-                        PlayerNeedsController.Instance.RestoreEnergy(15f);
+                        mode.RaiseStatusMessage("Elini yüzünü az önce yıkadın, tertemizsin!");
+                        return;
                     }
-                    mode.RaiseStatusMessage("Lavaboda soğuk suyla elini yüzünü yıkadın, kendine geldin! (+15 Enerji)");
+                    _lastActionTime = Time.time;
+                    PlayerActionAnimator.Play(mode, transform, PlayerActionKind.WashFace, onClimax: () =>
+                    {
+                        if (PlayerNeedsController.Instance != null)
+                        {
+                            PlayerNeedsController.Instance.RestoreEnergy(15f);
+                        }
+                        mode.RaiseStatusMessage("Lavaboda soğuk suyla elini yüzünü yıkadın, kendine geldin! (+15 Enerji)");
+                    }, startStatus: "Lavaboda soğuk suyla el ve yüz yıkanıyor...");
                     break;
                 }
             }

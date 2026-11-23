@@ -527,13 +527,14 @@ namespace Gridroam.Jobs
             {
                 _lastPizzaRewardTime = Time.time;
                 int timeBonus = Mathf.Clamp(Mathf.RoundToInt(_jobRemainingTime * 0.35f), 0, 30);
-                int reward = 40 + timeBonus;
+                int reward = Mathf.RoundToInt((40 + timeBonus) * NeighborhoodReputation.GetJobRewardMultiplier());
 
                 if (SaveManager.Instance != null)
                 {
                     SaveManager.Instance.Data.deliveriesDone++;
                     SaveManager.Instance.AddMoney(reward);
                 }
+                NeighborhoodReputation.AddReputation(12);
 
                 PlayBlip();
                 GameFeelAudio.PlayCoinChime();
@@ -736,11 +737,14 @@ namespace Gridroam.Jobs
                             finalFare = Mathf.Max(5, Mathf.RoundToInt(baseFare * mult));
                         }
 
+                        finalFare = Mathf.RoundToInt(finalFare * NeighborhoodReputation.GetJobRewardMultiplier());
+
                         if (SaveManager.Instance != null)
                         {
                             SaveManager.Instance.Data.taxiFaresDone++;
                             SaveManager.Instance.AddMoney(finalFare);
                         }
+                        NeighborhoodReputation.AddReputation(18);
 
                         PlayBlip();
                         StartCoroutine(ShowDropoffPassengerBriefRoutine(mode.CurrentVehicle.GetSafeExitPosition()));

@@ -189,18 +189,38 @@ namespace Gridroam.Player
             }
         }
 
-        public void TrySleepInBed()
+        public void TrySleepInBed(Transform bedTransform = null)
         {
             if (_isBusy) return;
-            StartCoroutine(SleepRoutine());
+            StartCoroutine(SleepRoutine(bedTransform));
         }
 
-        private IEnumerator SleepRoutine()
+        private IEnumerator SleepRoutine(Transform bedTransform)
         {
             _isBusy = true;
-            if (PlayerModeController.Instance != null)
+            PlayerModeController mode = PlayerModeController.Instance;
+            PlayerFootController foot = mode != null ? mode.FootController : null;
+            ProceduralHumanoid hum = foot != null ? foot.Humanoid : null;
+            Vector3 preSleepPos = foot != null ? foot.transform.position : Vector3.zero;
+            Quaternion preSleepRot = foot != null ? foot.transform.rotation : Quaternion.identity;
+            bool laidOnBed = false;
+
+            if (mode != null)
             {
-                PlayerModeController.Instance.SetModalLock(this, true);
+                mode.SetModalLock(this, true);
+            }
+
+            // Physically lie down on the bed before drifting off to sleep!
+            if (foot != null && hum != null && bedTransform != null && mode.CurrentMode == ControlMode.OnFoot)
+            {
+                laidOnBed = true;
+                foot.SetMovementEnabled(false);
+                Vector3 bedTop = bedTransform.position + Vector3.up * 0.54f;
+                foot.TeleportTo(bedTop, bedTransform.rotation);
+                hum.SetLocomotion(0f, true, 0f);
+                hum.SetLyingDown(true);
+                OnNeedsMessage?.Invoke("Yatağına uzandın, uykuya dalıyorsun...");
+                yield return new WaitForSecondsRealtime(0.95f);
             }
 
             if (sleepFadeCanvasGroup != null)
@@ -229,6 +249,14 @@ namespace Gridroam.Player
                 SaveManager.Instance.Save();
             }
 
+            // Stand cleanly back beside the bed before waking up
+            if (laidOnBed && foot != null)
+            {
+                if (hum != null) hum.SetLyingDown(false);
+                foot.TeleportTo(preSleepPos, preSleepRot);
+                foot.SetMovementEnabled(true);
+            }
+
             yield return new WaitForSecondsRealtime(0.3f);
 
             if (sleepFadeCanvasGroup != null)
@@ -249,6 +277,10 @@ namespace Gridroam.Player
             if (PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.SetModalLock(this, false);
+                if (PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot)
+                {
+                    PlayerActionAnimator.Play(PlayerModeController.Instance, null, PlayerActionKind.WakeStretch);
+                }
             }
 
             _isBusy = false;
@@ -302,6 +334,13 @@ namespace Gridroam.Player
             }
 
             OnNeedsMessage?.Invoke(LocalizationService.Tr("ui.fuel.filling", "Yakıt dolduruluyor..."));
+
+            if (PlayerModeController.Instance != null &&
+                PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot &&
+                vehicle != null)
+            {
+                PlayerActionAnimator.Play(PlayerModeController.Instance, vehicle.transform, PlayerActionKind.RefuelCar);
+            }
 
             float startFuel = vehicle != null ? vehicle.Fuel : 0f;
             const float duration = 3.0f;

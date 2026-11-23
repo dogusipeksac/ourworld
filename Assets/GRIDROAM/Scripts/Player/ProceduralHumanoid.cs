@@ -100,6 +100,10 @@ namespace Gridroam.Player
         private float _swimPhase;
         private int _prayerStage;
         private float _prayerSelamYaw;
+        private bool _prayerHandsInit;
+        private Vector3 _prayerLeftHandLocal;
+        private Vector3 _prayerRightHandLocal;
+        private bool _isLyingDown;
         private float _startledTimer = -1f;
         private float _startledDuration = 1.1f;
         private float _autoWaveCountdown = 8f;
@@ -125,8 +129,19 @@ namespace Gridroam.Player
         private float _consumeWeight;
         private float _consumeCyclePhase;
 
+        // Dual-hand interactive action overlay (wash face, abdest, typing, ATM, remote, wardrobe, washer, refuel)
+        private bool _hasDualAction;
+        private Vector3 _dualLeftTarget;
+        private Vector3 _dualRightTarget;
+        private float _dualLeftWeight;
+        private float _dualRightWeight;
+        private float _dualSpineLean;
+        private float _dualHeadPitch;
+        private float _dualHipsDrop;
+
         public Transform HeadTransform => head;
         public Transform RightForearm => rElbow;
+        public Transform LeftForearm => lElbow;
 
         public bool IsSitting => isSitting;
         public event Action<float> OnFootstepContact;
@@ -441,18 +456,41 @@ namespace Gridroam.Player
 
         /// <summary>
         /// Sets an animated Salah (Namaz) prayer stage:
-        /// 0 = None, 1 = Kıyam (standing hands folded), 2 = Rükû (bow), 3 = Secde (prostration),
-        /// 4 = Oturuş / Tahiyyat (kneeling; selamHeadYaw +55 right / -55 left for Selam).
+        /// 0 = None, 1 = Kıyam (standing hands folded over abdomen), 2 = Rükû (90° bow, palms on knees),
+        /// 3 = Secde (7-point prostration: forehead, palms, knees & toes on carpet),
+        /// 4 = Oturuş / Celse / Tahiyyat (kneeling back on heels, palms on thighs; selamHeadYaw ±64° for Selam),
+        /// 5 = İftitah Tekbiri (standing, hands raised beside ears),
+        /// 6 = Kavme (standing upright from Rükû, arms relaxed at sides).
         /// </summary>
         public void SetPrayerPose(int stage, float selamHeadYaw = 0f)
         {
-            _prayerStage = Mathf.Clamp(stage, 0, 4);
-            _prayerSelamYaw = Mathf.Clamp(selamHeadYaw, -65f, 65f);
+            if (_prayerStage == 0 && stage > 0)
+            {
+                _prayerHandsInit = false;
+            }
+            _prayerStage = Mathf.Clamp(stage, 0, 6);
+            _prayerSelamYaw = Mathf.Clamp(selamHeadYaw, -70f, 70f);
             if (_prayerStage > 0)
             {
                 _waveTimer = -1f;
                 _punchTimer = -1f;
                 _startledTimer = -1f;
+                _isLyingDown = false;
+            }
+            else
+            {
+                _prayerHandsInit = false;
+            }
+        }
+
+        public void SetLyingDown(bool lying)
+        {
+            _isLyingDown = lying;
+            if (lying)
+            {
+                _waveTimer = -1f;
+                _punchTimer = -1f;
+                _prayerStage = 0;
             }
         }
 
@@ -500,6 +538,30 @@ namespace Gridroam.Player
             _doorReachStarted = Time.time;
             _doorReachDuration = duration;
             _doorReachRight = transform.InverseTransformPoint(handle.position).x >= -0.08f;
+        }
+
+        public void SetDualHandAction(
+            bool active,
+            Vector3 leftHandWorld,
+            Vector3 rightHandWorld,
+            float leftWeight,
+            float rightWeight,
+            float spineLeanDeg = 0f,
+            float headPitchDeg = 0f,
+            float hipsDrop = 0f)
+        {
+            _hasDualAction = active;
+            _dualLeftTarget = leftHandWorld;
+            _dualRightTarget = rightHandWorld;
+            _dualLeftWeight = active ? Mathf.Clamp01(leftWeight) : 0f;
+            _dualRightWeight = active ? Mathf.Clamp01(rightWeight) : 0f;
+            _dualSpineLean = active ? spineLeanDeg : 0f;
+            _dualHeadPitch = active ? headPitchDeg : 0f;
+            _dualHipsDrop = active ? hipsDrop : 0f;
+            if (active)
+            {
+                _waveTimer = -1f;
+            }
         }
 
         private void Start()
@@ -875,21 +937,40 @@ namespace Gridroam.Player
                 targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -6f, fall);
             }
 
-            // --- Prayer (Namaz / Salah) animated pose override (Kıyam -> Rükû -> Secde -> Oturuş/Selam) ---
-            if (_prayerStage > 0)
+            // --- Bed sleep lying-down override ---
+            if (_isLyingDown)
             {
-                if (_prayerStage == 1)
+                targetHipsPos = new Vector3(0f, 0.16f, 0f);
+                targetHipsRot = new Vector3(-90f, 0f, 0f);
+                targetSpineRot = new Vector3(2f + idleChestPitch * 0.4f, 0f, 0f);
+                targetNeckRot = new Vector3(6f, 0f, 0f);
+                targetHeadRot = new Vector3(10f, 6f, 0f);
+                targetLShoulderRot = new Vector3(4f, 0f, -10f);
+                targetRShoulderRot = new Vector3(4f, 0f, 10f);
+                targetLElbowRot = new Vector3(-16f, 0f, 0f);
+                targetRElbowRot = new Vector3(-16f, 0f, 0f);
+                targetLHipRot = new Vector3(2f, 0f, -4f);
+                targetRHipRot = new Vector3(2f, 0f, 4f);
+                targetLKneeRot = new Vector3(6f, 0f, 0f);
+                targetRKneeRot = new Vector3(6f, 0f, 0f);
+                targetLAnkleRot = new Vector3(18f, 0f, 0f);
+                targetRAnkleRot = new Vector3(18f, 0f, 0f);
+            }
+            // --- Prayer (Namaz / Salah) mathematically exact pose override (Tekbir -> Kıyam -> Rükû -> Kavme -> Secde -> Oturuş/Selam) ---
+            else if (_prayerStage > 0)
+            {
+                if (_prayerStage == 1 || _prayerStage == 5 || _prayerStage == 6)
                 {
-                    // Kıyam: upright serene stance, hands folded calmly over abdomen, gaze lowered toward secde spot
+                    // Standing phases: 5 = Tekbir (hands beside ears via IK), 1 = Kıyam (hands folded over abdomen via IK), 6 = Kavme (arms at sides)
                     targetHipsPos = new Vector3(0f, hipsBaseY, 0f);
                     targetHipsRot = Vector3.zero;
-                    targetSpineRot = new Vector3(3f + idleChestPitch * 0.45f, 0f, 0f);
-                    targetNeckRot = new Vector3(8f, 0f, 0f);
-                    targetHeadRot = new Vector3(12f, 0f, 0f);
-                    targetLShoulderRot = new Vector3(-28f, 24f, 12f);
-                    targetRShoulderRot = new Vector3(-30f, -24f, -12f);
-                    targetLElbowRot = new Vector3(-86f, 24f, 0f);
-                    targetRElbowRot = new Vector3(-88f, -24f, 0f);
+                    targetSpineRot = new Vector3(2f + idleChestPitch * 0.35f, 0f, 0f);
+                    targetNeckRot = new Vector3(7f, 0f, 0f);
+                    targetHeadRot = new Vector3(11f, 0f, 0f);
+                    targetLShoulderRot = new Vector3(4f, 0f, -6f);
+                    targetRShoulderRot = new Vector3(4f, 0f, 6f);
+                    targetLElbowRot = new Vector3(-10f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-10f, 0f, 0f);
                     targetLHipRot = new Vector3(0f, 0f, -2f);
                     targetRHipRot = new Vector3(0f, 0f, 2f);
                     targetLKneeRot = new Vector3(2f, 0f, 0f);
@@ -899,60 +980,60 @@ namespace Gridroam.Player
                 }
                 else if (_prayerStage == 2)
                 {
-                    // Rükû: straight horizontal back bow, hands resting on knees
-                    targetHipsPos = new Vector3(0f, hipsBaseY - 0.04f, -0.08f);
-                    targetHipsRot = new Vector3(16f, 0f, 0f);
-                    targetSpineRot = new Vector3(68f, 0f, 0f);
-                    targetNeckRot = new Vector3(-6f, 0f, 0f);
-                    targetHeadRot = new Vector3(-8f, 0f, 0f);
-                    targetLShoulderRot = new Vector3(-82f, 4f, -6f);
-                    targetRShoulderRot = new Vector3(-82f, -4f, 6f);
-                    targetLElbowRot = new Vector3(-12f, 0f, 0f);
-                    targetRElbowRot = new Vector3(-12f, 0f, 0f);
-                    targetLHipRot = new Vector3(-16f, 0f, -2f);
-                    targetRHipRot = new Vector3(-16f, 0f, 2f);
-                    targetLKneeRot = new Vector3(4f, 0f, 0f);
-                    targetRKneeRot = new Vector3(4f, 0f, 0f);
+                    // Rükû: crisp straight 88° horizontal back, head aligned with spine, palms placed directly on knees via IK
+                    targetHipsPos = new Vector3(0f, hipsBaseY - 0.025f, -0.06f);
+                    targetHipsRot = new Vector3(12f, 0f, 0f);
+                    targetSpineRot = new Vector3(76f, 0f, 0f);
+                    targetNeckRot = new Vector3(-4f, 0f, 0f);
+                    targetHeadRot = new Vector3(-4f, 0f, 0f);
+                    targetLShoulderRot = new Vector3(-78f, 0f, -6f);
+                    targetRShoulderRot = new Vector3(-78f, 0f, 6f);
+                    targetLElbowRot = new Vector3(-10f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-10f, 0f, 0f);
+                    targetLHipRot = new Vector3(-12f, 0f, -2f);
+                    targetRHipRot = new Vector3(-12f, 0f, 2f);
+                    targetLKneeRot = new Vector3(3f, 0f, 0f);
+                    targetRKneeRot = new Vector3(3f, 0f, 0f);
                     targetLAnkleRot = Vector3.zero;
                     targetRAnkleRot = Vector3.zero;
                 }
                 else if (_prayerStage == 3)
                 {
-                    // Secde: prostration with knees, hands, and forehead lowered gently onto the emerald carpet
-                    targetHipsPos = new Vector3(0f, 0.42f, -0.08f);
-                    targetHipsRot = new Vector3(58f, 0f, 0f);
-                    targetSpineRot = new Vector3(44f, 0f, 0f);
-                    targetNeckRot = new Vector3(-14f, 0f, 0f);
-                    targetHeadRot = new Vector3(-10f, 0f, 0f);
-                    targetLShoulderRot = new Vector3(-118f, 8f, -18f);
-                    targetRShoulderRot = new Vector3(-118f, -8f, 18f);
-                    targetLElbowRot = new Vector3(-64f, 0f, 0f);
-                    targetRElbowRot = new Vector3(-64f, 0f, 0f);
-                    targetLHipRot = new Vector3(-118f, 0f, -6f);
-                    targetRHipRot = new Vector3(-118f, 0f, 6f);
-                    targetLKneeRot = new Vector3(132f, 0f, 0f);
-                    targetRKneeRot = new Vector3(132f, 0f, 0f);
-                    targetLAnkleRot = new Vector3(-28f, 0f, 0f);
-                    targetRAnkleRot = new Vector3(-28f, 0f, 0f);
+                    // Secde: exact 7-point prostration — knees (y≈0.058), toes, forehead (y≈0.03), and both palms (via IK) resting cleanly on the carpet!
+                    targetHipsPos = new Vector3(0f, 0.45f, -0.14f);
+                    targetHipsRot = new Vector3(62f, 0f, 0f);
+                    targetSpineRot = new Vector3(64f, 0f, 0f);
+                    targetNeckRot = new Vector3(-10f, 0f, 0f);
+                    targetHeadRot = new Vector3(-12f, 0f, 0f);
+                    targetLShoulderRot = new Vector3(-105f, 0f, -18f);
+                    targetRShoulderRot = new Vector3(-105f, 0f, 18f);
+                    targetLElbowRot = new Vector3(-55f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-55f, 0f, 0f);
+                    targetLHipRot = new Vector3(-92f, 0f, -5f);
+                    targetRHipRot = new Vector3(-92f, 0f, 5f);
+                    targetLKneeRot = new Vector3(122f, 0f, 0f);
+                    targetRKneeRot = new Vector3(122f, 0f, 0f);
+                    targetLAnkleRot = new Vector3(-62f, 0f, 0f);
+                    targetRAnkleRot = new Vector3(-62f, 0f, 0f);
                 }
                 else
                 {
-                    // Oturuş / Tahiyyat & Selam: calm kneeling seat, hands on thighs, gentle right/left head turn for Selam
-                    targetHipsPos = new Vector3(0f, 0.36f, -0.04f);
-                    targetHipsRot = new Vector3(4f, 0f, 0f);
-                    targetSpineRot = new Vector3(2f + idleChestPitch * 0.35f, 0f, 0f);
-                    targetNeckRot = new Vector3(5f, _prayerSelamYaw * 0.35f, 0f);
-                    targetHeadRot = new Vector3(10f, _prayerSelamYaw * 0.65f, 0f);
-                    targetLShoulderRot = new Vector3(-34f, 6f, -4f);
-                    targetRShoulderRot = new Vector3(-34f, -6f, 4f);
-                    targetLElbowRot = new Vector3(-26f, 0f, 0f);
-                    targetRElbowRot = new Vector3(-26f, 0f, 0f);
-                    targetLHipRot = new Vector3(-62f, 0f, -6f);
-                    targetRHipRot = new Vector3(-62f, 0f, 6f);
-                    targetLKneeRot = new Vector3(136f, 0f, 0f);
-                    targetRKneeRot = new Vector3(136f, 0f, 0f);
-                    targetLAnkleRot = new Vector3(38f, 0f, 0f);
-                    targetRAnkleRot = new Vector3(38f, 0f, 0f);
+                    // Oturuş / Celse / Tahiyyat & Selam: kneeling back on heels with knees & shins flat on carpet (y≈0.059), upright torso, palms on thighs via IK
+                    targetHipsPos = new Vector3(0f, 0.24f, -0.18f);
+                    targetHipsRot = new Vector3(8f, 0f, 0f);
+                    targetSpineRot = new Vector3(-5f + idleChestPitch * 0.3f, 0f, 0f);
+                    targetNeckRot = new Vector3(5f, _prayerSelamYaw * 0.38f, 0f);
+                    targetHeadRot = new Vector3(9f, _prayerSelamYaw * 0.62f, 0f);
+                    targetLShoulderRot = new Vector3(-28f, 0f, -6f);
+                    targetRShoulderRot = new Vector3(-28f, 0f, 6f);
+                    targetLElbowRot = new Vector3(-24f, 0f, 0f);
+                    targetRElbowRot = new Vector3(-24f, 0f, 0f);
+                    targetLHipRot = new Vector3(-76f, 0f, -5f);
+                    targetRHipRot = new Vector3(-76f, 0f, 5f);
+                    targetLKneeRot = new Vector3(158f, 0f, 0f);
+                    targetRKneeRot = new Vector3(158f, 0f, 0f);
+                    targetLAnkleRot = new Vector3(56f, 0f, 0f);
+                    targetRAnkleRot = new Vector3(56f, 0f, 0f);
                 }
             }
             // --- Swimming override (front-crawl freestyle when moving, treading water when idle) ---
@@ -1165,6 +1246,18 @@ namespace Gridroam.Player
                 targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 14f, bite * _consumeWeight);
                 targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 5f, bite * _consumeWeight);
             }
+            else if (_hasDualAction)
+            {
+                float actionBlend = Mathf.Max(_dualLeftWeight, _dualRightWeight);
+                if (actionBlend < 0.01f && (Mathf.Abs(_dualSpineLean) > 0.1f || Mathf.Abs(_dualHeadPitch) > 0.1f || Mathf.Abs(_dualHipsDrop) > 0.001f))
+                {
+                    actionBlend = 1f;
+                }
+                targetHipsPos.y -= _dualHipsDrop * actionBlend;
+                targetSpineRot.x += _dualSpineLean;
+                targetNeckRot.x += _dualHeadPitch * 0.35f;
+                targetHeadRot.x += _dualHeadPitch * 0.65f;
+            }
 
             if (chestVisual != null)
             {
@@ -1212,11 +1305,83 @@ namespace Gridroam.Player
                 hips.position += Vector3.ClampMagnitude(reach, 0.13f * transform.lossyScale.y) * petWeight;
             }
 
-            if (_grounded && !_isSwimming && _prayerStage == 0 && _vaultTimer < 0f &&
+            if (_grounded && !_isSwimming && !_isLyingDown && _prayerStage == 0 && _vaultTimer < 0f &&
                 _knockdownTimer < 0f && _hitReactTimer < 0f && _punchTimer < 0f &&
                 lAnkle != null && rAnkle != null)
             {
                 PlantFeet(strideLength, stance, runBlend, tennisStance, idleW);
+            }
+
+            // Smoothly blended 2-bone IK hand placements for every Prayer (Namaz) stage so hands glide naturally between ears, abdomen, knees, carpet & thighs!
+            if (_prayerStage > 0 && _prayerStage != 6 && !_isLyingDown && lShoulder != null && lElbow != null && rShoulder != null && rElbow != null)
+            {
+                Vector3 leftWorld = Vector3.zero;
+                Vector3 rightWorld = Vector3.zero;
+                Vector3 leftPole = -transform.right;
+                Vector3 rightPole = transform.right;
+                bool hasTargets = false;
+
+                if (_prayerStage == 5 && head != null)
+                {
+                    // İftitah Tekbiri: both hands raised respectfully beside the ears
+                    leftWorld = head.position - transform.right * 0.21f + transform.forward * 0.09f + transform.up * 0.04f;
+                    rightWorld = head.position + transform.right * 0.21f + transform.forward * 0.09f + transform.up * 0.04f;
+                    leftPole = -transform.right - transform.up * 0.5f;
+                    rightPole = transform.right - transform.up * 0.5f;
+                    hasTargets = true;
+                }
+                else if (_prayerStage == 1 && spine != null)
+                {
+                    // Kıyam: right hand folded cleanly over left hand at navel/abdomen
+                    leftWorld = spine.position + transform.forward * 0.165f + transform.up * 0.075f - transform.right * 0.01f;
+                    rightWorld = spine.position + transform.forward * 0.185f + transform.up * 0.085f + transform.right * 0.01f;
+                    leftPole = -transform.right - transform.up * 0.35f;
+                    rightPole = transform.right - transform.up * 0.35f;
+                    hasTargets = true;
+                }
+                else if (_prayerStage == 2 && lKnee != null && rKnee != null)
+                {
+                    // Rükû: both palms directly grasping the knees
+                    leftWorld = lKnee.position + transform.forward * 0.04f + transform.up * 0.02f;
+                    rightWorld = rKnee.position + transform.forward * 0.04f + transform.up * 0.02f;
+                    hasTargets = true;
+                }
+                else if (_prayerStage == 3)
+                {
+                    // Secde: both palms placed flat on the carpet right beside the head, elbows lifted outward
+                    leftWorld = transform.TransformPoint(new Vector3(-0.23f, 0.045f, 0.36f));
+                    rightWorld = transform.TransformPoint(new Vector3(0.23f, 0.045f, 0.36f));
+                    leftPole = -transform.right + transform.up * 0.45f;
+                    rightPole = transform.right + transform.up * 0.45f;
+                    hasTargets = true;
+                }
+                else if (_prayerStage == 4 && lKnee != null && rKnee != null)
+                {
+                    // Oturuş / Tahiyyat & Selam: both palms resting cleanly on thighs just behind knees
+                    leftWorld = lKnee.position - transform.forward * 0.09f + transform.up * 0.085f;
+                    rightWorld = rKnee.position - transform.forward * 0.09f + transform.up * 0.085f;
+                    hasTargets = true;
+                }
+
+                if (hasTargets)
+                {
+                    Vector3 targetL = transform.InverseTransformPoint(leftWorld);
+                    Vector3 targetR = transform.InverseTransformPoint(rightWorld);
+                    if (!_prayerHandsInit)
+                    {
+                        _prayerLeftHandLocal = targetL;
+                        _prayerRightHandLocal = targetR;
+                        _prayerHandsInit = true;
+                    }
+                    else
+                    {
+                        float hBlend = 1f - Mathf.Exp(-8.5f * dt);
+                        _prayerLeftHandLocal = Vector3.Lerp(_prayerLeftHandLocal, targetL, hBlend);
+                        _prayerRightHandLocal = Vector3.Lerp(_prayerRightHandLocal, targetR, hBlend);
+                    }
+                    AimHand(lShoulder, lElbow, transform.TransformPoint(_prayerLeftHandLocal), leftPole, 1f);
+                    AimHand(rShoulder, rElbow, transform.TransformPoint(_prayerRightHandLocal), rightPole, 1f);
+                }
             }
 
             if (carryWeight > 0f)
@@ -1275,6 +1440,19 @@ namespace Gridroam.Player
                         : head.position + transform.forward * 0.19f + transform.right * 0.04f - transform.up * 0.06f;
                     Vector3 handTarget = Vector3.Lerp(holdPos, mouthPos, phase);
                     AimHand(rShoulder, rElbow, handTarget, transform.right, _consumeWeight);
+                }
+            }
+
+            // Dual-hand physical interaction IK overlay (washing face/hands, abdest, typing, ATM, remote, etc.)
+            if (!carrying && !petting && !tennisStance && !_isSwimming && _hasDualAction)
+            {
+                if (_dualLeftWeight > 0.01f && lShoulder != null && lElbow != null)
+                {
+                    AimHand(lShoulder, lElbow, _dualLeftTarget, -transform.right, _dualLeftWeight);
+                }
+                if (_dualRightWeight > 0.01f && rShoulder != null && rElbow != null)
+                {
+                    AimHand(rShoulder, rElbow, _dualRightTarget, transform.right, _dualRightWeight);
                 }
             }
         }

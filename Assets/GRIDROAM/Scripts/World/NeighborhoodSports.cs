@@ -64,6 +64,7 @@ namespace Gridroam.World
             BuildBicycle(paintedSteel, rubber, cream, metal);
             BuildMotorcycle(shader, rubber, cream, metal);
             BuildCourt(playerModel, paintedSteel, rubber, cream, asphalt, clay, green);
+            BuildCommunitySportsArenas(playerModel, shader, paintedSteel, rubber, cream, metal, asphalt, clay);
             BuildDuplexHomes(shader, cream, paintedSteel);
         }
 
@@ -213,26 +214,15 @@ namespace Gridroam.World
             Transform marker = Child(court, "Return timing marker", Vector3.zero);
             markerParts.Emit(marker, "Ready ring", shadows: false);
 
-            // Use the existing jointed player art with a different shirt for the neighborhood opponent.
+            // Use the existing jointed player art with distinct shirts for both neighborhood tennis NPCs
+            // so two NPCs rally autonomously whenever the player isn't playing!
             ProceduralHumanoid opponent = Instantiate(playerModel, court);
             opponent.name = "Mahalle Tenis Rakibi";
-            Transform opponentTorso = opponent.transform.Find("Hips/Spine");
-            if (opponentTorso != null)
-            {
-                Material shirt = MaterialFor(steel.shader, "Opponent Blue Sports Shirt", new Color(0.22f, 0.42f, 0.55f), 0.22f);
-                foreach (Renderer renderer in opponentTorso.GetComponentsInChildren<Renderer>(true))
-                {
-                    Material[] materials = renderer.sharedMaterials;
-                    bool changed = false;
-                    for (int slot = 0; slot < materials.Length; slot++)
-                    {
-                        if (materials[slot] == null || !materials[slot].name.Contains("Shirt")) continue;
-                        materials[slot] = shirt;
-                        changed = true;
-                    }
-                    if (changed) renderer.sharedMaterials = materials;
-                }
-            }
+            ApplyNpcShirtColor(opponent, steel.shader, "Opponent Blue Sports Shirt", new Color(0.22f, 0.42f, 0.55f));
+
+            ProceduralHumanoid ambientPlayer = Instantiate(playerModel, court);
+            ambientPlayer.name = "Mahalle Tenis Oyuncusu";
+            ApplyNpcShirtColor(ambientPlayer, steel.shader, "Ambient Crimson Sports Shirt", new Color(0.68f, 0.24f, 0.20f));
 
             MeshParts racketParts = new MeshParts(this);
             racketParts.Ring(steel, 0.125f, 0.158f, 0.012f, 22, Quaternion.identity, new Vector3(0f, 0.48f, 0f));
@@ -255,13 +245,34 @@ namespace Gridroam.World
 
             AudioSource ballSound = ball.gameObject.AddComponent<AudioSource>();
             ballSound.playOnAwake = false;
-            ballSound.spatialBlend = 0.58f;
-            ballSound.minDistance = 3f;
-            ballSound.maxDistance = 34f;
+            ballSound.spatialBlend = 1.0f;
+            ballSound.rolloffMode = AudioRolloffMode.Linear;
+            ballSound.minDistance = 4f;
+            ballSound.maxDistance = 24f;
             AudioClip hit = BuildBallSound("Racket hit", 340f, 61f, 0.30f);
             AudioClip bounce = BuildBallSound("Court bounce", 155f, 86f, 0.12f);
             court.gameObject.AddComponent<TennisCourt>().Configure(
-                ball, ballShadow, opponent, opponentRacket, playerRacket, marker, ballSound, hit, bounce);
+                ball, ballShadow, opponent, opponentRacket, playerRacket, marker, ballSound, hit, bounce, ambientPlayer);
+        }
+
+        private void ApplyNpcShirtColor(ProceduralHumanoid npc, Shader shader, string matName, Color shirtColor)
+        {
+            if (npc == null) return;
+            Transform torso = npc.transform.Find("Hips/Spine");
+            if (torso == null) return;
+            Material shirt = MaterialFor(shader, matName, shirtColor, 0.22f);
+            foreach (Renderer renderer in torso.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] materials = renderer.sharedMaterials;
+                bool changed = false;
+                for (int slot = 0; slot < materials.Length; slot++)
+                {
+                    if (materials[slot] == null || !materials[slot].name.Contains("Shirt")) continue;
+                    materials[slot] = shirt;
+                    changed = true;
+                }
+                if (changed) renderer.sharedMaterials = materials;
+            }
         }
 
         private void AddFence(MeshParts parts, Transform court, Material material, Vector3 start, Vector3 end)

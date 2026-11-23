@@ -539,6 +539,11 @@ namespace Gridroam.Editor
             BuildHamidiyeAvenueCitizensAndCats(hamRoot.transform, mats, seats);
 
             // =========================================================================
+            // 11b. NORTHERN NEIGHBORHOOD LANDMARK: HAMİDİYE ÇAY BAHÇESİ & PARKI!
+            // =========================================================================
+            BuildHamidiyeTeaGardenPark(hamRoot.transform, mats, seats);
+
+            // =========================================================================
             // 12. WARM NIGHT STREETLAMPS ALONG THE 8 MAIN AVENUES (Mobile-budgeted 16 lamps!)
             // =========================================================================
             Vector3[] avenueLampCoords =
@@ -735,6 +740,73 @@ namespace Gridroam.Editor
                 InteractableTrigger trig = catGo.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.StreetCat, $"street_cat_{c.name.ToLowerInvariant()}", "ui.btn.pet_cat", 2.5f);
             }
+        }
+
+        private static void BuildHamidiyeTeaGardenPark(Transform parent, MaterialSet mats, List<SeatInteractable> seats)
+        {
+            // Lush green neighborhood tea garden & rest park in the open pocket between Mürşit Cd. (Z=46) and Atatürk Cd. (Z=96)!
+            Vector3 center = new Vector3(-20.0f, 0.0f, 70.0f);
+            GameObject park = new GameObject("Hamidiye_CayBahcesi_Ve_Parki");
+            park.transform.SetParent(parent, false);
+            park.transform.position = center;
+
+            // Stone plaza + North/South footpaths connecting directly to Mürşit Cd. & Atatürk Cd.
+            DisableShadowCasting(CreateTiledBox("Park_Plaza", park.transform, center + new Vector3(0f, 0.032f, 0f), new Vector3(18.0f, 0.064f, 12.0f), Quaternion.identity, mats.TravertineStone, 1.6f, collider: false));
+            DisableShadowCasting(CreateTiledBox("Park_PathSouth", park.transform, center + new Vector3(0f, 0.028f, -12.2f), new Vector3(3.0f, 0.056f, 12.6f), Quaternion.identity, mats.KilitParke, 1.05f, collider: false));
+            DisableShadowCasting(CreateTiledBox("Park_PathNorth", park.transform, center + new Vector3(0f, 0.028f,  12.6f), new Vector3(3.0f, 0.056f, 13.4f), Quaternion.identity, mats.KilitParke, 1.05f, collider: false));
+
+            // Ornamental Center Stone Fountain with shimmering turquoise water
+            CreateStaticBlock("Park_FountainRim", park.transform, center + new Vector3(0f, 0.28f, 0f), new Vector3(3.0f, 0.56f, 3.0f), mats.TravertineStone, addCollider: true);
+            GameObject fWater = CreatePrimitiveChild("Park_FountainWater", PrimitiveType.Cube, park.transform, new Vector3(0f, 0.48f, 0f), new Vector3(2.45f, 0.08f, 2.45f), mats.PoolWaterClear, removeCollider: true);
+            DisableShadowCasting(fWater);
+            fWater.AddComponent<PoolWaterAnimator>();
+            CreateStaticBlock("Park_FountainSpire", park.transform, center + new Vector3(0f, 0.85f, 0f), new Vector3(0.45f, 1.15f, 0.45f), mats.TravertineStone, addCollider: true);
+
+            // Wooden Tea Pergola (Kamelya) on the West half of the plaza
+            Vector3 pg = new Vector3(-5.5f, 0f, 0f);
+            for (int px = -1; px <= 1; px += 2)
+            {
+                for (int pz = -1; pz <= 1; pz += 2)
+                {
+                    CreateStaticBlock($"Park_PergPost_{px}_{pz}", park.transform, center + pg + new Vector3(px * 2.1f, 1.45f, pz * 2.1f), new Vector3(0.18f, 2.90f, 0.18f), mats.TownWood, addCollider: true);
+                }
+            }
+            for (int r = -2; r <= 2; r++)
+            {
+                GameObject rafter = CreatePrimitiveChild($"Park_PergRafter_{r}", PrimitiveType.Cube, park.transform, pg + new Vector3(0f, 2.94f, r * 0.95f), new Vector3(4.8f, 0.12f, 0.14f), mats.TownWood, removeCollider: true);
+                DisableShadowCasting(rafter);
+                MarkStaticEnvironment(rafter);
+            }
+            PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Park_TeaTable_1", park.transform, pg + new Vector3(-0.9f, 0.06f,  0.8f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
+            PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Park_TeaTable_2", park.transform, pg + new Vector3( 0.9f, 0.06f, -0.8f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
+            CreatePointLamp("Park_PergolaWarmGlow", park.transform, center + pg + new Vector3(0f, 2.65f, 0f), new Color(1.0f, 0.84f, 0.52f), 16f, 2.8f);
+
+            // Park Benches (8 seats total!)
+            var (pb1, pb2) = CreateBench("Park_Bench_N1", park.transform, center + new Vector3(-4.5f, 0.06f,  4.8f), Quaternion.Euler(0f, 180f, 0f), mats);
+            seats.Add(pb1); seats.Add(pb2);
+            var (pb3, pb4) = CreateBench("Park_Bench_N2", park.transform, center + new Vector3( 4.5f, 0.06f,  4.8f), Quaternion.Euler(0f, 180f, 0f), mats);
+            seats.Add(pb3); seats.Add(pb4);
+            var (pb5, pb6) = CreateBench("Park_Bench_S1", park.transform, center + new Vector3(-4.5f, 0.06f, -4.8f), Quaternion.identity, mats);
+            seats.Add(pb5); seats.Add(pb6);
+            var (pb7, pb8) = CreateBench("Park_Bench_S2", park.transform, center + new Vector3( 4.5f, 0.06f, -4.8f), Quaternion.identity, mats);
+            seats.Add(pb7); seats.Add(pb8);
+
+            // Park Tea & Cold Drinks Kiosk (İsmail Amca) on the East side of the park
+            CreateStreetVendorStall(
+                "Vendor_ParkCayBahcesi", "shop_coffee", "İsmail Amca", "Hamidiye Çay Bahçesi", "HAMİDİYE ÇAY BAHÇESİ",
+                park.transform, center + new Vector3(6.2f, 0.06f, 0f), Quaternion.Euler(0f, -90f, 0f),
+                mats.TownAwningGreen, BlenderCharacterVariant.CasualMale,
+                mats.PedShirtOlive, mats.CharPants, mats.CharSkinWarm, mats.CharHair, mats);
+
+            // Welcome Sign + Low Ornamental Hedges + Shade Trees
+            CreateIstanbulRedStreetSign(park.transform, "HAMİDİYE PARKI", center + new Vector3(-2.4f, 0.06f, -6.2f), 0f, mats);
+            CreateStaticBlock("Park_Hedge_WL", park.transform, center + new Vector3(-9.1f, 0.45f, 0f), new Vector3(0.55f, 0.90f, 11.4f), mats.TownHedge, addCollider: true);
+            CreateStaticBlock("Park_Hedge_ER", park.transform, center + new Vector3( 9.1f, 0.45f, 0f), new Vector3(0.55f, 0.90f, 11.4f), mats.TownHedge, addCollider: true);
+
+            CreateTownTree("Park_Tree_NW", parent, center + new Vector3(-10.5f, 0.04f,  6.5f), mats, 1.22f, 971);
+            CreateTownTree("Park_Tree_NE", parent, center + new Vector3( 10.5f, 0.04f,  6.5f), mats, 1.18f, 972);
+            CreateTownTree("Park_Tree_SW", parent, center + new Vector3(-10.5f, 0.04f, -6.5f), mats, 1.15f, 973);
+            CreateTownTree("Park_Tree_SE", parent, center + new Vector3( 10.5f, 0.04f, -6.5f), mats, 1.20f, 974);
         }
     }
 }

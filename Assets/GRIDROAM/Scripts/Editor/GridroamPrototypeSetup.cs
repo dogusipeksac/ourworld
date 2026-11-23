@@ -2355,7 +2355,8 @@ namespace Gridroam.Editor
 
             MissionCatalog catalog = CreateOrLoadAsset<MissionCatalog>($"{MissionDir}/MissionCatalog.asset");
             catalog.missions = new List<MissionData> { m01, m02, m03, m04, m05 };
-            AppendChapterTwoMissions(catalog); // Missions 6-10 (Bölüm 2)
+            AppendChapterTwoMissions(catalog);   // Missions 6-10 (Bölüm 2)
+            AppendChapterThreeMissions(catalog); // Missions 11-14 (Bölüm 3: Hamidiye'nin Kalbi)
             EditorUtility.SetDirty(catalog);
             return catalog;
         }

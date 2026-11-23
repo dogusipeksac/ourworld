@@ -22,6 +22,7 @@ namespace Gridroam.World
         private const float ServeTime = 0.63f;
         private const float ServeRelease = 0.12f;
         private const int PointsToWin = 3;
+        private const float AmbientActiveRangeSq = 78f * 78f;
 
         private enum Phase { Serve, Serving, ToOpponent, ToPlayer, Point, MatchOver }
 
@@ -67,6 +68,7 @@ namespace Gridroam.World
         private Transform _ball;
         private Transform _ballShadow;
         private ProceduralHumanoid _opponent;
+        private ProceduralHumanoid _ambientPlayer;
         private Transform _opponentRacket;
         private Transform _playerRacket;
         private Transform _readyMarker;
@@ -84,20 +86,33 @@ namespace Gridroam.World
         private int _points;
         private int _opponentPoints;
         private int _returns;
+        private int _ambientMaxReturns = 5;
         private bool _ready;
         private bool _returnQueued;
         private bool _preciseReturn;
         private bool _opponentSwinging;
+        private bool _ambientSwinging;
         private bool _lastPointWon;
         private Vector3 _beginPosition;
         private Quaternion _beginRotation;
+
+        private bool IsAmbientMatch => _player == null && _ambientPlayer != null;
 
         public Vector3 ReturnPosition => _beginPosition;
         public Quaternion ReturnRotation => _beginRotation;
         public int HudRevision { get; private set; }
 
-        public void Configure(Transform ball, Transform ballShadow, ProceduralHumanoid opponent, Transform opponentRacket,
-            Transform playerRacket, Transform readyMarker, AudioSource ballSound, AudioClip hitSound, AudioClip bounceSound)
+        public void Configure(
+            Transform ball,
+            Transform ballShadow,
+            ProceduralHumanoid opponent,
+            Transform opponentRacket,
+            Transform playerRacket,
+            Transform readyMarker,
+            AudioSource ballSound,
+            AudioClip hitSound,
+            AudioClip bounceSound,
+            ProceduralHumanoid ambientPlayer = null)
         {
             _ball = ball;
             _ballShadow = ballShadow;
@@ -108,8 +123,17 @@ namespace Gridroam.World
             _ballSound = ballSound;
             _hitSound = hitSound;
             _bounceSound = bounceSound;
-            ResetVisuals();
-            enabled = false;
+            _ambientPlayer = ambientPlayer;
+
+            if (_ambientPlayer != null)
+            {
+                StartAmbientMatch();
+            }
+            else
+            {
+                ResetVisuals();
+                enabled = false;
+            }
         }
 
         public void Begin(PlayerFootController player)
@@ -120,7 +144,16 @@ namespace Gridroam.World
             _points = 0;
             _opponentPoints = 0;
 
+            if (_ambientPlayer != null)
+            {
+                _ambientPlayer.SetLookAtPoint(false, Vector3.zero);
+                _ambientPlayer.SetTennisLeftHand(null);
+                _ambientPlayer.SetTennisRacket(null);
+                _ambientPlayer.gameObject.SetActive(false);
+            }
+
             player.SetSeatedState(true);
+            _playerRacket.SetParent(transform, false);
             _playerRacket.gameObject.SetActive(player.Humanoid != null);
             player.Humanoid?.SetTennisRacket(_playerRacket);
             _opponent.gameObject.SetActive(true);
@@ -134,19 +167,43 @@ namespace Gridroam.World
             if (_player != null)
             {
                 _player.Humanoid?.SetLookAtPoint(false, Vector3.zero);
+                _player.Humanoid?.SetTennisLeftHand(null);
                 _player.Humanoid?.SetTennisRacket(null);
                 _player.SetSeatedState(false);
             }
             _player = null;
-            _opponent.SetTennisRacket(null);
-            ResetVisuals();
-            enabled = false;
+
+            if (_ambientPlayer != null)
+            {
+                StartAmbientMatch();
+            }
+            else
+            {
+                _opponent.SetTennisRacket(null);
+                ResetVisuals();
+                enabled = false;
+            }
+        }
+
+        private void StartAmbientMatch()
+        {
+            _readyMarker.gameObject.SetActive(false);
+            _ready = false;
+            _ambientPlayer.gameObject.SetActive(true);
+            _opponent.gameObject.SetActive(true);
+            _playerRacket.SetParent(transform, false);
+            _playerRacket.gameObject.SetActive(true);
+            _ambientPlayer.SetTennisRacket(_playerRacket);
+            _opponent.SetTennisRacket(_opponentRacket);
+            ResetAmbientPoint();
+            enabled = true;
         }
 
         private void ResetVisuals()
         {
             SetBallVisible(false);
-            _opponent.gameObject.SetActive(false);
+            if (_opponent != null) _opponent.gameObject.SetActive(false);
+            if (_ambientPlayer != null) _ambientPlayer.gameObject.SetActive(false);
             _readyMarker.gameObject.SetActive(false);
             _playerRacket.gameObject.SetActive(false);
             _playerRacket.SetParent(transform, false);
@@ -172,11 +229,11 @@ namespace Gridroam.World
             return $"{player} {_points}  ·  {_opponentPoints} {opponent}\n{LocalizationService.Tr(instructions)}";
         }
 
-        public bool AcceptsHit => _phase == Phase.Serve || _ready;
+        public bool AcceptsHit => _player != null && (_phase == Phase.Serve || _ready);
 
         public void Hit()
         {
-            if ((_phase != Phase.Serve && _phase != Phase.ToPlayer) || _returnQueued) return;
+            if (_player == null || (_phase != Phase.Serve && _phase != Phase.ToPlayer) || _returnQueued) return;
 
             float playerX = PlayerX;
             float input = InputHub.Instance != null ? InputHub.Instance.MoveInput.x : 0f;
@@ -208,7 +265,20 @@ namespace Gridroam.World
 
         private void Update()
         {
-            if (_player == null || Time.deltaTime <= 0f ||
+            if (Time.deltaTime <= 0f) return;
+
+            if (IsAmbientMatch)
+            {
+                Camera cam = Camera.main;
+                if (cam != null && (cam.transform.position - transform.position).sqrMagnitude > AmbientActiveRangeSq)
+                {
+                    return;
+                }
+                UpdateAmbientMatch();
+                return;
+            }
+
+            if (_player == null ||
                 (PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked))
             {
                 return;
@@ -230,6 +300,146 @@ namespace Gridroam.World
                     if (_phase == Phase.Point && _elapsed >= 1.35f) ResetPoint();
                     break;
             }
+        }
+
+        // =====================================================================
+        // AUTONOMOUS NPC vs NPC AMBIENT RALLY (when player is not playing!)
+        // =====================================================================
+        private void UpdateAmbientMatch()
+        {
+            _elapsed += Time.deltaTime;
+            switch (_phase)
+            {
+                case Phase.Serve:
+                    if (_elapsed >= 0.85f)
+                    {
+                        float sx = _ambientPlayer.transform.localPosition.x;
+                        _phase = Phase.Serving;
+                        _elapsed = 0f;
+                        _serveStart = _ball.localPosition;
+                        _serveContact = new Vector3(sx + 0.46f, 2.08f, PlayerBaseline + 0.40f);
+                        _ambientPlayer.PlayTennisSwing(transform.TransformPoint(_serveContact), ServeTime, serving: true);
+                    }
+                    break;
+
+                case Phase.Serving:
+                {
+                    float time = Mathf.Min(_elapsed, ServeTime);
+                    if (time <= ServeRelease)
+                    {
+                        float raise = Mathf.SmoothStep(0f, 1f, time / ServeRelease) * 0.21f;
+                        SetBallPosition(_serveStart + Vector3.up * raise);
+                        _ambientPlayer.SetTennisLeftHand(_ball.position - transform.up * 0.065f);
+                    }
+                    else
+                    {
+                        SetBallPosition(Projectile(_serveStart + Vector3.up * 0.21f, _serveContact, time - ServeRelease, ServeTime - ServeRelease));
+                        _ambientPlayer.SetTennisLeftHand(null);
+                    }
+                    if (time < ServeTime) return;
+                    _ambientPlayer.PlayTennisSwing(_ball.position, 0f, serving: true);
+                    StartFlight(true, _serveContact, Random.Range(-3.1f, 3.1f), Random.Range(1.02f, 1.18f), volumeScale: 0.58f);
+                    _returns = 1;
+                    break;
+                }
+
+                case Phase.ToOpponent:
+                case Phase.ToPlayer:
+                {
+                    float time = Mathf.Min(_elapsed, _flight.Duration);
+                    float remaining = _flight.Duration - time;
+                    SetBallPosition(_flight.PositionAt(time));
+                    if (_elapsed - Time.deltaTime < _flight.FirstLeg && _elapsed >= _flight.FirstLeg)
+                    {
+                        PlayCourtSound(_bounceSound, 0.26f);
+                    }
+
+                    bool toSouthNpc = _phase == Phase.ToPlayer;
+                    bool shouldMissThisBall = _returns >= _ambientMaxReturns;
+                    float targetX = _flight.End.x + (toSouthNpc ? -ContactSide : ContactSide);
+                    float speed = shouldMissThisBall ? 2.15f : 4.25f;
+
+                    if (toSouthNpc)
+                    {
+                        MoveNpc(_opponent, 0f, _elapsed > 0.24f ? 2.1f : 0f);
+                        float gap = MoveNpc(_ambientPlayer, targetX, _elapsed >= 0.16f ? speed : 0f);
+                        if (!_ambientSwinging && !shouldMissThisBall && remaining <= 0.19f && gap <= remaining * speed + 0.28f)
+                        {
+                            _ambientSwinging = true;
+                            _ambientPlayer.PlayTennisSwing(transform.TransformPoint(_flight.End), remaining);
+                        }
+                        if (remaining > 0f) return;
+
+                        if (shouldMissThisBall || gap > 0.35f)
+                        {
+                            FinishAmbientPoint();
+                            return;
+                        }
+                        _ambientPlayer.PlayTennisSwing(_ball.position, 0f);
+                        _returns++;
+                        StartFlight(true, _flight.End, Random.Range(-3.45f, 3.45f), Random.Range(0.96f, 1.16f), volumeScale: 0.58f);
+                    }
+                    else
+                    {
+                        MoveNpc(_ambientPlayer, 0f, _elapsed > 0.24f ? 2.1f : 0f);
+                        float gap = MoveNpc(_opponent, targetX, _elapsed >= 0.16f ? speed : 0f);
+                        if (!_opponentSwinging && !shouldMissThisBall && remaining <= 0.19f && gap <= remaining * speed + 0.28f)
+                        {
+                            _opponentSwinging = true;
+                            _opponent.PlayTennisSwing(transform.TransformPoint(_flight.End), remaining);
+                        }
+                        if (remaining > 0f) return;
+
+                        if (shouldMissThisBall || gap > 0.35f)
+                        {
+                            FinishAmbientPoint();
+                            return;
+                        }
+                        _opponent.PlayTennisSwing(_ball.position, 0f);
+                        _returns++;
+                        StartFlight(false, _flight.End, Random.Range(-3.45f, 3.45f), Random.Range(0.96f, 1.16f), volumeScale: 0.58f);
+                    }
+                    break;
+                }
+
+                case Phase.Point:
+                    UpdateLooseBall(volumeScale: 0.55f);
+                    if (_elapsed >= 1.65f) ResetAmbientPoint();
+                    break;
+            }
+        }
+
+        private void FinishAmbientPoint()
+        {
+            _phase = Phase.Point;
+            _looseBallTime = Mathf.Min(_elapsed, _flight.Duration);
+            _elapsed = 0f;
+            _ambientPlayer.SetLocomotion(0f, true, 0f);
+            _opponent.SetLocomotion(0f, true, 0f);
+        }
+
+        private void ResetAmbientPoint()
+        {
+            _phase = Phase.Serve;
+            _returns = 0;
+            _ambientMaxReturns = Random.Range(4, 8);
+            _elapsed = 0f;
+            _opponentSwinging = false;
+            _ambientSwinging = false;
+
+            float serveX = Random.Range(-1.1f, 1.1f);
+            _opponent.transform.SetLocalPositionAndRotation(new Vector3(-serveX * 0.5f, CourtSurface, -PlayerBaseline), Quaternion.Euler(0f, 180f, 0f));
+            _opponent.SetLocomotion(0f, true, 0f);
+            _opponent.ClearTennisSwing();
+
+            _ambientPlayer.transform.SetLocalPositionAndRotation(new Vector3(serveX, CourtSurface, PlayerBaseline), Quaternion.identity);
+            _ambientPlayer.SetLocomotion(0f, true, 0f);
+            _ambientPlayer.ClearTennisSwing();
+
+            Vector3 hand = new Vector3(serveX - 0.25f, 1.12f, PlayerBaseline + 0.33f);
+            _ambientPlayer.SetTennisLeftHand(transform.TransformPoint(hand));
+            SetBallPosition(hand + Vector3.up * 0.065f);
+            SetBallVisible(true);
         }
 
         private void UpdateServe()
@@ -266,7 +476,7 @@ namespace Gridroam.World
             float targetX = _flight.End.x + (toPlayer ? -ContactSide : ContactSide);
             if (toPlayer)
             {
-                MoveOpponent(0f, _elapsed > 0.2f ? 2.25f : 0f);
+                MoveNpc(_opponent, 0f, _elapsed > 0.2f ? 2.25f : 0f);
                 float gap = MovePlayer(targetX, 5.75f);
                 bool inWindow = remaining <= ContactWindow && remaining >= 0.055f;
                 SetReady(!_returnQueued && inWindow && gap < 0.30f);
@@ -286,7 +496,7 @@ namespace Gridroam.World
 
             MovePlayer(0f, _elapsed > 0.29f ? 2.25f : 0f);
             float reactionTime = Mathf.Min(0.58f, 0.25f + _returns * 0.055f);
-            float opponentGap = MoveOpponent(targetX, _elapsed >= reactionTime ? 3.9f : 0f);
+            float opponentGap = MoveNpc(_opponent, targetX, _elapsed >= reactionTime ? 3.9f : 0f);
             if (!_opponentSwinging && remaining <= 0.19f && opponentGap <= remaining * 3.9f + 0.20f)
             {
                 _opponentSwinging = true;
@@ -311,7 +521,21 @@ namespace Gridroam.World
             _returns++;
         }
 
-        private void StartFlight(bool toOpponent, Vector3 start, float targetX, float firstLeg)
+        private void PlayCourtSound(AudioClip clip, float volume)
+        {
+            if (_ballSound == null || clip == null) return;
+            if (IsAmbientMatch)
+            {
+                Camera cam = Camera.main;
+                if (cam == null || (cam.transform.position - transform.position).sqrMagnitude > 22f * 22f)
+                {
+                    return;
+                }
+            }
+            _ballSound.PlayOneShot(clip, volume);
+        }
+
+        private void StartFlight(bool toOpponent, Vector3 start, float targetX, float firstLeg, float volumeScale = 1f)
         {
             float direction = toOpponent ? 1f : -1f;
             _flight = new Flight
@@ -321,9 +545,10 @@ namespace Gridroam.World
                 FirstLeg = firstLeg
             };
             _phase = toOpponent ? Phase.ToOpponent : Phase.ToPlayer;
-            _ballSound.PlayOneShot(_hitSound, 0.56f);
+            PlayCourtSound(_hitSound, 0.56f * volumeScale);
             _returnQueued = false;
             _opponentSwinging = false;
+            _ambientSwinging = false;
             _elapsed = 0f;
             SetReady(false);
             HudRevision++;
@@ -344,7 +569,7 @@ namespace Gridroam.World
             _opponent.SetLocomotion(0f, true, 0f);
         }
 
-        private void UpdateLooseBall()
+        private void UpdateLooseBall(float volumeScale = 1f)
         {
             float lastTime = _looseBallTime;
             if (lastTime >= _flight.SecondBounceTime + 1.2f) return;
@@ -352,7 +577,7 @@ namespace Gridroam.World
             SetBallPosition(_flight.PositionAt(_looseBallTime));
             if (lastTime < _flight.SecondBounceTime && _looseBallTime >= _flight.SecondBounceTime)
             {
-                _ballSound.PlayOneShot(_bounceSound, 0.28f);
+                PlayCourtSound(_bounceSound, 0.28f * volumeScale);
             }
         }
 
@@ -396,8 +621,18 @@ namespace Gridroam.World
             _ballShadow.localPosition = new Vector3(position.x, 0.006f, position.z);
             float spread = Mathf.Lerp(0.72f, 1.18f, Mathf.InverseLerp(BallFloor, 2f, position.y));
             _ballShadow.localScale = new Vector3(spread, 1f, spread);
-            _player.Humanoid?.SetLookAtPoint(true, _ball.position);
-            _opponent.SetLookAtPoint(true, _ball.position);
+            if (_player != null)
+            {
+                _player.Humanoid?.SetLookAtPoint(true, _ball.position);
+            }
+            else if (_ambientPlayer != null && _ambientPlayer.gameObject.activeSelf)
+            {
+                _ambientPlayer.SetLookAtPoint(true, _ball.position);
+            }
+            if (_opponent != null)
+            {
+                _opponent.SetLookAtPoint(true, _ball.position);
+            }
         }
 
         private float PlayerX => transform.InverseTransformPoint(_player.transform.position).x;
@@ -411,13 +646,13 @@ namespace Gridroam.World
             return Mathf.Abs(target - next);
         }
 
-        private float MoveOpponent(float target, float speed)
+        private float MoveNpc(ProceduralHumanoid npc, float target, float speed)
         {
-            Vector3 position = _opponent.transform.localPosition;
+            Vector3 position = npc.transform.localPosition;
             float next = Mathf.MoveTowards(position.x, target, speed * Time.deltaTime);
-            SetLateralGait(_opponent, next - position.x);
+            SetLateralGait(npc, next - position.x);
             position.x = next;
-            _opponent.transform.localPosition = position;
+            npc.transform.localPosition = position;
             return Mathf.Abs(target - next);
         }
 

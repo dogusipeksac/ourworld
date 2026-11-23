@@ -100,10 +100,16 @@ namespace Gridroam.World
                 humanoid.PlayWave();
             }
 
-            if (!string.IsNullOrEmpty(vendorShopId) && ShopMenuPanel.Instance != null)
+            if (!string.IsNullOrEmpty(vendorShopId) &&
+                PlayerShoppingCart.HasActiveItems &&
+                PlayerModeController.Instance != null)
             {
-                ShopMenuPanel.Instance.Open(vendorShopId);
-                return;
+                PlayerShoppingCart cart = PlayerShoppingCart.GetOrCreate(PlayerModeController.Instance);
+                if (cart != null)
+                {
+                    cart.Checkout(PlayerModeController.Instance, transform);
+                    return;
+                }
             }
 
             string[] pool = (chatLines != null && chatLines.Length > 0) ? chatLines : DefaultChatLinesTr;

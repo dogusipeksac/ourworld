@@ -5,6 +5,7 @@ using Gridroam.Jobs;
 using Gridroam.Missions;
 using Gridroam.Player;
 using Gridroam.Vehicle;
+using Gridroam.World;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -608,10 +609,10 @@ namespace Gridroam.UI
             };
             string[] descFallbacks =
             {
-                "Ana Cadde Pizzacı · Araçla evlere sıcak teslimat (40 ₺ + bonus)",
-                "Meydan Taksi Durağı · Yolcu al ve hedefe götür (mesafe + temiz sürüş)",
-                "Saat Kulesi Önü · Yaya olarak 10 çöp topla (parça başı 5 ₺)",
-                "Konut Mahallesi Girişi · İstenen evi seçilen renge boya (60 ₺)"
+                "Selman Bakkal No:58 · Araçla mahalleye sıcak teslimat (40 ₺ + bonus)",
+                "Fatih Bulvarı · Saat Kulesi Taksi Durağı · 8 caddede yolcu taşı",
+                "Petrol Yolu Cd. · Cadde ve okul çevresinde 10 çöp topla (parça başı 5 ₺)",
+                "Zübeyde Hanım Cd. · İstenen evi seçilen renge boya (60 ₺)"
             };
 
             string pinLabel = LocalizationService.Tr("ui.phone.pin_job", "Konum İşaretle");
@@ -647,11 +648,15 @@ namespace Gridroam.UI
         {
             SaveData d = SaveManager.Instance != null ? SaveManager.Instance.Data : null;
             int money = d != null ? d.money : 250;
-            float energy = PlayerNeedsController.Instance != null ? PlayerNeedsController.Instance.Energy : (d != null ? d.energy : 80f);
             int pizzas = d != null ? d.deliveriesDone : 0;
             int taxis = d != null ? d.taxiFaresDone : 0;
             int painted = d != null ? d.housesPaintedCount : 0;
             int litter = d != null ? d.litterCollectedCount : 0;
+            int missionsDone = d != null && d.completedMissionIds != null ? d.completedMissionIds.Count : 0;
+            int landmarks = LandmarkDiscoverySystem.DiscoveredCount;
+            int memories = NeighborhoodCollectibleManager.CollectedCount;
+            string rankTitle = NeighborhoodReputation.GetRankTitle();
+            int repXp = NeighborhoodReputation.CurrentXp;
             float playSec = d != null ? d.totalPlayTimeSeconds : 0f;
 
             int hours = Mathf.FloorToInt(playSec / 3600f);
@@ -659,34 +664,18 @@ namespace Gridroam.UI
             int secs = Mathf.FloorToInt(playSec % 60f);
             string timeFormatted = hours > 0 ? $"{hours}s {mins:00}dk" : $"{mins:00}dk {secs:00}sn";
 
-            string[] nameKeys =
-            {
-                "ui.stats.money",
-                "ui.stats.energy",
-                "ui.stats.deliveries",
-                "ui.stats.taxis",
-                "ui.stats.painted",
-                "ui.stats.litter",
-                "ui.stats.playtime"
-            };
-            string[] nameFallbacks =
-            {
-                "Bakiye",
-                "Enerji",
-                "Teslim Edilen Pizza",
-                "Taksi Yolculuğu",
-                "Boyanan Ev",
-                "Toplanan Çöp",
-                "Oynama Süresi"
-            };
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+            string[] labels = isEn
+                ? new[] { "Balance", "Reputation", "Story Progress", "Explore & Memories", "Pizza & Taxi", "Paint & Cleanup", "Play Time" }
+                : new[] { "Bakiye", "Mahalle Saygınlığı", "Hikâye İlerlemesi", "Keşif & Hatıralar", "Pizza & Taksi", "Boyama & Temizlik", "Oynama Süresi" };
             string[] values =
             {
                 $"₺ {money}",
-                $"%{Mathf.RoundToInt(energy)}",
-                pizzas.ToString(),
-                taxis.ToString(),
-                painted.ToString(),
-                litter.ToString(),
+                $"{rankTitle} ({repXp} XP)",
+                $"{missionsDone}/14",
+                $"{landmarks}/{LandmarkDiscoverySystem.TotalCount}  ·  {memories}/{NeighborhoodCollectibleManager.TotalCount}",
+                $"{pizzas}  ·  {taxis}",
+                $"{painted}  ·  {litter}",
                 timeFormatted
             };
 
@@ -694,7 +683,7 @@ namespace Gridroam.UI
             {
                 if (statNameTexts != null && i < statNameTexts.Length && statNameTexts[i] != null)
                 {
-                    statNameTexts[i].text = LocalizationService.Tr(nameKeys[i], nameFallbacks[i]);
+                    statNameTexts[i].text = labels[i];
                 }
                 if (statValueTexts != null && i < statValueTexts.Length && statValueTexts[i] != null)
                 {

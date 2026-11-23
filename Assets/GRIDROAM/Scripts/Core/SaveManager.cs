@@ -28,7 +28,7 @@ namespace Gridroam.Core
         public event Action<SaveData> OnSaveUpdated;
         public event Action<int> OnMoneyChanged;
 
-        private const int CurrentSchemaVersion = 3;
+        private const int CurrentSchemaVersion = 4;
 
         private string SavePath => Path.Combine(Application.persistentDataPath, saveFileName);
         private string TempSavePath => SavePath + ".tmp";
@@ -136,6 +136,14 @@ namespace Gridroam.Core
             {
                 Data.housePaint = new List<HousePaintEntry>();
             }
+            if (Data.discoveredLandmarkIds == null)
+            {
+                Data.discoveredLandmarkIds = new List<string>();
+            }
+            if (Data.collectedMemoryIds == null)
+            {
+                Data.collectedMemoryIds = new List<string>();
+            }
 
             // Forward-compatibility guard: never auto-reset saves written by a newer schema version!
             if (Data.schemaVersion > CurrentSchemaVersion)
@@ -162,6 +170,20 @@ namespace Gridroam.Core
                 {
                     Data.schemaVersion = 3;
                     Data.hasSavedPlayerState = false;
+                }
+
+                // Upgrade v3 -> v4: preserve all player progress & initialize open-world reputation/collectibles
+                if (Data.schemaVersion < 4)
+                {
+                    Data.schemaVersion = 4;
+                    if (Data.completedMissionIds.Count > 0 && Data.reputationXp <= 0)
+                    {
+                        Data.reputationXp = Data.completedMissionIds.Count * 45;
+                    }
+                    if (Data.completedMissionIds.Contains("m10_mahalle_senligi") && string.IsNullOrEmpty(Data.nextMissionId))
+                    {
+                        Data.nextMissionId = "m11_saat_kulesi_dosyasi";
+                    }
                 }
             }
 

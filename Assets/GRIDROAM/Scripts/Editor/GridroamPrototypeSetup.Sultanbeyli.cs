@@ -70,6 +70,9 @@ namespace Gridroam.Editor
             // 10. Full 8-Avenue Hamidiye Mahallesi Living District (Sidewalks, Balconies, Shops, Jobs, Cars, Citizens, Cats!)
             BuildHamidiyeEightMainAvenues(root.transform, mats, prefabs, seats);
 
+            // 10b. Swimmable Neighborhood Swimming Pool Complex (Hamidiye Açık Yüzme Havuzu — WaterZone + Underwater Steps + Diving Blocks!)
+            BuildHamidiyeSwimmingPool(root.transform, mats, seats);
+
             // 11. Clean perimeter bounds framing Hamidiye Mahallesi's 8 main avenues & Selman Sokağı core
             BuildSelmanCorridorBoundary(root.transform, mats);
 
@@ -399,11 +402,11 @@ namespace Gridroam.Editor
                 AddLocalBoxCollider(house48, new Vector3(1.4f, 0.9f, 3.55f), new Vector3(6.4f, 1.8f, 0.32f));
                 AddLocalBoxCollider(house48, new Vector3(-6.6f, 0.9f, 3.55f), new Vector3(4.4f, 1.8f, 0.32f));
                 CreatePrimitiveChild("No48_PlaqueBg", PrimitiveType.Cube, house48.transform,
-                    new Vector3(4.65f, 1.48f, 3.81f), new Vector3(0.42f, 0.26f, 0.04f), mats.SignRed, removeCollider: true);
-                CreateWorldSignText("NO: 48", house48.transform, new Vector3(4.65f, 1.48f, 3.85f),
-                    Quaternion.Euler(0f, 180f, 0f), new Vector2(0.38f, 0.20f), Color.white);
+                    new Vector3(4.65f, 1.48f, 3.81f), new Vector3(0.72f, 0.30f, 0.04f), mats.SignRed, removeCollider: true);
+                CreateWorldSignText("NO: 48 · EVİM", house48.transform, new Vector3(4.65f, 1.48f, 3.85f),
+                    Quaternion.Euler(0f, 180f, 0f), new Vector2(0.68f, 0.22f), Color.white);
 
-                FurnishSelmanHomeInterior(house48.transform, new Vector3(0.2f, 0.09f, -2.8f), SelmanFloorPlan.Flat_1_1, 8.2f, 6.6f, mats);
+                FurnishSelmanHomeInterior(house48.transform, new Vector3(0.2f, 0.09f, -2.8f), SelmanFloorPlan.Flat_1_1, 8.2f, 6.6f, mats, isPlayerHome: true);
                 AddSideWallWindowGrid(house48.transform, "No48_WinW", 4.60f, true, new[] { -1.7f, -4.5f }, new[] { 1.92f }, 1.25f, 1.30f, mats, warmLitIndex: 0);
                 AddSideWallWindowGrid(house48.transform, "No48_WinE", -4.20f, false, new[] { -2.2f, -4.8f }, new[] { 1.92f }, 1.25f, 1.30f, mats);
                 AttachSelmanPaintableAddress(house48, "selman_home_48", "Selman Sokağı No: 48", new Vector3(-68.0f, 0.12f, 4.9f));
@@ -1308,11 +1311,12 @@ namespace Gridroam.Editor
                 new Vector3(0f, 0.45f, 0.08f), Quaternion.identity, 2.4f);
         }
 
-        private static void AttachBedTrigger(GameObject bedObj)
+        private static void AttachBedTrigger(GameObject bedObj, bool isPlayerHome)
         {
-            if (bedObj == null) return;
+            if (bedObj == null || !isPlayerHome) return;
             InteractableTrigger trig = bedObj.AddComponent<InteractableTrigger>();
-            trig.Configure(InteractableKind.Bed, $"bed_{bedObj.name}".ToLowerInvariant(), "ui.btn.sleep", 2.5f);
+            trig.Configure(InteractableKind.Bed, "bed_player_home_48", "ui.btn.sleep", 2.5f);
+            trig.SetCustomPrompt("Kendi Yatağında Uyu (Evim · No:48)");
         }
 
         private static void BuildInteriorPartitionWall(
@@ -1371,7 +1375,8 @@ namespace Gridroam.Editor
             SelmanFloorPlan plan,
             float roomW,
             float roomD,
-            MaterialSet mats)
+            MaterialSet mats,
+            bool isPlayerHome = false)
         {
             float hw = roomW * 0.5f;
             float hd = roomD * 0.5f;
@@ -1431,7 +1436,7 @@ namespace Gridroam.Editor
                     // Room 2 (-X side): Ayrı Yatak Odası
                     float bedX = (-hw + splitX) * 0.5f;
                     GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "Flat11_Bed", host, center + new Vector3(bedX, 0f, -hd + 1.45f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
-                    AttachBedTrigger(bed);
+                    AttachBedTrigger(bed, isPlayerHome);
 
                     GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Flat11_Wardrobe", host, center + new Vector3(-hw + 0.65f, 0f, 0.5f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
@@ -1464,7 +1469,7 @@ namespace Gridroam.Editor
                     // Yatak Odası (-X Back)
                     float westX = (-hw + splitX) * 0.5f;
                     GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "Fam21_Bed", host, center + new Vector3(westX, 0f, -hd + 1.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
-                    AttachBedTrigger(bed);
+                    AttachBedTrigger(bed, isPlayerHome);
 
                     GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Fam21_Wardrobe", host, center + new Vector3(-hw + 0.62f, 0f, -hd + 1.8f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
@@ -1516,7 +1521,7 @@ namespace Gridroam.Editor
 
                     // Room 3 (-X, -Z): Ebeveyn Yatak Odası
                     GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "G31_MasterBed", host, center + new Vector3(wx, 0f, -hd + 1.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
-                    AttachBedTrigger(bed);
+                    AttachBedTrigger(bed, isPlayerHome);
                     GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "G31_Wardrobe", host, center + new Vector3(-hw + 0.65f, 0f, bz), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
 
@@ -1970,6 +1975,229 @@ namespace Gridroam.Editor
             l.intensity = intensity;
             l.shadows = LightShadows.None;
             l.enabled = true;
+        }
+
+        private static void BuildHamidiyeSwimmingPool(Transform parent, MaterialSet mats, List<SeatInteractable> seats)
+        {
+            // Sunny open green pocket south of Selman Sokağı (between Çiçekçi Sk. & Hz. Osman Camii, clear of all buildings/roads!)
+            Vector3 poolCenter = new Vector3(16.0f, 0.0f, -40.0f);
+            GameObject poolRoot = new GameObject("Hamidiye_AcikYuzmeHavuzu");
+            poolRoot.transform.SetParent(parent, false);
+            poolRoot.transform.position = poolCenter;
+
+            // 1. Stone walkway leading directly from Selman Sokağı South sidewalk (X=12.2, Z=-6) to the pool entrance stairs!
+            DisableShadowCasting(CreateTiledBox("Pool_ApproachWalkway", parent,
+                new Vector3(13.2f, 0.030f, -18.2f), new Vector3(3.0f, 0.060f, 24.4f),
+                Quaternion.identity, mats.KilitParke, 1.05f, collider: false));
+            DisableShadowCasting(CreateTiledBox("Pool_ApproachPlaza", poolRoot.transform,
+                poolCenter + new Vector3(0.0f, 0.032f, 10.8f), new Vector3(11.0f, 0.064f, 4.4f),
+                Quaternion.identity, mats.TravertineStone, 1.6f, collider: false));
+            CreateIstanbulRedStreetSign(parent, "YÜZME HAVUZU ↓", new Vector3(10.8f, 0f, -5.6f), 180f, mats);
+
+            // 2. Sunken Turquoise Tiled Pool Basin Floor (y = 0.05m) + Crisp Swimming Lane Lines!
+            CreateStaticBlock("Pool_BasinFloor", poolRoot.transform,
+                poolCenter + new Vector3(0f, 0.025f, 0f), new Vector3(14.4f, 0.05f, 8.8f), mats.PoolTileBlue, addCollider: true);
+            for (int lane = -1; lane <= 1; lane++)
+            {
+                GameObject stripe = CreatePrimitiveChild($"Pool_LaneLine_{lane + 1}", PrimitiveType.Cube, poolRoot.transform,
+                    new Vector3(0f, 0.056f, lane * 2.2f), new Vector3(12.2f, 0.008f, 0.14f), mats.WhitePVC, removeCollider: true);
+                DisableShadowCasting(stripe);
+                MarkStaticEnvironment(stripe);
+            }
+
+            // 3. Raised Travertine Sun-Deck (deckY = 1.38m) framing all 4 sides around the 14.0m x 8.4m open water basin
+            const float deckH = 1.38f;
+            CreateStaticBlock("Pool_DeckNorth", poolRoot.transform, poolCenter + new Vector3(0f, deckH * 0.5f,  6.0f), new Vector3(22.0f, deckH, 3.6f), mats.TravertineStone, addCollider: true);
+            CreateStaticBlock("Pool_DeckSouth", poolRoot.transform, poolCenter + new Vector3(0f, deckH * 0.5f, -6.0f), new Vector3(22.0f, deckH, 3.6f), mats.TravertineStone, addCollider: true);
+            CreateStaticBlock("Pool_DeckWest",  poolRoot.transform, poolCenter + new Vector3(-9.0f, deckH * 0.5f, 0f), new Vector3(4.0f, deckH, 8.4f), mats.TravertineStone, addCollider: true);
+            CreateStaticBlock("Pool_DeckEast",  poolRoot.transform, poolCenter + new Vector3( 9.0f, deckH * 0.5f, 0f), new Vector3(4.0f, deckH, 8.4f), mats.TravertineStone, addCollider: true);
+
+            // Turquoise tiled inner basin wall liners + crisp white marble coping rim
+            DisableShadowCasting(CreatePrimitiveChild("Pool_WallLinerN", PrimitiveType.Cube, poolRoot.transform, new Vector3(0f, 0.70f,  4.17f), new Vector3(14.0f, 1.32f, 0.06f), mats.PoolTileBlue, removeCollider: true));
+            DisableShadowCasting(CreatePrimitiveChild("Pool_WallLinerS", PrimitiveType.Cube, poolRoot.transform, new Vector3(0f, 0.70f, -4.17f), new Vector3(14.0f, 1.32f, 0.06f), mats.PoolTileBlue, removeCollider: true));
+            DisableShadowCasting(CreatePrimitiveChild("Pool_WallLinerW", PrimitiveType.Cube, poolRoot.transform, new Vector3(-6.97f, 0.70f, 0f), new Vector3(0.06f, 1.32f, 8.4f), mats.PoolTileBlue, removeCollider: true));
+            DisableShadowCasting(CreatePrimitiveChild("Pool_WallLinerE", PrimitiveType.Cube, poolRoot.transform, new Vector3( 6.97f, 0.70f, 0f), new Vector3(0.06f, 1.32f, 8.4f), mats.PoolTileBlue, removeCollider: true));
+
+            DisableShadowCasting(CreatePrimitiveChild("Pool_CopingN", PrimitiveType.Cube, poolRoot.transform, new Vector3(0f, deckH + 0.025f,  4.32f), new Vector3(14.6f, 0.05f, 0.30f), mats.WhitePVC, removeCollider: true));
+            DisableShadowCasting(CreatePrimitiveChild("Pool_CopingS", PrimitiveType.Cube, poolRoot.transform, new Vector3(0f, deckH + 0.025f, -4.32f), new Vector3(14.6f, 0.05f, 0.30f), mats.WhitePVC, removeCollider: true));
+            DisableShadowCasting(CreatePrimitiveChild("Pool_CopingW", PrimitiveType.Cube, poolRoot.transform, new Vector3(-7.15f, deckH + 0.025f, 0f), new Vector3(0.30f, 0.05f, 8.94f), mats.WhitePVC, removeCollider: true));
+            DisableShadowCasting(CreatePrimitiveChild("Pool_CopingE", PrimitiveType.Cube, poolRoot.transform, new Vector3( 7.15f, deckH + 0.025f, 0f), new Vector3(0.30f, 0.05f, 8.94f), mats.WhitePVC, removeCollider: true));
+
+            // 4. Shimmering Translucent Water Surface (y = 1.18m) + Swimmable WaterZone!
+            GameObject waterSurface = CreatePrimitiveChild("Pool_WaterSurface", PrimitiveType.Cube, poolRoot.transform,
+                new Vector3(0f, 1.18f, 0f), new Vector3(13.94f, 0.03f, 8.34f), mats.PoolWaterClear, removeCollider: true);
+            DisableShadowCasting(waterSurface);
+            waterSurface.AddComponent<PoolWaterAnimator>();
+
+            GameObject waterZoneGo = new GameObject("Pool_SwimmableWaterZone");
+            waterZoneGo.transform.SetParent(poolRoot.transform, false);
+            WaterZone wz = waterZoneGo.AddComponent<WaterZone>();
+            wz.Configure(new Vector3(0f, 0.62f, 0f), new Vector3(13.8f, 2.2f, 8.2f), surfaceY: 1.18f, floorY: 0.05f);
+
+            // 5. Gentle Walkable North Exterior Stairs (street y=0.04m -> deck y=1.38m, 6 steps)
+            const int extSteps = 6;
+            for (int s = 0; s < extSteps; s++)
+            {
+                float h = (s + 1) * (deckH / extSteps);
+                float z = 10.35f - s * 0.44f;
+                CreateStaticBlock($"Pool_ExtStep_{s}", poolRoot.transform,
+                    poolCenter + new Vector3(0f, h * 0.5f, z), new Vector3(4.2f, h, 0.46f), mats.TravertineStone, addCollider: true);
+            }
+            // Stainless handrails flanking exterior stairs
+            for (int side = -1; side <= 1; side += 2)
+            {
+                CreateStaticBlock($"Pool_ExtRailPostBot_{side}", poolRoot.transform, poolCenter + new Vector3(side * 2.15f, 0.55f, 10.3f), new Vector3(0.07f, 1.1f, 0.07f), mats.SedanChrome, addCollider: true);
+                CreateStaticBlock($"Pool_ExtRailPostTop_{side}", poolRoot.transform, poolCenter + new Vector3(side * 2.15f, deckH + 0.50f, 7.9f), new Vector3(0.07f, 1.0f, 0.07f), mats.SedanChrome, addCollider: true);
+            }
+
+            // Welcome Portal Sign right over the North entrance stairs
+            CreateStaticBlock("Pool_ArchPostL", poolRoot.transform, poolCenter + new Vector3(-2.45f, deckH + 1.45f, 7.75f), new Vector3(0.18f, 2.90f, 0.18f), mats.WhitePVC, addCollider: true);
+            CreateStaticBlock("Pool_ArchPostR", poolRoot.transform, poolCenter + new Vector3( 2.45f, deckH + 1.45f, 7.75f), new Vector3(0.18f, 2.90f, 0.18f), mats.WhitePVC, addCollider: true);
+            CreateStaticBlock("Pool_ArchBeam",  poolRoot.transform, poolCenter + new Vector3(0f, deckH + 2.85f, 7.75f), new Vector3(5.35f, 0.58f, 0.22f), mats.CobaltBlue, addCollider: false);
+            CreateWorldSignText("HAMİDİYE AÇIK YÜZME HAVUZU", poolRoot.transform,
+                new Vector3(0f, deckH + 2.85f, 7.88f), Quaternion.Euler(0f, 180f, 0f),
+                new Vector2(4.9f, 0.42f), Color.white);
+            CreateWorldSignText("HAMİDİYE AÇIK YÜZME HAVUZU", poolRoot.transform,
+                new Vector3(0f, deckH + 2.85f, 7.62f), Quaternion.identity,
+                new Vector2(4.9f, 0.42f), Color.white);
+
+            // 6. Wide Underwater Tiled Entry Stairs (NW inner basin corner: effortless walk-in AND swim-out!)
+            const int subSteps = 5;
+            for (int s = 0; s < subSteps; s++)
+            {
+                float topY = deckH - (s + 1) * 0.23f; // 1.15, 0.92, 0.69, 0.46, 0.23
+                float z = 3.92f - s * 0.46f;
+                CreateStaticBlock($"Pool_SubStep_{s}", poolRoot.transform,
+                    poolCenter + new Vector3(-5.2f, topY * 0.5f, z), new Vector3(3.2f, topY, 0.48f), mats.PoolTileBlue, addCollider: true);
+            }
+
+            // 7. Two Chrome Swimming Ladders (East & South walls) + Two Elevated Diving Blocks (West rim)
+            (Vector3 pos, float yaw)[] ladders =
+            {
+                (new Vector3(6.88f, 0f,  2.2f), -90f),
+                (new Vector3(3.50f, 0f, -4.08f),  0f)
+            };
+            for (int i = 0; i < ladders.Length; i++)
+            {
+                GameObject lad = new GameObject($"Pool_Ladder_{i + 1}");
+                lad.transform.SetParent(poolRoot.transform, false);
+                lad.transform.localPosition = ladders[i].pos;
+                lad.transform.localRotation = Quaternion.Euler(0f, ladders[i].yaw, 0f);
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    CreatePrimitiveChild($"Rail_{side}", PrimitiveType.Cylinder, lad.transform,
+                        new Vector3(side * 0.26f, 1.02f, 0f), new Vector3(0.045f, 0.96f, 0.045f), mats.SedanChrome, removeCollider: true);
+                }
+                for (int r = 0; r < 4; r++)
+                {
+                    CreatePrimitiveChild($"Rung_{r}", PrimitiveType.Cube, lad.transform,
+                        new Vector3(0f, 0.34f + r * 0.30f, 0f), new Vector3(0.52f, 0.04f, 0.07f), mats.SedanChrome, removeCollider: true);
+                }
+                DisableShadowCasting(lad);
+                MarkStaticEnvironment(lad);
+            }
+
+            // Diving Blocks (Atlama Taşı) on West edge so players can run & dive straight into the deep water!
+            for (int d = -1; d <= 1; d += 2)
+            {
+                float dz = d * 1.9f;
+                CreateStaticBlock($"Pool_DiveBase_{d}", poolRoot.transform, poolCenter + new Vector3(-7.45f, deckH + 0.22f, dz), new Vector3(0.56f, 0.44f, 0.56f), mats.WhitePVC, addCollider: true);
+                CreateStaticBlock($"Pool_DiveTop_{d}",  poolRoot.transform, poolCenter + new Vector3(-7.32f, deckH + 0.47f, dz), new Vector3(0.72f, 0.07f, 0.62f), mats.CobaltBlue, addCollider: true);
+            }
+
+            // 8. Poolside Sun Loungers (4 Şezlonglar with Bench Seats!), 2 Beach Umbrellas, Lifeguard Chair & Changing Cabin!
+            float[] loungerXs = { -5.8f, -3.4f, 3.4f, 5.8f };
+            for (int i = 0; i < loungerXs.Length; i++)
+            {
+                Vector3 lp = new Vector3(loungerXs[i], deckH, -6.2f);
+                GameObject lounger = new GameObject($"Pool_SunLounger_{i + 1}");
+                lounger.transform.SetParent(poolRoot.transform, false);
+                lounger.transform.localPosition = lp;
+                CreatePrimitiveChild("Frame", PrimitiveType.Cube, lounger.transform, new Vector3(0f, 0.28f, 0f), new Vector3(0.76f, 0.08f, 1.92f), mats.WhitePVC, removeCollider: false);
+                CreatePrimitiveChild("Cushion", PrimitiveType.Cube, lounger.transform, new Vector3(0f, 0.35f, 0.08f), new Vector3(0.70f, 0.07f, 1.45f), (i % 2 == 0) ? mats.TownFabricTeal : mats.TownAwningCream, removeCollider: true);
+                GameObject back = CreatePrimitiveChild("Backrest", PrimitiveType.Cube, lounger.transform, new Vector3(0f, 0.56f, -0.76f), new Vector3(0.70f, 0.07f, 0.62f), (i % 2 == 0) ? mats.TownFabricTeal : mats.TownAwningCream, removeCollider: true);
+                back.transform.localRotation = Quaternion.Euler(34f, 0f, 0f);
+                DisableShadowCasting(lounger);
+                MarkStaticEnvironment(lounger);
+
+                GameObject seatGo = new GameObject($"Pool_LoungerSeat_{i + 1}");
+                seatGo.transform.SetParent(lounger.transform, false);
+                seatGo.transform.localPosition = new Vector3(0f, 0.42f, 0.10f);
+                SeatInteractable seat = seatGo.AddComponent<SeatInteractable>();
+                InteractableTrigger seatTrig = seatGo.AddComponent<InteractableTrigger>();
+                seatTrig.Configure(InteractableKind.Seat, $"pool_lounger_{i + 1}", "ui.btn.sit", 2.0f);
+                seats.Add(seat);
+            }
+
+            // Two Striped Poolside Umbrellas between the loungers
+            (float ux, Material canopy)[] umbrellas = { (-4.6f, mats.TownAwningTerracotta), (4.6f, mats.TownAwningNavy) };
+            for (int i = 0; i < umbrellas.Length; i++)
+            {
+                GameObject umb = new GameObject($"Pool_Umbrella_{i + 1}");
+                umb.transform.SetParent(poolRoot.transform, false);
+                umb.transform.localPosition = new Vector3(umbrellas[i].ux, deckH, -6.5f);
+                CreatePrimitiveChild("Pole", PrimitiveType.Cylinder, umb.transform, new Vector3(0f, 1.28f, 0f), new Vector3(0.06f, 1.28f, 0.06f), mats.TownWood, removeCollider: true);
+                CreatePrimitiveChild("Canopy", PrimitiveType.Cylinder, umb.transform, new Vector3(0f, 2.48f, 0f), new Vector3(2.45f, 0.14f, 2.45f), umbrellas[i].canopy, removeCollider: true);
+                CreatePrimitiveChild("Cap", PrimitiveType.Sphere, umb.transform, new Vector3(0f, 2.62f, 0f), new Vector3(0.32f, 0.16f, 0.32f), mats.WhitePVC, removeCollider: true);
+                DisableShadowCasting(umb);
+                MarkStaticEnvironment(umb);
+            }
+
+            // Lifeguard Chair (Cankurtaran Kulesi) + Red Lifebuoy on East Deck
+            GameObject lg = new GameObject("Pool_LifeguardTower");
+            lg.transform.SetParent(poolRoot.transform, false);
+            lg.transform.localPosition = new Vector3(9.4f, deckH, -1.2f);
+            lg.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            for (int lx = -1; lx <= 1; lx += 2)
+                for (int lz = -1; lz <= 1; lz += 2)
+                    CreatePrimitiveChild($"Leg_{lx}_{lz}", PrimitiveType.Cube, lg.transform, new Vector3(lx * 0.36f, 0.72f, lz * 0.36f), new Vector3(0.08f, 1.44f, 0.08f), mats.WhitePVC, removeCollider: true);
+            CreatePrimitiveChild("Seat", PrimitiveType.Cube, lg.transform, new Vector3(0f, 1.48f, 0f), new Vector3(0.84f, 0.10f, 0.80f), mats.SignRed, removeCollider: true);
+            CreatePrimitiveChild("Back", PrimitiveType.Cube, lg.transform, new Vector3(0f, 1.88f, -0.36f), new Vector3(0.84f, 0.74f, 0.08f), mats.WhitePVC, removeCollider: true);
+            CreatePrimitiveChild("Buoy", PrimitiveType.Cylinder, lg.transform, new Vector3(0.46f, 1.15f, 0.08f), new Vector3(0.48f, 0.07f, 0.48f), mats.SignRed, removeCollider: true).transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            AddLocalBoxCollider(lg, new Vector3(0f, 0.9f, 0f), new Vector3(0.95f, 1.8f, 0.95f));
+            MarkStaticEnvironment(lg);
+
+            // Poolside Shower & Changing Cabin (Soyunma Kabini & Duş) on NE corner of deck
+            CreateStaticBlock("Pool_ChangingCabin", poolRoot.transform, poolCenter + new Vector3(9.4f, deckH + 1.22f, 5.4f), new Vector3(2.4f, 2.44f, 2.8f), mats.PowderBlue, addCollider: true);
+            CreateStaticBlock("Pool_CabinRoof",     poolRoot.transform, poolCenter + new Vector3(9.4f, deckH + 2.52f, 5.4f), new Vector3(2.7f, 0.18f, 3.1f), mats.WhitePVC, addCollider: false);
+            CreateWorldSignText("DUŞ & SOYUNMA", poolRoot.transform, new Vector3(8.16f, deckH + 2.15f, 5.4f), Quaternion.Euler(0f, 90f, 0f), new Vector2(2.1f, 0.32f), Color.white);
+
+            // Friendly Poolside Lifeguard NPC (Cankurtaran Can)
+            SpawnSelmanResidentNpc(
+                "NPC_CankurtaranCan_Havuz", "Cankurtaran Can", "Hamidiye Açık Yüzme Havuzu",
+                poolRoot.transform, new Vector3(8.2f, deckH + 0.02f, 1.4f), Quaternion.Euler(0f, -90f, 0f),
+                BlenderCharacterVariant.CasualMale, mats.SignRed, mats.CharPantsKhaki, mats.CharSkinWarm, mats.CharHairBrown,
+                new[]
+                {
+                    "Hamidiye Açık Yüzme Havuzu'na hoş geldin! İster köşedeki merdivenden in, ister atlama taşından suya dal!",
+                    "Su tertemiz ve serin; havuzdan çıkarken merdivenden yürüyebilir ya da kenarda zıplama tuşuna basıp güverteye tırmanabilirsin.",
+                    "Güneşlenmek istersen şemsiyelerin altındaki şezlonglar boş, keyfine bak!"
+                },
+                mats);
+
+            // Soft Turquoise Pool Night Lights (NightLight, zero shadows -> resort atmosphere at night!)
+            Vector3[] poolLights = { new Vector3(-4.0f, 1.35f, 0f), new Vector3(4.0f, 1.35f, 0f) };
+            for (int i = 0; i < poolLights.Length; i++)
+            {
+                GameObject plGo = new GameObject($"Pool_AquaNightLight_{i + 1}");
+                plGo.transform.SetParent(poolRoot.transform, false);
+                plGo.transform.localPosition = poolLights[i];
+                Light pl = plGo.AddComponent<Light>();
+                pl.type = LightType.Point;
+                pl.color = new Color(0.28f, 0.88f, 1.0f);
+                pl.range = 16f;
+                pl.intensity = 2.8f;
+                pl.shadows = LightShadows.None;
+                pl.enabled = false;
+                NightLight nl = plGo.AddComponent<NightLight>();
+                nl.Configure(pl, null, new Color(0.28f, 0.88f, 1.0f) * 2.2f);
+            }
+
+            // Shade trees framing the pool complex
+            CreateTownTree("Pool_Tree_NW", parent, poolCenter + new Vector3(-12.5f, 0.04f,  8.5f), mats, 1.12f, 881);
+            CreateTownTree("Pool_Tree_NE", parent, poolCenter + new Vector3( 12.5f, 0.04f,  8.5f), mats, 1.15f, 882);
+            CreateTownTree("Pool_Tree_SW", parent, poolCenter + new Vector3(-12.5f, 0.04f, -8.8f), mats, 1.18f, 883);
+            CreateTownTree("Pool_Tree_SE", parent, poolCenter + new Vector3( 12.5f, 0.04f, -8.8f), mats, 1.10f, 884);
         }
 
         private static void BuildSelmanCorridorBoundary(Transform parent, MaterialSet mats)

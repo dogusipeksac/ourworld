@@ -14,7 +14,7 @@ namespace Gridroam.Editor
     public static class GridroamAutoSetup
     {
         private const string VersionKey = "GRIDROAM_SceneBuildVersion";
-        private const string CurrentBuildVersion = "v31_district_wide_distribution";
+        private const string CurrentBuildVersion = "v34_fix_pool_and_park_world_positions";
 
         static GridroamAutoSetup()
         {

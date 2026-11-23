@@ -163,6 +163,47 @@ namespace Gridroam.Player
         public void RefreshInteractablesCache()
         {
             _cachedInteractables = FindObjectsByType<InteractableTrigger>(FindObjectsInactive.Include);
+            EnforceSingleHomeBedPolicy();
+        }
+
+        private void EnforceSingleHomeBedPolicy()
+        {
+            if (_cachedInteractables == null) return;
+            for (int i = 0; i < _cachedInteractables.Length; i++)
+            {
+                InteractableTrigger trig = _cachedInteractables[i];
+                if (trig == null || trig.Kind != InteractableKind.Bed) continue;
+
+                if (IsPlayerHomeBed(trig))
+                {
+                    trig.enabled = true;
+                    trig.SetCustomPrompt("Kendi Yatağında Uyu (Evim · No:48)");
+                }
+                else
+                {
+                    // Only the player's own home (No:48 Selman Sokağı) has a sleepable bed!
+                    trig.enabled = false;
+                }
+            }
+        }
+
+        public static bool IsPlayerHomeBed(InteractableTrigger trig)
+        {
+            if (trig == null) return false;
+            if (string.Equals(trig.InteractableId, "bed_player_home_48", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            Transform cur = trig.transform;
+            while (cur != null)
+            {
+                if (cur.name == "Selman_No48_HeroHouse") return true;
+                cur = cur.parent;
+            }
+            Vector3 homeCenter = new Vector3(-68.0f, 0f, 9.55f);
+            Vector3 d = trig.transform.position - homeCenter;
+            d.y = 0f;
+            return d.sqrMagnitude <= 10.5f * 10.5f;
         }
 
         public void SetModalLock(object source, bool locked)
@@ -334,14 +375,15 @@ namespace Gridroam.Player
 
         private static readonly (string label, Vector3 pos, float yaw)[] FastTravelSpots =
         {
-            ("Fatih Bulvarı · Saat Kulesi",      new Vector3(  0.0f, 0.18f, 134.0f),   0f),
+            ("No:48 Selman Sokağı · Benim Evim", new Vector3(-62.0f, 0.12f,   4.5f),   0f),
+            ("Hamidiye Halı Saha · Futbol",      new Vector3(-14.0f, 0.12f, -29.0f), 180f),
+            ("Hamidiye Basketbol & Voleybol",    new Vector3( 49.0f, 0.12f, -31.0f), 180f),
+            ("No:58 Selman Bakkal & ATM",        new Vector3(  6.5f, 0.12f,   4.5f),   0f),
             ("Hz. Osman Camii Avlusu",           new Vector3( 82.0f, 0.12f, -24.0f), 180f),
+            ("Fatih Bulvarı · Saat Kulesi",      new Vector3(  0.0f, 0.18f, 134.0f),   0f),
             ("Petrol Yolu Caddesi",              new Vector3(-18.0f, 0.12f, -78.0f),  90f),
             ("Aziziye Cd. · İlkokul",            new Vector3(-16.0f, 0.12f,-114.0f), 180f),
-            ("No:58 Selman Bakkal & ATM",        new Vector3(  6.5f, 0.12f,   4.5f),   0f),
-            ("Gürsu Sk. Mahalle Futbol Sahası",  new Vector3(-41.0f, 0.12f,  -8.5f), 180f),
-            ("No:73 Oto Tamir",                  new Vector3( 24.0f, 0.12f,   4.2f),   0f),
-            ("No:48 Selman Sokağı Evim",         new Vector3(-62.0f, 0.12f,   4.5f),   0f)
+            ("No:73 Oto Tamir",                  new Vector3( 24.0f, 0.12f,   4.2f),   0f)
         };
 
         private void Update()
@@ -483,7 +525,8 @@ namespace Gridroam.Player
                                     trigger.Kind != InteractableKind.PaintableHouse;
                     if (checkLos && distSq > 0.45f)
                     {
-                        Vector3 trigProbe = trigPos + Vector3.up * 0.85f;
+                        float probeUp = trigger.Kind == InteractableKind.ShopItem ? 0.12f : 0.85f;
+                        Vector3 trigProbe = trigPos + Vector3.up * probeUp;
                         if (Physics.Linecast(playerChest, trigProbe, out RaycastHit wallHit, ~0, QueryTriggerInteraction.Ignore))
                         {
                             Transform hitTr = wallHit.transform;
@@ -505,7 +548,8 @@ namespace Gridroam.Player
                     if (flatDir.sqrMagnitude > 0.04f)
                     {
                         float dot = Vector3.Dot(playerFwd, flatDir.normalized);
-                        facingBonus = (1f - dot) * 0.55f;
+                        float weight = trigger.Kind == InteractableKind.ShopItem ? 0.85f : 0.55f;
+                        facingBonus = (1f - dot) * weight;
                     }
                     float score = Mathf.Sqrt(distSq) + facingBonus;
                     if (score < bestScore)
@@ -682,20 +726,44 @@ namespace Gridroam.Player
                     return;
                 }
 
+                case InteractableKind.ShopItem:
+                {
+                    PhysicalShopItem shopItem = _nearestInteractable.GetComponentInParent<PhysicalShopItem>();
+                    if (shopItem != null)
+                    {
+                        shopItem.Use(this);
+                    }
+                    return;
+                }
+
                 case InteractableKind.ShopCounter:
                 {
-                    if (ShopMenuPanel.Instance != null)
+                    if (PlayerShoppingCart.HasActiveItems)
                     {
-                        ShopMenuPanel.Instance.Open(_nearestInteractable.InteractableId);
+                        PlayerShoppingCart cart = PlayerShoppingCart.GetOrCreate(this);
+                        if (cart != null)
+                        {
+                            cart.Checkout(this, _nearestInteractable.transform);
+                        }
+                    }
+                    else
+                    {
+                        GameFeelAudio.PlayUiClick();
+                        RaiseStatusMessage("Raflardan, dolaptan veya tezgahtan almak istediğin ürüne yaklaşıp E ile eline al, sonra kasaya getir!");
                     }
                     return;
                 }
 
                 case InteractableKind.Bed:
                 {
+                    if (!IsPlayerHomeBed(_nearestInteractable))
+                    {
+                        RaiseStatusMessage("Burası komşunun evi! Sadece No:48 Selman Sokağı'ndaki kendi evinde uyuyabilirsin.");
+                        return;
+                    }
                     if (PlayerNeedsController.Instance != null)
                     {
-                        PlayerNeedsController.Instance.TrySleepInBed();
+                        PlayerNeedsController.Instance.TrySleepInBed(_nearestInteractable.transform);
                     }
                     return;
                 }
@@ -714,6 +782,10 @@ namespace Gridroam.Player
                     TownPedestrian citizen = _nearestInteractable.GetComponentInParent<TownPedestrian>();
                     if (citizen != null)
                     {
+                        if (footController != null && footController.Humanoid != null)
+                        {
+                            footController.Humanoid.PlayWave();
+                        }
                         citizen.TalkToPlayer(ActiveWorldPosition);
                     }
                     return;
@@ -781,12 +853,17 @@ namespace Gridroam.Player
 
                 case InteractableKind.InspectObject:
                 {
-                    if (!string.IsNullOrEmpty(_nearestInteractable.InteractableId) &&
-                        _nearestInteractable.InteractableId.StartsWith("mailbox", StringComparison.OrdinalIgnoreCase))
+                    InteractableTrigger inspected = _nearestInteractable;
+                    PlayerActionAnimator.Play(this, inspected.transform, PlayerActionKind.InspectReach, onClimax: () =>
                     {
-                        RaiseStatusMessage(LocalizationService.Tr("ui.mailbox.inspect", "Liman Kasabası Postası — Kutuda birkaç kartpostal var."));
-                    }
-                    OnInteracted?.Invoke(_nearestInteractable);
+                        if (inspected == null) return;
+                        if (!string.IsNullOrEmpty(inspected.InteractableId) &&
+                            inspected.InteractableId.StartsWith("mailbox", StringComparison.OrdinalIgnoreCase))
+                        {
+                            RaiseStatusMessage(LocalizationService.Tr("ui.mailbox.inspect", "Hamidiye Mahallesi Postası — Kutuda birkaç kartpostal var."));
+                        }
+                        OnInteracted?.Invoke(inspected);
+                    });
                     return;
                 }
 

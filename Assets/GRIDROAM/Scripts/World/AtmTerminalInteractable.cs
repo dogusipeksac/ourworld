@@ -33,6 +33,7 @@ namespace Gridroam.World
         public void Use(PlayerModeController mode)
         {
             if (mode == null || SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
+            if (PlayerActionAnimator.IsBusyOn(mode)) return;
 
             SaveData data = SaveManager.Instance.Data;
             float elapsedSinceClaim = data.totalPlayTimeSeconds - data.lastAtmClaimPlayTimeSeconds;
@@ -42,10 +43,14 @@ namespace Gridroam.World
             {
                 _pendingService = -1;
                 data.lastAtmClaimPlayTimeSeconds = data.totalPlayTimeSeconds;
-                SaveManager.Instance.AddMoney(75);
-                GameFeelAudio.PlayCoinChime();
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.4f, new Color(0.28f, 0.92f, 0.56f), count: 12, spread: 0.5f);
-                mode.RaiseStatusMessage($"{bankName}: Günlük mahalle geliri çekildi! (+75 ₺ · Bakiye: {data.money} ₺)");
+                PlayerActionAnimator.Play(mode, transform, PlayerActionKind.AtmKeypad, onClimax: () =>
+                {
+                    if (SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
+                    SaveManager.Instance.AddMoney(75);
+                    GameFeelAudio.PlayCoinChime();
+                    GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.4f, new Color(0.28f, 0.92f, 0.56f), count: 12, spread: 0.5f);
+                    mode.RaiseStatusMessage($"{bankName}: Günlük mahalle geliri çekildi! (+75 ₺ · Bakiye: {SaveManager.Instance.Data.money} ₺)");
+                }, startStatus: $"{bankName}: Şifre giriliyor, nakit hazırlanıyor...");
                 return;
             }
 
@@ -56,7 +61,11 @@ namespace Gridroam.World
                 SedanVehicleController targetCar = _pendingTargetCar;
                 _pendingService = -1;
                 _pendingTargetCar = null;
-                ExecutePaidService(mode, data, confirmed, targetCar);
+                PlayerActionAnimator.Play(mode, transform, PlayerActionKind.AtmKeypad, onClimax: () =>
+                {
+                    if (SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
+                    ExecutePaidService(mode, SaveManager.Instance.Data, confirmed, targetCar);
+                }, startStatus: $"{bankName}: İşlem onaylanıyor...");
                 return;
             }
 

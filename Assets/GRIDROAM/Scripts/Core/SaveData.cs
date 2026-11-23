@@ -20,7 +20,7 @@ namespace Gridroam.Core
     [Serializable]
     public class SaveData
     {
-        public int schemaVersion = 3;
+        public int schemaVersion = 4;
         public List<string> completedMissionIds = new List<string>();
         public string nextMissionId = "m01_get_the_keys";
         public bool hasVehicleKeys = true;
@@ -28,6 +28,14 @@ namespace Gridroam.Core
         public string languageCode = "tr";
         public int graphicsTierIndex = 1; // 0 = Low, 1 = Medium
         public List<HousePaintEntry> housePaint = new List<HousePaintEntry>();
+
+        // Open-World Story, Reputation, Discovery & Collectibles (v4)
+        public int reputationXp;
+        public bool hasSeenStoryIntro;
+        public bool chapterThreeCompleted;
+        public List<string> discoveredLandmarkIds = new List<string>();
+        public List<string> collectedMemoryIds = new List<string>();
+        public int streetEventsHelpedCount;
 
         // E1: Economy
         public int money = 250;
