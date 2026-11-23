@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Gently animates coastal water normal/UV flow and optional floating harbor buoys

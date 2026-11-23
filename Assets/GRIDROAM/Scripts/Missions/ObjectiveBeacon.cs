@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.Missions
+namespace OurWorld.Missions
 {
     /// <summary>
     /// Lightweight 3D beacon (translucent ring + floating diamond) marking the active mission anchor.

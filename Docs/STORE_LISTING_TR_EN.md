@@ -1,82 +1,74 @@
-# OurWorld (v1.0.0) — Global Google Play & App Store Publishing Kit
+# Bizim Dünyamız / Our World (v1.0.0) — Global App Store & Google Play Publishing Kit
 
-## 1. Global App Identity
-- **App Name (EN — Primary Global, max 30 chars):** `OurWorld: Built by Players` *(26 chars)*
-- **App Name (TR — Turkish Localization):** `OurWorld: Birlikte Kuralım` *(26 chars)*
-- **App Store Subtitle (EN — max 30 chars):** `You Wish It, We Build It!` *(25 chars)*
-- **App Store Subtitle (TR — max 30 chars):** `Sen Hayal Et, Biz Kuralım!` *(26 chars)*
-- **Home Screen Icon Name (`productName` / `CFBundleDisplayName`):** `OurWorld`
+## 1. Global App Identity & Search Optimization (ASO)
+- **App Name (TR — max 30 chars):** `Bizim Dünyamız · Açık Dünya` *(27 chars)*
+- **App Subtitle (TR — max 30 chars):** `Sür, Spor Yap, Mahalleni Yaşa` *(29 chars)*
+- **App Name (EN — max 30 chars):** `Our World · Living Open World` *(29 chars)*
+- **App Subtitle (EN — max 30 chars):** `Drive, Play Sports & Roam 3D!` *(29 chars)*
+- **Home Screen Icon Name (`productName` / `CFBundleDisplayName`):** `Our World`
 - **Package / Bundle ID:** `com.dogusipeksac.ourworld`
 - **Developer / Company Name:** `Dogus Store`
 - **Version:** `1.0.0` (Android `versionCode: 1`, iOS `buildNumber: 1`)
-- **Category:** Games → Simulation (Secondary: Adventure / Action)
+- **Category:** Games → Simulation (Secondary: Adventure)
 
 ---
 
-## 2. Global Store Listing — English (Primary Worldwide)
+## 2. Türkçe Mağaza & Arama (Search) Metinleri (TR)
 
-### Short Description (max 80 chars)
-`A living 3D open world shaped by player imagination — drive, explore & build!` *(77 chars)*
+### Kısa Açıklama (Google Play · maks 80 karakter)
+`20 görev, 4 canlı spor, akıllı komşular ve araba sürüşüyle 3D açık dünya!` *(73 karakter)*
 
-### Full Description (EN)
-**OurWorld** is a living 3D open-world sandbox that grows directly from **players' imagination**!
+### Tanıtım Metni (App Store Promotional Text)
+`20 görev, 4 oynanabilir spor (Tenis, Futbol, Basketbol, Voleybol), akıllı komşular, araba sürüşü ve ışıklı İstanbul geceleri seni bekliyor!`
 
-Explore a lively, sunlit starting district inspired by the real streets of Istanbul — walk into every furnished home and corner shop, drive realistic cars, take on open-world jobs — and help decide what gets built next in every update!
-
-**What You Can Do in v1.0.0 (Chapter 1: Istanbul District):**
-- **Walk Into Every Home, Shop & Landmark:** Enter furnished 1+0 to 3+1 apartments, watch TV, brew tea, change outfits, rest, shop at local markets and tea houses, or step inside the domed mosque.
-- **Tactile Driving, Drift & Real Vehicle Damage:** Drive multiple cars with realistic suspension, handbrake drift-to-charge Nitro boost, 3 live procedural radio stations, working headlights & horn, and real-time collision deformation.
-- **10 Story Missions + 4 Open-World Jobs:** Help your neighbors in 10 hand-made missions (find a lost cat, rush medicine from the pharmacy, prepare the street festival…) and earn money through Pizza Delivery, Taxi, Street Cleanup and House Painting.
-- **Shape the Next Update:** Send your ideas straight from the in-game phone's Ideas tab — the most requested features get built next.
-- **Living Street Details:** Pet roaming street cats, score goals in street football, carry & throw physical props, and explore dynamic sunny days, golden sunsets, and lamp-lit nights.
-- **Offline Ready:** Seamless automatic local saves — jump in anytime, anywhere.
-
-**A World Built With You!**
-Every update expands **OurWorld** with the most creative community ideas — new districts, vehicles, mini-games, shops, and surprises. Jump in at Chapter 1 and shape what comes next!
-
-### What's New (`v1.0.0` — EN)
-`Welcome to OurWorld v1.0.0! Chapter 1 launches with our lively Istanbul starting district: walk-in furnished homes & mosque, 10 story missions, 4 open-world jobs (Pizza, Taxi, Cleanup, Painting), an in-game Ideas tab to shape future updates, realistic driving & crash physics, Nitro drift, street football, roaming cats, and full offline play.`
-
-### App Store Keywords (EN — max 100 chars)
-`open world,sandbox,driving,life sim,city,car,drift,free roam,build,explore,taxi,pizza,community` *(95 chars)*
-
----
-
-## 3. Türkçe Mağaza Metinleri (TR)
-
-### Kısa Açıklama (maks 80 karakter)
-`Oyuncuların hayal gücüyle büyüyen 3D açık dünya — gez, sür, keşfet ve şekillendir!` *(80 karakter)*
+### Arama Anahtar Kelimeleri (App Store Search Keywords · 98/100 karakter, sıfır tekrar!)
+`araba,sürme,istanbul,simülasyon,tenis,futbol,basketbol,voleybol,taksi,görev,3d,şehir,drift,offline`
 
 ### Uzun Açıklama (TR)
-**OurWorld**, oyuncuların hayal gücüyle her güncellemede büyüyen **canlı 3D global açık dünya oyunudur!**
+**Bizim Dünyamız (Our World)**, oyuncuların fikirleriyle birlikte büyüyen, capcanlı bir 3D açık dünya yaşam, sürüş ve spor oyunudur!
 
-1. Bölümde gerçek İstanbul sokaklarından ilham alan canlı başlangıç bölgesini keşfet: içi döşeli evlere ve esnaf dükkânlarına gir, gerçekçi fizikle araba sür, yan işlerden para kazan — ve sıradaki güncellemede bu dünyaya ne ekleneceğine birlikte karar verelim!
+Hamidiye Mahallesi'nin samimi sokaklarından 8 ana caddeye uzanan özgür bir şehre adım at. Yaya olarak mahalleni gez, dilediğin araca binip sür, dilediğin an halı saha, tenis, basketbol ve voleybol maçlarına katıl, konuşan komşularla tanış ve günlük hayatın tadını çıkar.
 
-**v1.0.0'da Neler Var? (1. Bölüm: İstanbul Bölgesi)**
-- **İçi Gezilebilir Evler, Dükkânlar & Cami:** 1+0'dan 3+1'e içi döşeli evlere gir; TV izle, çay iç, kıyafet değiştir, dinlen; mahalle bakkalı, çay ocağı, tesisatçı ve kubbeli caminin içine girip etkileşime geç.
-- **Gerçekçi Araç Fiziği, Drift, Nitro & Radyo:** Farklı araçları sür; drift yaparak Nitro doldur, 3 kanallı araç radyosunu aç, farlarını yak, korna çal, gerçek çarpışma hasarı ve tamiri deneyimle.
-- **10 Hikâye Görevi + 4 Açık Dünya İşi:** Komşularına 10 özel görevde yardım et (kayıp kediyi bul, eczaneden ilacı yetiştir, mahalle şenliğini hazırla…); Pizza, Taksi, Sokak Temizliği ve Ev Boyama işlerinden para kazan.
-- **Sıradaki Güncellemeyi Sen Belirle:** Oyun içi telefondaki Öneri sekmesinden fikrini gönder — en çok istenenler bir sonraki sürümde oyunda!
-- **Yaşayan Dünya Ayrıntıları:** Gezen sokak kedilerini sev, sokak futbolunda gol at, fiziksel eşyaları taşıyıp fırlat, gündüz/gün batımı/gece döngüsünde özgürce dolaş.
-- **Çevrimdışı & Otomatik Kayıt:** İnternet gerekmeden kaldığın yerden devam et.
-
-**Dünyamız Senin Fikirlerinle Büyüyecek!**
-Her yeni sürümde oyuncularımızdan gelen en yaratıcı fikirleri yeni bölgeler, araçlar, dükkânlar ve mekanikler olarak **OurWorld**'e ekliyoruz!
-
-### Sürüm Notları (`v1.0.0` — TR)
-`OurWorld v1.0.0 yayında! 1. Bölüm İstanbul bölgesiyle başla: içi gezilebilir evler ve cami, 10 hikâye görevi, 4 yan iş (Pizza, Taksi, Temizlik, Boyama), fikirlerini gönderebileceğin Öneri sekmesi, çoklu araç sürüşü & hasar fiziği, Nitro drift, araç radyosu, sokak futbolu ve sokak kedileri!`
+**ÖNE ÇIKAN ÖZELLİKLER:**
+- **Yaşayan 3D Açık Dünya:** Selman Sokağı, Fatih Bulvarı Saat Kulesi, Hz. Osman Camii, Çay Bahçesi, Açık Yüzme Havuzu ve 8 ana cadde.
+- **5 Bölümlük 20 Hikâye Görevi + 4 Yan İş:** Büyük Spor Kupası, Gece Yarısı Kesintisi, Sekiz Cadde Rallisi ve Büyük Final dâhil 20 görev; ayrıca Taksi, Pizza, Temizlik ve Ev Boyama işleriyle para kazan.
+- **4 Oynanabilir Spor (İstediğin An Maç!):** 1v1 Toprak Kort Tenis, 3v3 Halı Saha Futbolu, 2v2 Sokak Basketbolu ve 2v2 Voleybol maçlarına dilediğin zaman gir, ödül kazan.
+- **Akıllı & Konuşan Mahalle NPC'leri:** Birbiriyle sohbet eden, korna ve yağmura tepki veren, sokak kedilerini seven ve saygınlığına göre seni selamlayan canlı komşular.
+- **Gerçekçi Fiziksel Etkileşimler:** Menü açmadan bakkal raflarından alışveriş yap, çay iç, evinde dinlen, havuzda yüz ve camide ibadet et.
+- **Çoklu Araç & Işıklı Geceler:** Araba, bisiklet ve motosiklet sür; driftle nitro doldur, Türkçe radyo aç, akşam 18:30'dan itibaren yanan sokak lambaları ve farlarla şehri keşfet.
+- **Birlikte Büyüyen Dünya:** Oyun içi Öneri sekmesinden fikrini yaz, sıradaki güncellemeleri birlikte şekillendirelim!
 
 ---
 
-## 4. Store Compliance & Questionnaire Answers (Google Play & App Store Connect)
-- **Data Collection (v1.0.0):** **Yes — only optional player suggestions.** Google Play Data Safety: *Personal info → User IDs* (anonymous Firebase UID) and *App activity → Other user-generated content* (suggestion text); purpose: App functionality + Analytics (product improvement); not shared, not sold, encrypted in transit, optional, deletion on request by email. App Store Connect App Privacy: *User Content → Other User Content* and *Identifiers → User ID*, **not linked** to identity, **not used for tracking**. Game save stays 100% on-device; zero ads, zero tracking.
-- **ATT / Tracking:** **No** (`NSPrivacyTracking = false`, `Assets/Plugins/iOS/PrivacyInfo.xcprivacy` included).
-- **iOS Export Compliance (`ITSAppUsesNonExemptEncryption`):** **No (`false`)** (auto-injected by `GridroamBuildTools.cs`).
-- **Age Rating:** `7+ / 9+` (Mild stylized open-world action, no realistic violence/blood, no gambling, no IAP).
-- **Privacy Policy URL:** Upload [`Docs/privacy_policy.html`](privacy_policy.html) (e.g. `https://dogusipeksac.github.io/ourworld-privacy.html`).
+## 3. Global Store & Search Metadata — English (en-US)
+
+### Short Description (Google Play · max 80 chars)
+`Living 3D open world: 20 missions, 4 playable sports, driving & smart NPCs!` *(75 chars)*
+
+### Promotional Text (App Store)
+`20 story missions, 4 playable sports (Tennis, Football, Basketball, Volleyball), smart talking NPCs, multi-vehicle driving & glowing nights!`
+
+### Search Keywords (App Store · 99/100 chars, zero duplicates!)
+`sandbox,car,driving,life,sim,city,tennis,football,basketball,volleyball,taxi,missions,drift,offline`
+
+### Full Description (EN)
+**Our World** is a vibrant, living 3D open-world life, driving & sports game built to grow together with its community!
+
+Step into a lively handcrafted neighborhood spanning 8 bustling avenues — drive cars, bikes, and motorcycles, jump into playable tennis, football, basketball, and volleyball matches anytime, meet talking smart NPCs, and shape the city's story.
+
+**KEY FEATURES:**
+- **Living 3D Open World:** Explore 8 connected avenues, Clock Tower Plaza, local shops, parks, a swimmable pool, and enterable interiors.
+- **5-Chapter Story (20 Missions) + 4 Side Jobs:** Compete in the Sports Cup, restore a midnight blackout, race the 8-Avenue Rally, and choose the neighborhood's legacy — plus Taxi, Pizza, Cleanup, and House Painting jobs.
+- **4 Playable Sports Anytime:** Jump straight into 1v1 Clay Tennis, 3v3 Street Football, 2v2 Street Basketball, and 2v2 Volleyball with crisp controls and animations.
+- **Smart Talking Neighborhood NPCs:** Citizens chat with neighbors via speech bubbles, react to car horns, rain, and fights, pet street cats, and remember how you treat them.
+- **Physical Zero-Menu Interactions:** Pick products right off market shelves and pay at the counter, brew hot tea, swim freely, and rest in your own home.
+- **Multi-Vehicle Driving & Glowing Nights:** Cruise with realistic handling, drift nitro, headlights, glowing streetlamps, lit apartment windows, and stadium floodlights after dusk.
+- **Shaped by Players:** Share your ideas directly via the in-game Suggestions tab to help guide every update!
 
 ---
 
-## 5. Store Visual Assets
-- **App Icon (`1024×1024` & `512×512`):** `Assets/GRIDROAM/Art/Store/AppIcon_1024.png`, `StoreAssets/AppStore_Icon_1024.png`, `StoreAssets/GooglePlay_Icon_512.png`
-- **Google Play Feature Graphic (`1024×500`):** `StoreAssets/GooglePlay_FeatureGraphic_1024x500.png` (`OURWORLD · BUILT BY PLAYERS`)
+## 4. Store Compliance & Visual Assets
+- **Data Collection:** Optional anonymous community suggestions & Firebase Crashlytics only. Zero ads, zero tracking, zero IAP.
+- **App Icon (`1024×1024` & `512×512`):** `StoreAssets/AppStore_Icon_1024.png`, `StoreAssets/GooglePlay_Icon_512.png`
+- **Google Play Store Header / Feature Graphic (`1024×500` TR + EN):** `StoreAssets/GooglePlay_FeatureGraphic_1024x500.png`, `release/store_screenshots/google_play_feature/`
+- **App Store & Google Play Posters (TR + EN across 6 device sizes):** `release/store_screenshots/`

@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
   m_Name: Mission_13_HavuzSenligi
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
   missionId: m13_havuz_senligi
   titleKey: m13.title
   summaryKey: m13.summary
@@ -38,6 +38,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 0
     objectiveKey: m13.step2.objective
     targetAnchorId: m13_pool_deck_zone
@@ -54,6 +55,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 5
     objectiveKey: m13.step3.objective
     targetAnchorId: m13_pool_table
@@ -70,6 +72,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 1
     objectiveKey: m13.step4.objective
     targetAnchorId: npc_avukat_tarik
@@ -86,3 +89,4 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1

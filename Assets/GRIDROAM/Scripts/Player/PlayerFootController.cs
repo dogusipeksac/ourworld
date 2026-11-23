@@ -1,13 +1,13 @@
 using System;
 using System.Collections;
-using Gridroam.CameraSystem;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Vehicle;
-using Gridroam.World;
+using OurWorld.CameraSystem;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Vehicle;
+using OurWorld.World;
 using UnityEngine;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     /// <summary>
     /// Third-person on-foot movement using CharacterController.
@@ -18,12 +18,12 @@ namespace Gridroam.Player
     public class PlayerFootController : MonoBehaviour
     {
         [Header("Movement")]
-        [SerializeField] private float walkSpeed = 3.4f;
-        [SerializeField] private float runSpeed = 6.2f;
-        [SerializeField] private float acceleration = 10f;
-        [SerializeField] private float deceleration = 14f;
+        [SerializeField] private float walkSpeed = 2.25f;
+        [SerializeField] private float runSpeed = 4.25f;
+        [SerializeField] private float acceleration = 8.0f;
+        [SerializeField] private float deceleration = 11.5f;
         [SerializeField] private float jumpHeight = 1.0f;
-        [SerializeField] private float rotationSpeed = 12f;
+        [SerializeField] private float rotationSpeed = 9.5f;
         [SerializeField] private float gravity = -20f;
 
         [Header("Visual & Mixamo Animator Slot")]

@@ -3,7 +3,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Profiling;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Tracks rolling FPS, min FPS, frame time, allocated/reserved memory, and device details
@@ -93,7 +93,7 @@ namespace Gridroam.Core
                 : "Default";
             float minDisplay = MinFps < float.MaxValue ? MinFps : CurrentFps;
             Rect safe = Screen.safeArea;
-            return $"[GRIDROAM Perf Report] Platform={Application.platform} | Device={SystemInfo.deviceModel} | " +
+            return $"[OurWorld Perf Report] Platform={Application.platform} | Device={SystemInfo.deviceModel} | " +
                    $"OS={SystemInfo.operatingSystem} | GPU={SystemInfo.graphicsDeviceName} | " +
                    $"Res={Screen.width}x{Screen.height} | SafeArea=({safe.x:0},{safe.y:0},{safe.width:0}x{safe.height:0}) | " +
                    $"Profile={tier} | SessionSec={_sessionTime:0.0} | AvgFPS={avgSessionFps:0.0} | " +
@@ -107,7 +107,7 @@ namespace Gridroam.Core
             Debug.Log(report);
             try
             {
-                string filePath = Path.Combine(Application.persistentDataPath, "gridroam_perf_log.txt");
+                string filePath = Path.Combine(Application.persistentDataPath, "ourworld_perf_log.txt");
                 string line = $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}Z {report}{Environment.NewLine}";
                 File.AppendAllText(filePath, line);
                 return filePath;

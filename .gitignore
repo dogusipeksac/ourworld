@@ -59,3 +59,12 @@ Thumbs.db
 *-firebase-adminsdk-*.json
 .venv/
 *.blend1
+
+# Auto-generated multi-resolution store poster exports (regenerated via release/store_screenshots/generate_store_posters.py)
+release/store_screenshots/app_store_6.5/
+release/store_screenshots/app_store_6.7/
+release/store_screenshots/app_store_ipad_12.9/
+release/store_screenshots/google_play_phone/
+release/store_screenshots/google_play_tablet_7/
+release/store_screenshots/google_play_tablet_10/
+release/store_screenshots/en-US/

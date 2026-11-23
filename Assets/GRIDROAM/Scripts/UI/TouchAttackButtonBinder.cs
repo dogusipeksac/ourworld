@@ -1,8 +1,8 @@
-using Gridroam.Input;
+using OurWorld.Input;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Binds the On-Foot touch "Vur" (Punch) button directly to InputHub.TriggerTouchAttack().

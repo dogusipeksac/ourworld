@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Gridroam.Missions
+namespace OurWorld.Missions
 {
     public enum MissionStepType
     {
@@ -12,7 +12,10 @@ namespace Gridroam.Missions
         ExitVehicle,
         DeliverToZone,
         InspectTarget,
-        TailVehicle
+        TailVehicle,
+        PlaySportMatch,
+        SwimAtPool,
+        RideTwoWheeler
     }
 
     [Serializable]
@@ -56,6 +59,10 @@ namespace Gridroam.Missions
         public DialogueData secondaryDialogueAsset;
         public string primaryChoiceId;
         public string secondaryChoiceId;
+
+        [Header("Atmosphere Override")]
+        [Tooltip("If >= 0, transitions the world clock to this hour (0-24) when this step starts.")]
+        public float setTimeOfDayHours = -1f;
     }
 
     /// <summary>
@@ -63,7 +70,7 @@ namespace Gridroam.Missions
     /// Adding new missions or neighborhoods only requires creating new MissionData assets
     /// and placing matching WorldAnchors in the scene—no mission C# rewrite required.
     /// </summary>
-    [CreateAssetMenu(menuName = "GRIDROAM/Mission Data", fileName = "Mission_New")]
+    [CreateAssetMenu(menuName = "OurWorld/Mission Data", fileName = "Mission_New")]
     public class MissionData : ScriptableObject
     {
         [Header("Identity & Localization Keys")]

@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Text;
-using Gridroam.Core;
+using OurWorld.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// "Öneri / Mesajlar" tab inside the phone. Built at runtime so the scene does not need regenerating.

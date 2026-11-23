@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Player;
-using Gridroam.World;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Player;
+using OurWorld.World;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Gridroam.Vehicle
+namespace OurWorld.Vehicle
 {
     [Serializable]
     public class AxleInfo
@@ -362,7 +362,32 @@ namespace Gridroam.Vehicle
             if (_headlightBeam == null)
             {
                 Transform beamTr = bodyVisualRoot.Find("Headlight_Beam");
-                if (beamTr != null) _headlightBeam = beamTr.GetComponent<Light>();
+                if (beamTr != null)
+                {
+                    _headlightBeam = beamTr.GetComponent<Light>();
+                }
+                else
+                {
+                    GameObject beamObj = new GameObject("Headlight_Beam");
+                    beamObj.transform.SetParent(bodyVisualRoot, false);
+                    beamObj.transform.localPosition = new Vector3(0f, 0.80f, 2.25f);
+                    beamObj.transform.localRotation = Quaternion.Euler(8f, 0f, 0f);
+                    _headlightBeam = beamObj.AddComponent<Light>();
+                    _headlightBeam.type = LightType.Spot;
+                    _headlightBeam.shadows = LightShadows.None;
+                }
+            }
+
+            if (_headlightBeam != null)
+            {
+                // Calibrate car headlight beam for crisp URP Linear night street visibility
+                _headlightBeam.type = LightType.Spot;
+                _headlightBeam.color = new Color(1.0f, 0.95f, 0.82f);
+                _headlightBeam.range = Mathf.Max(_headlightBeam.range, 54f);
+                _headlightBeam.spotAngle = Mathf.Max(_headlightBeam.spotAngle, 74f);
+                _headlightBeam.innerSpotAngle = Mathf.Max(_headlightBeam.innerSpotAngle, 40f);
+                _headlightBeam.intensity = Mathf.Max(_headlightBeam.intensity, 48f);
+                _headlightBeam.shadows = LightShadows.None;
             }
 
             if (steeringWheelTransform == null)
@@ -402,11 +427,22 @@ namespace Gridroam.Vehicle
                 _lastHeadlightOnVisual = headlightsOn;
                 if (_mpb == null) _mpb = new MaterialPropertyBlock();
 
-                Color headEmission = headlightsOn ? new Color(1.0f, 0.90f, 0.66f) * 3.0f : Color.black;
+                Color headEmission = headlightsOn ? new Color(1.0f, 0.92f, 0.70f) * 4.5f : Color.black;
                 for (int i = 0; i < _headlightRenderers.Count; i++)
                 {
                     Renderer r = _headlightRenderers[i];
                     if (r == null) continue;
+                    if (headlightsOn)
+                    {
+                        Material[] mats = r.sharedMaterials;
+                        for (int m = 0; m < mats.Length; m++)
+                        {
+                            if (mats[m] != null && !mats[m].IsKeywordEnabled("_EMISSION"))
+                            {
+                                mats[m].EnableKeyword("_EMISSION");
+                            }
+                        }
+                    }
                     r.GetPropertyBlock(_mpb);
                     _mpb.SetColor(EmissionColorId, headEmission);
                     r.SetPropertyBlock(_mpb);

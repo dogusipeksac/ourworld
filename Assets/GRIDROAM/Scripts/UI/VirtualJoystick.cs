@@ -1,9 +1,9 @@
-using Gridroam.Input;
+using OurWorld.Input;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Multi-touch safe floating/dynamic virtual thumbstick for on-foot mobile movement:
@@ -36,6 +36,16 @@ namespace Gridroam.UI
             handleRange = range;
         }
 
+        public void ConfigureSizing(float range, Vector2 restingPos)
+        {
+            handleRange = Mathf.Max(48f, range);
+            defaultBackgroundPosition = restingPos;
+            if (background != null && _activePointerId == int.MinValue)
+            {
+                background.anchoredPosition = restingPos;
+            }
+        }
+
         public void ConfigureFloating(
             CanvasGroup group,
             Image knobImg,
@@ -58,7 +68,7 @@ namespace Gridroam.UI
             _zoneRect = GetComponent<RectTransform>();
             if (canvasGroup != null)
             {
-                canvasGroup.alpha = 0.35f;
+                canvasGroup.alpha = 0.52f;
             }
             if (handleImage != null)
             {
@@ -153,7 +163,7 @@ namespace Gridroam.UI
 
             if (canvasGroup != null)
             {
-                float targetAlpha = active ? 0.95f : 0.35f;
+                float targetAlpha = active ? 0.96f : 0.52f;
                 canvasGroup.alpha = Mathf.Lerp(canvasGroup.alpha, targetAlpha, 1f - Mathf.Exp(-14f * dt));
             }
 
@@ -182,8 +192,10 @@ namespace Gridroam.UI
                 Vector2 finalInput = Vector2.zero;
                 if (mag > deadZone)
                 {
-                    float remapped = (mag - deadZone) / Mathf.Max(0.01f, 1f - deadZone);
-                    finalInput = (rawNorm / mag) * Mathf.Clamp01(remapped);
+                    float remapped = Mathf.Clamp01((mag - deadZone) / Mathf.Max(0.01f, 1f - deadZone));
+                    // Gentle power curve for precise slow walking inside homes & shops while reaching full walk cleanly at the rim
+                    float curved = Mathf.Pow(remapped, 1.25f);
+                    finalInput = (rawNorm / mag) * curved;
                 }
 
                 if (InputHub.Instance != null)
@@ -203,7 +215,7 @@ namespace Gridroam.UI
             }
             if (canvasGroup != null)
             {
-                canvasGroup.alpha = 0.35f;
+                canvasGroup.alpha = 0.52f;
             }
             if (handleImage != null)
             {

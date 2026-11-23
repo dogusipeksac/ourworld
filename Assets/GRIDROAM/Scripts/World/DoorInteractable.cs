@@ -1,8 +1,8 @@
 using System.Collections;
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Hinged door controller that smoothly toggles open/closed over 0.35 s,

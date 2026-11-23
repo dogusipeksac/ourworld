@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
   m_Name: Mission_05_EndOfShift
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
   missionId: m05_end_of_shift
   titleKey: m05.title
   summaryKey: m05.summary
@@ -38,6 +38,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 1
     objectiveKey: m05.step2.objective
     targetAnchorId: npc_mechanic
@@ -54,3 +55,4 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 11400000, guid: d10b531c6123741ed8c6b3db590ac35f, type: 2}
     primaryChoiceId: marco
     secondaryChoiceId: elena
+    setTimeOfDayHours: -1

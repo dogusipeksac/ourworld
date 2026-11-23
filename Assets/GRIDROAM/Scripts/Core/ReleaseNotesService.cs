@@ -1,10 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Gridroam.UI;
+using OurWorld.Player;
+using OurWorld.UI;
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     [Serializable]
     public class ReleaseHighlightItem
@@ -98,10 +99,14 @@ namespace Gridroam.Core
                 yield break;
             }
 
-            // Wait cleanly if a Force/Soft Update or Maintenance overlay is currently visible
-            while (AppUpdateOverlay.IsShowing)
+            // Wait cleanly if a Force/Soft Update, Maintenance overlay, Main Menu, or active Sport Match is in progress
+            while (AppUpdateOverlay.IsShowing ||
+                   MainMenuController.IsMenuActive ||
+                   (PlayerModeController.Instance != null &&
+                    (PlayerModeController.Instance.CurrentMode == ControlMode.Tennis ||
+                     PlayerModeController.Instance.CurrentMode == ControlMode.ArenaSport)))
             {
-                yield return new WaitForSecondsRealtime(0.5f);
+                yield return new WaitForSecondsRealtime(0.4f);
             }
 
             ShowNow(markSeen: true);

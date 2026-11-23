@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Gridroam.Missions
+namespace OurWorld.Missions
 {
     /// <summary>
     /// Ordered catalog of all missions in GRIDROAM.
     /// </summary>
-    [CreateAssetMenu(menuName = "GRIDROAM/Mission Catalog", fileName = "MissionCatalog")]
+    [CreateAssetMenu(menuName = "OurWorld/Mission Catalog", fileName = "MissionCatalog")]
     public class MissionCatalog : ScriptableObject
     {
         public List<MissionData> missions = new List<MissionData>();

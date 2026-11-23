@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Constrains a RectTransform to Screen.safeArea on both Android (punch-hole/notch/gesture bar)

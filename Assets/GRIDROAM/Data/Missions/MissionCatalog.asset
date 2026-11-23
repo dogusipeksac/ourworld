@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5b343cc0c01814262a6cc35a17f2cff5, type: 3}
   m_Name: MissionCatalog
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionCatalog
   missions:
   - {fileID: 11400000, guid: 2f995ab1c4ebd46b8a847509e6416b11, type: 2}
   - {fileID: 11400000, guid: b90cf1ff326894e94a883de632362758, type: 2}
@@ -27,3 +27,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 75185cc7f83f44c98a54be8966ee5f1c, type: 2}
   - {fileID: 11400000, guid: e5f2b9c3b3268466d820304c96e88ae8, type: 2}
   - {fileID: 11400000, guid: 5e82a14738d7c415b8e49cf5ad4238e1, type: 2}
+  - {fileID: 11400000, guid: 200ee61d725f34a369a2029d5cae5227, type: 2}
+  - {fileID: 11400000, guid: 7670f7a4c3dfa4068a7326c2804d6569, type: 2}
+  - {fileID: 11400000, guid: f0a3d8f2b9e8445de96e2191e92c7362, type: 2}
+  - {fileID: 11400000, guid: 981a0e614bdf84920892822d99dc08b8, type: 2}
+  - {fileID: 11400000, guid: 4ffb42e6e25d7406c85ff978fa419d7c, type: 2}
+  - {fileID: 11400000, guid: 39d3c12bf207b46389855f002e907143, type: 2}

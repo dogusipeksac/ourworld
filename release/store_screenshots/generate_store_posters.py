@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-OurWorld — Universal Store Marketing Screenshot & Poster Studio (ported from Kube 2026 Studio)
-Generates high-converting landscape store marketing posters across all required mobile & tablet sizes
+Our World / Bizim Dünyamız — Next-Gen Store Marketing Poster, Header & Search Studio
+Generates ultra-vibrant, Search-optimized store screenshots & headers across ALL mobile & tablet sizes
 in BOTH Turkish (tr) and English (en-US):
   - Google Play Phone (1920 x 1080)
   - Apple App Store 6.7" iPhone (2796 x 1290)
@@ -9,21 +9,26 @@ in BOTH Turkish (tr) and English (en-US):
   - Apple App Store 12.9"/13" iPad Pro (2732 x 2048)
   - Google Play 7" Tablet (1920 x 1200)
   - Google Play 10" Tablet (2560 x 1600)
-  - Google Play Feature Graphic (1024 x 500 RGB)
+  - Google Play Feature Graphic / Store Header (1024 x 500 RGB — TR & EN + synced to StoreAssets/)
 
 Usage:
   python3 release/store_screenshots/generate_store_posters.py --lang tr
   python3 release/store_screenshots/generate_store_posters.py --lang en
 """
 
+import math
 import os
 import random
+import shutil
 import sys
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 RAW_DIR = os.path.join(SCRIPT_DIR, "raw")
+ICON_PATH = os.path.join(PROJECT_DIR, "StoreAssets", "AppStore_Icon_1024.png")
+OUT_FEATURE = os.path.join(SCRIPT_DIR, "google_play_feature")
+STORE_FEATURE_DST = os.path.join(PROJECT_DIR, "StoreAssets", "GooglePlay_FeatureGraphic_1024x500.png")
 
 TARGETS = {
     "google_play_phone":     {"w": 1920, "h": 1080, "is_tablet": False},
@@ -34,503 +39,801 @@ TARGETS = {
     "google_play_tablet_10": {"w": 2560, "h": 1600, "is_tablet": True},
 }
 
-OUT_FEATURE = os.path.join(SCRIPT_DIR, "google_play_feature")
-
-FONT_CANDIDATES = [
+FONT_BOLD_CANDIDATES = [
+    "/System/Library/Fonts/Supplemental/Arial Black.ttf",
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "/System/Library/Fonts/Helvetica.ttc",
     "/System/Library/Fonts/SFNS.ttf",
 ]
-FONT_SYSTEM_PATH = next((p for p in FONT_CANDIDATES if os.path.exists(p)), "")
+FONT_MED_CANDIDATES = [
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/System/Library/Fonts/SFNS.ttf",
+]
+FONT_BOLD_PATH = next((p for p in FONT_BOLD_CANDIDATES if os.path.exists(p)), "")
+FONT_MED_PATH = next((p for p in FONT_MED_CANDIDATES if os.path.exists(p)), FONT_BOLD_PATH)
 
 _FONT_CACHE = {}
+_RAW_CACHE = {}
 
 
 def get_font(path, size):
-    key = (path, int(size))
+    key = (path, max(10, int(size)))
     if key not in _FONT_CACHE:
         try:
-            _FONT_CACHE[key] = ImageFont.truetype(path, int(size))
+            _FONT_CACHE[key] = ImageFont.truetype(path, max(10, int(size)))
         except Exception:
             _FONT_CACHE[key] = ImageFont.load_default()
     return _FONT_CACHE[key]
 
 
-_RAW_CACHE = {}
+def fit_font(path, text, size, max_w, min_size=14):
+    s = int(size)
+    f = get_font(path, s)
+    while (f.getbbox(text)[2] - f.getbbox(text)[0]) > max_w and s > min_size:
+        s -= 2
+        f = get_font(path, s)
+    return f
 
 
-def load_and_clean_screenshot(raw_path):
-    if raw_path in _RAW_CACHE:
-        return _RAW_CACHE[raw_path]
+def load_and_grade_screenshot(raw_path, crop_bottom_px=0, warm_night_boost=False):
+    """Loads a raw gameplay capture, optionally trims desktop bottom key-hint bar,
+    and applies vibrant sunlit OLED studio color grading so shots pop in Store & Search."""
+    cache_key = (raw_path, crop_bottom_px, warm_night_boost)
+    if cache_key in _RAW_CACHE:
+        return _RAW_CACHE[cache_key]
+
     if not os.path.exists(raw_path):
-        raise FileNotFoundError(
-            f"Missing raw screenshot: {raw_path}\n"
-            f"Run Unity menu 'GRIDROAM -> Store -> 1. Capture Raw Store Screenshots' first."
-        )
+        raise FileNotFoundError(f"Missing raw screenshot: {raw_path}")
 
-    im = Image.open(raw_path).convert("RGBA")
+    im = Image.open(raw_path).convert("RGB")
     w, h = im.size
     if w == 2622 and h == 1206:
-        # iPhone landscape Dynamic Island crop
         im = im.crop((175, 0, w, h))
     elif w == 2424 and h == 1080:
-        # Android Pixel landscape cutout + status bar crop
         im = im.crop((145, 138, 2424, 1080))
 
-    _RAW_CACHE[raw_path] = im
-    return im
+    if crop_bottom_px > 0 and im.size[1] > crop_bottom_px + 200:
+        cw, ch = im.size
+        im = im.crop((0, 0, cw, ch - crop_bottom_px))
+
+    if warm_night_boost:
+        # Lift dark night asphalt/buildings cleanly while saturating warm evening amber lights
+        im = ImageEnhance.Brightness(im).enhance(1.38)
+        im = ImageEnhance.Contrast(im).enhance(1.16)
+        im = ImageEnhance.Color(im).enhance(1.36)
+        im = ImageEnhance.Sharpness(im).enhance(1.20)
+        rgba = im.convert("RGBA")
+        # Add subtle warm golden streetlamp atmospheric glow halos along the avenue lamps
+        glow = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
+        gdraw = ImageDraw.Draw(glow)
+        gw, gh = rgba.size
+        lamp_spots = [
+            (0.41, 0.25, 0.08),
+            (0.55, 0.35, 0.07),
+            (0.64, 0.43, 0.06),
+            (0.89, 0.45, 0.07),
+            (0.52, 0.56, 0.14),
+            (0.28, 0.64, 0.16),
+        ]
+        for lx, ly, lr in lamp_spots:
+            cx, cy, r = int(gw * lx), int(gh * ly), int(gw * lr)
+            gdraw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 198, 92, 68))
+        glow = glow.filter(ImageFilter.GaussianBlur(max(12, gw // 24)))
+        rgba = Image.alpha_composite(rgba, glow)
+    else:
+        # Vibrant, crisp sunlit OLED store color grade
+        im = ImageEnhance.Brightness(im).enhance(1.10)
+        im = ImageEnhance.Contrast(im).enhance(1.14)
+        im = ImageEnhance.Color(im).enhance(1.30)
+        im = ImageEnhance.Sharpness(im).enhance(1.22)
+        rgba = im.convert("RGBA")
+        # Gentle warm top sunlight glaze
+        sun = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
+        sdraw = ImageDraw.Draw(sun)
+        sw, sh = rgba.size
+        sdraw.ellipse([int(sw * 0.55), -int(sh * 0.35), int(sw * 1.25), int(sh * 0.55)], fill=(255, 224, 150, 26))
+        sun = sun.filter(ImageFilter.GaussianBlur(max(16, sw // 18)))
+        rgba = Image.alpha_composite(rgba, sun)
+
+    _RAW_CACHE[cache_key] = rgba
+    return rgba
 
 
-def draw_diamond_icon(draw, cx, cy, r, fill):
-    pts = [(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)]
-    draw.polygon(pts, fill=fill)
+def load_rounded_icon(size_px):
+    if not os.path.exists(ICON_PATH):
+        return None
+    ic = Image.open(ICON_PATH).convert("RGBA").resize((size_px, size_px), Image.Resampling.LANCZOS)
+    mask = Image.new("L", (size_px, size_px), 0)
+    mdraw = ImageDraw.Draw(mask)
+    r = int(size_px * 0.225)
+    mdraw.rounded_rectangle([0, 0, size_px, size_px], radius=r, fill=255)
+    out = Image.new("RGBA", (size_px, size_px), (0, 0, 0, 0))
+    out.paste(ic, (0, 0), mask)
+    # Crisp luminous rim
+    odraw = ImageDraw.Draw(out)
+    odraw.rounded_rectangle([1, 1, size_px - 2, size_px - 2], radius=r, outline=(255, 255, 255, 145), width=max(2, size_px // 42))
+    return out
 
 
-def create_stylized_background(width, height, top_col, bot_col, glow_col, seed=42):
-    grad_1px = Image.new("RGBA", (1, height))
-    for y in range(height):
-        t = y / float(max(1, height - 1))
-        r = int(top_col[0] * (1 - t) + bot_col[0] * t)
-        g = int(top_col[1] * (1 - t) + bot_col[1] * t)
-        b = int(top_col[2] * (1 - t) + bot_col[2] * t)
-        grad_1px.putpixel((0, y), (r, g, b, 255))
-    img = grad_1px.resize((width, height), Image.Resampling.NEAREST)
+def create_vibrant_backdrop(width, height, c_tl, c_br, glow_a, glow_b, bg_shot=None, seed=42):
+    """Builds a rich, vibrant multi-stop diagonal studio gradient with atmospheric blurred gameplay depth,
+    luminous twin glows, sunlit volumetric rays, and bokeh sparkles."""
+    # Smooth diagonal 2D gradient via low-res bilinear upscale (super fast & silky smooth!)
+    gw, gh = 64, 36
+    grad = Image.new("RGBA", (gw, gh))
+    px = grad.load()
+    for y in range(gh):
+        ty = y / float(gh - 1)
+        for x in range(gw):
+            tx = x / float(gw - 1)
+            t = min(1.0, max(0.0, tx * 0.45 + ty * 0.55))
+            r = int(c_tl[0] * (1 - t) + c_br[0] * t)
+            g = int(c_tl[1] * (1 - t) + c_br[1] * t)
+            b = int(c_tl[2] * (1 - t) + c_br[2] * t)
+            px[x, y] = (r, g, b, 255)
+    canvas = grad.resize((width, height), Image.Resampling.BICUBIC)
 
+    # Subtle blurred atmospheric world image blended underneath glows (eliminates dead flat background!)
+    if bg_shot is not None:
+        bw, bh = bg_shot.size
+        scale = max(width / float(bw), height / float(bh))
+        nw, nh = int(bw * scale), int(bh * scale)
+        bg = bg_shot.resize((nw, nh), Image.Resampling.BILINEAR)
+        ox, oy = (nw - width) // 2, (nh - height) // 2
+        bg = bg.crop((ox, oy, ox + width, oy + height))
+        bg = bg.filter(ImageFilter.GaussianBlur(max(18, width // 55)))
+        bg_alpha = Image.new("L", (width, height), 58)
+        bg.putalpha(bg_alpha)
+        canvas = Image.alpha_composite(canvas, bg)
+
+    # Twin luminous radiant glows (inspired by the App Icon's cyan + warm gold energy rings!)
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     gdraw = ImageDraw.Draw(glow)
-    cx1, cy1 = int(width * 0.5), int(height * 0.52)
-    rad1 = int(width * 0.48)
-    gdraw.ellipse([cx1 - rad1, cy1 - rad1, cx1 + rad1, cy1 + rad1], fill=glow_col)
 
-    cx2, cy2 = int(width * 0.5), int(height * 0.12)
-    rad2 = int(width * 0.30)
-    top_glow = (glow_col[0], glow_col[1], glow_col[2], max(24, glow_col[3] // 2))
-    gdraw.ellipse([cx2 - rad2, cy2 - rad2, cx2 + rad2, cy2 + rad2], fill=top_glow)
+    r1 = int(width * 0.42)
+    gdraw.ellipse([int(width * 0.14) - r1, int(height * 0.22) - r1, int(width * 0.14) + r1, int(height * 0.22) + r1], fill=glow_a)
 
-    glow = glow.filter(ImageFilter.GaussianBlur(max(1, rad1 // 3)))
-    img = Image.alpha_composite(img, glow)
+    r2 = int(width * 0.44)
+    gdraw.ellipse([int(width * 0.84) - r2, int(height * 0.72) - r2, int(width * 0.84) + r2, int(height * 0.72) + r2], fill=glow_b)
 
+    r3 = int(width * 0.36)
+    center_glow = (
+        min(255, (glow_a[0] + glow_b[0]) // 2 + 20),
+        min(255, (glow_a[1] + glow_b[1]) // 2 + 20),
+        min(255, (glow_a[2] + glow_b[2]) // 2 + 20),
+        75,
+    )
+    gdraw.ellipse([width // 2 - r3, int(height * 0.56) - r3, width // 2 + r3, int(height * 0.56) + r3], fill=center_glow)
+
+    glow = glow.filter(ImageFilter.GaussianBlur(max(24, width // 14)))
+    canvas = Image.alpha_composite(canvas, glow)
+
+    # Diagonal sunlit light beams + glowing bokeh orbs
     fx = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     fdraw = ImageDraw.Draw(fx)
-    accent_rgb = glow_col[:3]
-
-    beam_w = int(width * 0.08)
-    for offset in [-0.22, 0.36, 0.78]:
-        x0 = int(width * offset)
+    beam_w = int(width * 0.09)
+    for frac, alpha in [(-0.08, 18), (0.28, 14), (0.68, 16)]:
+        x0 = int(width * frac)
         pts = [
             (x0, 0),
             (x0 + beam_w, 0),
-            (x0 - int(height * 0.25) + beam_w, int(height * 0.45)),
-            (x0 - int(height * 0.25), int(height * 0.45)),
+            (x0 - int(height * 0.35) + beam_w, height),
+            (x0 - int(height * 0.35), height),
         ]
-        fdraw.polygon(pts, fill=accent_rgb + (8,))
+        fdraw.polygon(pts, fill=(255, 255, 255, alpha))
 
-    horizon_y = int(height * 0.78)
-    for gy in range(horizon_y, height, max(16, int(height * 0.028))):
-        alpha = int(20 * ((gy - horizon_y) / float(max(1, height - horizon_y))))
-        fdraw.line([(0, gy), (width, gy)], fill=accent_rgb + (alpha,), width=1)
-    for i in range(-6, 7):
-        top_x = width // 2 + int(i * width * 0.06)
-        bot_x = width // 2 + int(i * width * 0.18)
-        fdraw.line([(top_x, horizon_y), (bot_x, height)], fill=accent_rgb + (14,), width=1)
-
+    # Soft decorative curved luminous accent arc (echoes the app icon's iconic orbital rings!)
     rng = random.Random(seed)
-    for _ in range(20):
-        px = rng.randint(int(width * 0.04), int(width * 0.96))
-        py = rng.randint(int(height * 0.04), int(height * 0.94))
-        pr = rng.randint(max(3, int(width * 0.003)), max(7, int(width * 0.011)))
-        pa = rng.randint(24, 68)
-        fdraw.ellipse([px - pr, py - pr, px + pr, py + pr], fill=accent_rgb + (pa,))
+    for _ in range(28):
+        px_x = rng.randint(int(width * 0.02), int(width * 0.98))
+        px_y = rng.randint(int(height * 0.03), int(height * 0.96))
+        pr = rng.randint(max(3, int(width * 0.0025)), max(8, int(width * 0.009)))
+        col = glow_a[:3] if rng.random() < 0.55 else glow_b[:3]
+        pa = rng.randint(45, 130)
+        fdraw.ellipse([px_x - pr, px_y - pr, px_x + pr, px_y + pr], fill=col + (pa,))
+        # Tiny bright core sparkle
+        cr = max(1, pr // 3)
+        fdraw.ellipse([px_x - cr, px_y - cr, px_x + cr, px_y + cr], fill=(255, 255, 255, min(220, pa + 70)))
 
-    return Image.alpha_composite(img, fx)
+    canvas = Image.alpha_composite(canvas, fx)
+
+    # Gentle edge contrast vignette to keep the center & header razor-sharp
+    vig = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    vdraw = ImageDraw.Draw(vig)
+    vdraw.rectangle([0, 0, width, int(height * 0.24)], fill=(6, 12, 26, 72))
+    vig = vig.filter(ImageFilter.GaussianBlur(max(14, height // 18)))
+    return Image.alpha_composite(canvas, vig)
 
 
-def render_device_frame(content_img, target_w, target_h, accent_col=(64, 210, 196), bezel_scale=1.0):
-    bezel = max(10, int(14 * bezel_scale))
-    corner = max(24, int(40 * bezel_scale))
-    pad = max(20, int(30 * bezel_scale))
-    frame_w = target_w + bezel * 2
-    frame_h = target_h + bezel * 2
+def render_floating_screen(content_img, target_w, target_h, accent_rgb, scale=1.0):
+    """Renders a sleek, crisp modern floating display card with luminous rim glow & soft realistic drop shadow."""
+    bezel = max(7, int(10 * scale))
+    corner = max(22, int(34 * scale))
+    pad = max(26, int(44 * scale))
+    fw = target_w + bezel * 2
+    fh = target_h + bezel * 2
 
-    frame = Image.new("RGBA", (frame_w + pad * 2, frame_h + pad * 2), (0, 0, 0, 0))
+    frame = Image.new("RGBA", (fw + pad * 2, fh + pad * 2), (0, 0, 0, 0))
+
+    # Soft multi-pass ambient shadow + outer color glow
+    shadow_layer = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    sdraw = ImageDraw.Draw(shadow_layer)
+    sdraw.rounded_rectangle(
+        [pad - 4, pad + int(12 * scale), pad + fw + 4, pad + fh + int(18 * scale)],
+        radius=corner + 6,
+        fill=(4, 8, 18, 175),
+    )
+    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(max(10, int(18 * scale))))
+    frame = Image.alpha_composite(frame, shadow_layer)
+
+    glow_layer = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+    gdraw = ImageDraw.Draw(glow_layer)
+    gdraw.rounded_rectangle(
+        [pad - 3, pad - 3, pad + fw + 3, pad + fh + 3],
+        radius=corner + 3,
+        outline=accent_rgb + (155,),
+        width=max(4, int(7 * scale)),
+    )
+    glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(max(6, int(10 * scale))))
+    frame = Image.alpha_composite(frame, glow_layer)
+
     fdraw = ImageDraw.Draw(frame)
-
-    steps = 14
-    for i in range(steps, 0, -2):
-        ratio = 1.0 - (i / float(steps))
-        alpha_shadow = int(22 * ratio)
-        fdraw.rounded_rectangle(
-            [pad - i, pad + i // 2, pad + frame_w + i, pad + frame_h + i + 4],
-            radius=corner + i,
-            fill=(0, 0, 0, alpha_shadow),
-        )
-    for i in range(6, 0, -2):
-        fdraw.rounded_rectangle(
-            [pad - i, pad - i, pad + frame_w + i, pad + frame_h + i],
-            radius=corner + i,
-            outline=accent_col[:3] + (int(42 * (1.0 - i / 7.0)),),
-            width=2,
-        )
-
-    body_col = (
-        min(42, 14 + accent_col[0] // 10),
-        min(52, 22 + accent_col[1] // 10),
-        min(68, 32 + accent_col[2] // 8),
-        255,
+    # Sleek anodized midnight frame + bright specular inner rim
+    fdraw.rounded_rectangle(
+        [pad, pad, pad + fw, pad + fh],
+        radius=corner,
+        fill=(10, 16, 28, 255),
+        outline=accent_rgb + (245,),
+        width=max(2, int(3.5 * scale)),
     )
     fdraw.rounded_rectangle(
-        [pad, pad, pad + frame_w, pad + frame_h],
-        radius=corner,
-        fill=body_col,
-        outline=accent_col[:3] + (210,),
-        width=max(2, int(3 * bezel_scale)),
+        [pad + 2, pad + 2, pad + fw - 2, pad + fh - 2],
+        radius=max(6, corner - 2),
+        outline=(255, 255, 255, 95),
+        width=max(1, int(1.6 * scale)),
     )
 
-    screen_mask = Image.new("L", (target_w, target_h), 0)
-    sdraw = ImageDraw.Draw(screen_mask)
-    sdraw.rounded_rectangle([0, 0, target_w, target_h], radius=max(8, corner - bezel), fill=255)
+    # Rounded viewport content
+    mask = Image.new("L", (target_w, target_h), 0)
+    mdraw = ImageDraw.Draw(mask)
+    mdraw.rounded_rectangle([0, 0, target_w, target_h], radius=max(10, corner - bezel), fill=255)
+    resized = content_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    frame.paste(resized, (pad + bezel, pad + bezel), mask)
 
-    resized_content = content_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-    frame.paste(resized_content, (pad + bezel, pad + bezel), screen_mask)
-
+    # Subtle diagonal glass highlight across upper-left corner
     gloss = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-    gdraw = ImageDraw.Draw(gloss)
-    gdraw.polygon([(0, 0), (int(target_w * 0.36), 0), (0, int(target_h * 0.28))], fill=(255, 255, 255, 10))
+    gl_draw = ImageDraw.Draw(gloss)
+    gl_draw.polygon([(0, 0), (int(target_w * 0.34), 0), (0, int(target_h * 0.28))], fill=(255, 255, 255, 16))
     frame.paste(gloss, (pad + bezel, pad + bezel), gloss)
 
     return frame
 
 
 def ui_scale(width, height, is_tablet=False):
-    s = min(width / 2400.0, height / 1080.0) * 0.78
-    return s * (1.14 if is_tablet else 1.0)
+    s = min(width / 2350.0, height / 1080.0) * 0.84
+    return s * (1.16 if is_tablet else 1.0)
 
 
-def _fit_font(path, text, size, max_w, min_size):
-    f = get_font(path, size)
-    while (f.getbbox(text)[2] - f.getbbox(text)[0]) > max_w and size > min_size:
-        size -= 2
-        f = get_font(path, size)
-    return f
+def draw_text_with_glow(draw, x, y, text, font, fill, shadow_col=(4, 10, 22, 230), sh_off=4):
+    # Clean crisp drop shadow + crisp foreground for instant readability at tiny Search sizes
+    for ox, oy in [(sh_off, sh_off), (0, sh_off), (sh_off // 2, sh_off)]:
+        draw.text((x + ox, y + oy), text, font=font, fill=shadow_col)
+    draw.text((x, y), text, font=font, fill=fill)
 
 
-def _draw_centered(draw, width, y, text, font, fill, shadow=None, sh_off=3):
-    bb = font.getbbox(text)
-    x = (width - (bb[2] - bb[0])) // 2 - bb[0]
-    if shadow:
-        draw.text((x + sh_off, y - bb[1] + sh_off), text, font=font, fill=shadow)
-    draw.text((x, y - bb[1]), text, font=font, fill=fill)
-    return bb[3] - bb[1]
-
-
-def draw_header(canvas, width, height, badge_text, title_text, subtitle_text, glow_col, is_tablet=False):
+def draw_modern_header(canvas, width, height, spec, is_tablet=False, show_icon=False):
+    """High-impact, Search-legible poster header with luminous badge pill, huge bold headline,
+    vibrant accent color highlight, and crisp subtitle."""
     draw = ImageDraw.Draw(canvas)
     s = ui_scale(width, height, is_tablet)
-    max_w = width * 0.90
+    accent = spec["accent_rgb"]
+    accent2 = spec["accent2_rgb"]
+    max_w = width * (0.88 if not show_icon else 0.78)
 
-    f_badge = _fit_font(FONT_SYSTEM_PATH, badge_text, int(28 * s), max_w * 0.85, 14)
-    f_title = _fit_font(FONT_SYSTEM_PATH, title_text, int(86 * s), max_w, 28)
-    f_sub = _fit_font(FONT_SYSTEM_PATH, subtitle_text, int(36 * s), max_w, 16)
+    y = int(height * 0.028)
 
-    y = int(height * 0.032)
-
-    bb = f_badge.getbbox(badge_text)
+    # Top glowing pill badge (auto-sized dynamically so text NEVER overflows!)
+    f_badge = fit_font(FONT_MED_PATH, spec["badge"], int(27 * s), max_w * 0.90, 14)
+    bb = f_badge.getbbox(spec["badge"])
     tw, th = bb[2] - bb[0], bb[3] - bb[1]
-    pad_x = int(44 * s)
-    bw, bh = tw + pad_x * 2, th + int(22 * s)
+    pad_x = int(34 * s)
+    bw, bh = tw + pad_x * 2, th + int(20 * s)
     bx = (width - bw) // 2
     draw.rounded_rectangle(
         [bx, y, bx + bw, y + bh],
         radius=bh // 2,
-        fill=(12, 26, 40, 240),
-        outline=glow_col[:3] + (235,),
+        fill=(10, 20, 42, 225),
+        outline=accent + (245,),
         width=max(2, int(3 * s)),
     )
-    diam_r = max(4, int(6 * s))
-    draw_diamond_icon(draw, bx + int(20 * s), y + bh // 2, diam_r, glow_col[:3] + (255,))
-    draw_diamond_icon(draw, bx + bw - int(20 * s), y + bh // 2, diam_r, glow_col[:3] + (255,))
-    draw.text((bx + (bw - tw) // 2 - bb[0], y + (bh - th) // 2 - bb[1]), badge_text, font=f_badge, fill=glow_col[:3] + (255,))
-    y += bh + int(20 * s)
+    dot_r = max(4, int(5.5 * s))
+    draw.ellipse([bx + int(16 * s) - dot_r, y + bh // 2 - dot_r, bx + int(16 * s) + dot_r, y + bh // 2 + dot_r], fill=accent2 + (255,))
+    draw.ellipse([bx + bw - int(16 * s) - dot_r, y + bh // 2 - dot_r, bx + bw - int(16 * s) + dot_r, y + bh // 2 + dot_r], fill=accent2 + (255,))
+    draw.text((bx + (bw - tw) // 2 - bb[0], y + (bh - th) // 2 - bb[1]), spec["badge"], font=f_badge, fill=(242, 250, 255, 255))
+    y += bh + int(16 * s)
 
-    h = _draw_centered(draw, width, y, title_text, f_title, (255, 255, 255, 255), shadow=(0, 0, 0, 220), sh_off=max(2, int(4 * s)))
-    y += h + int(14 * s)
+    # Giant Search-stopping Headline (split highlight word in golden/accent tint!)
+    title = spec["title"]
+    f_title = fit_font(FONT_BOLD_PATH, title, int(92 * s), max_w, 30)
+    tbb = f_title.getbbox(title)
+    title_w, title_h = tbb[2] - tbb[0], tbb[3] - tbb[1]
 
-    h = _draw_centered(draw, width, y, subtitle_text, f_sub, (212, 236, 248, 255), shadow=(0, 0, 0, 180), sh_off=2)
-    return y + h + int(24 * s)
+    icon_sz = int(title_h * 1.15) if show_icon else 0
+    icon_gap = int(20 * s) if show_icon else 0
+    total_row_w = title_w + (icon_sz + icon_gap if show_icon else 0)
+    start_x = (width - total_row_w) // 2
+
+    if show_icon:
+        ic = load_rounded_icon(icon_sz)
+        if ic is not None:
+            canvas.paste(ic, (start_x, y - int(title_h * 0.08)), ic)
+            start_x += icon_sz + icon_gap
+
+    tx = start_x - tbb[0]
+    ty = y - tbb[1]
+    highlight = spec.get("highlight", "")
+    sh = max(3, int(5 * s))
+    if highlight and highlight in title:
+        before, after = title.split(highlight, 1)
+        cur_x = tx
+        if before:
+            draw_text_with_glow(draw, cur_x, ty, before, f_title, (255, 255, 255, 255), sh_off=sh)
+            cur_x += int(draw.textlength(before, font=f_title))
+        draw_text_with_glow(draw, cur_x, ty, highlight, f_title, accent2 + (255,), sh_off=sh)
+        cur_x += int(draw.textlength(highlight, font=f_title))
+        if after:
+            draw_text_with_glow(draw, cur_x, ty, after, f_title, (255, 255, 255, 255), sh_off=sh)
+    else:
+        draw_text_with_glow(draw, tx, ty, title, f_title, (255, 255, 255, 255), sh_off=sh)
+
+    y += title_h + int(14 * s)
+
+    # Crisp legible subtitle
+    sub = spec["sub"]
+    f_sub = fit_font(FONT_MED_PATH, sub, int(36 * s), width * 0.88, 16)
+    sbb = f_sub.getbbox(sub)
+    sw, sh_h = sbb[2] - sbb[0], sbb[3] - sbb[1]
+    sx = (width - sw) // 2 - sbb[0]
+    draw_text_with_glow(draw, sx, y - sbb[1], sub, f_sub, (226, 244, 255, 255), shadow_col=(4, 10, 22, 210), sh_off=max(2, int(3 * s)))
+    return y + sh_h + int(16 * s)
 
 
-def draw_footer_pill(canvas, width, height, footer_text, glow_col, is_tablet=False):
+def draw_footer_chips(canvas, width, height, chips, accent_rgb, accent2_rgb, is_tablet=False):
+    """Draws 3 crisp, modern pill feature chips at the bottom instead of one long plain bar."""
     draw = ImageDraw.Draw(canvas)
     s = ui_scale(width, height, is_tablet)
-    f_foot = _fit_font(FONT_SYSTEM_PATH, footer_text, int(28 * s), width * 0.84, 14)
-    bb = f_foot.getbbox(footer_text)
-    tw, th = bb[2] - bb[0], bb[3] - bb[1]
-    bw, bh = tw + int(76 * s), th + int(26 * s)
-    bx = (width - bw) // 2
-    by = height - bh - int(height * 0.025)
-    draw.rounded_rectangle(
-        [bx, by, bx + bw, by + bh],
-        radius=bh // 2,
-        fill=(12, 24, 38, 235),
-        outline=glow_col[:3] + (210,),
-        width=max(2, int(3 * s)),
-    )
-    diam_r = max(4, int(6 * s))
-    draw_diamond_icon(draw, bx + int(22 * s), by + bh // 2, diam_r, glow_col[:3] + (255,))
-    draw_diamond_icon(draw, bx + bw - int(22 * s), by + bh // 2, diam_r, glow_col[:3] + (255,))
-    draw.text((bx + (bw - tw) // 2 - bb[0], by + (bh - th) // 2 - bb[1]), footer_text, font=f_foot, fill=(235, 248, 255, 255))
-    return by - int(20 * s)
+    f_chip = get_font(FONT_MED_PATH, int(25 * s))
+    gap = int(18 * s)
+    pad_x = int(28 * s)
+    pad_y = int(12 * s)
+
+    chip_dims = []
+    total_w = 0
+    for text in chips:
+        bb = f_chip.getbbox(text)
+        cw = (bb[2] - bb[0]) + pad_x * 2
+        ch = (bb[3] - bb[1]) + pad_y * 2
+        chip_dims.append((text, bb, cw, ch))
+        total_w += cw
+    total_w += gap * max(0, len(chips) - 1)
+
+    # Scale font slightly down if needed on narrow aspects
+    if total_w > width * 0.90:
+        scale_fix = (width * 0.90) / float(total_w)
+        f_chip = get_font(FONT_MED_PATH, max(13, int(25 * s * scale_fix)))
+        chip_dims = []
+        total_w = 0
+        for text in chips:
+            bb = f_chip.getbbox(text)
+            cw = (bb[2] - bb[0]) + int(pad_x * scale_fix) * 2
+            ch = (bb[3] - bb[1]) + int(pad_y * scale_fix) * 2
+            chip_dims.append((text, bb, cw, ch))
+            total_w += cw
+        total_w += gap * max(0, len(chips) - 1)
+
+    max_h = max(c[3] for c in chip_dims)
+    by = height - max_h - int(height * 0.022)
+    cx = (width - total_w) // 2
+
+    for idx, (text, bb, cw, ch) in enumerate(chip_dims):
+        rim = accent_rgb if idx % 2 == 0 else accent2_rgb
+        draw.rounded_rectangle(
+            [cx, by, cx + cw, by + ch],
+            radius=ch // 2,
+            fill=(10, 18, 36, 228),
+            outline=rim + (235,),
+            width=max(2, int(2.6 * s)),
+        )
+        tw, th = bb[2] - bb[0], bb[3] - bb[1]
+        draw.text((cx + (cw - tw) // 2 - bb[0], by + (ch - th) // 2 - bb[1]), text, font=f_chip, fill=(244, 250, 255, 255))
+        cx += cw + gap
+
+    return by - int(14 * s)
 
 
 def _frame_extra(s):
-    return max(10, int(14 * s)) + max(20, int(30 * s))
+    return (max(7, int(10 * s)) + max(26, int(44 * s))) * 2
 
 
-def _fit_phone(raw, max_w, max_h, s):
-    ex = _frame_extra(s) * 2
+def _fit_box(raw, max_w, max_h, s):
+    ex = _frame_extra(s)
     ar = raw.size[0] / float(raw.size[1])
     h = max_h - ex
     w = int(h * ar)
     if w > max_w - ex:
         w = max_w - ex
         h = int(w / ar)
-    return max(160, w), max(90, h)
+    return max(200, w), max(112, h)
 
 
-def compose_single(canvas, width, height, top_y, bot_y, raw_path, glow_col, is_tablet=False):
-    raw = load_and_clean_screenshot(raw_path)
+def compose_single(canvas, width, height, top_y, bot_y, raw_img, accent_rgb, is_tablet=False):
     s = ui_scale(width, height, is_tablet)
     avail_h = bot_y - top_y
-    w, h = _fit_phone(raw, int(width * (0.86 if is_tablet else 0.78)), avail_h, s)
-    dev = render_device_frame(raw, w, h, glow_col, s)
+    w, h = _fit_box(raw_img, int(width * (0.90 if is_tablet else 0.86)), int(avail_h * 1.04), s)
+    dev = render_floating_screen(raw_img, w, h, accent_rgb, s)
     canvas.paste(dev, ((width - dev.size[0]) // 2, top_y + (avail_h - dev.size[1]) // 2), dev)
 
 
-def compose_dual(canvas, width, height, top_y, bot_y, front_path, back_path, glow_col, is_tablet=False):
-    raw_front = load_and_clean_screenshot(front_path)
-    raw_back = load_and_clean_screenshot(back_path)
+def compose_dual(canvas, width, height, top_y, bot_y, front_img, back_img, accent_rgb, accent2_rgb, is_tablet=False):
     s = ui_scale(width, height, is_tablet)
     avail_h = bot_y - top_y
 
-    fw, fh = _fit_phone(raw_front, int(width * 0.62), avail_h, s)
+    fw, fh = _fit_box(front_img, int(width * 0.64), int(avail_h * 1.02), s)
     bw, bh = int(fw * 0.86), int(fh * 0.86)
-    dev_f = render_device_frame(raw_front, fw, fh, glow_col, s)
-    dev_b = render_device_frame(raw_back, bw, bh, glow_col, s * 0.86)
+    dev_f = render_floating_screen(front_img, fw, fh, accent_rgb, s)
+    dev_b = render_floating_screen(back_img, bw, bh, accent2_rgb, s * 0.88)
 
-    fx = int(width * 0.05)
-    fy = top_y + (avail_h - dev_f.size[1]) // 2
-    tilted = dev_b.rotate(-5, resample=Image.Resampling.BICUBIC, expand=True)
-    bx = width - tilted.size[0] - int(width * 0.03)
-    by = top_y + (avail_h - tilted.size[1]) // 2 + int(18 * s)
+    tilted_b = dev_b.rotate(-4.5, resample=Image.Resampling.BICUBIC, expand=True)
+    bx = width - tilted_b.size[0] - int(width * 0.022)
+    by = top_y + (avail_h - tilted_b.size[1]) // 2 + int(10 * s)
 
-    canvas.paste(tilted, (bx, by), tilted)
+    fx = int(width * 0.036)
+    fy = top_y + (avail_h - dev_f.size[1]) // 2 - int(4 * s)
+
+    canvas.paste(tilted_b, (bx, by), tilted_b)
     canvas.paste(dev_f, (fx, fy), dev_f)
 
 
 def build_poster(spec, width, height, is_tablet=False):
-    canvas = create_stylized_background(width, height, spec["top_col"], spec["bot_col"], spec["glow_col"], seed=spec["seed"])
-    top_y = draw_header(canvas, width, height, spec["badge"], spec["title"], spec["sub"], spec["glow_col"], is_tablet)
-    bot_y = draw_footer_pill(canvas, width, height, spec["footer"], spec["glow_col"], is_tablet)
+    if spec["layout"] == "dual":
+        front_img = load_and_grade_screenshot(spec["front_raw"], spec.get("front_crop_bot", 0), spec.get("front_night", False))
+        back_img = load_and_grade_screenshot(spec["back_raw"], spec.get("back_crop_bot", 0), spec.get("back_night", False))
+        bg_ref = front_img
+    else:
+        front_img = load_and_grade_screenshot(spec["raw"], spec.get("crop_bot", 0), spec.get("night", False))
+        back_img = None
+        bg_ref = front_img
+
+    canvas = create_vibrant_backdrop(
+        width, height,
+        spec["c_tl"], spec["c_br"],
+        spec["glow_a"], spec["glow_b"],
+        bg_shot=bg_ref,
+        seed=spec["seed"],
+    )
+    top_y = draw_modern_header(canvas, width, height, spec, is_tablet=is_tablet, show_icon=spec.get("show_icon", False))
+    bot_y = draw_footer_chips(canvas, width, height, spec["chips"], spec["accent_rgb"], spec["accent2_rgb"], is_tablet=is_tablet)
 
     if spec["layout"] == "dual":
-        compose_dual(canvas, width, height, top_y, bot_y, spec["front_raw"], spec["back_raw"], spec["glow_col"], is_tablet)
+        compose_dual(canvas, width, height, top_y, bot_y, front_img, back_img, spec["accent_rgb"], spec["accent2_rgb"], is_tablet)
     else:
-        compose_single(canvas, width, height, top_y, bot_y, spec["raw"], spec["glow_col"], is_tablet)
+        compose_single(canvas, width, height, top_y, bot_y, front_img, spec["accent_rgb"], is_tablet)
 
     return canvas
 
 
-def build_feature_graphic():
+def build_feature_graphic(lang="tr"):
+    """Generates a razor-sharp, luminous 1024x500 Google Play Store Header / Feature Graphic
+    with zero text overflow, matching the App Icon palette and showcasing a 3-shot dynamic action collage."""
     os.makedirs(OUT_FEATURE, exist_ok=True)
-    fg = create_stylized_background(1024, 500, (10, 26, 40), (6, 14, 24), (64, 214, 198, 92), seed=777)
-    fdraw = ImageDraw.Draw(fg)
+    w, h = 1024, 500
 
-    f_badge = get_font(FONT_SYSTEM_PATH, 18)
-    badge = "OURWORLD • OYUNCULARLA BÜYÜYEN AÇIK DÜNYA"
-    fdraw.rounded_rectangle([42, 42, 495, 78], radius=18, fill=(14, 34, 48, 240), outline=(64, 214, 198, 235), width=2)
-    fdraw.text((62, 50), badge, font=f_badge, fill=(96, 238, 222, 255))
+    hero_drive = load_and_grade_screenshot(os.path.join(RAW_DIR, "shot2_selman_driving.png"))
+    hero_foot = load_and_grade_screenshot(os.path.join(RAW_DIR, "live_football_3v3.png"), crop_bottom_px=42)
+    hero_tennis = load_and_grade_screenshot(os.path.join(RAW_DIR, "live_tennis_1v1.png"), crop_bottom_px=42)
 
-    f_title = get_font(FONT_SYSTEM_PATH, 68)
-    fdraw.text((44, 96), "OURWORLD", font=f_title, fill=(0, 0, 0, 190))
-    fdraw.text((42, 94), "OURWORLD", font=f_title, fill=(255, 255, 255, 255))
+    fg = create_vibrant_backdrop(
+        w, h,
+        c_tl=(14, 34, 88),
+        c_br=(8, 22, 54),
+        glow_a=(36, 224, 212, 130),
+        glow_b=(255, 184, 52, 128),
+        bg_shot=hero_drive,
+        seed=777,
+    )
 
-    f_tag = get_font(FONT_SYSTEM_PATH, 24)
-    fdraw.text((42, 178), "Yürü • Sür • Keşfet • Fikrini Yaz", font=f_tag, fill=(205, 234, 248, 255))
+    # Darken left half softly so left-aligned header typography has 100% WCAG AAA contrast
+    scrim = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sc_px = scrim.load()
+    for x in range(w):
+        t = max(0.0, min(1.0, 1.0 - (x / float(w * 0.62))))
+        a = int(150 * (t * t))
+        for y in range(h):
+            sc_px[x, y] = (6, 14, 34, a)
+    fg = Image.alpha_composite(fg, scrim)
 
-    bullets = [
-        "• Gerçek Sokaklardan İlham Alan 3D Açık Dünya",
-        "• Çoklu Araç Sürüşü, Drift & Nitro + Radyo",
-        "• Girilebilir Evler, Dükkânlar, Cami & Yan İşler",
-        "• Oyun İçi Canlı Topluluk Öneri Panosu",
-    ]
-    f_b = get_font(FONT_SYSTEM_PATH, 19)
-    by = 236
-    for b in bullets:
-        fdraw.text((42, by), b, font=f_b, fill=(94, 240, 210, 255))
-        by += 36
+    # Right side: Dynamic 3-shot fanned action showcase!
+    card_back_top = render_floating_screen(hero_foot, 255, 148, (66, 236, 152), 0.48).rotate(-6, resample=Image.Resampling.BICUBIC, expand=True)
+    card_back_bot = render_floating_screen(hero_tennis, 255, 148, (255, 186, 62), 0.48).rotate(6, resample=Image.Resampling.BICUBIC, expand=True)
+    card_front = render_floating_screen(hero_drive, 378, 218, (54, 228, 214), 0.64)
 
-    raw_hero = load_and_clean_screenshot(os.path.join(RAW_DIR, "shot1_fatih_saat_kulesi.png"))
-    hero_w = 430
-    hero_h = int(hero_w * raw_hero.size[1] / float(raw_hero.size[0]))
-    hero = render_device_frame(raw_hero, hero_w, hero_h, (64, 214, 198), 0.78)
-    fg.paste(hero, (1024 - hero.size[0] - 10, (500 - hero.size[1]) // 2), hero)
+    fg.paste(card_back_top, (w - card_back_top.size[0] - 12, 16), card_back_top)
+    fg.paste(card_back_bot, (w - card_back_bot.size[0] - 14, h - card_back_bot.size[1] - 14), card_back_bot)
+    fg.paste(card_front, (w - card_front.size[0] - 88, (h - card_front.size[1]) // 2 + 4), card_front)
 
-    out_file = os.path.join(OUT_FEATURE, "feature_graphic_1024x500.png")
+    # Left side: App Icon + auto-sized Badge + Giant Brand Title + 3 Feature Chips (ZERO overflow!)
+    draw = ImageDraw.Draw(fg)
+    left_x = 42
+
+    ic = load_rounded_icon(88)
+    if ic is not None:
+        fg.paste(ic, (left_x, 42), ic)
+
+    is_en = lang == "en"
+    badge_txt = "LIVING 3D OPEN WORLD" if is_en else "YAŞAYAN 3D AÇIK DÜNYA"
+    f_badge = fit_font(FONT_MED_PATH, badge_txt, 17, 340, 13)
+    bbb = f_badge.getbbox(badge_txt)
+    btw, bth = bbb[2] - bbb[0], bbb[3] - bbb[1]
+    bx = left_x + 104
+    by = 54
+    bw, bh = btw + 36, bth + 18
+    draw.rounded_rectangle([bx, by, bx + bw, by + bh], radius=bh // 2, fill=(10, 24, 52, 235), outline=(54, 228, 214, 245), width=2)
+    draw.text((bx + (bw - btw) // 2 - bbb[0], by + (bh - bth) // 2 - bbb[1]), badge_txt, font=f_badge, fill=(116, 246, 234, 255))
+
+    # Brand subtitle next to icon under badge
+    sub_small = "Our World · Istanbul" if is_en else "Our World · Hamidiye"
+    f_small = get_font(FONT_MED_PATH, 19)
+    draw_text_with_glow(draw, bx + 4, by + bh + 10, sub_small, f_small, (255, 206, 84, 255), sh_off=2)
+
+    # Giant two-line / hero title
+    title_main = "OUR WORLD" if is_en else "BİZİM DÜNYAMIZ"
+    f_title = fit_font(FONT_BOLD_PATH, title_main, 54, 468, 34)
+    draw_text_with_glow(draw, left_x, 152, title_main, f_title, (255, 255, 255, 255), sh_off=4)
+
+    tagline = "Drive • Play Sports • Meet Smart NPCs" if is_en else "Sür • Spor Yap • Mahalleni Yaşa"
+    f_tag = fit_font(FONT_MED_PATH, tagline, 24, 468, 16)
+    draw_text_with_glow(draw, left_x, 224, tagline, f_tag, (255, 212, 92, 255), sh_off=2)
+
+    # 3 crisp glowing feature rows with colorful dots
+    rows = (
+        [
+            ("20 Story Missions & 4 Open-World Jobs", (54, 228, 214)),
+            ("Playable Tennis, Football, Hoops & Volley", (92, 242, 162)),
+            ("Smart Talking NPCs & Glowing Nights", (255, 196, 72)),
+        ]
+        if is_en
+        else [
+            ("20 Hikâye Görevi & 4 Açık Dünya İşi", (54, 228, 214)),
+            ("Oynanabilir Tenis, Futbol, Basketbol, Voleybol", (92, 242, 162)),
+            ("Konuşan Akıllı NPC'ler & Işıklı Geceler", (255, 196, 72)),
+        ]
+    )
+    f_row = get_font(FONT_MED_PATH, 19)
+    ry = 282
+    for label, col in rows:
+        draw.ellipse([left_x + 2, ry + 6, left_x + 14, ry + 18], fill=col + (255,))
+        draw_text_with_glow(draw, left_x + 24, ry, label, f_row, (238, 248, 255, 255), sh_off=2)
+        ry += 38
+
+    # Bottom crisp pill CTA bar
+    cta = "FREE 3D SANDBOX  •  OFFLINE PLAY" if is_en else "ÜCRETSİZ 3D AÇIK DÜNYA  •  ÇEVRİMDIŞI"
+    f_cta = fit_font(FONT_MED_PATH, cta, 16, 440, 12)
+    cbb = f_cta.getbbox(cta)
+    ctw, cth = cbb[2] - cbb[0], cbb[3] - cbb[1]
+    cw, ch = ctw + 38, cth + 18
+    cy = h - ch - 26
+    draw.rounded_rectangle([left_x, cy, left_x + cw, cy + ch], radius=ch // 2, fill=(14, 34, 62, 235), outline=(255, 196, 72, 240), width=2)
+    draw.text((left_x + (cw - ctw) // 2 - cbb[0], cy + (ch - cth) // 2 - cbb[1]), cta, font=f_cta, fill=(255, 238, 186, 255))
+
+    fname = "feature_graphic_en_1024x500.png" if is_en else "feature_graphic_1024x500.png"
+    out_file = os.path.join(OUT_FEATURE, fname)
     fg.convert("RGB").save(out_file, "PNG", optimize=True)
+    if not is_en:
+        shutil.copyfile(out_file, STORE_FEATURE_DST)
     print(f"  -> Saved {out_file} (1024x500)")
+    return out_file
 
 
 POSTERS_TR = [
     {
         "id": "01_open_world_landmark",
-        "layout": "single",
-        "badge": "OURWORLD • GERÇEK SOKAKLARDAN AÇIK DÜNYA",
-        "title": "YAŞAYAN ŞEHİRDE ÖZGÜRCE DOLAŞ",
-        "sub": "Saat Kulesi meydanından ara sokaklara kadar her caddeyi keşfet!",
-        "footer": "8 ANA CADDE  •  GERÇEKÇİ 3D MİMARİ  •  CANLI GPS",
-        "raw": os.path.join(RAW_DIR, "shot1_fatih_saat_kulesi.png"),
-        "top_col": (10, 26, 40), "bot_col": (6, 13, 22),
-        "glow_col": (64, 214, 198, 92),
-        "seed": 101,
+        "layout": "dual",
+        "show_icon": True,
+        "badge": "BİZİM DÜNYAMIZ • 3D AÇIK DÜNYA",
+        "title": "YAŞAYAN İSTANBUL'U KEŞFET",
+        "highlight": "İSTANBUL'U",
+        "sub": "8 ana cadde, 20 görev, araç sürüşü ve özgür mahalle hayatı!",
+        "chips": ["8 ANA CADDE", "20 HİKÂYE GÖREVİ", "ÇEVRİMDIŞI 3D"],
+        "front_raw": os.path.join(RAW_DIR, "shot2_selman_driving.png"),
+        "back_raw": os.path.join(RAW_DIR, "live_menu_hub.png"),
+        "c_tl": (14, 42, 108), "c_br": (8, 22, 54),
+        "glow_a": (36, 228, 214, 138), "glow_b": (255, 188, 56, 132),
+        "accent_rgb": (48, 232, 216), "accent2_rgb": (255, 204, 72),
+        "seed": 201,
     },
     {
         "id": "02_drive_and_explore",
         "layout": "single",
         "badge": "ÇOKLU ARAÇ • DRİFT, NİTRO & RADYO",
-        "title": "İSTEDİĞİN ARACA BİN VE SÜR",
-        "sub": "Sokaklarda gez, driftle nitro doldur, Türkçe radyo aç!",
-        "footer": "GERÇEKÇİ HASAR FİZİĞİ  •  KORNA & FARLAR  •  60 FPS",
-        "raw": os.path.join(RAW_DIR, "shot2_selman_driving.png"),
-        "top_col": (14, 28, 46), "bot_col": (7, 14, 26),
-        "glow_col": (80, 198, 255, 92),
-        "seed": 102,
+        "title": "ARABANA BİN, SOKAKLARA ÇIK",
+        "highlight": "SOKAKLARA ÇIK",
+        "sub": "Akıcı mobil kontrollerle sür, drift yap, nitro doldur ve radyo aç!",
+        "chips": ["ARABA & MOTOSİKLET", "DRİFT + NİTRO", "TÜRKÇE RADYO"],
+        "raw": os.path.join(RAW_DIR, "live_driving_mobile.png"),
+        "crop_bot": 44,
+        "c_tl": (12, 46, 118), "c_br": (8, 18, 48),
+        "glow_a": (52, 198, 255, 140), "glow_b": (255, 126, 76, 115),
+        "accent_rgb": (74, 208, 255), "accent2_rgb": (255, 194, 74),
+        "seed": 202,
     },
     {
-        "id": "03_enterable_buildings",
-        "layout": "single",
-        "badge": "100% GİRİLEBİLİR İÇ MEKÂNLAR",
-        "title": "EVLERE, DÜKKÂNLARA VE CAMİYE GİR",
-        "sub": "Koltuğa otur, ev boya, mahalle esnafıyla sohbet et!",
-        "footer": "DETAYLI İÇ MEKÂNLAR  •  HZ. OSMAN CAMİİ  •  EV BOYAMA",
-        "raw": os.path.join(RAW_DIR, "shot3_hz_osman_camii.png"),
-        "top_col": (24, 22, 14), "bot_col": (12, 11, 8),
-        "glow_col": (246, 192, 76, 92),
-        "seed": 103,
-    },
-    {
-        "id": "04_avenues_and_jobs",
+        "id": "03_live_sports_4games",
         "layout": "dual",
-        "badge": "4 FARKLI YAN İŞ & 10 HİKÂYE GÖREVİ",
-        "title": "PİZZA, TAKSİ, TEMİZLİK VE BOYAMA",
-        "sub": "Görevlerden para kazan, yeni araçlar ve mahalleler keşfet!",
-        "footer": "PİZZA TESLİMATI  •  TAKSİCİLİK  •  MAHALLE EKONOMİSİ",
-        "front_raw": os.path.join(RAW_DIR, "shot4_petrol_aziziye_avenues.png"),
-        "back_raw": os.path.join(RAW_DIR, "shot2_selman_driving.png"),
-        "top_col": (14, 30, 38), "bot_col": (7, 15, 22),
-        "glow_col": (66, 232, 186, 92),
-        "seed": 104,
+        "badge": "4 OYNANABİLİR SPOR • İSTEDİĞİN AN MAÇ",
+        "title": "HALI SAHA FUTBOL & TENİS",
+        "highlight": "FUTBOL & TENİS",
+        "sub": "3v3 halı sahada gol at, toprak kortta 1v1 tenis maçını kazan!",
+        "chips": ["3v3 HALI SAHA", "1v1 TOPRAK KORT TENİS", "MAÇ ÖDÜLLERİ"],
+        "front_raw": os.path.join(RAW_DIR, "live_football_3v3.png"),
+        "front_crop_bot": 42,
+        "back_raw": os.path.join(RAW_DIR, "live_tennis_1v1.png"),
+        "back_crop_bot": 42,
+        "c_tl": (10, 68, 56), "c_br": (8, 26, 36),
+        "glow_a": (54, 240, 148, 138), "glow_b": (255, 162, 62, 126),
+        "accent_rgb": (68, 242, 154), "accent2_rgb": (255, 196, 72),
+        "seed": 203,
     },
     {
-        "id": "05_living_neighborhood",
-        "layout": "single",
-        "badge": "YAŞAYAN MAHALLE & MİNİ OYUNLAR",
-        "title": "SOKAK FUTBOLU, KEDİLER & DAHA FAZLASI",
-        "sub": "Sokak kedilerini sev, mahalle sahasında gol at, toplulukla oyunu büyüt!",
-        "footer": "SOKAK FUTBOLU  •  İSTANBUL KEDİLERİ  •  CANLI TOPLULUK",
-        "raw": os.path.join(RAW_DIR, "shot5_street_football_life.png"),
-        "top_col": (12, 32, 28), "bot_col": (6, 16, 16),
-        "glow_col": (92, 236, 158, 92),
-        "seed": 105,
+        "id": "04_smart_npcs_20missions",
+        "layout": "dual",
+        "badge": "5 BÖLÜM • 20 HİKÂYE GÖREVİ & AKILLI NPC",
+        "title": "KONUŞAN CANLI MAHALLE",
+        "highlight": "CANLI MAHALLE",
+        "sub": "Sohbet eden komşular, sokak kedileri, yan işler ve 20 görev!",
+        "chips": ["20 HİKÂYE GÖREVİ", "KONUŞAN KOMŞULAR", "SOKAK KEDİLERİ"],
+        "front_raw": os.path.join(RAW_DIR, "live_npc_mission.png"),
+        "front_crop_bot": 42,
+        "back_raw": os.path.join(RAW_DIR, "live_npc_neighbors.png"),
+        "back_crop_bot": 42,
+        "c_tl": (74, 42, 18), "c_br": (24, 16, 38),
+        "glow_a": (255, 182, 58, 145), "glow_b": (48, 224, 206, 125),
+        "accent_rgb": (255, 196, 68), "accent2_rgb": (62, 234, 214),
+        "seed": 204,
+    },
+    {
+        "id": "05_basketball_volleyball_pool",
+        "layout": "dual",
+        "badge": "SOKAK SPORLARI • AÇIK YÜZME HAVUZU",
+        "title": "BASKETBOL, VOLEYBOL & HAVUZ",
+        "highlight": "BASKETBOL,",
+        "sub": "2v2 basketbolda şut at, voleybolda smaç vur, açık havuzda yüz!",
+        "chips": ["2v2 BASKETBOL", "2v2 VOLEYBOL", "AÇIK YÜZME HAVUZU"],
+        "front_raw": os.path.join(RAW_DIR, "live_basketball_2v2.png"),
+        "front_crop_bot": 42,
+        "back_raw": os.path.join(RAW_DIR, "live_volleyball_2v2.png"),
+        "back_crop_bot": 42,
+        "c_tl": (82, 34, 28), "c_br": (16, 24, 58),
+        "glow_a": (255, 134, 58, 142), "glow_b": (52, 222, 232, 130),
+        "accent_rgb": (255, 162, 68), "accent2_rgb": (64, 234, 226),
+        "seed": 205,
     },
     {
         "id": "06_day_night_cycle",
         "layout": "dual",
-        "badge": "DİNAMİK GÜN / GECE DÖNGÜSÜ",
+        "badge": "CANLI MENÜ • IŞIKLI İSTANBUL GECELERİ",
         "title": "GÜNDÜZDEN GECE IŞIKLARINA",
-        "sub": "Sabah güneşinden sokak lambalarına uzanan canlı atmosfer!",
-        "footer": "SOKAK LAMBALARI  •  TELEFON HARİTASI  •  OYUNCULARLA BÜYÜR",
-        "front_raw": os.path.join(RAW_DIR, "shot6_night_istanbul_lights.png"),
-        "back_raw": os.path.join(RAW_DIR, "shot1_fatih_saat_kulesi.png"),
-        "top_col": (18, 16, 38), "bot_col": (8, 9, 22),
-        "glow_col": (250, 186, 86, 92),
-        "seed": 106,
+        "highlight": "GECE IŞIKLARINA",
+        "sub": "İstediğin mahalleden başla, sokak lambalarıyla akşamları gez!",
+        "chips": ["BÖLGE SEÇ & BAŞLA", "GECE SOKAK LAMBALARI", "TOPLULUKLA BÜYÜR"],
+        "front_raw": os.path.join(RAW_DIR, "live_menu_hub.png"),
+        "back_raw": os.path.join(RAW_DIR, "live_selman_night.png"),
+        "back_night": True,
+        "c_tl": (28, 22, 82), "c_br": (10, 14, 40),
+        "glow_a": (255, 186, 64, 140), "glow_b": (62, 214, 242, 132),
+        "accent_rgb": (255, 198, 76), "accent2_rgb": (74, 228, 244),
+        "seed": 206,
     },
 ]
 
 POSTERS_EN = [
     {
         "id": "01_open_world_landmark",
-        "layout": "single",
-        "badge": "OURWORLD • BUILT TOGETHER WITH PLAYERS",
-        "title": "ROAM FREE IN A LIVING 3D WORLD",
-        "sub": "Explore clock-tower plazas, bustling avenues & hidden side streets!",
-        "footer": "8 MAIN AVENUES  •  HANDCRAFTED 3D STREETS  •  LIVE GPS",
-        "raw": os.path.join(RAW_DIR, "shot1_fatih_saat_kulesi.png"),
-        "top_col": (10, 26, 40), "bot_col": (6, 13, 22),
-        "glow_col": (64, 214, 198, 92),
-        "seed": 101,
+        "layout": "dual",
+        "show_icon": True,
+        "badge": "OUR WORLD • LIVING 3D OPEN WORLD",
+        "title": "EXPLORE A LIVING 3D CITY",
+        "highlight": "LIVING 3D",
+        "sub": "8 avenues, 20 story missions, driving, sports & total freedom!",
+        "chips": ["8 MAIN AVENUES", "20 STORY MISSIONS", "OFFLINE 3D"],
+        "front_raw": os.path.join(RAW_DIR, "shot2_selman_driving.png"),
+        "back_raw": os.path.join(RAW_DIR, "live_menu_hub.png"),
+        "c_tl": (14, 42, 108), "c_br": (8, 22, 54),
+        "glow_a": (36, 228, 214, 138), "glow_b": (255, 188, 56, 132),
+        "accent_rgb": (48, 232, 216), "accent2_rgb": (255, 204, 72),
+        "seed": 201,
     },
     {
         "id": "02_drive_and_explore",
         "layout": "single",
-        "badge": "MULTI-VEHICLE DRIVING • DRIFT & NITRO",
-        "title": "HOP INTO ANY CAR AND DRIVE",
-        "sub": "Drift to charge nitro, honk at traffic & tune the car radio!",
-        "footer": "REAL-TIME CRASH DAMAGE  •  HEADLIGHTS & HORN  •  60 FPS",
-        "raw": os.path.join(RAW_DIR, "shot2_selman_driving.png"),
-        "top_col": (14, 28, 46), "bot_col": (7, 14, 26),
-        "glow_col": (80, 198, 255, 92),
-        "seed": 102,
+        "badge": "MULTI-VEHICLE • DRIFT, NITRO & RADIO",
+        "title": "HOP IN ANY CAR & DRIVE",
+        "highlight": "DRIVE",
+        "sub": "Smooth mobile driving controls, drift nitro, headlights & radio!",
+        "chips": ["CARS & MOTORCYCLES", "DRIFT + NITRO", "CAR RADIO"],
+        "raw": os.path.join(RAW_DIR, "live_driving_mobile.png"),
+        "crop_bot": 44,
+        "c_tl": (12, 46, 118), "c_br": (8, 18, 48),
+        "glow_a": (52, 198, 255, 140), "glow_b": (255, 126, 76, 115),
+        "accent_rgb": (74, 208, 255), "accent2_rgb": (255, 194, 74),
+        "seed": 202,
     },
     {
-        "id": "03_enterable_buildings",
-        "layout": "single",
-        "badge": "100% ENTERABLE INTERIORS",
-        "title": "STEP INSIDE HOMES, SHOPS & LANDMARKS",
-        "sub": "Sit on benches, paint houses & explore detailed interiors!",
-        "footer": "WALK-IN BUILDINGS  •  HOUSE PAINTING  •  LOCAL LIFE",
-        "raw": os.path.join(RAW_DIR, "shot3_hz_osman_camii.png"),
-        "top_col": (24, 22, 14), "bot_col": (12, 11, 8),
-        "glow_col": (246, 192, 76, 92),
-        "seed": 103,
-    },
-    {
-        "id": "04_avenues_and_jobs",
+        "id": "03_live_sports_4games",
         "layout": "dual",
-        "badge": "4 SIDE JOBS & 10 STORY MISSIONS",
-        "title": "PIZZA, TAXI, CLEANUP & PAINTING",
-        "sub": "Earn cash from open-world jobs & unlock every corner of the city!",
-        "footer": "PIZZA DELIVERY  •  TAXI FARES  •  OPEN-WORLD ECONOMY",
-        "front_raw": os.path.join(RAW_DIR, "shot4_petrol_aziziye_avenues.png"),
-        "back_raw": os.path.join(RAW_DIR, "shot2_selman_driving.png"),
-        "top_col": (14, 30, 38), "bot_col": (7, 15, 22),
-        "glow_col": (66, 232, 186, 92),
-        "seed": 104,
+        "badge": "4 PLAYABLE SPORTS • JUMP IN ANYTIME",
+        "title": "STREET FOOTBALL & TENNIS",
+        "highlight": "FOOTBALL & TENNIS",
+        "sub": "Score goals in 3v3 football & win rallies on the clay tennis court!",
+        "chips": ["3v3 STREET FOOTBALL", "1v1 CLAY TENNIS", "WIN REWARDS"],
+        "front_raw": os.path.join(RAW_DIR, "live_football_3v3.png"),
+        "front_crop_bot": 42,
+        "back_raw": os.path.join(RAW_DIR, "live_tennis_1v1.png"),
+        "back_crop_bot": 42,
+        "c_tl": (10, 68, 56), "c_br": (8, 26, 36),
+        "glow_a": (54, 240, 148, 138), "glow_b": (255, 162, 62, 126),
+        "accent_rgb": (68, 242, 154), "accent2_rgb": (255, 196, 72),
+        "seed": 203,
     },
     {
-        "id": "05_living_neighborhood",
-        "layout": "single",
-        "badge": "LIVING STREETS & MINI-GAMES",
-        "title": "STREET FOOTBALL, CATS & COMMUNITY",
-        "sub": "Pet friendly street cats, score goals & suggest features in-game!",
-        "footer": "STREET FOOTBALL  •  STREET CATS  •  PLAYER IDEAS BOARD",
-        "raw": os.path.join(RAW_DIR, "shot5_street_football_life.png"),
-        "top_col": (12, 32, 28), "bot_col": (6, 16, 16),
-        "glow_col": (92, 236, 158, 92),
-        "seed": 105,
+        "id": "04_smart_npcs_20missions",
+        "layout": "dual",
+        "badge": "5 CHAPTERS • 20 STORY MISSIONS & SMART NPCS",
+        "title": "SMART TALKING NEIGHBORS",
+        "highlight": "TALKING",
+        "sub": "Chatting citizens with speech bubbles, street cats & 20 missions!",
+        "chips": ["20 STORY MISSIONS", "SMART NPC AI", "STREET CATS"],
+        "front_raw": os.path.join(RAW_DIR, "live_npc_mission.png"),
+        "front_crop_bot": 42,
+        "back_raw": os.path.join(RAW_DIR, "live_npc_neighbors.png"),
+        "back_crop_bot": 42,
+        "c_tl": (74, 42, 18), "c_br": (24, 16, 38),
+        "glow_a": (255, 182, 58, 145), "glow_b": (48, 224, 206, 125),
+        "accent_rgb": (255, 196, 68), "accent2_rgb": (62, 234, 214),
+        "seed": 204,
+    },
+    {
+        "id": "05_basketball_volleyball_pool",
+        "layout": "dual",
+        "badge": "STREET COURTS • SWIMMABLE POOL",
+        "title": "HOOPS, VOLLEYBALL & POOL",
+        "highlight": "HOOPS,",
+        "sub": "Drain 2v2 jump shots, spike volleyball winners & swim freely!",
+        "chips": ["2v2 BASKETBALL", "2v2 VOLLEYBALL", "OPEN POOL"],
+        "front_raw": os.path.join(RAW_DIR, "live_basketball_2v2.png"),
+        "front_crop_bot": 42,
+        "back_raw": os.path.join(RAW_DIR, "live_volleyball_2v2.png"),
+        "back_crop_bot": 42,
+        "c_tl": (82, 34, 28), "c_br": (16, 24, 58),
+        "glow_a": (255, 134, 58, 142), "glow_b": (52, 222, 232, 130),
+        "accent_rgb": (255, 162, 68), "accent2_rgb": (64, 234, 226),
+        "seed": 205,
     },
     {
         "id": "06_day_night_cycle",
         "layout": "dual",
-        "badge": "DYNAMIC DAY / NIGHT CYCLE",
-        "title": "FROM SUNNY MORNINGS TO NIGHT LIGHTS",
-        "sub": "Watch streetlamps glow at dusk and cruise under the stars!",
-        "footer": "GLOWING STREETLAMPS  •  PHONE GPS MAP  •  REGULAR UPDATES",
-        "front_raw": os.path.join(RAW_DIR, "shot6_night_istanbul_lights.png"),
-        "back_raw": os.path.join(RAW_DIR, "shot1_fatih_saat_kulesi.png"),
-        "top_col": (18, 16, 38), "bot_col": (8, 9, 22),
-        "glow_col": (250, 186, 86, 92),
-        "seed": 106,
+        "badge": "LIVING MENU • GLOWING NIGHT STREETS",
+        "title": "FROM SUNNY DAYS TO LIT NIGHTS",
+        "highlight": "LIT NIGHTS",
+        "sub": "Start in any district & explore under glowing evening streetlamps!",
+        "chips": ["DISTRICT FAST-START", "NIGHT STREETLAMPS", "PLAYER IDEAS"],
+        "front_raw": os.path.join(RAW_DIR, "live_menu_hub.png"),
+        "back_raw": os.path.join(RAW_DIR, "live_selman_night.png"),
+        "back_night": True,
+        "c_tl": (28, 22, 82), "c_br": (10, 14, 40),
+        "glow_a": (255, 186, 64, 140), "glow_b": (62, 214, 242, 132),
+        "accent_rgb": (255, 198, 76), "accent2_rgb": (74, 228, 244),
+        "seed": 206,
     },
 ]
 
@@ -545,11 +848,18 @@ def main():
     posters = POSTERS_EN if active_lang == "en" else POSTERS_TR
     root_dir = os.path.join(SCRIPT_DIR, "en-US") if active_lang == "en" else SCRIPT_DIR
 
+    # Remove stale poster filenames from previous versions so sets stay clean & exact (6 files)
+    valid_ids = {f"{p['id']}.png" for p in posters}
+
     total = 0
     for target_name, cfg in TARGETS.items():
         w, h, is_tab = cfg["w"], cfg["h"], cfg["is_tablet"]
         out_dir = os.path.join(root_dir, target_name)
         os.makedirs(out_dir, exist_ok=True)
+        for existing in os.listdir(out_dir):
+            if existing.endswith(".png") and existing not in valid_ids:
+                os.remove(os.path.join(out_dir, existing))
+
         print(f"=== Generating [{active_lang}] {target_name} ({w} x {h}, tablet={is_tab}) ===")
         for spec in posters:
             img = build_poster(spec, w, h, is_tab)
@@ -560,12 +870,11 @@ def main():
             total += 1
             print(f"  -> {out_file}")
 
-    if active_lang != "en":
-        print("=== Generating Google Play Feature Graphic (1024 x 500) ===")
-        build_feature_graphic()
-        total += 1
+    print(f"=== Generating Google Play Header / Feature Graphic ({active_lang}, 1024 x 500) ===")
+    build_feature_graphic(active_lang)
+    total += 1
 
-    print(f"=== Generated {total} OurWorld Store Marketing Assets ({active_lang})! ===")
+    print(f"=== Generated {total} Vibrant Store Marketing Assets ({active_lang})! ===")
 
 
 if __name__ == "__main__":

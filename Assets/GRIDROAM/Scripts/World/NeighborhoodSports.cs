@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>Installs the neighborhood vehicles, court, and house additions in the shipped scene.</summary>
     public sealed partial class NeighborhoodSports : MonoBehaviour
@@ -196,7 +196,10 @@ namespace Gridroam.World
 
             Transform station = Child(court, "Court entrance", new Vector3(-5.25f, 0f, 14.6f));
             station.gameObject.AddComponent<InteractableTrigger>()
-                .Configure(InteractableKind.Tennis, "gursu_tennis", "ui.btn.play_tennis", 3.0f);
+                .Configure(InteractableKind.Tennis, "gursu_tennis", "ui.btn.play_tennis", 4.6f);
+            Transform courtPlayZone = Child(court, "Court center trigger", Vector3.zero);
+            courtPlayZone.gameObject.AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.Tennis, "gursu_tennis_center", "ui.btn.play_tennis", 7.8f);
 
             MeshParts ballParts = new MeshParts(this);
             ballParts.Add(ballMaterial, _sphere, Vector3.zero, Quaternion.identity, Vector3.one * (TennisCourt.BallRadius * 2f));

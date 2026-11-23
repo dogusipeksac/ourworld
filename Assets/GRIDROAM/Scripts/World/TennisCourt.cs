@@ -1,9 +1,10 @@
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Player;
+using OurWorld.CameraSystem;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     public sealed class TennisCourt : MonoBehaviour
     {
@@ -15,11 +16,11 @@ namespace Gridroam.World
         private const float CourtSurface = 0.002f;
         private const float BallFloor = CourtSurface + BallRadius;
         private const float Gravity = 9.81f;
-        private const float ContactHeight = 0.93f;
+        private const float ContactHeight = 0.95f;
         private const float ContactSide = 0.65f;
         private const float ContactForward = 0.28f;
-        private const float ContactWindow = 0.33f;
-        private const float ServeTime = 0.63f;
+        private const float ContactWindow = 0.72f;
+        private const float ServeTime = 0.56f;
         private const float ServeRelease = 0.12f;
         private const int PointsToWin = 3;
         private const float AmbientActiveRangeSq = 78f * 78f;
@@ -28,8 +29,8 @@ namespace Gridroam.World
 
         private struct Flight
         {
-            private const float BounceSpeedFraction = 0.68f;
-            private const float AfterBounceDuration = 0.36f;
+            private const float BounceSpeedFraction = 0.64f;
+            private const float AfterBounceDuration = 0.54f;
 
             public Vector3 Start, End;
             public float FirstLeg;
@@ -72,10 +73,13 @@ namespace Gridroam.World
         private Transform _opponentRacket;
         private Transform _playerRacket;
         private Transform _readyMarker;
+        private Renderer _readyMarkerRenderer;
+        private MaterialPropertyBlock _markerProps;
         private AudioSource _ballSound;
         private AudioClip _hitSound;
         private AudioClip _bounceSound;
         private PlayerFootController _player;
+        private ThirdPersonCameraRig _cameraRig;
         private Phase _phase;
         private Flight _flight;
         private Vector3 _serveStart;
@@ -89,12 +93,17 @@ namespace Gridroam.World
         private int _ambientMaxReturns = 5;
         private bool _ready;
         private bool _returnQueued;
+        private bool _earlyBufferQueued;
         private bool _preciseReturn;
+        private bool _lastShotWasPerfect;
         private bool _opponentSwinging;
         private bool _ambientSwinging;
         private bool _lastPointWon;
         private Vector3 _beginPosition;
         private Quaternion _beginRotation;
+
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
         private bool IsAmbientMatch => _player == null && _ambientPlayer != null;
 
@@ -120,6 +129,8 @@ namespace Gridroam.World
             _opponentRacket = opponentRacket;
             _playerRacket = playerRacket;
             _readyMarker = readyMarker;
+            _readyMarkerRenderer = readyMarker != null ? readyMarker.GetComponentInChildren<Renderer>(true) : null;
+            _markerProps = new MaterialPropertyBlock();
             _ballSound = ballSound;
             _hitSound = hitSound;
             _bounceSound = bounceSound;
@@ -143,6 +154,7 @@ namespace Gridroam.World
             _beginRotation = player.transform.rotation;
             _points = 0;
             _opponentPoints = 0;
+            _lastShotWasPerfect = false;
 
             if (_ambientPlayer != null)
             {
@@ -152,18 +164,39 @@ namespace Gridroam.World
                 _ambientPlayer.gameObject.SetActive(false);
             }
 
+            if (_ball != null) _ball.localScale = Vector3.one * 1.85f;
             player.SetSeatedState(true);
             _playerRacket.SetParent(transform, false);
             _playerRacket.gameObject.SetActive(player.Humanoid != null);
             player.Humanoid?.SetTennisRacket(_playerRacket);
             _opponent.gameObject.SetActive(true);
             _opponent.SetTennisRacket(_opponentRacket);
+
+            _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(true, distance: 7.4f, pitch: 23f, fov: 60f, lockYaw: transform.eulerAngles.y);
+            }
+
             ResetPoint();
             enabled = true;
         }
 
         public void End()
         {
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(false);
+                _cameraRig = null;
+            }
+
+            if (_ball != null) _ball.localScale = Vector3.one;
+            if (_readyMarker != null)
+            {
+                _readyMarker.localScale = Vector3.one;
+                _readyMarker.gameObject.SetActive(false);
+            }
+
             if (_player != null)
             {
                 _player.Humanoid?.SetLookAtPoint(false, Vector3.zero);
@@ -187,8 +220,10 @@ namespace Gridroam.World
 
         private void StartAmbientMatch()
         {
+            if (_ball != null) _ball.localScale = Vector3.one;
             _readyMarker.gameObject.SetActive(false);
             _ready = false;
+            _earlyBufferQueued = false;
             _ambientPlayer.gameObject.SetActive(true);
             _opponent.gameObject.SetActive(true);
             _playerRacket.SetParent(transform, false);
@@ -217,50 +252,90 @@ namespace Gridroam.World
             {
                 Phase.Serve => "sports.tennis.serve",
                 Phase.Serving => "sports.tennis.swing",
+                Phase.ToPlayer when _returnQueued && _preciseReturn => "sports.tennis.perfect",
+                Phase.ToPlayer when _returnQueued || _earlyBufferQueued => "sports.tennis.buffered",
                 Phase.ToPlayer when _ready => "sports.tennis.now",
-                Phase.ToPlayer when _returnQueued => "sports.tennis.swing",
                 Phase.ToPlayer => "sports.tennis.wait",
+                Phase.ToOpponent when _lastShotWasPerfect => "sports.tennis.perfect",
                 Phase.Point when _lastPointWon => "sports.tennis.point_won",
                 Phase.Point => "sports.tennis.point_lost",
-                Phase.MatchOver when _lastPointWon => "sports.tennis.won",
-                Phase.MatchOver => "sports.tennis.lost",
+                Phase.MatchOver when _lastPointWon => "sports.tennis.won_rematch",
+                Phase.MatchOver => "sports.tennis.lost_rematch",
                 _ => "sports.tennis.rally"
             };
             return $"{player} {_points}  ·  {_opponentPoints} {opponent}\n{LocalizationService.Tr(instructions)}";
         }
 
-        public bool AcceptsHit => _player != null && (_phase == Phase.Serve || _ready);
+        public string PrimaryButtonLabel()
+        {
+            return _phase switch
+            {
+                Phase.Serve => LocalizationService.Tr("sports.btn.serve", "Servis"),
+                Phase.MatchOver => LocalizationService.Tr("sports.btn.rematch", "Tekrar"),
+                Phase.ToPlayer when _ready => LocalizationService.Tr("sports.btn.hit_now", "VUR!"),
+                _ => LocalizationService.Tr("ui.btn.attack", "Vur")
+            };
+        }
+
+        public bool AcceptsHit => _player != null && (_phase == Phase.Serve || _ready || _phase == Phase.MatchOver);
 
         public void Hit()
         {
-            if (_player == null || (_phase != Phase.Serve && _phase != Phase.ToPlayer) || _returnQueued) return;
+            if (_player == null) return;
+
+            if (_phase == Phase.MatchOver)
+            {
+                if (_elapsed >= 0.45f)
+                {
+                    _points = 0;
+                    _opponentPoints = 0;
+                    _lastShotWasPerfect = false;
+                    ResetPoint();
+                    GameFeelAudio.PlayUiClick();
+                }
+                return;
+            }
+
+            if ((_phase != Phase.Serve && _phase != Phase.ToPlayer) || _returnQueued) return;
 
             float playerX = PlayerX;
             float input = InputHub.Instance != null ? InputHub.Instance.MoveInput.x : 0f;
-            _queuedAim = Mathf.Abs(input) >= 0.2f ? Mathf.Clamp(input, -1f, 1f) : (playerX > 0f ? -0.35f : 0.35f);
+            _queuedAim = Mathf.Abs(input) >= 0.16f ? Mathf.Clamp(input, -1f, 1f) : (playerX > 0f ? -0.45f : 0.45f);
             if (_phase == Phase.Serve)
             {
                 _phase = Phase.Serving;
                 _elapsed = 0f;
+                _lastShotWasPerfect = false;
                 _serveStart = _ball.localPosition;
-                _serveContact = new Vector3(playerX + 0.48f, 2.10f, PlayerBaseline + 0.40f);
+                _serveContact = new Vector3(playerX + 0.46f, 2.08f, PlayerBaseline + 0.40f);
                 _player.Humanoid?.PlayTennisSwing(transform.TransformPoint(_serveContact), ServeTime, serving: true);
                 HudRevision++;
                 return;
             }
 
-            if (!_ready)
+            float remaining = Mathf.Max(0f, _flight.Duration - _elapsed);
+            if (_ready || remaining <= ContactWindow)
             {
-                Vector3 drySwing = transform.TransformPoint(new Vector3(playerX + ContactSide, ContactHeight, PlayerBaseline + ContactForward));
-                _player.Humanoid?.PlayTennisSwing(drySwing, 0.13f);
-                if (_elapsed > _flight.FirstLeg) AwardPoint(playerWon: false);
+                LockInPlayerReturn(remaining, isDirectTap: true);
                 return;
             }
 
+            // Forgiving early-tap input buffer: tapping early queues a clean return instead of losing the point!
+            if (remaining <= _flight.Duration + 0.05f && !_earlyBufferQueued)
+            {
+                _earlyBufferQueued = true;
+                HudRevision++;
+            }
+        }
+
+        private void LockInPlayerReturn(float remaining, bool isDirectTap)
+        {
             _returnQueued = true;
-            _preciseReturn = Mathf.Abs(_elapsed - _flight.Duration + 0.12f) < 0.08f;
+            _earlyBufferQueued = false;
+            _preciseReturn = isDirectTap && remaining >= 0.06f && remaining <= 0.44f;
             SetReady(false);
-            _player.Humanoid?.PlayTennisSwing(transform.TransformPoint(_flight.End), _flight.Duration - _elapsed);
+            _player.Humanoid?.PlayTennisSwing(transform.TransformPoint(_flight.End), Mathf.Max(0.04f, remaining));
+            HudRevision++;
         }
 
         private void Update()
@@ -287,6 +362,16 @@ namespace Gridroam.World
             _elapsed += Time.deltaTime;
             switch (_phase)
             {
+                case Phase.Serve:
+                    if (InputHub.Instance != null && Mathf.Abs(InputHub.Instance.MoveInput.x) > 0.12f)
+                    {
+                        float serveMoveX = Mathf.Clamp(PlayerX + InputHub.Instance.MoveInput.x * 3.0f * Time.deltaTime, -2.4f, 2.4f);
+                        SetPlayerPosition(serveMoveX);
+                        Vector3 hand = new Vector3(serveMoveX - 0.25f, 1.12f, PlayerBaseline + 0.33f);
+                        _player.Humanoid?.SetTennisLeftHand(transform.TransformPoint(hand));
+                        SetBallPosition(hand + Vector3.up * 0.065f);
+                    }
+                    break;
                 case Phase.Serving:
                     UpdateServe();
                     break;
@@ -297,7 +382,7 @@ namespace Gridroam.World
                 case Phase.Point:
                 case Phase.MatchOver:
                     UpdateLooseBall();
-                    if (_phase == Phase.Point && _elapsed >= 1.35f) ResetPoint();
+                    if (_phase == Phase.Point && _elapsed >= 1.25f) ResetPoint();
                     break;
             }
         }
@@ -477,47 +562,111 @@ namespace Gridroam.World
             if (toPlayer)
             {
                 MoveNpc(_opponent, 0f, _elapsed > 0.2f ? 2.25f : 0f);
-                float gap = MovePlayer(targetX, 5.75f);
-                bool inWindow = remaining <= ContactWindow && remaining >= 0.055f;
-                SetReady(!_returnQueued && inWindow && gap < 0.30f);
-                _readyMarker.localPosition = new Vector3(PlayerX, 0.013f, PlayerBaseline);
+                float gap = MovePlayer(targetX, 7.2f);
+
+                // Allow aim refinement with joystick anytime before impact!
+                if (InputHub.Instance != null && Mathf.Abs(InputHub.Instance.MoveInput.x) >= 0.16f)
+                {
+                    _queuedAim = Mathf.Clamp(InputHub.Instance.MoveInput.x, -1f, 1f);
+                }
+
+                // Trigger buffered early tap right in the clean contact zone
+                if (_earlyBufferQueued && !_returnQueued && remaining <= 0.36f && gap < 0.70f)
+                {
+                    LockInPlayerReturn(remaining, isDirectTap: false);
+                }
+
+                bool inWindow = remaining <= ContactWindow && remaining >= 0.02f;
+                SetReady(!_returnQueued && inWindow && gap < 0.75f);
+                UpdateTimingRingVisual(remaining, inWindow);
+
                 if (remaining > 0f) return;
 
-                if (!_returnQueued || gap > 0.22f)
+                if (!_returnQueued || gap > 0.65f)
                 {
                     AwardPoint(playerWon: false);
                     return;
                 }
 
                 _player.Humanoid?.PlayTennisSwing(_ball.position, 0f);
+                if (_preciseReturn)
+                {
+                    GameFeelAudio.SpawnBurst(_ball.position, new Color(1.0f, 0.85f, 0.24f), count: 8, spread: 0.35f);
+                }
                 StartPlayerShot(_flight.End, _preciseReturn);
                 return;
             }
 
-            MovePlayer(0f, _elapsed > 0.29f ? 2.25f : 0f);
-            float reactionTime = Mathf.Min(0.58f, 0.25f + _returns * 0.055f);
-            float opponentGap = MoveNpc(_opponent, targetX, _elapsed >= reactionTime ? 3.9f : 0f);
-            if (!_opponentSwinging && remaining <= 0.19f && opponentGap <= remaining * 3.9f + 0.20f)
+            if (_readyMarker != null && _readyMarker.gameObject.activeSelf)
+            {
+                _readyMarker.gameObject.SetActive(false);
+            }
+
+            MovePlayer(0f, _elapsed > 0.28f ? 2.65f : 0f);
+            float reactionTime = Mathf.Min(0.62f, 0.26f + _returns * 0.065f);
+            float opponentSpeed = _lastShotWasPerfect ? 3.35f : 3.75f;
+            float opponentGap = MoveNpc(_opponent, targetX, _elapsed >= reactionTime ? opponentSpeed : 0f);
+            if (!_opponentSwinging && remaining <= 0.20f && opponentGap <= remaining * opponentSpeed + 0.22f)
             {
                 _opponentSwinging = true;
                 _opponent.PlayTennisSwing(transform.TransformPoint(_flight.End), remaining);
             }
             if (remaining > 0f) return;
 
-            if (opponentGap > 0.22f)
+            if (opponentGap > 0.24f)
             {
                 AwardPoint(playerWon: true);
                 return;
             }
 
             _opponent.PlayTennisSwing(_ball.position, 0f);
-            StartFlight(false, _flight.End, Random.Range(-3.65f, 3.65f), Mathf.Max(0.93f, 1.18f - _returns * 0.025f));
+            float returnX = Random.Range(-3.15f, 3.15f);
+            float returnFirstLeg = Mathf.Max(1.06f, 1.32f - _returns * 0.02f);
+            StartFlight(false, _flight.End, returnX, returnFirstLeg);
+        }
+
+        private void UpdateTimingRingVisual(float remaining, bool inWindow)
+        {
+            if (_readyMarker == null) return;
+            if (!_readyMarker.gameObject.activeSelf) _readyMarker.gameObject.SetActive(true);
+
+            _readyMarker.localPosition = new Vector3(_flight.End.x, 0.016f, PlayerBaseline + ContactForward);
+            float progress = 1f - Mathf.Clamp01(remaining / Mathf.Max(0.25f, _flight.Duration));
+            float ringScale = _returnQueued
+                ? 1.08f
+                : Mathf.Lerp(1.85f, 0.92f, progress);
+            _readyMarker.localScale = new Vector3(ringScale, 1f, ringScale);
+
+            if (_readyMarkerRenderer != null && _markerProps != null)
+            {
+                Color c;
+                Color em;
+                if (_returnQueued)
+                {
+                    c = new Color(1.0f, 0.84f, 0.22f, 1f);
+                    em = new Color(0.65f, 0.50f, 0.08f, 1f);
+                }
+                else if (inWindow)
+                {
+                    c = new Color(0.22f, 0.96f, 0.58f, 1f);
+                    em = new Color(0.12f, 0.65f, 0.36f, 1f);
+                }
+                else
+                {
+                    c = new Color(0.96f, 0.78f, 0.26f, 1f);
+                    em = new Color(0.32f, 0.24f, 0.05f, 1f);
+                }
+                _markerProps.SetColor(BaseColorId, c);
+                _markerProps.SetColor(EmissionColorId, em);
+                _readyMarkerRenderer.SetPropertyBlock(_markerProps);
+            }
         }
 
         private void StartPlayerShot(Vector3 contact, bool precise)
         {
-            float targetX = _queuedAim * (precise ? 3.95f : 3.3f);
-            StartFlight(true, contact, targetX, precise ? 0.87f : 1.16f);
+            _lastShotWasPerfect = precise;
+            float targetX = _queuedAim * (precise ? 3.92f : 3.15f);
+            StartFlight(true, contact, targetX, precise ? 0.84f : 1.18f);
             _returns++;
         }
 
@@ -547,6 +696,7 @@ namespace Gridroam.World
             _phase = toOpponent ? Phase.ToOpponent : Phase.ToPlayer;
             PlayCourtSound(_hitSound, 0.56f * volumeScale);
             _returnQueued = false;
+            _earlyBufferQueued = false;
             _opponentSwinging = false;
             _ambientSwinging = false;
             _elapsed = 0f;
@@ -560,13 +710,42 @@ namespace Gridroam.World
             else _opponentPoints++;
 
             _lastPointWon = playerWon;
-            _phase = _points >= PointsToWin || _opponentPoints >= PointsToWin ? Phase.MatchOver : Phase.Point;
+            _lastShotWasPerfect = false;
+            _earlyBufferQueued = false;
+            bool matchOver = _points >= PointsToWin || _opponentPoints >= PointsToWin;
+            _phase = matchOver ? Phase.MatchOver : Phase.Point;
             _looseBallTime = Mathf.Min(_elapsed, _flight.Duration);
             _elapsed = 0f;
             SetReady(false);
+            if (_readyMarker != null) _readyMarker.gameObject.SetActive(false);
             HudRevision++;
             _player.Humanoid?.SetLocomotion(0f, true, 0f);
             _opponent.SetLocomotion(0f, true, 0f);
+
+            if (playerWon)
+            {
+                _player.Humanoid?.PlaySportAnim(SportAnimKind.VictoryJump, matchOver ? 0.85f : 0.60f);
+                GameFeelAudio.SpawnBurst(_player.transform.position + Vector3.up * 1.4f, new Color(0.24f, 0.92f, 0.64f), count: matchOver ? 16 : 8, spread: 0.6f);
+                if (matchOver)
+                {
+                    GameFeelAudio.PlayMilestoneFanfare();
+                    SaveManager.Instance?.AddMoney(75);
+                    NeighborhoodReputation.AddReputation(25, LocalizationService.Tr("sports.tennis.win_toast", "Tenis Maçı Kazanıldı! (+75 ₺)"));
+                }
+                else
+                {
+                    GameFeelAudio.PlayCoinChime();
+                }
+            }
+            else
+            {
+                _opponent.PlaySportAnim(SportAnimKind.VictoryJump, 0.58f);
+            }
+
+            if (matchOver)
+            {
+                SportMatchEvents.NotifyMatchFinished("sport_tennis", playerWon);
+            }
         }
 
         private void UpdateLooseBall(float volumeScale = 1f)
@@ -587,7 +766,10 @@ namespace Gridroam.World
             _returns = 0;
             _elapsed = 0f;
             _returnQueued = false;
+            _earlyBufferQueued = false;
+            _lastShotWasPerfect = false;
             SetReady(false);
+            if (_readyMarker != null) _readyMarker.gameObject.SetActive(false);
             HudRevision++;
             _opponent.transform.SetLocalPositionAndRotation(new Vector3(0f, CourtSurface, -PlayerBaseline), Quaternion.Euler(0f, 180f, 0f));
             _opponent.SetLocomotion(0f, true, 0f);
@@ -605,7 +787,6 @@ namespace Gridroam.World
         {
             if (_ready == ready) return;
             _ready = ready;
-            _readyMarker.gameObject.SetActive(ready);
             HudRevision++;
         }
 
@@ -619,7 +800,8 @@ namespace Gridroam.World
         {
             _ball.localPosition = position;
             _ballShadow.localPosition = new Vector3(position.x, 0.006f, position.z);
-            float spread = Mathf.Lerp(0.72f, 1.18f, Mathf.InverseLerp(BallFloor, 2f, position.y));
+            float spread = Mathf.Lerp(0.72f, 1.25f, Mathf.InverseLerp(BallFloor, 2f, position.y));
+            if (_player != null) spread *= 1.45f;
             _ballShadow.localScale = new Vector3(spread, 1f, spread);
             if (_player != null)
             {

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     [Serializable]
     public class HousePaintEntry

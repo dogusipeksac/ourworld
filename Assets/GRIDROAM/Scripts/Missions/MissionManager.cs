@@ -1,13 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Player;
-using Gridroam.Vehicle;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Player;
+using OurWorld.Vehicle;
+using OurWorld.World;
 using UnityEngine;
 
-namespace Gridroam.Missions
+namespace OurWorld.Missions
 {
     public enum TailWarningState
     {
@@ -47,6 +48,7 @@ namespace Gridroam.Missions
         // Tail state (ready for Mission 4)
         private float _tailGraceTimer;
         private TailWarningState _tailWarningState = TailWarningState.None;
+        private float _swimStepTimer;
 
         // Dialogue state
         private DialogueData _activeDialogue;
@@ -54,7 +56,20 @@ namespace Gridroam.Missions
         private Action _onDialogueCompleted;
         private bool _dialogueWaitingForChoice;
 
+        public MissionCatalog Catalog => missionCatalog;
         public MissionData ActiveMission => _activeMission;
+        public int TotalMissionCount => missionCatalog != null && missionCatalog.missions != null ? missionCatalog.missions.Count : 0;
+        public int ActiveMissionIndex
+        {
+            get
+            {
+                if (_activeMission == null || missionCatalog == null || missionCatalog.missions == null) return 0;
+                int idx = missionCatalog.missions.IndexOf(_activeMission);
+                return idx >= 0 ? idx + 1 : 0;
+            }
+        }
+        public int CurrentStepNumber => _currentStepIndex >= 0 ? _currentStepIndex + 1 : 0;
+        public int ActiveMissionStepCount => _activeMission != null && _activeMission.steps != null ? _activeMission.steps.Count : 0;
         public MissionStepData CurrentStep =>
             (_activeMission != null && _currentStepIndex >= 0 && _currentStepIndex < _activeMission.steps.Count)
                 ? _activeMission.steps[_currentStepIndex]
@@ -108,11 +123,15 @@ namespace Gridroam.Missions
                 InputHub.Instance.OnRetryPressed += HandleRetryShortcut;
             }
 
+            SportMatchEvents.OnMatchFinished += HandleSportMatchFinished;
+
             StartFromSavedProgress();
         }
 
         private void OnDestroy()
         {
+            SportMatchEvents.OnMatchFinished -= HandleSportMatchFinished;
+
             if (PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.OnInteracted -= HandleInteracted;
@@ -292,6 +311,7 @@ namespace Gridroam.Missions
             _currentStepIndex++;
             _hasActiveTimer = false;
             _tailGraceTimer = 0f;
+            _swimStepTimer = 0f;
             _tailWarningState = TailWarningState.None;
 
             if (_currentStepIndex >= _activeMission.steps.Count)
@@ -302,6 +322,11 @@ namespace Gridroam.Missions
 
             MissionStepData step = _activeMission.steps[_currentStepIndex];
             _currentTargetAnchor = WorldAnchorRegistry.Get(step.targetAnchorId);
+
+            if (step.setTimeOfDayHours >= 0f && DayNightCycle.Instance != null)
+            {
+                DayNightCycle.Instance.SetTimeOfDay(step.setTimeOfDayHours);
+            }
 
             if (step.timeLimitSeconds > 0f)
             {
@@ -384,6 +409,52 @@ namespace Gridroam.Missions
             {
                 EvaluateTailStep(step, dist);
             }
+            else if (step.stepType == MissionStepType.SwimAtPool)
+            {
+                if (mode.FootController != null && mode.FootController.IsSwimming)
+                {
+                    _swimStepTimer += Time.deltaTime;
+                    if (_swimStepTimer >= 0.6f)
+                    {
+                        GameFeelAudio.PlayWaterSplash();
+                        GameFeelAudio.PlayCoinChime();
+                        CompleteCurrentStep(step);
+                    }
+                }
+            }
+            else if (step.stepType == MissionStepType.RideTwoWheeler)
+            {
+                if (mode.CurrentMode == ControlMode.Cycling)
+                {
+                    GameFeelAudio.PlayCoinChime();
+                    CompleteCurrentStep(step);
+                }
+            }
+        }
+
+        private void HandleSportMatchFinished(string sportId, bool playerWon)
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed || IsDialoguePlaying) return;
+            if (step.stepType != MissionStepType.PlaySportMatch) return;
+            if (!string.Equals(step.targetAnchorId, sportId, StringComparison.OrdinalIgnoreCase)) return;
+
+            if (!playerWon)
+            {
+                if (PlayerModeController.Instance != null)
+                {
+                    PlayerModeController.Instance.RaiseStatusMessage(
+                        LocalizationService.Tr("sports.mission.retry_hint", "Rövanş için Tekrar'a dokun ve bu etabı kazan!"));
+                }
+                return;
+            }
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.RaiseStatusMessage(
+                    LocalizationService.Tr("sports.mission.stage_done", "Turnuva etabı kazanıldı! Sıradaki hedef güncellendi."));
+            }
+            CompleteCurrentStep(step);
         }
 
         private void EvaluateTailStep(MissionStepData step, float distance)
@@ -542,7 +613,7 @@ namespace Gridroam.Missions
                 {
                     SaveManager.Instance.AddMoney(finished.rewardMoney);
                 }
-                if (finished.missionId == "m14_hamidiye_zaferi")
+                if (finished.missionId == "m14_hamidiye_zaferi" || finished.missionId == "m20_bizim_dunyamiz_mirasi")
                 {
                     SaveManager.Instance.Data.chapterThreeCompleted = true;
                 }
@@ -550,9 +621,14 @@ namespace Gridroam.Missions
             }
 
             // Award Neighborhood Reputation XP & celebratory feedback
-            int repReward = finished.missionId == "m14_hamidiye_zaferi" ? 200 : 60;
+            bool isGrandFinale = finished.missionId == "m20_bizim_dunyamiz_mirasi";
+            bool isChapterMilestone = isGrandFinale ||
+                                      finished.missionId == "m14_hamidiye_zaferi" ||
+                                      finished.missionId == "m16_buyuk_spor_kupasi" ||
+                                      finished.missionId == "m18_sekiz_cadde_rallisi";
+            int repReward = isGrandFinale ? 350 : (isChapterMilestone ? 150 : 75);
             NeighborhoodReputation.AddReputation(repReward);
-            if (finished.missionId == "m14_hamidiye_zaferi")
+            if (isChapterMilestone)
             {
                 GameFeelAudio.PlayMilestoneFanfare();
                 if (PlayerModeController.Instance != null)
@@ -560,8 +636,8 @@ namespace Gridroam.Missions
                     GameFeelAudio.SpawnBurst(
                         PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 1.6f,
                         new Color(1.0f, 0.85f, 0.22f),
-                        count: 24,
-                        spread: 1.1f);
+                        count: isGrandFinale ? 32 : 20,
+                        spread: isGrandFinale ? 1.4f : 1.0f);
                 }
             }
 

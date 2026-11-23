@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Cross-platform Firebase Crashlytics bridge for OurWorld (Android + iOS + Editor):

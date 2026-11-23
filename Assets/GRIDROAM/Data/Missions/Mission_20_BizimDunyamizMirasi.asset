@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_20_BizimDunyamizMirasi
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
+  missionId: m20_bizim_dunyamiz_mirasi
+  titleKey: m20.title
+  summaryKey: m20.summary
+  rewardMoney: 3000
+  nextMissionId: 
+  autoStartNextMission: 0
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 0
+  steps:
+  - stepType: 1
+    objectiveKey: m20.step1.objective
+    targetAnchorId: npc_muhtar_plaza
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: f2bcb01b24ab44af0a2a0f2c8c2d78a4, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: 10
+  - stepType: 7
+    objectiveKey: m20.step2.objective
+    targetAnchorId: sport_volleyball
+    triggerRadius: 8
+    dialogueAsset: {fileID: 0}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m20.step3.objective
+    targetAnchorId: m20_celebration_cake
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: eb65c8b401a14487bb41fac696c34599, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m20.step4.objective
+    targetAnchorId: m20_legacy_plaque
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: f05d05e5f3f764eaaa263ae21f2eb8c3, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 1
+    objectiveKey: m20.step5.objective
+    targetAnchorId: npc_avukat_tarik
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 6949af85faa6d42c0b1b7f8d010f6046, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: npc_elena_neighborhood
+    secondaryDialogueAsset: {fileID: 11400000, guid: 1ffc891262a364cc79ee7630858997a3, type: 2}
+    primaryChoiceId: legacy_youth_academy
+    secondaryChoiceId: legacy_green_park
+    setTimeOfDayHours: -1

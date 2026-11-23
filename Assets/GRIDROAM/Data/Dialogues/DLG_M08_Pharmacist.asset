@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6fbf2695678364565a2c8c368a334a1b, type: 3}
   m_Name: DLG_M08_Pharmacist
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.DialogueData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.DialogueData
   lines:
   - speakerKey: npc.pharmacist.name
     textKey: m08.dlg.b1

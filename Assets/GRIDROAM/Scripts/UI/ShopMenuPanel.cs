@@ -1,11 +1,11 @@
 using System.Collections;
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Safe-area modal shop panel for Café and Market counters:

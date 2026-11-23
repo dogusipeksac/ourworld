@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     public enum GraphicsTier
     {

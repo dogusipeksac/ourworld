@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Lightweight JSON-backed localization service.

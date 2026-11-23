@@ -1,0 +1,7 @@
+Bizim Dünyamız (Our World) v1.0.0 · Build 2 (Büyük Oynanış Güncellemesi)
+• Canlı Açık Dünya Ana Menüsü: Bölge seçerek başlama, hızlı spor maçları ve ayarlar
+• Yenilenen Mobil Kontroller: Dengeli yürüyüş hızı ve büyütülmüş ergonomik joystick / sürüş pedalları
+• 4 Oynanabilir Spor (İstediğin An Maç): Geliştirilen 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol ve 2v2 Voleybol + tam vücut spor animasyonları
+• 5 Bölümlük 20 Hikâye Görevi: Spor Kupası, Gece Yarısı Kesintisi, 8 Cadde Rallisi ve Büyük Final
+• Akıllı Mahalle NPC'leri: Baş üstü konuşma baloncukları, komşu sohbetleri, korna/yağmur/tanık tepkileri
+• Akşam & Gece Aydınlatması: 18:30'dan itibaren yanan sokak lambaları, apartman ışıkları, saha projektörleri ve araç farları

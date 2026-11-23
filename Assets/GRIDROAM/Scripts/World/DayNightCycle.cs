@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Gridroam.Core;
+using OurWorld.Core;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Runtime Day/Night Cycle (default 1 real minute = 1 game hour, starting at 09:00).
@@ -31,7 +31,8 @@ namespace Gridroam.World
         private bool _nightStateInitialized;
 
         public float CurrentHour => _currentHour;
-        public bool IsNight => _currentHour >= 20f || _currentHour < 6f;
+        public bool IsNight => _currentHour >= 18.5f || _currentHour < 6.5f;
+        public float NightFactor { get; private set; }
         public float RealSecondsPerGameHour => Mathf.Max(5f, realSecondsPerGameHour);
 
         public event Action<bool> OnNightStateChanged;
@@ -47,17 +48,20 @@ namespace Gridroam.World
             public float SkyExposure;
         }
 
+        // Positive SunPitch during night acts as high-angle silver-blue Istanbul moonlight shining DOWNWARD
+        // so streets, curbs, buildings, and characters stay crisp and readable while streetlights glow warmly!
         private static readonly AtmosphereKey[] Keys =
         {
-            new AtmosphereKey { Hour = 0.0f,  SunPitch = -35f, SunColor = new Color(0.46f, 0.58f, 0.82f), SunIntensity = 0.24f, AmbientIntensity = 0.62f, FogColor = new Color(0.09f, 0.12f, 0.20f), SkyExposure = 0.42f },
-            new AtmosphereKey { Hour = 5.2f,  SunPitch = -8f,  SunColor = new Color(0.54f, 0.56f, 0.78f), SunIntensity = 0.30f, AmbientIntensity = 0.64f, FogColor = new Color(0.18f, 0.20f, 0.30f), SkyExposure = 0.48f },
-            new AtmosphereKey { Hour = 6.5f,  SunPitch = 12f,  SunColor = new Color(1.00f, 0.70f, 0.48f), SunIntensity = 1.25f, AmbientIntensity = 0.90f, FogColor = new Color(0.66f, 0.54f, 0.50f), SkyExposure = 0.88f },
-            new AtmosphereKey { Hour = 9.0f,  SunPitch = 36f,  SunColor = new Color(1.00f, 0.94f, 0.84f), SunIntensity = 1.85f, AmbientIntensity = 1.15f, FogColor = new Color(0.64f, 0.72f, 0.80f), SkyExposure = 1.12f },
-            new AtmosphereKey { Hour = 12.5f, SunPitch = 56f,  SunColor = new Color(1.00f, 0.97f, 0.90f), SunIntensity = 2.05f, AmbientIntensity = 1.24f, FogColor = new Color(0.68f, 0.77f, 0.85f), SkyExposure = 1.20f },
-            new AtmosphereKey { Hour = 16.8f, SunPitch = 28f,  SunColor = new Color(1.00f, 0.86f, 0.66f), SunIntensity = 1.95f, AmbientIntensity = 1.12f, FogColor = new Color(0.62f, 0.58f, 0.58f), SkyExposure = 1.08f },
-            new AtmosphereKey { Hour = 18.8f, SunPitch = 11f,  SunColor = new Color(1.00f, 0.56f, 0.32f), SunIntensity = 1.32f, AmbientIntensity = 0.86f, FogColor = new Color(0.52f, 0.38f, 0.42f), SkyExposure = 0.84f },
-            new AtmosphereKey { Hour = 20.5f, SunPitch = -14f, SunColor = new Color(0.48f, 0.58f, 0.82f), SunIntensity = 0.26f, AmbientIntensity = 0.64f, FogColor = new Color(0.11f, 0.14f, 0.22f), SkyExposure = 0.45f },
-            new AtmosphereKey { Hour = 24.0f, SunPitch = -35f, SunColor = new Color(0.46f, 0.58f, 0.82f), SunIntensity = 0.24f, AmbientIntensity = 0.62f, FogColor = new Color(0.09f, 0.12f, 0.20f), SkyExposure = 0.42f }
+            new AtmosphereKey { Hour = 0.0f,  SunPitch = 40f, SunColor = new Color(0.60f, 0.72f, 0.96f), SunIntensity = 0.60f, AmbientIntensity = 0.88f, FogColor = new Color(0.14f, 0.19f, 0.30f), SkyExposure = 0.56f },
+            new AtmosphereKey { Hour = 5.2f,  SunPitch = 28f, SunColor = new Color(0.66f, 0.70f, 0.92f), SunIntensity = 0.62f, AmbientIntensity = 0.88f, FogColor = new Color(0.22f, 0.25f, 0.38f), SkyExposure = 0.62f },
+            new AtmosphereKey { Hour = 6.5f,  SunPitch = 14f, SunColor = new Color(1.00f, 0.72f, 0.50f), SunIntensity = 1.28f, AmbientIntensity = 0.95f, FogColor = new Color(0.66f, 0.54f, 0.50f), SkyExposure = 0.90f },
+            new AtmosphereKey { Hour = 9.0f,  SunPitch = 36f, SunColor = new Color(1.00f, 0.94f, 0.84f), SunIntensity = 1.85f, AmbientIntensity = 1.15f, FogColor = new Color(0.64f, 0.72f, 0.80f), SkyExposure = 1.12f },
+            new AtmosphereKey { Hour = 12.5f, SunPitch = 56f, SunColor = new Color(1.00f, 0.97f, 0.90f), SunIntensity = 2.05f, AmbientIntensity = 1.24f, FogColor = new Color(0.68f, 0.77f, 0.85f), SkyExposure = 1.20f },
+            new AtmosphereKey { Hour = 16.8f, SunPitch = 28f, SunColor = new Color(1.00f, 0.86f, 0.66f), SunIntensity = 1.95f, AmbientIntensity = 1.12f, FogColor = new Color(0.62f, 0.58f, 0.58f), SkyExposure = 1.08f },
+            new AtmosphereKey { Hour = 18.6f, SunPitch = 14f, SunColor = new Color(1.00f, 0.62f, 0.38f), SunIntensity = 1.18f, AmbientIntensity = 0.94f, FogColor = new Color(0.46f, 0.36f, 0.44f), SkyExposure = 0.82f },
+            new AtmosphereKey { Hour = 19.6f, SunPitch = 32f, SunColor = new Color(0.64f, 0.72f, 0.94f), SunIntensity = 0.64f, AmbientIntensity = 0.88f, FogColor = new Color(0.18f, 0.22f, 0.34f), SkyExposure = 0.60f },
+            new AtmosphereKey { Hour = 20.8f, SunPitch = 40f, SunColor = new Color(0.60f, 0.72f, 0.96f), SunIntensity = 0.60f, AmbientIntensity = 0.88f, FogColor = new Color(0.14f, 0.19f, 0.30f), SkyExposure = 0.56f },
+            new AtmosphereKey { Hour = 24.0f, SunPitch = 40f, SunColor = new Color(0.60f, 0.72f, 0.96f), SunIntensity = 0.60f, AmbientIntensity = 0.88f, FogColor = new Color(0.14f, 0.19f, 0.30f), SkyExposure = 0.56f }
         };
 
         public static void RegisterNightLight(NightLight lightMarker)
@@ -192,6 +196,8 @@ namespace Gridroam.World
 
         private void Update()
         {
+            if (OurWorld.UI.MainMenuController.IsMenuActive) return;
+
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
@@ -216,14 +222,32 @@ namespace Gridroam.World
                 _sunLight.transform.rotation = Quaternion.Euler(sample.SunPitch, azimuth, 0f);
                 _sunLight.color = sample.SunColor;
                 _sunLight.intensity = sample.SunIntensity;
-                _sunLight.shadowStrength = Mathf.Lerp(0.18f, 0.78f, Mathf.InverseLerp(0.2f, 1.2f, sample.SunIntensity));
+                _sunLight.shadowStrength = Mathf.Lerp(0.24f, 0.78f, Mathf.InverseLerp(0.55f, 1.4f, sample.SunIntensity));
+            }
+
+            // Compute smooth 0..1 evening/night factor (ramps in 18:15-19:30, out 05:30-06:45)
+            if (_currentHour >= 19.5f || _currentHour < 5.5f)
+            {
+                NightFactor = 1f;
+            }
+            else if (_currentHour >= 18.25f)
+            {
+                NightFactor = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(18.25f, 19.5f, _currentHour));
+            }
+            else if (_currentHour < 6.75f)
+            {
+                NightFactor = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(5.5f, 6.75f, _currentHour));
+            }
+            else
+            {
+                NightFactor = 0f;
             }
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            float dayFactor = Mathf.InverseLerp(0.24f, 1.85f, sample.SunIntensity);
-            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.18f, 0.24f, 0.38f), new Color(0.62f, 0.74f, 0.88f), dayFactor) * sample.AmbientIntensity;
-            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.16f, 0.17f, 0.22f), new Color(0.54f, 0.53f, 0.50f), dayFactor) * sample.AmbientIntensity;
-            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.10f, 0.09f, 0.08f), new Color(0.28f, 0.24f, 0.20f), dayFactor) * sample.AmbientIntensity;
+            float dayFactor = 1f - NightFactor;
+            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.32f, 0.40f, 0.56f), new Color(0.62f, 0.74f, 0.88f), dayFactor) * sample.AmbientIntensity;
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.28f, 0.27f, 0.34f), new Color(0.54f, 0.53f, 0.50f), dayFactor) * sample.AmbientIntensity;
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.18f, 0.17f, 0.21f), new Color(0.28f, 0.24f, 0.20f), dayFactor) * sample.AmbientIntensity;
             RenderSettings.ambientIntensity = sample.AmbientIntensity;
             RenderSettings.fogColor = sample.FogColor;
 

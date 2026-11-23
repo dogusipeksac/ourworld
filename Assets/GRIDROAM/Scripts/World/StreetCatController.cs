@@ -1,9 +1,9 @@
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     public class StreetCatController : MonoBehaviour
     {

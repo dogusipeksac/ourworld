@@ -1,8 +1,8 @@
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Lightweight circular top-left minimap using a single static TownMap Texture2D

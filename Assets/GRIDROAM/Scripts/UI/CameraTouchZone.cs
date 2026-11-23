@@ -1,8 +1,8 @@
-using Gridroam.Input;
+using OurWorld.Input;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Transparent touch area on the right half of the screen allowing camera orbit via touch drag

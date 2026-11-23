@@ -1,9 +1,21 @@
 using System;
-using Gridroam.World;
+using OurWorld.World;
 using UnityEngine;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
+    public enum SportAnimKind
+    {
+        None = 0,
+        SoccerKick = 1,
+        SoccerSteal = 2,
+        BasketballJumpShot = 3,
+        BasketballPass = 4,
+        VolleyballBump = 5,
+        VolleyballSpike = 6,
+        VictoryJump = 7
+    }
+
     /// <summary>
     /// Jointed primitive humanoid character with smooth procedural animation:
     /// idle breathing/weight-shift/head look, head-look IK-lite toward nearby interactables (max 60° yaw),
@@ -36,8 +48,8 @@ namespace Gridroam.Player
         [SerializeField] private bool isSitting;
         [SerializeField] private bool isDrivingSeat;
 
-        private const float WalkSpeedRef = 3.4f;
-        private const float RunSpeedRef = 6.2f;
+        private const float WalkSpeedRef = 2.25f;
+        private const float RunSpeedRef = 4.25f;
         private const float WaveDuration = 1.5f;
         private const float LandSquatDuration = 0.15f;
         private const float HandLength = 0.30f;
@@ -70,11 +82,17 @@ namespace Gridroam.Player
         private Vector3 _tennisContact;
         private float _tennisContactAt = float.NegativeInfinity;
         private bool _tennisServing;
+        private bool _tennisBackhand;
         private Vector3? _tennisLeftHand;
-        private const float TennisWindup = 0.19f;
-        private const float TennisFollowThrough = 0.29f;
+        private const float TennisWindup = 0.24f;
+        private const float TennisFollowThrough = 0.34f;
         private const float RacketHandleCenter = 0.09f;
         private const float RacketHeadFromHand = 0.39f;
+
+        // Dedicated full-body sports action animations (Soccer, Basketball, Volleyball, Celebrations)
+        private SportAnimKind _sportAnimKind = SportAnimKind.None;
+        private float _sportAnimTimer = -1f;
+        private float _sportAnimDuration = 0.55f;
 
         private float _phase;
         private int _lastStepCount;
@@ -418,6 +436,20 @@ namespace Gridroam.Player
             _waveTimer = -1f;
         }
 
+        public void PlaySportAnim(SportAnimKind kind, float duration = 0.55f)
+        {
+            if (kind == SportAnimKind.None)
+            {
+                _sportAnimKind = SportAnimKind.None;
+                _sportAnimTimer = -1f;
+                return;
+            }
+            _sportAnimKind = kind;
+            _sportAnimDuration = Mathf.Max(0.28f, duration);
+            _sportAnimTimer = 0f;
+            _waveTimer = -1f;
+        }
+
         public void PlayHitReact()
         {
             _hitReactTimer = 0f;
@@ -723,6 +755,16 @@ namespace Gridroam.Player
                 if (_vaultTimer >= VaultDuration)
                 {
                     _vaultTimer = -1f;
+                }
+            }
+
+            if (_sportAnimTimer >= 0f)
+            {
+                _sportAnimTimer += dt;
+                if (_sportAnimTimer >= _sportAnimDuration)
+                {
+                    _sportAnimTimer = -1f;
+                    _sportAnimKind = SportAnimKind.None;
                 }
             }
 
@@ -1214,15 +1256,158 @@ namespace Gridroam.Player
                 targetHeadRot.x += 14f * crouch;
             }
 
+            // --- Dedicated Full-Body Sports Action Animations (Soccer, Basketball, Volleyball, Celebration) ---
+            if (_sportAnimTimer >= 0f && _sportAnimKind != SportAnimKind.None)
+            {
+                float sn = Mathf.Clamp01(_sportAnimTimer / Mathf.Max(0.1f, _sportAnimDuration));
+                float env = Mathf.Sin(sn * Mathf.PI);
+
+                switch (_sportAnimKind)
+                {
+                    case SportAnimKind.SoccerKick:
+                    {
+                        // Authentic windup -> explosive right-foot strike -> follow-through
+                        float cock = sn < 0.34f ? Mathf.SmoothStep(0f, 1f, sn / 0.34f) : 0f;
+                        float whip = sn >= 0.28f ? Mathf.Sin(Mathf.Clamp01((sn - 0.28f) / 0.72f) * Mathf.PI) : 0f;
+                        targetHipsPos.y -= 0.06f * env;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, cock > 0f ? 8f : -16f, env);
+                        targetSpineRot.y += 22f * cock - 28f * whip;
+                        targetSpineRot.z += -12f * whip;
+                        // Planted left leg bends naturally, right leg cocks far back then whips through ball
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-18f, 0f, -6f), env);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(24f, 0f, 0f), env);
+                        float kickHip = Mathf.Lerp(46f * cock, -78f, whip);
+                        float kickKnee = sn < 0.44f ? Mathf.Lerp(10f, 76f, cock) : Mathf.Lerp(76f, 12f, Mathf.Clamp01((sn - 0.44f) / 0.28f));
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(kickHip, 0f, 8f), env);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(kickKnee, 0f, 0f), env);
+                        targetRAnkleRot = Vector3.Lerp(targetRAnkleRot, new Vector3(28f, 0f, 0f), whip);
+                        // Counter-balancing arms spread athletically
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-48f, 0f, -42f), env);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-36f, 0f, 0f), env);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(32f, 0f, 34f), env);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-28f, 0f, 0f), env);
+                        break;
+                    }
+                    case SportAnimKind.SoccerSteal:
+                    {
+                        // Low forward poke-tackle lunge
+                        targetHipsPos.y -= 0.14f * env;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 22f, env);
+                        targetSpineRot.y += -24f * env;
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-62f, 0f, 10f), env);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(14f, 0f, 0f), env);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(26f, 0f, -6f), env);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(32f, 0f, 0f), env);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-28f, 0f, -46f), env);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(24f, 0f, 40f), env);
+                        break;
+                    }
+                    case SportAnimKind.BasketballJumpShot:
+                    {
+                        // Squat -> explosive 0.56 m jump -> high 2-hand overhead shot release & wrist follow-through!
+                        float dip = sn < 0.22f ? Mathf.Sin((sn / 0.22f) * Mathf.PI) : 0f;
+                        float air = sn >= 0.16f ? Mathf.Sin(Mathf.Clamp01((sn - 0.16f) / 0.84f) * Mathf.PI) : 0f;
+                        float release = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.22f) / 0.28f)) *
+                                        (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.80f) / 0.20f)));
+                        targetHipsPos.y += air * 0.56f - dip * 0.14f;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, dip > 0f ? 14f : -10f, Mathf.Max(dip, air));
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-18f * air + 16f * dip, 0f, -5f), Mathf.Max(dip, air));
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-14f * air + 16f * dip, 0f, 5f), Mathf.Max(dip, air));
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(26f * air + 36f * dip, 0f, 0f), Mathf.Max(dip, air));
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(22f * air + 36f * dip, 0f, 0f), Mathf.Max(dip, air));
+                        // Right shooting arm extends straight overhead, left guide hand supports cleanly
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-164f, 0f, 12f), release);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(sn < 0.48f ? -52f : -12f, 0f, 0f), release);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-146f, 14f, -12f), release);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-34f, 0f, 0f), release);
+                        break;
+                    }
+                    case SportAnimKind.BasketballPass:
+                    {
+                        // Snappy two-hand chest pass push
+                        targetHipsPos.y -= 0.06f * env;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 14f, env);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-84f, 16f, -8f), env);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-84f, -16f, 8f), env);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(sn < 0.35f ? -72f : -10f, 0f, 0f), env);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(sn < 0.35f ? -72f : -10f, 0f, 0f), env);
+                        break;
+                    }
+                    case SportAnimKind.VolleyballBump:
+                    {
+                        // Deep athletic knee crouch -> smooth upward forearm dig platform!
+                        float lift = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.25f) / 0.45f));
+                        targetHipsPos.y -= Mathf.Lerp(0.18f, 0.04f, lift) * env;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, Mathf.Lerp(26f, 10f, lift), env);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-28f, 0f, -10f), env);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-28f, 0f, 10f), env);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(48f, 0f, 0f), env);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(48f, 0f, 0f), env);
+                        float armPitch = Mathf.Lerp(-52f, -94f, lift);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(armPitch, 24f, -4f), env);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(armPitch, -24f, 4f), env);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-6f, 0f, 0f), env);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-6f, 0f, 0f), env);
+                        break;
+                    }
+                    case SportAnimKind.VolleyballSpike:
+                    {
+                        // Explosive 0.66 m airborne leap -> arched back cock -> violent overhead spike whip!
+                        float air = Mathf.Sin(sn * Mathf.PI);
+                        float cock = sn < 0.44f ? Mathf.SmoothStep(0f, 1f, sn / 0.44f) : 0f;
+                        float slam = sn >= 0.38f ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.38f) / 0.26f)) * (1f - Mathf.Clamp01((sn - 0.78f) / 0.22f)) : 0f;
+                        targetHipsPos.y += air * 0.66f;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, cock > 0f ? -20f : 16f, air);
+                        targetSpineRot.y += 28f * cock - 34f * slam;
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-22f, 0f, -5f), air);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-18f, 0f, 5f), air);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(58f, 0f, 0f), air);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(64f, 0f, 0f), air);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(cock > 0f ? -145f : -40f, 0f, -24f), air);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-18f, 0f, 0f), air);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(Mathf.Lerp(-172f, -48f, slam), -14f, 22f), air);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(cock > 0f ? -78f : -12f, 0f, 0f), air);
+                        break;
+                    }
+                    case SportAnimKind.VictoryJump:
+                    {
+                        // Joyful celebration hop with both fists pumped skyward!
+                        float hop = Mathf.Sin(sn * Mathf.PI);
+                        targetHipsPos.y += hop * 0.40f;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -10f, hop);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(38f, 0f, 0f), hop);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(38f, 0f, 0f), hop);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-156f, 0f, -34f), hop);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-156f, 0f, 34f), hop);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-26f, 0f, 0f), hop);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-26f, 0f, 0f), hop);
+                        break;
+                    }
+                }
+            }
+
             float swingTime = Time.time - _tennisContactAt;
             if (tennisStance)
             {
-                targetHipsPos.y -= 0.064f;
+                float serveJump = 0f;
+                if (_tennisServing && swingTime >= -0.22f && swingTime <= 0.22f)
+                {
+                    serveJump = Mathf.Sin(Mathf.InverseLerp(-0.22f, 0.22f, swingTime) * Mathf.PI) * 0.24f;
+                }
+                float readyBounce = Mathf.Abs(Mathf.Sin(_idleTime * 4.2f)) * 0.016f * (1f - moveBlend);
+                targetHipsPos.y += serveJump - 0.072f + readyBounce;
                 targetHipsRot.y *= 0.35f;
-                targetSpineRot.x = _tennisServing && swingTime < 0.09f ? 1f : 12f;
-                float windup = 1f - Mathf.Abs(swingTime + 0.12f) / 0.15f;
-                float follow = 1f - Mathf.Abs(swingTime - 0.10f) / 0.17f;
-                targetSpineRot.y += 32f * Mathf.Clamp01(windup) - 37f * Mathf.Clamp01(follow);
+                targetSpineRot.x = _tennisServing && swingTime < 0.06f ? -14f : 14f;
+                float windup = Mathf.Clamp01(1f - Mathf.Abs(swingTime + 0.14f) / 0.18f);
+                float follow = Mathf.Clamp01(1f - Mathf.Abs(swingTime - 0.11f) / 0.20f);
+                float sideSign = _tennisBackhand ? -1f : 1f;
+                targetSpineRot.y += sideSign * (36f * windup - 42f * follow);
+                targetHipsRot.y += sideSign * (14f * windup - 16f * follow);
+                if (serveJump > 0.02f)
+                {
+                    targetLKneeRot.x = Mathf.Lerp(targetLKneeRot.x, 26f, serveJump / 0.24f);
+                    targetRKneeRot.x = Mathf.Lerp(targetRKneeRot.x, 30f, serveJump / 0.24f);
+                }
             }
 
             if (_hasShelfReach && _shelfReachWeight > 0.01f)
@@ -1305,8 +1490,17 @@ namespace Gridroam.Player
                 hips.position += Vector3.ClampMagnitude(reach, 0.13f * transform.lossyScale.y) * petWeight;
             }
 
+            bool sportAirOrKick = _sportAnimTimer >= 0f &&
+                                  (_sportAnimKind == SportAnimKind.SoccerKick ||
+                                   _sportAnimKind == SportAnimKind.SoccerSteal ||
+                                   _sportAnimKind == SportAnimKind.BasketballJumpShot ||
+                                   _sportAnimKind == SportAnimKind.VolleyballSpike ||
+                                   _sportAnimKind == SportAnimKind.VictoryJump);
+            bool tennisJumpServe = tennisStance && _tennisServing && swingTime >= -0.22f && swingTime <= 0.22f;
+
             if (_grounded && !_isSwimming && !_isLyingDown && _prayerStage == 0 && _vaultTimer < 0f &&
                 _knockdownTimer < 0f && _hitReactTimer < 0f && _punchTimer < 0f &&
+                !sportAirOrKick && !tennisJumpServe &&
                 lAnkle != null && rAnkle != null)
             {
                 PlantFeet(strideLength, stance, runBlend, tennisStance, idleW);
@@ -1686,12 +1880,14 @@ namespace Gridroam.Player
             _tennisContact = contact;
             _tennisContactAt = Time.time + secondsToContact;
             _tennisServing = serving;
+            _tennisBackhand = !serving && transform.InverseTransformPoint(contact).x < -0.05f;
         }
 
         public void ClearTennisSwing()
         {
             _tennisContactAt = float.NegativeInfinity;
             _tennisServing = false;
+            _tennisBackhand = false;
         }
 
         public void SetShelfReach(bool active, Vector3 worldPos, float weight)
@@ -1710,63 +1906,81 @@ namespace Gridroam.Player
 
         private void ApplyTennisRacketPose(float swingTime)
         {
-            Vector3 readyHand = transform.TransformPoint(new Vector3(0.24f, 1.06f, 0.28f));
+            Vector3 readyHand = transform.TransformPoint(new Vector3(0.24f, 1.06f, 0.30f));
             Vector3 readyAxis = new Vector3(0.42f, 0.86f, 0.28f);
             Vector3 axis = readyAxis;
             Vector3 hand = readyHand;
+            Vector3 balanceLeft = transform.TransformPoint(new Vector3(-0.27f, 1.04f, 0.30f));
+
             if (swingTime >= -TennisWindup && swingTime < TennisFollowThrough)
             {
                 Vector3 strikeAxis = _tennisServing
-                    ? new Vector3(0.45f, 0.86f, 0.22f)
-                    : new Vector3(0.89f, 0.25f, 0.38f);
+                    ? new Vector3(0.32f, 0.92f, 0.22f)
+                    : (_tennisBackhand ? new Vector3(-0.88f, 0.28f, 0.38f) : new Vector3(0.89f, 0.25f, 0.38f));
                 Vector3 strikeUp = transform.TransformDirection(strikeAxis.normalized);
                 Vector3 strikeFace = Vector3.ProjectOnPlane(transform.forward, strikeUp).normalized;
                 Vector3 strikeHand = _tennisContact - strikeFace * TennisCourt.BallRadius -
                     strikeUp * (RacketHeadFromHand * transform.lossyScale.y);
+
                 if (swingTime < 0f)
                 {
-                    const float backswingTime = -0.11f;
+                    const float backswingTime = -0.12f;
                     Vector3 backswingHand = transform.TransformPoint(_tennisServing
-                        ? new Vector3(0.27f, 1.42f, -0.14f)
-                        : new Vector3(0.43f, 1.02f, -0.23f));
-                    Vector3 backswingAxis = new Vector3(0.64f, 0.45f, -0.62f);
+                        ? new Vector3(0.30f, 1.56f, -0.18f)
+                        : (_tennisBackhand ? new Vector3(-0.34f, 0.96f, -0.16f) : new Vector3(0.46f, 1.02f, -0.26f)));
+                    Vector3 backswingAxis = _tennisServing
+                        ? new Vector3(0.42f, 0.32f, -0.85f)
+                        : (_tennisBackhand ? new Vector3(-0.72f, 0.42f, -0.55f) : new Vector3(0.66f, 0.45f, -0.60f));
                     if (swingTime < backswingTime)
                     {
                         float windup = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-TennisWindup, backswingTime, swingTime));
                         hand = Vector3.Lerp(readyHand, backswingHand, windup);
                         axis = Vector3.Slerp(readyAxis, backswingAxis, windup);
+                        balanceLeft = transform.TransformPoint(Vector3.Lerp(
+                            new Vector3(-0.27f, 1.04f, 0.30f),
+                            _tennisBackhand ? new Vector3(-0.32f, 1.08f, 0.08f) : new Vector3(-0.42f, 1.16f, 0.42f),
+                            windup));
                     }
                     else
                     {
                         float strike = Mathf.InverseLerp(backswingTime, 0f, swingTime);
-                        hand = Vector3.Lerp(backswingHand, strikeHand, strike * strike);
-                        axis = Vector3.Slerp(backswingAxis, strikeAxis, strike * strike);
+                        float ease = strike * strike;
+                        hand = Vector3.Lerp(backswingHand, strikeHand, ease);
+                        axis = Vector3.Slerp(backswingAxis, strikeAxis, ease);
+                        balanceLeft = transform.TransformPoint(Vector3.Lerp(
+                            new Vector3(-0.42f, 1.16f, 0.42f),
+                            new Vector3(-0.46f, 1.04f, 0.04f),
+                            ease));
                     }
                 }
                 else
                 {
-                    Vector3 finishHand = transform.TransformPoint(new Vector3(-0.10f, 1.28f, 0.32f));
-                    Vector3 finishAxis = new Vector3(-0.75f, 0.62f, 0.22f);
-                    const float finishTime = 0.12f;
+                    Vector3 finishHand = transform.TransformPoint(_tennisServing
+                        ? new Vector3(-0.22f, 0.88f, 0.36f)
+                        : (_tennisBackhand ? new Vector3(0.38f, 1.32f, 0.34f) : new Vector3(-0.18f, 1.32f, 0.34f)));
+                    Vector3 finishAxis = _tennisServing
+                        ? new Vector3(-0.62f, -0.58f, 0.52f)
+                        : (_tennisBackhand ? new Vector3(0.78f, 0.58f, 0.24f) : new Vector3(-0.78f, 0.60f, 0.22f));
+                    const float finishTime = 0.14f;
                     if (swingTime < finishTime)
                     {
                         float follow = Mathf.SmoothStep(0f, 1f, swingTime / finishTime);
                         hand = Vector3.Lerp(strikeHand, finishHand, follow);
                         axis = Vector3.Slerp(strikeAxis, finishAxis, follow);
+                        balanceLeft = transform.TransformPoint(new Vector3(-0.44f, 1.06f, -0.06f));
                     }
                     else
                     {
                         float recover = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(finishTime, TennisFollowThrough, swingTime));
                         hand = Vector3.Lerp(finishHand, readyHand, recover);
                         axis = Vector3.Slerp(finishAxis, readyAxis, recover);
+                        balanceLeft = transform.TransformPoint(Vector3.Lerp(new Vector3(-0.44f, 1.06f, -0.06f), new Vector3(-0.27f, 1.04f, 0.30f), recover));
                     }
                 }
             }
 
-            AimHand(rShoulder, rElbow, hand, transform.right, 1f);
-            AimHand(lShoulder, lElbow,
-                _tennisLeftHand ?? transform.TransformPoint(new Vector3(-0.27f, 1.03f, 0.29f)),
-                -transform.right, 1f);
+            AimHand(rShoulder, rElbow, hand, _tennisBackhand ? -transform.right : transform.right, 1f);
+            AimHand(lShoulder, lElbow, _tennisLeftHand ?? balanceLeft, -transform.right, 1f);
             Vector3 racketUp = transform.TransformDirection(axis.normalized);
             Vector3 racketForward = Vector3.ProjectOnPlane(transform.forward, racketUp).normalized;
             Quaternion rotation = Quaternion.LookRotation(racketForward, racketUp);

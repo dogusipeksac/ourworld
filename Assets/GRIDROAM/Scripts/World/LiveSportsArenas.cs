@@ -1,20 +1,59 @@
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.CameraSystem;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
-    /// Autonomous 3v3 Halı Saha football (soccer) match: 3 Red vs 3 Blue NPCs (1 GK + 2 outfield per team)
-    /// who dynamically sprint, dribble, pass, shoot on goal, dive/defend, celebrate goals, and update
-    /// the live 3D scoreboard. Audio is strictly 3D spatial and muted beyond 22 m.
+    /// Lightweight event bus broadcasting completed player sport matches (Tennis, Football, Basketball, Volleyball)
+    /// so story missions and achievements react cleanly without tight coupling.
     /// </summary>
-    public sealed class LiveFootballMatch : MonoBehaviour
+    public static class SportMatchEvents
+    {
+        public static event System.Action<string, bool> OnMatchFinished;
+
+        public static void NotifyMatchFinished(string sportId, bool playerWon)
+        {
+            OnMatchFinished?.Invoke(sportId, playerWon);
+        }
+    }
+
+    /// <summary>
+    /// Shared runtime contract for any playable neighborhood sports arena
+    /// (3v3 Halı Saha Football, 2v2 Streetball Basketball, 2v2 Sand Volleyball).
+    /// </summary>
+    public interface IPlayableSportArena
+    {
+        bool IsPlayerActive { get; }
+        int HudRevision { get; }
+        bool AcceptsPrimaryAction { get; }
+        bool HasSecondaryAction { get; }
+        Vector3 ReturnPosition { get; }
+        Quaternion ReturnRotation { get; }
+        string HudText();
+        string PrimaryButtonLabel();
+        string SecondaryButtonLabel();
+        string ControlsHintKey();
+        void BeginPlayerMatch(PlayerFootController player);
+        void EndPlayerMatch();
+        void TriggerPrimaryAction();
+        void TriggerSecondaryAction();
+    }
+
+    /// <summary>
+    /// 3v3 Halı Saha football (soccer) arena: runs autonomously as a lively NPC match when unattended,
+    /// and seamlessly lets the player join Red Team anytime to dribble, pass, steal, shoot aimed goals,
+    /// and win matches for cash and neighborhood reputation.
+    /// </summary>
+    public sealed class LiveFootballMatch : MonoBehaviour, IPlayableSportArena
     {
         private const float HalfW = 7.6f;
         private const float HalfL = 11.4f;
         private const float GoalHalfW = 2.05f;
         private const float BallRadius = 0.13f;
+        private const int GoalsToWin = 3;
 
         private ProceduralHumanoid[] _red;
         private ProceduralHumanoid[] _blue;
@@ -37,6 +76,31 @@ namespace Gridroam.World
         private Vector3[] _redHome;
         private Vector3[] _blueHome;
 
+        // Player-controlled match state
+        private PlayerFootController _player;
+        private ThirdPersonCameraRig _cameraRig;
+        private Vector3 _beginPos;
+        private Quaternion _beginRot;
+        private Vector3 _playerLocalPos;
+        private Quaternion _playerLocalRot = Quaternion.identity;
+        private bool _matchOver;
+        private bool _playerWonMatch;
+        private bool _lastGoalByRed;
+        private float _stealImmunityTimer;
+        private float _dashBoostTimer;
+        private float _statusBannerTimer;
+        private string _statusBannerKey;
+        private int _lastHudStateHash;
+
+        public bool IsPlayerActive => _player != null;
+        public int HudRevision { get; private set; }
+        public Vector3 ReturnPosition => _beginPos;
+        public Quaternion ReturnRotation => _beginRot;
+        public bool HasSecondaryAction => _player != null && !_matchOver && PlayerHasBall;
+        public bool AcceptsPrimaryAction => _player != null && (_matchOver || _goalResetTimer <= 0f);
+
+        private bool PlayerHasBall => _player != null && _carrierTeam == 0 && _carrierIdx == 1;
+
         public void Configure(
             ProceduralHumanoid[] redTeam,
             ProceduralHumanoid[] blueTeam,
@@ -57,18 +121,277 @@ namespace Gridroam.World
             _redHome = new[]
             {
                 new Vector3(0f, 0f, -HalfL + 0.9f),
-                new Vector3(-3.0f, 0f, -3.2f),
-                new Vector3(3.0f, 0f, -1.8f)
+                new Vector3(-2.6f, 0f, -2.2f),
+                new Vector3(3.0f, 0f, -1.5f)
             };
             _blueHome = new[]
             {
                 new Vector3(0f, 0f, HalfL - 0.9f),
-                new Vector3(-3.0f, 0f, 1.8f),
+                new Vector3(-3.0f, 0f, 2.2f),
                 new Vector3(3.0f, 0f, 3.2f)
             };
 
             ResetKickoff(0);
             UpdateScoreboard();
+        }
+
+        public void BeginPlayerMatch(PlayerFootController player)
+        {
+            if (player == null) return;
+            _player = player;
+            _beginPos = player.transform.position;
+            _beginRot = player.transform.rotation;
+            _redScore = 0;
+            _blueScore = 0;
+            _matchOver = false;
+            _playerWonMatch = false;
+            _goalResetTimer = 0f;
+            _statusBannerTimer = 0f;
+            _statusBannerKey = null;
+
+            if (_red != null && _red.Length > 1 && _red[1] != null)
+            {
+                _red[1].gameObject.SetActive(false);
+            }
+
+            player.SetSeatedState(true);
+            _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(true, distance: 9.2f, pitch: 28f, fov: 62f, lockYaw: transform.eulerAngles.y);
+            }
+
+            ResetKickoff(0);
+            UpdateScoreboard();
+            HudRevision++;
+        }
+
+        public void EndPlayerMatch()
+        {
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(false);
+                _cameraRig = null;
+            }
+
+            if (_player != null)
+            {
+                _player.Humanoid?.SetLookAtPoint(false, Vector3.zero);
+                _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                _player.SetSeatedState(false);
+            }
+            _player = null;
+            _matchOver = false;
+
+            if (_red != null && _red.Length > 1 && _red[1] != null)
+            {
+                _red[1].gameObject.SetActive(true);
+            }
+
+            _redScore = 0;
+            _blueScore = 0;
+            ResetKickoff(0);
+            UpdateScoreboard();
+        }
+
+        public string ControlsHintKey() => "sports.football.controls";
+
+        public string PrimaryButtonLabel()
+        {
+            if (_matchOver) return LocalizationService.Tr("sports.btn.rematch", "Tekrar");
+            if (PlayerHasBall) return LocalizationService.Tr("sports.btn.shoot", "Şut!");
+            if (_carrierTeam == 0 && _carrierIdx == 2) return LocalizationService.Tr("sports.btn.call_pass", "Pas İste");
+            if (_carrierTeam == 1) return LocalizationService.Tr("sports.btn.steal", "Top Kap");
+            return LocalizationService.Tr("sports.btn.shoot", "Şut!");
+        }
+
+        public string SecondaryButtonLabel()
+        {
+            if (PlayerHasBall) return LocalizationService.Tr("sports.btn.pass", "Pas Ver");
+            if (_carrierTeam == 0 && _carrierIdx == 2) return LocalizationService.Tr("sports.btn.call_pass", "Pas İste");
+            return LocalizationService.Tr("sports.btn.steal", "Top Kap");
+        }
+
+        public string HudText()
+        {
+            string title = LocalizationService.Tr("sports.football.title", "Halı Saha");
+            string redLbl = LocalizationService.Tr("sports.football.team_you", "Sen");
+            string blueLbl = LocalizationService.Tr("sports.football.team_rival", "Mavi");
+            string status;
+
+            if (_matchOver)
+            {
+                status = LocalizationService.Tr(_playerWonMatch ? "sports.football.won" : "sports.football.lost");
+            }
+            else if (_goalResetTimer > 0f)
+            {
+                status = LocalizationService.Tr(_lastGoalByRed ? "sports.football.goal_you" : "sports.football.goal_rival");
+            }
+            else if (_statusBannerTimer > 0f && !string.IsNullOrEmpty(_statusBannerKey))
+            {
+                status = LocalizationService.Tr(_statusBannerKey);
+            }
+            else if (PlayerHasBall)
+            {
+                status = LocalizationService.Tr("sports.football.has_ball");
+            }
+            else if (_carrierTeam == 0)
+            {
+                status = LocalizationService.Tr("sports.football.mate_ball");
+            }
+            else if (_carrierTeam == 1)
+            {
+                status = LocalizationService.Tr("sports.football.defend");
+            }
+            else
+            {
+                status = LocalizationService.Tr("sports.football.chase");
+            }
+
+            return $"{title}  ·  {redLbl} {_redScore} - {_blueScore} {blueLbl}\n{status}";
+        }
+
+        public void TriggerPrimaryAction()
+        {
+            if (_player == null) return;
+
+            if (_matchOver)
+            {
+                if (_goalResetTimer <= 0f)
+                {
+                    _redScore = 0;
+                    _blueScore = 0;
+                    _matchOver = false;
+                    ResetKickoff(0);
+                    UpdateScoreboard();
+                    GameFeelAudio.PlayUiClick();
+                    HudRevision++;
+                }
+                return;
+            }
+
+            if (_goalResetTimer > 0f) return;
+
+            if (PlayerHasBall)
+            {
+                ShootTowardBlueGoal(powerMultiplier: 1.0f);
+                return;
+            }
+
+            // Ask Red teammate for an immediate crisp pass!
+            if (_carrierTeam == 0 && _carrierIdx == 2 && _red != null && _red.Length > 2 && _red[2] != null)
+            {
+                ProceduralHumanoid mate = _red[2];
+                mate.PlaySportAnim(SportAnimKind.SoccerKick, 0.45f);
+                PlayKickSound(0.45f, alwaysHear: true);
+                Vector3 lead = _playerLocalPos + new Vector3(0f, 0f, 0.9f);
+                lead.x = Mathf.Clamp(lead.x, -HalfW + 1f, HalfW - 1f);
+                lead.z = Mathf.Clamp(lead.z, -HalfL + 1.5f, HalfL - 1.5f);
+                Vector3 delta = lead - _ballPos;
+                float t = Mathf.Clamp(delta.magnitude / 10.5f, 0.25f, 0.65f);
+                _ballVel = new Vector3(delta.x / t, 1.35f, delta.z / t);
+                _carrierTeam = -1;
+                _actionTimer = 0.14f;
+                SetTempStatus("sports.football.passed_to_you", 1.1f);
+                return;
+            }
+
+            // One-touch volley if loose ball is within reach!
+            if (_carrierTeam == -1)
+            {
+                Vector3 dBall = _ballPos - _playerLocalPos;
+                dBall.y = 0f;
+                if (dBall.magnitude <= 2.4f)
+                {
+                    ShootTowardBlueGoal(powerMultiplier: 1.08f);
+                    return;
+                }
+            }
+
+            // Steal / tackle attempt on Blue carrier
+            TryPlayerSteal();
+        }
+
+        public void TriggerSecondaryAction()
+        {
+            if (_player == null || _matchOver || _goalResetTimer > 0f) return;
+
+            if (PlayerHasBall && _red != null && _red.Length > 2 && _red[2] != null)
+            {
+                _player.Humanoid?.PlaySportAnim(SportAnimKind.SoccerKick, 0.45f);
+                PlayKickSound(0.42f, alwaysHear: true);
+                Vector3 matePos = _red[2].transform.localPosition + new Vector3(0f, 0f, 1.6f);
+                matePos.x = Mathf.Clamp(matePos.x, -HalfW + 1.2f, HalfW - 1.2f);
+                matePos.z = Mathf.Clamp(matePos.z, -HalfL + 1.6f, HalfL - 1.6f);
+                Vector3 delta = matePos - _ballPos;
+                float t = Mathf.Clamp(delta.magnitude / 10.2f, 0.28f, 0.68f);
+                _ballVel = new Vector3(delta.x / t, 1.45f, delta.z / t);
+                _carrierTeam = -1;
+                _actionTimer = 0.22f;
+                SetTempStatus("sports.football.nice_pass", 1.0f);
+                return;
+            }
+
+            if (_carrierTeam == 0 && _carrierIdx == 2)
+            {
+                TriggerPrimaryAction();
+                return;
+            }
+
+            TryPlayerSteal();
+        }
+
+        private void ShootTowardBlueGoal(float powerMultiplier)
+        {
+            float aimInput = InputHub.Instance != null ? InputHub.Instance.MoveInput.x : 0f;
+            float gkX = (_blue != null && _blue.Length > 0 && _blue[0] != null) ? _blue[0].transform.localPosition.x : 0f;
+            // Smart aim assist: if player isn't aiming explicitly, bend away from goalkeeper!
+            float aimX = Mathf.Abs(aimInput) >= 0.16f
+                ? Mathf.Clamp(aimInput, -1f, 1f) * (GoalHalfW - 0.22f)
+                : (gkX >= 0f ? -GoalHalfW * 0.68f : GoalHalfW * 0.68f);
+
+            _player.Humanoid?.PlaySportAnim(SportAnimKind.SoccerKick, 0.52f);
+            PlayKickSound(0.64f, alwaysHear: true);
+
+            Vector3 shotTarget = new Vector3(aimX, 0.85f, HalfL + 0.65f);
+            Vector3 delta = shotTarget - _ballPos;
+            float speed = 14.2f * powerMultiplier;
+            float flightTime = Mathf.Clamp(delta.magnitude / speed, 0.30f, 0.78f);
+            float loft = Mathf.Clamp(2.2f + delta.magnitude * 0.14f, 2.2f, 4.1f);
+            _ballVel = new Vector3(delta.x / flightTime, loft, delta.z / flightTime);
+            _carrierTeam = -1;
+            _actionTimer = 0.22f;
+            GameFeelAudio.SpawnBurst(transform.TransformPoint(_ballPos + Vector3.up * 0.15f), new Color(0.28f, 0.90f, 0.78f), count: 7, spread: 0.35f);
+            HudRevision++;
+        }
+
+        private void TryPlayerSteal()
+        {
+            _player.Humanoid?.PlaySportAnim(SportAnimKind.SoccerSteal, 0.44f);
+            _dashBoostTimer = 0.26f;
+
+            if (_carrierTeam == 1 && _blue != null && _carrierIdx < _blue.Length && _blue[_carrierIdx] != null)
+            {
+                Vector3 carrierPos = _blue[_carrierIdx].transform.localPosition;
+                Vector3 d = carrierPos - _playerLocalPos;
+                d.y = 0f;
+                if (d.magnitude <= 3.5f)
+                {
+                    _carrierTeam = 0;
+                    _carrierIdx = 1;
+                    _stealImmunityTimer = 0.95f;
+                    PlayKickSound(0.45f, alwaysHear: true);
+                    GameFeelAudio.SpawnBurst(transform.TransformPoint(_ballPos + Vector3.up * 0.25f), new Color(0.98f, 0.82f, 0.24f), count: 8, spread: 0.4f);
+                    SetTempStatus("sports.football.stole", 1.15f);
+                }
+            }
+        }
+
+        private void SetTempStatus(string key, float duration)
+        {
+            _statusBannerKey = key;
+            _statusBannerTimer = duration;
+            HudRevision++;
         }
 
         private void ResetKickoff(int team)
@@ -78,6 +401,7 @@ namespace Gridroam.World
             _carrierTeam = team;
             _carrierIdx = 1;
             _actionTimer = 0.9f;
+            _stealImmunityTimer = 1.0f;
 
             for (int i = 0; i < 3; i++)
             {
@@ -92,74 +416,145 @@ namespace Gridroam.World
                     _blue[i].transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
                 }
             }
+
+            if (_player != null)
+            {
+                _playerLocalPos = new Vector3(0f, 0f, team == 0 ? -0.8f : -3.4f);
+                _playerLocalRot = Quaternion.identity;
+                _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation);
+                _player.Humanoid?.SetLocomotion(0f, true, 0f);
+            }
         }
 
         private void Update()
         {
             if (_red == null || _blue == null || _ball == null) return;
+            if (_player != null && PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked) return;
+
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
+            if (_stealImmunityTimer > 0f) _stealImmunityTimer -= dt;
+            if (_dashBoostTimer > 0f) _dashBoostTimer -= dt;
+            if (_statusBannerTimer > 0f)
+            {
+                _statusBannerTimer -= dt;
+                if (_statusBannerTimer <= 0f) HudRevision++;
+            }
 
             if (_goalResetTimer > 0f)
             {
                 _goalResetTimer -= dt;
-                IdleTeam(_red, dt);
-                IdleTeam(_blue, dt);
+                IdleTeam(_red);
+                IdleTeam(_blue);
+                if (_player != null) _player.Humanoid?.SetLocomotion(0f, true, 0f);
                 if (_goalResetTimer <= 0f)
                 {
-                    ResetKickoff((_redScore + _blueScore) % 2);
+                    if (!_matchOver)
+                    {
+                        ResetKickoff(_player != null ? 0 : (_redScore + _blueScore) % 2);
+                    }
+                    HudRevision++;
                 }
                 UpdateBallVisual(dt);
                 return;
             }
 
+            if (_matchOver)
+            {
+                IdleTeam(_red);
+                IdleTeam(_blue);
+                if (_player != null) _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                UpdateBallVisual(dt);
+                return;
+            }
+
+            if (_player != null)
+            {
+                UpdatePlayerOnPitch(dt);
+            }
+
             if (_carrierTeam >= 0)
             {
-                ProceduralHumanoid carrier = (_carrierTeam == 0 ? _red : _blue)[_carrierIdx];
-                float attackDir = _carrierTeam == 0 ? 1f : -1f;
-                Vector3 goalTarget = new Vector3(Mathf.Sin(Time.time * 1.1f) * 1.4f, 0f, attackDir * (HalfL - 0.5f));
-                Vector3 toGoal = goalTarget - carrier.transform.localPosition;
-                toGoal.y = 0f;
-                Vector3 runDir = toGoal.sqrMagnitude > 0.01f ? toGoal.normalized : new Vector3(0f, 0f, attackDir);
-                // Gentle lateral weave while dribbling
-                runDir = (runDir + new Vector3(Mathf.Sin(Time.time * 2.2f + _carrierIdx) * 0.45f, 0f, 0f)).normalized;
-
-                MovePlayer(carrier, carrier.transform.localPosition + runDir * 2.8f, 3.4f, dt);
-                _dribbleStep += dt * 7f;
-                _ballPos = carrier.transform.localPosition + carrier.transform.localRotation * Vector3.forward * (0.52f + Mathf.Abs(Mathf.Sin(_dribbleStep)) * 0.22f);
-                _ballPos.y = BallRadius;
-
-                _actionTimer -= dt;
-                float distToGoalZ = Mathf.Abs(attackDir * HalfL - carrier.transform.localPosition.z);
-
-                if (_actionTimer <= 0f || distToGoalZ < 5.6f)
+                if (PlayerHasBall)
                 {
-                    bool shoot = distToGoalZ < 7.8f || Random.value < 0.42f;
-                    carrier.PlayCombatMove(2); // Kick swing
-                    PlayKickSound(shoot ? 0.55f : 0.36f);
+                    _dribbleStep += dt * 7.8f;
+                    _ballPos = _playerLocalPos + (_playerLocalRot * Vector3.forward) * (0.56f + Mathf.Abs(Mathf.Sin(_dribbleStep)) * 0.18f);
+                    _ballPos.y = BallRadius;
 
-                    if (shoot)
+                    // Fair defender pressure check: Blue defender can tackle only if sticking right on player after immunity expires
+                    if (_stealImmunityTimer <= 0f)
                     {
-                        float aimX = Random.Range(-GoalHalfW + 0.35f, GoalHalfW - 0.35f);
-                        Vector3 shotTarget = new Vector3(aimX, 0.9f, attackDir * (HalfL + 0.6f));
-                        Vector3 delta = shotTarget - _ballPos;
-                        float flightTime = Mathf.Clamp(delta.magnitude / 12.5f, 0.38f, 0.85f);
-                        _ballVel = new Vector3(delta.x / flightTime, Random.Range(2.4f, 4.4f), delta.z / flightTime);
+                        for (int b = 1; b < _blue.Length; b++)
+                        {
+                            Vector3 d = _blue[b].transform.localPosition - _playerLocalPos;
+                            d.y = 0f;
+                            if (d.magnitude < 0.92f)
+                            {
+                                _carrierTeam = 1;
+                                _carrierIdx = b;
+                                _actionTimer = 1.25f;
+                                _blue[b].PlaySportAnim(SportAnimKind.SoccerSteal, 0.40f);
+                                PlayKickSound(0.35f, alwaysHear: true);
+                                HudRevision++;
+                                break;
+                            }
+                        }
                     }
-                    else
-                    {
-                        // Pass to other outfield teammate
-                        int mateIdx = _carrierIdx == 1 ? 2 : 1;
-                        ProceduralHumanoid mate = (_carrierTeam == 0 ? _red : _blue)[mateIdx];
-                        Vector3 lead = mate.transform.localPosition + new Vector3(0f, 0f, attackDir * 2.2f);
-                        lead.x = Mathf.Clamp(lead.x, -HalfW + 1.2f, HalfW - 1.2f);
-                        lead.z = Mathf.Clamp(lead.z, -HalfL + 1.8f, HalfL - 1.8f);
-                        Vector3 delta = lead - _ballPos;
-                        float passTime = Mathf.Clamp(delta.magnitude / 9.2f, 0.35f, 0.85f);
-                        _ballVel = new Vector3(delta.x / passTime, 1.8f, delta.z / passTime);
-                    }
+                }
+                else
+                {
+                    ProceduralHumanoid carrier = (_carrierTeam == 0 ? _red : _blue)[_carrierIdx];
+                    float attackDir = _carrierTeam == 0 ? 1f : -1f;
+                    Vector3 goalTarget = new Vector3(Mathf.Sin(Time.time * 1.1f) * 1.4f, 0f, attackDir * (HalfL - 0.5f));
+                    Vector3 toGoal = goalTarget - carrier.transform.localPosition;
+                    toGoal.y = 0f;
+                    Vector3 runDir = toGoal.sqrMagnitude > 0.01f ? toGoal.normalized : new Vector3(0f, 0f, attackDir);
+                    runDir = (runDir + new Vector3(Mathf.Sin(Time.time * 2.2f + _carrierIdx) * 0.45f, 0f, 0f)).normalized;
 
-                    _carrierTeam = -1;
-                    _actionTimer = 0.25f;
+                    MoveNpc(carrier, carrier.transform.localPosition + runDir * 2.8f, _player != null && _carrierTeam == 1 ? 3.1f : 3.4f, dt);
+                    _dribbleStep += dt * 7f;
+                    _ballPos = carrier.transform.localPosition + carrier.transform.localRotation * Vector3.forward * (0.52f + Mathf.Abs(Mathf.Sin(_dribbleStep)) * 0.22f);
+                    _ballPos.y = BallRadius;
+
+                    _actionTimer -= dt;
+                    float distToGoalZ = Mathf.Abs(attackDir * HalfL - carrier.transform.localPosition.z);
+
+                    if (_actionTimer <= 0f || distToGoalZ < 5.6f)
+                    {
+                        bool shoot = distToGoalZ < 7.8f || Random.value < 0.42f;
+                        carrier.PlaySportAnim(SportAnimKind.SoccerKick, 0.48f);
+                        PlayKickSound(shoot ? 0.55f : 0.36f);
+
+                        if (shoot)
+                        {
+                            float aimX = Random.Range(-GoalHalfW + 0.35f, GoalHalfW - 0.35f);
+                            Vector3 shotTarget = new Vector3(aimX, 0.9f, attackDir * (HalfL + 0.6f));
+                            Vector3 delta = shotTarget - _ballPos;
+                            float flightTime = Mathf.Clamp(delta.magnitude / 12.2f, 0.38f, 0.85f);
+                            _ballVel = new Vector3(delta.x / flightTime, Random.Range(2.3f, 4.1f), delta.z / flightTime);
+                        }
+                        else
+                        {
+                            Vector3 targetMatePos;
+                            if (_carrierTeam == 0 && _player != null)
+                            {
+                                targetMatePos = _playerLocalPos + new Vector3(0f, 0f, 1.5f);
+                            }
+                            else
+                            {
+                                int mateIdx = _carrierIdx == 1 ? 2 : 1;
+                                ProceduralHumanoid mate = (_carrierTeam == 0 ? _red : _blue)[mateIdx];
+                                targetMatePos = mate.transform.localPosition + new Vector3(0f, 0f, attackDir * 2.2f);
+                            }
+                            targetMatePos.x = Mathf.Clamp(targetMatePos.x, -HalfW + 1.2f, HalfW - 1.2f);
+                            targetMatePos.z = Mathf.Clamp(targetMatePos.z, -HalfL + 1.8f, HalfL - 1.8f);
+                            Vector3 delta = targetMatePos - _ballPos;
+                            float passTime = Mathf.Clamp(delta.magnitude / 9.2f, 0.35f, 0.85f);
+                            _ballVel = new Vector3(delta.x / passTime, 1.7f, delta.z / passTime);
+                        }
+
+                        _carrierTeam = -1;
+                        _actionTimer = 0.25f;
+                    }
                 }
             }
             else
@@ -186,21 +581,7 @@ namespace Gridroam.World
                 // Check goals at Z = ±HalfL
                 if (Mathf.Abs(_ballPos.z) >= HalfL + 0.12f && Mathf.Abs(_ballPos.x) <= GoalHalfW)
                 {
-                    bool redScored = _ballPos.z > 0f;
-                    if (redScored) _redScore++; else _blueScore++;
-                    UpdateScoreboard();
-                    _goalResetTimer = 2.4f;
-                    _ballVel *= 0.2f;
-
-                    ProceduralHumanoid[] winners = redScored ? _red : _blue;
-                    for (int i = 0; i < winners.Length; i++) winners[i].PlayWave();
-                    if (IsPlayerNear(26f))
-                    {
-                        GameFeelAudio.SpawnBurst(
-                            transform.TransformPoint(_ballPos + Vector3.up * 0.8f),
-                            redScored ? new Color(0.95f, 0.25f, 0.20f) : new Color(0.22f, 0.56f, 0.98f),
-                            count: 14, spread: 0.7f);
-                    }
+                    HandleGoalScored(_ballPos.z > 0f);
                     UpdateBallVisual(dt);
                     return;
                 }
@@ -218,7 +599,7 @@ namespace Gridroam.World
                 }
 
                 _actionTimer -= dt;
-                if (_actionTimer <= 0f && _ballPos.y < 0.75f)
+                if (_actionTimer <= 0f && _ballPos.y < 1.05f)
                 {
                     TryClaimBall();
                 }
@@ -226,10 +607,130 @@ namespace Gridroam.World
 
             UpdateAllPlayers(dt);
             UpdateBallVisual(dt);
+            CheckHudStateChanged();
+        }
+
+        private void HandleGoalScored(bool redScored)
+        {
+            _lastGoalByRed = redScored;
+            if (redScored) _redScore++; else _blueScore++;
+            UpdateScoreboard();
+            _goalResetTimer = 2.0f;
+            _ballVel *= 0.2f;
+
+            ProceduralHumanoid[] winners = redScored ? _red : _blue;
+            for (int i = 0; i < winners.Length; i++)
+            {
+                if (winners[i] != null && winners[i].gameObject.activeSelf)
+                {
+                    winners[i].PlaySportAnim(SportAnimKind.VictoryJump, 0.68f);
+                }
+            }
+
+            if (_player != null)
+            {
+                if (redScored)
+                {
+                    _player.Humanoid?.PlaySportAnim(SportAnimKind.VictoryJump, 0.78f);
+                    if (SaveManager.Instance != null)
+                    {
+                        SaveManager.Instance.Data.footballGoalsScored++;
+                        SaveManager.Instance.AddMoney(35);
+                    }
+                    GameFeelAudio.PlayCoinChime();
+                }
+
+                if (_redScore >= GoalsToWin || _blueScore >= GoalsToWin)
+                {
+                    _matchOver = true;
+                    _playerWonMatch = _redScore >= GoalsToWin;
+                    _goalResetTimer = 1.1f;
+                    if (_playerWonMatch)
+                    {
+                        GameFeelAudio.PlayMilestoneFanfare();
+                        SaveManager.Instance?.AddMoney(90);
+                        NeighborhoodReputation.AddReputation(30, LocalizationService.Tr("sports.football.win_toast", "Halı Saha Zaferi! (+90 ₺)"));
+                    }
+                    SportMatchEvents.NotifyMatchFinished("sport_football", _playerWonMatch);
+                }
+                HudRevision++;
+            }
+
+            if (_player != null || IsPlayerNear(26f))
+            {
+                GameFeelAudio.SpawnBurst(
+                    transform.TransformPoint(_ballPos + Vector3.up * 0.8f),
+                    redScored ? new Color(0.95f, 0.25f, 0.20f) : new Color(0.22f, 0.56f, 0.98f),
+                    count: 16, spread: 0.75f);
+            }
+        }
+
+        private void UpdatePlayerOnPitch(float dt)
+        {
+            Vector2 move = InputHub.Instance != null ? InputHub.Instance.MoveInput : Vector2.zero;
+            bool sprinting = InputHub.Instance != null && InputHub.Instance.SprintHeld;
+            float maxSpd = sprinting ? 5.9f : 4.45f;
+            if (_dashBoostTimer > 0f) maxSpd += 2.2f;
+
+            Vector3 localDir = new Vector3(move.x, 0f, move.y);
+            float mag = Mathf.Clamp01(localDir.magnitude);
+            float speed = mag > 0.08f ? mag * maxSpd : 0f;
+            Vector3 worldDir = _player.transform.forward;
+
+            if (speed > 0.05f)
+            {
+                localDir.Normalize();
+                _playerLocalPos += localDir * (speed * dt);
+                _playerLocalPos.x = Mathf.Clamp(_playerLocalPos.x, -HalfW + 0.65f, HalfW - 0.65f);
+                _playerLocalPos.z = Mathf.Clamp(_playerLocalPos.z, -HalfL + 0.95f, HalfL - 0.95f);
+                Quaternion targetRot = Quaternion.LookRotation(localDir, Vector3.up);
+                _playerLocalRot = Quaternion.Slerp(_playerLocalRot, targetRot, 1f - Mathf.Exp(-12f * dt));
+                worldDir = transform.TransformDirection(localDir);
+            }
+            else
+            {
+                Vector3 toBall = _ballPos - _playerLocalPos;
+                toBall.y = 0f;
+                if (toBall.sqrMagnitude > 0.05f)
+                {
+                    Quaternion lookBall = Quaternion.LookRotation(toBall.normalized, Vector3.up);
+                    _playerLocalRot = Quaternion.Slerp(_playerLocalRot, lookBall, 1f - Mathf.Exp(-8f * dt));
+                }
+            }
+
+            _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation * _playerLocalRot);
+            _player.Humanoid?.SetLocomotion(speed, true, 0f, worldDir, sampleGround: false);
+            _player.Humanoid?.SetLookAtPoint(true, _ball.position);
+        }
+
+        private void CheckHudStateChanged()
+        {
+            if (_player == null) return;
+            int hash = (_carrierTeam + 2) * 10 + _carrierIdx + (_matchOver ? 100 : 0);
+            if (hash != _lastHudStateHash)
+            {
+                _lastHudStateHash = hash;
+                HudRevision++;
+            }
         }
 
         private void TryClaimBall()
         {
+            // Give the player a generous magnetic pickup radius!
+            if (_player != null)
+            {
+                Vector3 dp = _playerLocalPos - _ballPos;
+                dp.y = 0f;
+                if (dp.magnitude < 1.65f)
+                {
+                    _carrierTeam = 0;
+                    _carrierIdx = 1;
+                    _stealImmunityTimer = 0.85f;
+                    HudRevision++;
+                    return;
+                }
+            }
+
             float bestDist = 1.15f;
             int bestTeam = -1;
             int bestIdx = -1;
@@ -239,6 +740,7 @@ namespace Gridroam.World
                 ProceduralHumanoid[] team = t == 0 ? _red : _blue;
                 for (int i = 0; i < team.Length; i++)
                 {
+                    if (team[i] == null || !team[i].gameObject.activeSelf) continue;
                     Vector3 d = team[i].transform.localPosition - _ballPos;
                     d.y = 0f;
                     float dist = d.magnitude;
@@ -255,9 +757,8 @@ namespace Gridroam.World
             {
                 if (bestIdx == 0)
                 {
-                    // Goalkeeper clears ball out immediately to an outfield teammate
                     ProceduralHumanoid gk = (bestTeam == 0 ? _red : _blue)[0];
-                    gk.PlayCombatMove(2);
+                    gk.PlaySportAnim(SportAnimKind.SoccerKick, 0.48f);
                     PlayKickSound(0.45f);
                     float dir = bestTeam == 0 ? 1f : -1f;
                     _ballVel = new Vector3(Random.Range(-3.2f, 3.2f), 3.6f, dir * 8.5f);
@@ -274,9 +775,8 @@ namespace Gridroam.World
 
         private void UpdateAllPlayers(float dt)
         {
-            // Goalkeepers track ball X along their goal line
-            UpdateGoalkeeper(_red[0], -HalfL + 0.85f, dt);
-            UpdateGoalkeeper(_blue[0], HalfL - 0.85f, dt);
+            UpdateGoalkeeper(_red[0], -HalfL + 0.85f, dt, _player != null ? 3.5f : 3.2f);
+            UpdateGoalkeeper(_blue[0], HalfL - 0.85f, dt, _player != null ? 2.55f : 3.2f);
 
             for (int t = 0; t < 2; t++)
             {
@@ -286,31 +786,35 @@ namespace Gridroam.World
 
                 for (int i = 1; i < team.Length; i++)
                 {
+                    if (team[i] == null || !team[i].gameObject.activeSelf) continue;
                     if (_carrierTeam == t && _carrierIdx == i) continue;
 
                     Vector3 target;
                     if (_carrierTeam == -1)
                     {
-                        // Nearest outfielder chases loose ball, other supports
                         int other = i == 1 ? 2 : 1;
                         float myDist = (team[i].transform.localPosition - _ballPos).sqrMagnitude;
-                        float otherDist = (team[other].transform.localPosition - _ballPos).sqrMagnitude;
+                        Vector3 otherPos = (t == 0 && other == 1 && _player != null)
+                            ? _playerLocalPos
+                            : team[other].transform.localPosition;
+                        float otherDist = (otherPos - _ballPos).sqrMagnitude;
                         target = myDist <= otherDist
                             ? new Vector3(_ballPos.x, 0f, _ballPos.z)
                             : new Vector3(homes[i].x, 0f, Mathf.Clamp(_ballPos.z + attackDir * 2.0f, -HalfL + 2f, HalfL - 2f));
                     }
                     else if (_carrierTeam == t)
                     {
-                        // Support run ahead on opposite flank
-                        float flank = i == 1 ? -3.6f : 3.6f;
+                        float flank = i == 1 ? -3.6f : (_player != null && _playerLocalPos.x > 0f ? -3.4f : 3.4f);
                         target = new Vector3(flank, 0f, Mathf.Clamp(_ballPos.z + attackDir * 3.8f, -HalfL + 2.2f, HalfL - 2.2f));
                     }
                     else
                     {
-                        // Defend: closest defender presses ball carrier, other covers goal side
                         int other = i == 1 ? 2 : 1;
                         float myDist = (team[i].transform.localPosition - _ballPos).sqrMagnitude;
-                        float otherDist = (team[other].transform.localPosition - _ballPos).sqrMagnitude;
+                        Vector3 otherPos = (t == 0 && other == 1 && _player != null)
+                            ? _playerLocalPos
+                            : team[other].transform.localPosition;
+                        float otherDist = (otherPos - _ballPos).sqrMagnitude;
                         target = myDist <= otherDist
                             ? new Vector3(_ballPos.x, 0f, _ballPos.z - attackDir * 0.9f)
                             : new Vector3(homes[i].x * 0.8f, 0f, Mathf.Clamp(_ballPos.z - attackDir * 3.5f, -HalfL + 2.5f, HalfL - 2.5f));
@@ -318,18 +822,20 @@ namespace Gridroam.World
 
                     target.x = Mathf.Clamp(target.x, -HalfW + 0.9f, HalfW - 0.9f);
                     target.z = Mathf.Clamp(target.z, -HalfL + 1.4f, HalfL - 1.4f);
-                    MovePlayer(team[i], target, 3.8f, dt);
+                    float maxNpcSpd = (_player != null && t == 1) ? 3.25f : 3.8f;
+                    MoveNpc(team[i], target, maxNpcSpd, dt);
                 }
             }
         }
 
-        private void UpdateGoalkeeper(ProceduralHumanoid gk, float lineZ, float dt)
+        private void UpdateGoalkeeper(ProceduralHumanoid gk, float lineZ, float dt, float maxSpeed)
         {
+            if (gk == null) return;
             Vector3 target = new Vector3(Mathf.Clamp(_ballPos.x * 0.55f, -GoalHalfW + 0.45f, GoalHalfW - 0.45f), 0f, lineZ);
-            MovePlayer(gk, target, 3.2f, dt, facePoint: _ballPos);
+            MoveNpc(gk, target, maxSpeed, dt, facePoint: _ballPos);
         }
 
-        private void MovePlayer(ProceduralHumanoid hum, Vector3 localTarget, float maxSpeed, float dt, Vector3? facePoint = null)
+        private void MoveNpc(ProceduralHumanoid hum, Vector3 localTarget, float maxSpeed, float dt, Vector3? facePoint = null)
         {
             Vector3 pos = hum.transform.localPosition;
             Vector3 delta = localTarget - pos;
@@ -364,11 +870,14 @@ namespace Gridroam.World
             hum.SetLocomotion(speed, true, 0f, worldDir, sampleGround: false);
         }
 
-        private void IdleTeam(ProceduralHumanoid[] team, float dt)
+        private void IdleTeam(ProceduralHumanoid[] team)
         {
             for (int i = 0; i < team.Length; i++)
             {
-                team[i].SetLocomotion(0f, true, 0f, team[i].transform.forward, sampleGround: false);
+                if (team[i] != null && team[i].gameObject.activeSelf)
+                {
+                    team[i].SetLocomotion(0f, true, 0f, team[i].transform.forward, sampleGround: false);
+                }
             }
         }
 
@@ -392,9 +901,10 @@ namespace Gridroam.World
             }
         }
 
-        private void PlayKickSound(float vol)
+        private void PlayKickSound(float vol, bool alwaysHear = false)
         {
-            if (_audio == null || _kickClip == null || !IsPlayerNear(22f)) return;
+            if (_audio == null || _kickClip == null) return;
+            if (!alwaysHear && _player == null && !IsPlayerNear(22f)) return;
             _audio.pitch = Random.Range(0.92f, 1.08f);
             _audio.PlayOneShot(_kickClip, vol);
         }
@@ -407,17 +917,18 @@ namespace Gridroam.World
     }
 
     /// <summary>
-    /// Autonomous 2v2 streetball basketball match: ball-handler dribbles with synced right-hand bounce IK,
-    /// passes, rises for a 2-hand overhead jump shot toward the 3.05 m orange rim, scores baskets or
-    /// battles for rebounds, and updates the live 3D scoreboard.
+    /// 2v2 Streetball Basketball arena: runs live NPC streetball when unattended, and lets the player
+    /// join Gold Team anytime to dribble with synced right-hand bounce IK, chest-pass, steal,
+    /// rise for airborne 2pt & 3pt jump shots toward the 3.05 m rim, and win matches.
     /// </summary>
-    public sealed class LiveBasketballMatch : MonoBehaviour
+    public sealed class LiveBasketballMatch : MonoBehaviour, IPlayableSportArena
     {
         private const float HalfW = 5.6f;
         private const float HalfL = 9.2f;
         private const float RimZ = 8.95f;
         private const float RimY = 3.05f;
         private const float BallRadius = 0.135f;
+        private const int PointsToWin = 10;
 
         private ProceduralHumanoid[] _gold;
         private ProceduralHumanoid[] _navy;
@@ -437,11 +948,43 @@ namespace Gridroam.World
         private Vector3 _flightEnd;
         private float _flightArcHeight = 2.0f;
         private bool _shotWillScore;
+        private int _pendingShotPoints = 2;
         private float _dribbleCycle;
         private int _lastBounceTick;
         private Vector3 _ballPos;
         private int _goldScore;
         private int _navyScore;
+
+        // Player match state
+        private PlayerFootController _player;
+        private ThirdPersonCameraRig _cameraRig;
+        private Vector3 _beginPos;
+        private Quaternion _beginRot;
+        private Vector3 _playerLocalPos;
+        private Quaternion _playerLocalRot = Quaternion.identity;
+        private bool _matchOver;
+        private bool _playerWonMatch;
+        private float _statusBannerTimer;
+        private string _statusBannerKey;
+        private int _lastHudHash;
+
+        public bool IsPlayerActive => _player != null;
+        public int HudRevision { get; private set; }
+        public Vector3 ReturnPosition => _beginPos;
+        public Quaternion ReturnRotation => _beginRot;
+        public bool HasSecondaryAction => _player != null && !_matchOver && PlayerHasBall;
+        public bool AcceptsPrimaryAction => _player != null;
+
+        private bool PlayerHasBall => _player != null && _offenseTeam == 0 && _handlerIdx == 0 && _phase == 0;
+        private bool PlayerInThreePointZone
+        {
+            get
+            {
+                Vector3 hoop = new Vector3(0f, 0f, RimZ);
+                Vector3 p = new Vector3(_playerLocalPos.x, 0f, _playerLocalPos.z);
+                return Vector3.Distance(p, hoop) > 4.75f;
+            }
+        }
 
         public void Configure(
             ProceduralHumanoid[] goldTeam,
@@ -460,172 +1003,550 @@ namespace Gridroam.World
             _audio = audio;
             _bounceClip = bounceClip;
 
-            _gold[0].transform.localPosition = new Vector3(-2.2f, 0f, -2.5f);
-            _gold[1].transform.localPosition = new Vector3(2.4f, 0f, 1.5f);
-            _navy[0].transform.localPosition = new Vector3(-1.8f, 0f, 2.2f);
-            _navy[1].transform.localPosition = new Vector3(2.1f, 0f, 4.5f);
+            ResetPositions(offenseTeam: 0);
+            UpdateScoreboard();
+        }
 
-            _offenseTeam = 0;
+        private void ResetPositions(int offenseTeam)
+        {
+            if (_gold != null && _gold.Length >= 2)
+            {
+                _gold[0].transform.localPosition = new Vector3(-2.0f, 0f, -2.0f);
+                _gold[1].transform.localPosition = new Vector3(2.8f, 0f, 2.0f);
+            }
+            if (_navy != null && _navy.Length >= 2)
+            {
+                _navy[0].transform.localPosition = new Vector3(-1.4f, 0f, 2.8f);
+                _navy[1].transform.localPosition = new Vector3(2.2f, 0f, 4.6f);
+            }
+
+            _offenseTeam = offenseTeam;
             _handlerIdx = 0;
             _phase = 0;
             _phaseTimer = 2.1f;
+
+            if (_player != null)
+            {
+                _playerLocalPos = new Vector3(0f, 0f, -1.2f);
+                _playerLocalRot = Quaternion.identity;
+                _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation);
+                _player.Humanoid?.SetLocomotion(0f, true, 0f);
+            }
+        }
+
+        public void BeginPlayerMatch(PlayerFootController player)
+        {
+            if (player == null) return;
+            _player = player;
+            _beginPos = player.transform.position;
+            _beginRot = player.transform.rotation;
+            _goldScore = 0;
+            _navyScore = 0;
+            _matchOver = false;
+            _playerWonMatch = false;
+            _statusBannerTimer = 0f;
+            _statusBannerKey = null;
+
+            if (_gold != null && _gold.Length > 0 && _gold[0] != null)
+            {
+                _gold[0].gameObject.SetActive(false);
+            }
+
+            player.SetSeatedState(true);
+            _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(true, distance: 8.6f, pitch: 26f, fov: 62f, lockYaw: transform.eulerAngles.y);
+            }
+
+            ResetPositions(offenseTeam: 0);
             UpdateScoreboard();
+            HudRevision++;
+        }
+
+        public void EndPlayerMatch()
+        {
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(false);
+                _cameraRig = null;
+            }
+
+            if (_player != null)
+            {
+                _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+                _player.Humanoid?.SetLookAtPoint(false, Vector3.zero);
+                _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                _player.SetSeatedState(false);
+            }
+            _player = null;
+            _matchOver = false;
+
+            if (_gold != null && _gold.Length > 0 && _gold[0] != null)
+            {
+                _gold[0].gameObject.SetActive(true);
+            }
+
+            _goldScore = 0;
+            _navyScore = 0;
+            ResetPositions(offenseTeam: 0);
+            UpdateScoreboard();
+        }
+
+        public string ControlsHintKey() => "sports.basketball.controls";
+
+        public string PrimaryButtonLabel()
+        {
+            if (_matchOver) return LocalizationService.Tr("sports.btn.rematch", "Tekrar");
+            if (PlayerHasBall)
+            {
+                return PlayerInThreePointZone
+                    ? LocalizationService.Tr("sports.btn.shoot_3pt", "3'lük!")
+                    : LocalizationService.Tr("sports.btn.shoot_2pt", "Şut At");
+            }
+            if (_offenseTeam == 0 && _handlerIdx == 1) return LocalizationService.Tr("sports.btn.call_pass", "Pas İste");
+            return LocalizationService.Tr("sports.btn.steal", "Top Kap");
+        }
+
+        public string SecondaryButtonLabel()
+        {
+            if (PlayerHasBall) return LocalizationService.Tr("sports.btn.pass", "Pas Ver");
+            if (_offenseTeam == 0 && _handlerIdx == 1) return LocalizationService.Tr("sports.btn.call_pass", "Pas İste");
+            return LocalizationService.Tr("sports.btn.steal", "Top Kap");
+        }
+
+        public string HudText()
+        {
+            string title = LocalizationService.Tr("sports.basketball.title", "Basketbol");
+            string you = LocalizationService.Tr("sports.basketball.team_you", "Sen");
+            string rival = LocalizationService.Tr("sports.basketball.team_rival", "Lacivert");
+            string status;
+
+            if (_matchOver)
+            {
+                status = LocalizationService.Tr(_playerWonMatch ? "sports.basketball.won" : "sports.basketball.lost");
+            }
+            else if (_statusBannerTimer > 0f && !string.IsNullOrEmpty(_statusBannerKey))
+            {
+                status = LocalizationService.Tr(_statusBannerKey);
+            }
+            else if (PlayerHasBall)
+            {
+                status = LocalizationService.Tr(PlayerInThreePointZone ? "sports.basketball.zone_3pt" : "sports.basketball.zone_2pt");
+            }
+            else if (_offenseTeam == 0)
+            {
+                status = LocalizationService.Tr("sports.basketball.mate_ball");
+            }
+            else
+            {
+                status = LocalizationService.Tr("sports.basketball.defend");
+            }
+
+            return $"{title}  ·  {you} {_goldScore} - {_navyScore} {rival}\n{status}";
+        }
+
+        public void TriggerPrimaryAction()
+        {
+            if (_player == null) return;
+
+            if (_matchOver)
+            {
+                _goldScore = 0;
+                _navyScore = 0;
+                _matchOver = false;
+                ResetPositions(offenseTeam: 0);
+                UpdateScoreboard();
+                GameFeelAudio.PlayUiClick();
+                HudRevision++;
+                return;
+            }
+
+            if (PlayerHasBall)
+            {
+                LaunchPlayerJumpShot();
+                return;
+            }
+
+            // Ask Gold teammate for an instant chest pass!
+            if (_offenseTeam == 0 && _handlerIdx == 1 && _phase == 0 && _gold != null && _gold.Length > 1)
+            {
+                _gold[1].PlaySportAnim(SportAnimKind.BasketballPass, 0.42f);
+                _phase = 1;
+                _flightStart = _ballPos;
+                _flightEnd = _playerLocalPos + Vector3.up * 1.15f;
+                _flightDuration = 0.40f;
+                _flightElapsed = 0f;
+                _flightArcHeight = 0.38f;
+                PlayBounce(0.36f, alwaysHear: true);
+                HudRevision++;
+                return;
+            }
+
+            // Defend / steal from Navy!
+            if (_offenseTeam == 1 && _phase == 0 && _navy != null && _handlerIdx < _navy.Length)
+            {
+                _player.Humanoid?.PlaySportAnim(SportAnimKind.SoccerSteal, 0.42f);
+                Vector3 carrierPos = _navy[_handlerIdx].transform.localPosition;
+                Vector3 d = carrierPos - _playerLocalPos;
+                d.y = 0f;
+                if (d.magnitude <= 3.3f)
+                {
+                    _offenseTeam = 0;
+                    _handlerIdx = 0;
+                    _phase = 0;
+                    PlayBounce(0.45f, alwaysHear: true);
+                    GameFeelAudio.SpawnBurst(transform.TransformPoint(_ballPos), new Color(1.0f, 0.84f, 0.24f), count: 8, spread: 0.4f);
+                    SetTempStatus("sports.basketball.stole", 1.2f);
+                }
+            }
+        }
+
+        public void TriggerSecondaryAction()
+        {
+            if (_player == null || _matchOver) return;
+
+            if (PlayerHasBall && _gold != null && _gold.Length > 1 && _gold[1] != null)
+            {
+                _player.Humanoid?.PlaySportAnim(SportAnimKind.BasketballPass, 0.42f);
+                _phase = 1;
+                _flightStart = _ballPos;
+                _flightEnd = _gold[1].transform.localPosition + Vector3.up * 1.15f;
+                _flightDuration = 0.42f;
+                _flightElapsed = 0f;
+                _flightArcHeight = 0.40f;
+                PlayBounce(0.34f, alwaysHear: true);
+                HudRevision++;
+                return;
+            }
+
+            TriggerPrimaryAction();
+        }
+
+        private void LaunchPlayerJumpShot()
+        {
+            Vector3 hoopPos = new Vector3(0f, RimY, RimZ);
+            Vector3 flatPlayer = new Vector3(_playerLocalPos.x, 0f, _playerLocalPos.z);
+            float distToRim = Vector3.Distance(flatPlayer, new Vector3(0f, 0f, RimZ));
+
+            // Turn player smoothly toward the basket
+            Vector3 toHoop = new Vector3(0f, 0f, RimZ) - flatPlayer;
+            if (toHoop.sqrMagnitude > 0.01f)
+            {
+                _playerLocalRot = Quaternion.LookRotation(toHoop.normalized, Vector3.up);
+                _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation * _playerLocalRot);
+            }
+
+            _pendingShotPoints = distToRim > 4.75f ? 3 : 2;
+            float makeChance = distToRim < 3.4f ? 0.94f : (distToRim <= 4.75f ? 0.84f : 0.74f);
+            _shotWillScore = Random.value < makeChance;
+
+            _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+            _player.Humanoid?.PlaySportAnim(SportAnimKind.BasketballJumpShot, 0.74f);
+
+            _phase = 2;
+            _flightStart = _playerLocalPos + Vector3.up * 2.15f;
+            _flightEnd = _shotWillScore
+                ? hoopPos
+                : hoopPos + new Vector3(Random.Range(-0.42f, 0.42f), 0.1f, -0.32f);
+            _flightDuration = Mathf.Clamp(0.68f + distToRim * 0.055f, 0.72f, 1.12f);
+            _flightElapsed = 0f;
+            _flightArcHeight = Mathf.Clamp(1.35f + distToRim * 0.12f, 1.45f, 2.35f);
+            PlayBounce(0.42f, alwaysHear: true);
+            HudRevision++;
+        }
+
+        private void SetTempStatus(string key, float duration)
+        {
+            _statusBannerKey = key;
+            _statusBannerTimer = duration;
+            HudRevision++;
         }
 
         private void Update()
         {
             if (_gold == null || _navy == null || _ball == null) return;
+            if (_player != null && PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked) return;
+
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
+            if (_statusBannerTimer > 0f)
+            {
+                _statusBannerTimer -= dt;
+                if (_statusBannerTimer <= 0f) HudRevision++;
+            }
+
+            ClearHandPoses(_gold);
+            ClearHandPoses(_navy);
+            if (_player != null)
+            {
+                _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+            }
+
+            if (_matchOver)
+            {
+                IdleAll();
+                if (_player != null) _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                UpdateBallTransform(dt);
+                return;
+            }
+
+            if (_player != null)
+            {
+                UpdatePlayerOnCourt(dt);
+            }
 
             ProceduralHumanoid[] off = _offenseTeam == 0 ? _gold : _navy;
             ProceduralHumanoid[] def = _offenseTeam == 0 ? _navy : _gold;
             float dirZ = _offenseTeam == 0 ? 1f : -1f;
             Vector3 hoopPos = new Vector3(0f, RimY, dirZ * RimZ);
-            ProceduralHumanoid handler = off[_handlerIdx];
-            ProceduralHumanoid mate = off[1 - _handlerIdx];
-
-            ClearHandPoses(_gold);
-            ClearHandPoses(_navy);
+            bool handlerIsPlayer = _player != null && _offenseTeam == 0 && _handlerIdx == 0;
+            bool mateIsPlayer = _player != null && _offenseTeam == 0 && _handlerIdx == 1;
+            ProceduralHumanoid handlerNpc = off[_handlerIdx];
+            ProceduralHumanoid mateNpc = off[1 - _handlerIdx];
 
             if (_phase == 0)
             {
-                // Ball-handler dribbles toward shooting arc
-                Vector3 driveSpot = new Vector3(
-                    (_handlerIdx == 0 ? -2.2f : 2.2f) + Mathf.Sin(Time.time * 1.4f) * 1.1f,
-                    0f,
-                    dirZ * 4.4f);
-                MoveCourtPlayer(handler, driveSpot, 3.0f, dt, hoopPos);
+                Vector3 handlerPos = handlerIsPlayer ? _playerLocalPos : handlerNpc.transform.localPosition;
+                Quaternion handlerRot = handlerIsPlayer ? _playerLocalRot : handlerNpc.transform.localRotation;
 
-                // Teammate cuts to opposite wing
-                Vector3 wingSpot = new Vector3(_handlerIdx == 0 ? 3.2f : -3.2f, 0f, dirZ * 5.8f);
-                MoveCourtPlayer(mate, wingSpot, 3.2f, dt, handler.transform.localPosition);
+                if (!handlerIsPlayer)
+                {
+                    Vector3 driveSpot = new Vector3(
+                        (_handlerIdx == 0 ? -2.2f : 2.2f) + Mathf.Sin(Time.time * 1.4f) * 1.1f,
+                        0f,
+                        dirZ * 4.4f);
+                    MoveCourtPlayer(handlerNpc, driveSpot, _player != null && _offenseTeam == 1 ? 2.75f : 3.0f, dt, hoopPos);
+                    handlerPos = handlerNpc.transform.localPosition;
+                    handlerRot = handlerNpc.transform.localRotation;
+                }
 
-                // Defenders guard between player & hoop
-                MoveCourtPlayer(def[0], Vector3.Lerp(handler.transform.localPosition, new Vector3(0f, 0f, dirZ * RimZ), 0.34f), 3.1f, dt, handler.transform.localPosition);
-                MoveCourtPlayer(def[1], Vector3.Lerp(mate.transform.localPosition, new Vector3(0f, 0f, dirZ * RimZ), 0.38f), 3.1f, dt, mate.transform.localPosition);
+                if (!mateIsPlayer && mateNpc != null && mateNpc.gameObject.activeSelf)
+                {
+                    Vector3 wingSpot = new Vector3(handlerPos.x > 0f ? -3.4f : 3.4f, 0f, dirZ * 5.6f);
+                    MoveCourtPlayer(mateNpc, wingSpot, 3.2f, dt, handlerPos);
+                }
 
-                // Synced rhythmic dribble bounce + right-hand IK push!
+                // Defenders guard offense
+                if (def[0] != null && def[0].gameObject.activeSelf)
+                {
+                    MoveCourtPlayer(def[0], Vector3.Lerp(handlerPos, new Vector3(0f, 0f, dirZ * RimZ), 0.36f), _player != null ? 2.85f : 3.1f, dt, handlerPos);
+                }
+                if (def[1] != null && def[1].gameObject.activeSelf)
+                {
+                    Vector3 matePos = mateIsPlayer ? _playerLocalPos : mateNpc.transform.localPosition;
+                    MoveCourtPlayer(def[1], Vector3.Lerp(matePos, new Vector3(0f, 0f, dirZ * RimZ), 0.40f), 3.0f, dt, matePos);
+                }
+
+                // Synced rhythmic bounce dribble + right-hand IK push!
                 _dribbleCycle += dt * 4.2f;
                 float bounceSin = Mathf.Abs(Mathf.Sin(_dribbleCycle * Mathf.PI));
                 int tick = Mathf.FloorToInt(_dribbleCycle);
                 if (tick != _lastBounceTick)
                 {
                     _lastBounceTick = tick;
-                    PlayBounce(0.28f);
+                    PlayBounce(0.28f, alwaysHear: _player != null);
                 }
 
-                Vector3 dribbleBase = handler.transform.localPosition + handler.transform.localRotation * new Vector3(0.32f, 0f, 0.36f);
+                Vector3 dribbleBase = handlerPos + handlerRot * new Vector3(0.32f, 0f, 0.36f);
                 _ballPos = new Vector3(dribbleBase.x, BallRadius + bounceSin * 0.88f, dribbleBase.z);
                 Vector3 handWorld = transform.TransformPoint(new Vector3(dribbleBase.x, 0.92f + bounceSin * 0.16f, dribbleBase.z));
-                handler.SetDualHandAction(true, Vector3.zero, handWorld, 0f, 0.92f, 6f, 8f, 0f);
+                ProceduralHumanoid activeHum = handlerIsPlayer ? _player.Humanoid : handlerNpc;
+                activeHum?.SetDualHandAction(true, Vector3.zero, handWorld, 0f, 0.92f, 6f, 8f, 0f);
 
-                _phaseTimer -= dt;
-                if (_phaseTimer <= 0f)
+                if (!handlerIsPlayer)
                 {
-                    if (Random.value < 0.42f)
+                    _phaseTimer -= dt;
+                    if (_phaseTimer <= 0f)
                     {
-                        // Chest pass to teammate
-                        _phase = 1;
-                        _flightStart = _ballPos;
-                        _flightEnd = mate.transform.localPosition + Vector3.up * 1.15f;
-                        _flightDuration = 0.48f;
-                        _flightElapsed = 0f;
-                        _flightArcHeight = 0.45f;
-                        PlayBounce(0.32f);
-                    }
-                    else
-                    {
-                        // Jump shot toward orange rim!
-                        _phase = 2;
-                        _shotWillScore = Random.value < 0.64f;
-                        _flightStart = handler.transform.localPosition + Vector3.up * 1.95f;
-                        _flightEnd = _shotWillScore
-                            ? hoopPos
-                            : hoopPos + new Vector3(Random.Range(-0.45f, 0.45f), 0.1f, -dirZ * 0.35f);
-                        _flightDuration = 0.95f;
-                        _flightElapsed = 0f;
-                        _flightArcHeight = 1.65f;
-                        PlayBounce(0.35f);
+                        bool passToMate = Random.value < (mateIsPlayer ? 0.58f : 0.42f);
+                        if (passToMate)
+                        {
+                            handlerNpc.PlaySportAnim(SportAnimKind.BasketballPass, 0.42f);
+                            _phase = 1;
+                            _flightStart = _ballPos;
+                            _flightEnd = (mateIsPlayer ? _playerLocalPos : mateNpc.transform.localPosition) + Vector3.up * 1.15f;
+                            _flightDuration = 0.46f;
+                            _flightElapsed = 0f;
+                            _flightArcHeight = 0.42f;
+                            PlayBounce(0.32f);
+                        }
+                        else
+                        {
+                            handlerNpc.PlaySportAnim(SportAnimKind.BasketballJumpShot, 0.72f);
+                            _phase = 2;
+                            _pendingShotPoints = 2;
+                            _shotWillScore = Random.value < (_player != null && _offenseTeam == 1 ? 0.52f : 0.64f);
+                            _flightStart = handlerNpc.transform.localPosition + Vector3.up * 2.05f;
+                            _flightEnd = _shotWillScore
+                                ? hoopPos
+                                : hoopPos + new Vector3(Random.Range(-0.45f, 0.45f), 0.1f, -dirZ * 0.35f);
+                            _flightDuration = 0.92f;
+                            _flightElapsed = 0f;
+                            _flightArcHeight = 1.65f;
+                            PlayBounce(0.35f);
+                        }
                     }
                 }
             }
             else if (_phase == 1)
             {
-                // Pass in flight
                 _flightElapsed += dt;
                 float u = Mathf.Clamp01(_flightElapsed / _flightDuration);
                 _ballPos = ParabolicLerp(_flightStart, _flightEnd, u, _flightArcHeight);
-                IdleAll(dt);
+                IdleAll();
                 if (u >= 1f)
                 {
                     _handlerIdx = 1 - _handlerIdx;
                     _phase = 0;
                     _phaseTimer = Random.Range(1.2f, 2.0f);
+                    HudRevision++;
                 }
             }
             else if (_phase == 2)
             {
-                // Jump shot arc! Shooter holds high follow-through arms
                 _flightElapsed += dt;
                 float u = Mathf.Clamp01(_flightElapsed / _flightDuration);
                 _ballPos = ParabolicLerp(_flightStart, _flightEnd, u, _flightArcHeight);
-
-                if (u < 0.45f)
-                {
-                    Vector3 upL = handler.transform.position + handler.transform.forward * 0.25f - handler.transform.right * 0.12f + Vector3.up * 1.95f;
-                    Vector3 upR = handler.transform.position + handler.transform.forward * 0.25f + handler.transform.right * 0.12f + Vector3.up * 1.95f;
-                    handler.SetDualHandAction(true, upL, upR, 0.95f, 0.95f, -5f, -18f, 0f);
-                }
-                IdleAll(dt);
+                IdleAll();
 
                 if (u >= 1f)
                 {
                     if (_shotWillScore)
                     {
-                        if (_offenseTeam == 0) _goldScore += 2; else _navyScore += 2;
+                        int pts = _pendingShotPoints;
+                        if (_offenseTeam == 0) _goldScore += pts; else _navyScore += pts;
                         UpdateScoreboard();
-                        handler.PlayWave();
-                        PlayBounce(0.45f);
-                        if (IsPlayerNear(24f))
+
+                        ProceduralHumanoid shooter = handlerIsPlayer ? _player.Humanoid : handlerNpc;
+                        shooter?.PlaySportAnim(SportAnimKind.VictoryJump, 0.64f);
+                        PlayBounce(0.48f, alwaysHear: _player != null);
+
+                        if (_player != null)
+                        {
+                            if (_offenseTeam == 0)
+                            {
+                                GameFeelAudio.PlayCoinChime();
+                                SaveManager.Instance?.AddMoney(pts == 3 ? 25 : 15);
+                                SetTempStatus(pts == 3 ? "sports.basketball.scored_3pt" : "sports.basketball.scored_2pt", 1.35f);
+                            }
+                            else
+                            {
+                                SetTempStatus("sports.basketball.rival_scored", 1.2f);
+                            }
+
+                            if (_goldScore >= PointsToWin || _navyScore >= PointsToWin)
+                            {
+                                _matchOver = true;
+                                _playerWonMatch = _goldScore >= PointsToWin;
+                                if (_playerWonMatch)
+                                {
+                                    GameFeelAudio.PlayMilestoneFanfare();
+                                    SaveManager.Instance?.AddMoney(90);
+                                    NeighborhoodReputation.AddReputation(30, LocalizationService.Tr("sports.basketball.win_toast", "Basketbol Maçı Kazanıldı! (+90 ₺)"));
+                                }
+                                SportMatchEvents.NotifyMatchFinished("sport_basketball", _playerWonMatch);
+                                HudRevision++;
+                            }
+                        }
+
+                        if (_player != null || IsPlayerNear(24f))
                         {
                             GameFeelAudio.SpawnBurst(
                                 transform.TransformPoint(hoopPos),
                                 _offenseTeam == 0 ? new Color(1.0f, 0.78f, 0.18f) : new Color(0.28f, 0.56f, 0.96f),
-                                count: 10, spread: 0.45f);
+                                count: pts == 3 ? 16 : 10, spread: 0.55f);
                         }
                     }
                     else
                     {
-                        PlayBounce(0.50f);
+                        PlayBounce(0.50f, alwaysHear: _player != null);
+                        if (_player != null && _offenseTeam == 0)
+                        {
+                            SetTempStatus("sports.basketball.missed", 1.0f);
+                        }
                     }
 
-                    // Drop ball from rim to rebounding team & switch possession
+                    // Switch possession & rebound
                     _phase = 3;
-                    _phaseTimer = 1.05f;
+                    _phaseTimer = 0.95f;
                     _flightStart = _ballPos;
                     _offenseTeam = 1 - _offenseTeam;
-                    _handlerIdx = Random.Range(0, 2);
-                    ProceduralHumanoid rebounder = (_offenseTeam == 0 ? _gold : _navy)[_handlerIdx];
-                    _flightEnd = rebounder.transform.localPosition + Vector3.up * 1.1f;
+                    _handlerIdx = (_player != null && _offenseTeam == 0) ? 0 : Random.Range(0, 2);
+                    Vector3 reboundTarget = (_player != null && _offenseTeam == 0 && _handlerIdx == 0)
+                        ? _playerLocalPos
+                        : (_offenseTeam == 0 ? _gold : _navy)[_handlerIdx].transform.localPosition;
+                    _flightEnd = reboundTarget + Vector3.up * 1.1f;
                     _flightElapsed = 0f;
-                    _flightDuration = 0.75f;
+                    _flightDuration = 0.68f;
+                    HudRevision++;
                 }
             }
             else
             {
-                // Rebound / transition
                 _flightElapsed += dt;
                 float u = Mathf.Clamp01(_flightElapsed / _flightDuration);
                 _ballPos = ParabolicLerp(_flightStart, _flightEnd, u, 0.65f);
-                IdleAll(dt);
+                IdleAll();
                 _phaseTimer -= dt;
                 if (_phaseTimer <= 0f)
                 {
                     _phase = 0;
-                    _phaseTimer = Random.Range(1.8f, 2.8f);
+                    _phaseTimer = Random.Range(1.7f, 2.5f);
+                    HudRevision++;
                 }
             }
 
+            UpdateBallTransform(dt);
+            CheckHudStateChanged();
+        }
+
+        private void UpdatePlayerOnCourt(float dt)
+        {
+            Vector2 move = InputHub.Instance != null ? InputHub.Instance.MoveInput : Vector2.zero;
+            bool sprinting = InputHub.Instance != null && InputHub.Instance.SprintHeld;
+            float maxSpd = sprinting ? 5.6f : 4.35f;
+
+            Vector3 localDir = new Vector3(move.x, 0f, move.y);
+            float mag = Mathf.Clamp01(localDir.magnitude);
+            float speed = mag > 0.08f ? mag * maxSpd : 0f;
+            Vector3 worldDir = _player.transform.forward;
+
+            if (speed > 0.05f)
+            {
+                localDir.Normalize();
+                _playerLocalPos += localDir * (speed * dt);
+                _playerLocalPos.x = Mathf.Clamp(_playerLocalPos.x, -HalfW + 0.65f, HalfW - 0.65f);
+                _playerLocalPos.z = Mathf.Clamp(_playerLocalPos.z, -HalfL + 0.85f, HalfL - 0.85f);
+                worldDir = transform.TransformDirection(localDir);
+            }
+
+            // Face basket when holding ball, or face movement/ball otherwise
+            Vector3 facePoint = PlayerHasBall ? new Vector3(0f, 0f, RimZ) : (speed > 0.2f ? _playerLocalPos + localDir * 2f : _ballPos);
+            Vector3 look = facePoint - _playerLocalPos;
+            look.y = 0f;
+            if (look.sqrMagnitude > 0.02f)
+            {
+                _playerLocalRot = Quaternion.Slerp(_playerLocalRot, Quaternion.LookRotation(look.normalized, Vector3.up), 1f - Mathf.Exp(-10f * dt));
+            }
+
+            _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation * _playerLocalRot);
+            _player.Humanoid?.SetLocomotion(speed, true, 0f, worldDir, sampleGround: false);
+            _player.Humanoid?.SetLookAtPoint(true, _ball.position);
+        }
+
+        private void CheckHudStateChanged()
+        {
+            if (_player == null) return;
+            int hash = _offenseTeam * 100 + _handlerIdx * 10 + _phase + (PlayerInThreePointZone ? 1000 : 0);
+            if (hash != _lastHudHash)
+            {
+                _lastHudHash = hash;
+                HudRevision++;
+            }
+        }
+
+        private void UpdateBallTransform(float dt)
+        {
             _ball.localPosition = _ballPos;
             _ball.Rotate(Vector3.right * (dt * 240f), Space.Self);
             if (_ballShadow != null)
@@ -640,16 +1561,21 @@ namespace Gridroam.World
         {
             for (int i = 0; i < team.Length; i++)
             {
-                team[i].SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+                if (team[i] != null && team[i].gameObject.activeSelf)
+                {
+                    team[i].SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+                }
             }
         }
 
-        private void IdleAll(float dt)
+        private void IdleAll()
         {
             for (int i = 0; i < 2; i++)
             {
-                _gold[i].SetLocomotion(0f, true, 0f, _gold[i].transform.forward, sampleGround: false);
-                _navy[i].SetLocomotion(0f, true, 0f, _navy[i].transform.forward, sampleGround: false);
+                if (_gold[i] != null && _gold[i].gameObject.activeSelf)
+                    _gold[i].SetLocomotion(0f, true, 0f, _gold[i].transform.forward, sampleGround: false);
+                if (_navy[i] != null && _navy[i].gameObject.activeSelf)
+                    _navy[i].SetLocomotion(0f, true, 0f, _navy[i].transform.forward, sampleGround: false);
             }
         }
 
@@ -700,9 +1626,10 @@ namespace Gridroam.World
             }
         }
 
-        private void PlayBounce(float vol)
+        private void PlayBounce(float vol, bool alwaysHear = false)
         {
-            if (_audio == null || _bounceClip == null || !IsPlayerNear(22f)) return;
+            if (_audio == null || _bounceClip == null) return;
+            if (!alwaysHear && _player == null && !IsPlayerNear(22f)) return;
             _audio.pitch = Random.Range(0.92f, 1.08f);
             _audio.PlayOneShot(_bounceClip, vol);
         }
@@ -715,13 +1642,16 @@ namespace Gridroam.World
     }
 
     /// <summary>
-    /// Autonomous 2v2 Volleyball rally: baseline serve -> back-row dual-arm bump -> set -> overhead spike
-    /// over the 2.43 m net with live scoreboard and celebrations.
+    /// 2v2 Sand Volleyball arena: runs lively NPC rallies when unattended, and lets the player join
+    /// Teal Team anytime with a glowing shrinking landing ring, early-tap input buffer, crisp
+    /// forearm bump digs, high teammate sets, and explosive airborne spikes over the 2.43 m net!
     /// </summary>
-    public sealed class LiveVolleyballMatch : MonoBehaviour
+    public sealed class LiveVolleyballMatch : MonoBehaviour, IPlayableSportArena
     {
         private const float HalfW = 4.2f;
         private const float HalfL = 7.6f;
+        private const int PointsToWin = 5;
+        private const float PlayerHitWindow = 0.82f;
 
         private ProceduralHumanoid[] _teal;
         private ProceduralHumanoid[] _burgundy;
@@ -741,11 +1671,38 @@ namespace Gridroam.World
         private Vector3 _flightEnd;
         private float _flightArc = 2.6f;
         private float _pauseTimer;
-        private float _hitAnimTimer;
-        private ProceduralHumanoid _lastHitter;
-        private bool _lastHitWasSpike;
         private int _tealScore;
         private int _burgundyScore;
+
+        // Player match state
+        private PlayerFootController _player;
+        private ThirdPersonCameraRig _cameraRig;
+        private Vector3 _beginPos;
+        private Quaternion _beginRot;
+        private Vector3 _playerLocalPos;
+        private bool _awaitingPlayerServe;
+        private bool _playerHitQueued;
+        private bool _playerEarlyBuffered;
+        private bool _playerQueuedSpike;
+        private bool _playerInHitWindow;
+        private bool _matchOver;
+        private bool _playerWonMatch;
+        private bool _lastPointTeal;
+        private Transform _landingRing;
+        private Renderer _landingRingRenderer;
+        private Material _landingRingMat;
+        private MaterialPropertyBlock _ringProps;
+        private int _lastHudHash;
+
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+
+        public bool IsPlayerActive => _player != null;
+        public int HudRevision { get; private set; }
+        public Vector3 ReturnPosition => _beginPos;
+        public Quaternion ReturnRotation => _beginRot;
+        public bool HasSecondaryAction => _player != null && !_matchOver && !_awaitingPlayerServe && _targetTeam == 0 && _targetIdx == 1;
+        public bool AcceptsPrimaryAction => _player != null && (_matchOver || _awaitingPlayerServe || _playerInHitWindow);
 
         public void Configure(
             ProceduralHumanoid[] tealTeam,
@@ -768,6 +1725,265 @@ namespace Gridroam.World
             UpdateScoreboard();
         }
 
+        private void OnDestroy()
+        {
+            if (_landingRingMat != null) Destroy(_landingRingMat);
+        }
+
+        private void EnsureLandingRing()
+        {
+            if (_landingRing != null) return;
+            GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = "Volleyball_LandingRing";
+            Destroy(ring.GetComponent<Collider>());
+            ring.transform.SetParent(transform, false);
+            ring.transform.localScale = new Vector3(1.1f, 0.012f, 1.1f);
+            _landingRing = ring.transform;
+            _landingRingRenderer = ring.GetComponent<MeshRenderer>();
+            if (_landingRingRenderer != null)
+            {
+                _landingRingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
+                if (sh != null)
+                {
+                    _landingRingMat = new Material(sh) { color = new Color(0.24f, 0.92f, 0.72f, 1f) };
+                    _landingRingMat.EnableKeyword("_EMISSION");
+                    _landingRingMat.SetColor("_EmissionColor", new Color(0.14f, 0.55f, 0.42f));
+                    _landingRingRenderer.sharedMaterial = _landingRingMat;
+                }
+            }
+            _ringProps = new MaterialPropertyBlock();
+            ring.SetActive(false);
+        }
+
+        public void BeginPlayerMatch(PlayerFootController player)
+        {
+            if (player == null) return;
+            _player = player;
+            _beginPos = player.transform.position;
+            _beginRot = player.transform.rotation;
+            _tealScore = 0;
+            _burgundyScore = 0;
+            _matchOver = false;
+            _playerWonMatch = false;
+
+            EnsureLandingRing();
+
+            if (_teal != null && _teal.Length > 1 && _teal[1] != null)
+            {
+                _teal[1].gameObject.SetActive(false);
+            }
+
+            player.SetSeatedState(true);
+            _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(true, distance: 8.4f, pitch: 25f, fov: 60f, lockYaw: transform.eulerAngles.y);
+            }
+
+            SetupPlayerServe();
+            UpdateScoreboard();
+            HudRevision++;
+        }
+
+        public void EndPlayerMatch()
+        {
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetSportCameraOverride(false);
+                _cameraRig = null;
+            }
+            if (_landingRing != null) _landingRing.gameObject.SetActive(false);
+
+            if (_player != null)
+            {
+                _player.Humanoid?.SetLookAtPoint(false, Vector3.zero);
+                _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                _player.SetSeatedState(false);
+            }
+            _player = null;
+            _matchOver = false;
+            _awaitingPlayerServe = false;
+
+            if (_teal != null && _teal.Length > 1 && _teal[1] != null)
+            {
+                _teal[1].gameObject.SetActive(true);
+            }
+
+            _tealScore = 0;
+            _burgundyScore = 0;
+            StartServe(0);
+            UpdateScoreboard();
+        }
+
+        public string ControlsHintKey() => "sports.volleyball.controls";
+
+        public string PrimaryButtonLabel()
+        {
+            if (_matchOver) return LocalizationService.Tr("sports.btn.rematch", "Tekrar");
+            if (_awaitingPlayerServe) return LocalizationService.Tr("sports.btn.serve", "Servis");
+            if (_targetTeam == 0 && _targetIdx == 1)
+            {
+                return _touchStep >= 1
+                    ? LocalizationService.Tr("sports.btn.spike", "Smaç!")
+                    : LocalizationService.Tr("sports.btn.bump", "Manşet");
+            }
+            return LocalizationService.Tr("sports.btn.spike", "Smaç!");
+        }
+
+        public string SecondaryButtonLabel()
+        {
+            return LocalizationService.Tr("sports.btn.spike", "Smaç!");
+        }
+
+        public string HudText()
+        {
+            string title = LocalizationService.Tr("sports.volleyball.title", "Voleybol");
+            string you = LocalizationService.Tr("sports.volleyball.team_you", "Sen");
+            string rival = LocalizationService.Tr("sports.volleyball.team_rival", "Bordo");
+            string status;
+
+            if (_matchOver)
+            {
+                status = LocalizationService.Tr(_playerWonMatch ? "sports.volleyball.won" : "sports.volleyball.lost");
+            }
+            else if (_pauseTimer > 0f)
+            {
+                status = LocalizationService.Tr(_lastPointTeal ? "sports.volleyball.point_you" : "sports.volleyball.point_rival");
+            }
+            else if (_awaitingPlayerServe)
+            {
+                status = LocalizationService.Tr("sports.volleyball.serve");
+            }
+            else if (_targetTeam == 0 && _targetIdx == 1)
+            {
+                if (_playerHitQueued || _playerEarlyBuffered)
+                    status = LocalizationService.Tr(_touchStep >= 1 ? "sports.volleyball.spiking" : "sports.volleyball.bumping");
+                else if (_playerInHitWindow)
+                    status = LocalizationService.Tr(_touchStep >= 1 ? "sports.volleyball.now_spike" : "sports.volleyball.now_bump");
+                else
+                    status = LocalizationService.Tr("sports.volleyball.wait");
+            }
+            else if (_targetTeam == 0)
+            {
+                status = LocalizationService.Tr("sports.volleyball.mate_setting");
+            }
+            else
+            {
+                status = LocalizationService.Tr("sports.volleyball.rally");
+            }
+
+            return $"{title}  ·  {you} {_tealScore} - {_burgundyScore} {rival}\n{status}";
+        }
+
+        public void TriggerPrimaryAction()
+        {
+            HandlePlayerVolleyTap(forceSpike: false);
+        }
+
+        public void TriggerSecondaryAction()
+        {
+            HandlePlayerVolleyTap(forceSpike: true);
+        }
+
+        private void HandlePlayerVolleyTap(bool forceSpike)
+        {
+            if (_player == null) return;
+
+            if (_matchOver)
+            {
+                if (_pauseTimer <= 0f)
+                {
+                    _tealScore = 0;
+                    _burgundyScore = 0;
+                    _matchOver = false;
+                    SetupPlayerServe();
+                    UpdateScoreboard();
+                    GameFeelAudio.PlayUiClick();
+                    HudRevision++;
+                }
+                return;
+            }
+
+            if (_pauseTimer > 0f) return;
+
+            if (_awaitingPlayerServe)
+            {
+                LaunchPlayerServe();
+                return;
+            }
+
+            if (_targetTeam != 0 || _targetIdx != 1 || _playerHitQueued) return;
+
+            float remaining = Mathf.Max(0f, _flightDuration - _flightElapsed);
+            bool wantSpike = forceSpike || _touchStep >= 1;
+            if (remaining <= PlayerHitWindow)
+            {
+                LockInPlayerVolley(wantSpike);
+            }
+            else
+            {
+                // Forgiving early-tap input buffer: queues clean contact instead of missing!
+                _playerEarlyBuffered = true;
+                _playerQueuedSpike = wantSpike;
+                HudRevision++;
+            }
+        }
+
+        private void LockInPlayerVolley(bool spike)
+        {
+            _playerHitQueued = true;
+            _playerEarlyBuffered = false;
+            _playerQueuedSpike = spike;
+            _player.Humanoid?.PlaySportAnim(
+                spike ? SportAnimKind.VolleyballSpike : SportAnimKind.VolleyballBump,
+                spike ? 0.64f : 0.48f);
+            HudRevision++;
+        }
+
+        private void SetupPlayerServe()
+        {
+            _awaitingPlayerServe = true;
+            _playerHitQueued = false;
+            _playerEarlyBuffered = false;
+            _playerInHitWindow = false;
+            _touchStep = 0;
+            _rallyCount = 0;
+            _targetTeam = 1;
+
+            _teal[0].transform.localPosition = new Vector3(-1.6f, 0f, -2.3f);
+            _burgundy[0].transform.localPosition = new Vector3(1.5f, 0f, 2.4f);
+            _burgundy[1].transform.localPosition = new Vector3(-1.5f, 0f, 5.4f);
+
+            _playerLocalPos = new Vector3(0.4f, 0f, -6.2f);
+            _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation);
+            _player.Humanoid?.SetLocomotion(0f, true, 0f);
+            if (_landingRing != null) _landingRing.gameObject.SetActive(false);
+
+            _ball.localPosition = _playerLocalPos + new Vector3(0.18f, 1.25f, 0.35f);
+            HudRevision++;
+        }
+
+        private void LaunchPlayerServe()
+        {
+            _awaitingPlayerServe = false;
+            _player.Humanoid?.PlaySportAnim(SportAnimKind.VolleyballSpike, 0.65f);
+            PlayHit(0.55f, alwaysHear: true);
+
+            float aimX = InputHub.Instance != null ? InputHub.Instance.MoveInput.x * 2.8f : Random.Range(-2.2f, 2.2f);
+            _targetTeam = 1;
+            _targetIdx = 1;
+            _touchStep = 0;
+            _rallyCount = 0;
+            _flightStart = _playerLocalPos + Vector3.up * 2.1f;
+            _flightEnd = new Vector3(Mathf.Clamp(aimX, -3.1f, 3.1f), 1.05f, Random.Range(4.4f, 6.2f));
+            _flightDuration = 1.25f;
+            _flightElapsed = 0f;
+            _flightArc = 2.6f;
+            GameFeelAudio.SpawnBurst(transform.TransformPoint(_flightStart), new Color(0.24f, 0.90f, 0.85f), count: 8, spread: 0.4f);
+            HudRevision++;
+        }
+
         private void StartServe(int servingTeam)
         {
             _teal[0].transform.localPosition = new Vector3(-1.6f, 0f, -2.4f);
@@ -776,133 +1992,386 @@ namespace Gridroam.World
             _burgundy[1].transform.localPosition = new Vector3(-1.6f, 0f, 5.6f);
 
             ProceduralHumanoid server = (servingTeam == 0 ? _teal : _burgundy)[1];
+            server.PlaySportAnim(SportAnimKind.VolleyballSpike, 0.60f);
             _targetTeam = 1 - servingTeam;
             _targetIdx = 1;
             _touchStep = 0;
             _rallyCount = 0;
+            _playerHitQueued = false;
+            _playerEarlyBuffered = false;
 
-            float recvZ = _targetTeam == 0 ? Random.Range(-6.2f, -4.2f) : Random.Range(4.2f, 6.2f);
-            _flightStart = server.transform.localPosition + Vector3.up * 1.85f;
-            _flightEnd = new Vector3(Random.Range(-2.6f, 2.6f), 1.05f, recvZ);
-            _flightDuration = 1.25f;
+            float recvZ = _targetTeam == 0 ? Random.Range(-5.6f, -3.8f) : Random.Range(4.2f, 6.2f);
+            _flightStart = server.transform.localPosition + Vector3.up * 1.95f;
+            _flightEnd = new Vector3(Random.Range(-2.4f, 2.4f), 1.05f, recvZ);
+            _flightDuration = _player != null ? 1.42f : 1.25f;
             _flightElapsed = 0f;
-            _flightArc = 2.55f;
-            _lastHitter = server;
-            _lastHitWasSpike = true;
-            _hitAnimTimer = 0.40f;
-            PlayHit(0.45f);
+            _flightArc = 2.65f;
+            PlayHit(0.45f, alwaysHear: _player != null);
         }
 
         private void Update()
         {
             if (_teal == null || _burgundy == null || _ball == null) return;
-            float dt = Mathf.Min(Time.deltaTime, 0.05f);
+            if (_player != null && PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked) return;
 
-            ClearPoses(_teal);
-            ClearPoses(_burgundy);
+            float dt = Mathf.Min(Time.deltaTime, 0.05f);
 
             if (_pauseTimer > 0f)
             {
                 _pauseTimer -= dt;
                 IdleTeam(_teal);
                 IdleTeam(_burgundy);
+                if (_player != null) _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                if (_landingRing != null) _landingRing.gameObject.SetActive(false);
+
                 if (_pauseTimer <= 0f)
                 {
-                    StartServe((_tealScore + _burgundyScore) % 2);
+                    if (!_matchOver)
+                    {
+                        if (_player != null && _lastPointTeal) SetupPlayerServe();
+                        else StartServe(_player != null ? 1 : (_tealScore + _burgundyScore) % 2);
+                    }
+                    HudRevision++;
                 }
+                return;
+            }
+
+            if (_matchOver)
+            {
+                IdleTeam(_teal);
+                IdleTeam(_burgundy);
+                if (_player != null) _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                return;
+            }
+
+            if (_player != null && _awaitingPlayerServe)
+            {
+                // Allow horizontal shift along baseline before serving
+                float inputX = InputHub.Instance != null ? InputHub.Instance.MoveInput.x : 0f;
+                if (Mathf.Abs(inputX) > 0.1f)
+                {
+                    _playerLocalPos.x = Mathf.Clamp(_playerLocalPos.x + inputX * 3.0f * dt, -2.8f, 2.8f);
+                    _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation);
+                    _player.Humanoid?.SetLocomotion(Mathf.Abs(inputX) * 2.5f, true, 0f, transform.right * Mathf.Sign(inputX), sampleGround: false);
+                }
+                else
+                {
+                    _player.Humanoid?.SetLocomotion(0f, true, 0f);
+                }
+                Vector3 holdPos = _playerLocalPos + new Vector3(0.18f, 1.22f + Mathf.Sin(Time.time * 4f) * 0.05f, 0.35f);
+                UpdateBallAndShadow(holdPos, dt);
+                _player.Humanoid?.SetLookAtPoint(true, _ball.position);
                 return;
             }
 
             _flightElapsed += dt;
             float u = Mathf.Clamp01(_flightElapsed / _flightDuration);
+            float remaining = Mathf.Max(0f, _flightDuration - _flightElapsed);
             Vector3 ballPos = Vector3.Lerp(_flightStart, _flightEnd, u);
             ballPos.y += 4f * _flightArc * u * (1f - u);
 
-            // Move receiving player smoothly to exact landing spot while other 3 hold ready formation
             ProceduralHumanoid[] recvTeam = _targetTeam == 0 ? _teal : _burgundy;
             ProceduralHumanoid[] otherTeam = _targetTeam == 0 ? _burgundy : _teal;
 
-            Vector3 catchPos = new Vector3(_flightEnd.x, 0f, _flightEnd.z);
-            MoveVolleyPlayer(recvTeam[_targetIdx], catchPos, 4.4f, dt, _targetTeam == 0 ? 1f : -1f);
-            MoveVolleyPlayer(recvTeam[1 - _targetIdx], GetReadyPos(_targetTeam, 1 - _targetIdx), 2.8f, dt, _targetTeam == 0 ? 1f : -1f);
-            MoveVolleyPlayer(otherTeam[0], GetReadyPos(1 - _targetTeam, 0), 2.8f, dt, _targetTeam == 0 ? -1f : 1f);
-            MoveVolleyPlayer(otherTeam[1], GetReadyPos(1 - _targetTeam, 1), 2.8f, dt, _targetTeam == 0 ? -1f : 1f);
+            bool targetIsPlayer = _player != null && _targetTeam == 0 && _targetIdx == 1;
 
-            // Apply expressive bump or overhead spike pose on active hitter
-            if (_hitAnimTimer > 0f && _lastHitter != null)
+            if (_player != null)
             {
-                _hitAnimTimer -= dt;
-                Transform ht = _lastHitter.transform;
-                if (_lastHitWasSpike)
+                UpdatePlayerVolleyMovement(dt, targetIsPlayer);
+                UpdateLandingRing(targetIsPlayer, remaining);
+
+                if (targetIsPlayer)
                 {
-                    Vector3 upR = ht.position + ht.forward * 0.25f + ht.right * 0.14f + Vector3.up * 2.02f;
-                    Vector3 upL = ht.position + ht.forward * 0.20f - ht.right * 0.22f + Vector3.up * 1.45f;
-                    _lastHitter.SetDualHandAction(true, upL, upR, 0.85f, 0.96f, -6f, -15f, 0f);
+                    if (_playerEarlyBuffered && !_playerHitQueued && remaining <= 0.38f)
+                    {
+                        LockInPlayerVolley(_playerQueuedSpike);
+                    }
+                    _playerInHitWindow = !_playerHitQueued && remaining <= PlayerHitWindow && remaining >= 0.02f;
                 }
                 else
                 {
-                    Vector3 bumpL = ht.position + ht.forward * 0.44f - ht.right * 0.05f + Vector3.up * 1.08f;
-                    Vector3 bumpR = ht.position + ht.forward * 0.44f + ht.right * 0.05f + Vector3.up * 1.08f;
-                    _lastHitter.SetDualHandAction(true, bumpL, bumpR, 0.95f, 0.95f, 16f, 10f, 0.06f);
+                    _playerInHitWindow = false;
                 }
             }
+
+            // Move NPCs
+            Vector3 catchPos = new Vector3(_flightEnd.x, 0f, _flightEnd.z);
+            if (!targetIsPlayer && recvTeam[_targetIdx] != null && recvTeam[_targetIdx].gameObject.activeSelf)
+            {
+                MoveVolleyPlayer(recvTeam[_targetIdx], catchPos, 4.4f, dt, _targetTeam == 0 ? 1f : -1f);
+            }
+            if (!(_player != null && _targetTeam == 0 && (1 - _targetIdx) == 1) && recvTeam[1 - _targetIdx] != null && recvTeam[1 - _targetIdx].gameObject.activeSelf)
+            {
+                MoveVolleyPlayer(recvTeam[1 - _targetIdx], GetReadyPos(_targetTeam, 1 - _targetIdx), 2.9f, dt, _targetTeam == 0 ? 1f : -1f);
+            }
+            if (otherTeam[0] != null && otherTeam[0].gameObject.activeSelf)
+                MoveVolleyPlayer(otherTeam[0], GetReadyPos(1 - _targetTeam, 0), 2.8f, dt, _targetTeam == 0 ? -1f : 1f);
+            if (!(_player != null && _targetTeam == 1) && otherTeam[1] != null && otherTeam[1].gameObject.activeSelf)
+                MoveVolleyPlayer(otherTeam[1], GetReadyPos(1 - _targetTeam, 1), 2.8f, dt, _targetTeam == 0 ? -1f : 1f);
 
             if (u >= 1f)
             {
-                ProceduralHumanoid hitter = recvTeam[_targetIdx];
-                _lastHitter = hitter;
-                _hitAnimTimer = 0.42f;
-                PlayHit(_touchStep == 2 ? 0.52f : 0.34f);
+                ResolveBallArrival(ballPos, targetIsPlayer, recvTeam);
+            }
 
-                if (_touchStep == 0)
+            UpdateBallAndShadow(ballPos, dt);
+            if (_player != null)
+            {
+                _player.Humanoid?.SetLookAtPoint(true, _ball.position);
+                int hash = (_targetTeam * 100) + (_targetIdx * 10) + _touchStep + (_playerInHitWindow ? 1000 : 0) + (_playerHitQueued ? 2000 : 0);
+                if (hash != _lastHudHash)
                 {
-                    // Bump/dig to front-row setter/spiker
-                    _lastHitWasSpike = false;
-                    _touchStep = 1;
-                    _targetIdx = 0;
-                    float frontZ = _targetTeam == 0 ? -1.8f : 1.8f;
-                    _flightStart = ballPos;
-                    _flightEnd = new Vector3(Random.Range(-2.2f, 2.2f), 2.05f, frontZ);
-                    _flightDuration = 0.85f;
-                    _flightElapsed = 0f;
-                    _flightArc = 1.65f;
+                    _lastHudHash = hash;
+                    HudRevision++;
+                }
+            }
+        }
+
+        private void UpdatePlayerVolleyMovement(float dt, bool targetIsPlayer)
+        {
+            Vector2 move = InputHub.Instance != null ? InputHub.Instance.MoveInput : Vector2.zero;
+            Vector3 desired = _playerLocalPos;
+            bool userSteering = move.sqrMagnitude > 0.04f;
+
+            if (userSteering)
+            {
+                desired += new Vector3(move.x, 0f, move.y).normalized * (4.9f * dt);
+            }
+
+            // Gentle magnetic pull toward landing zone when ball is coming to player!
+            if (targetIsPlayer)
+            {
+                Vector3 drop = new Vector3(_flightEnd.x, 0f, _flightEnd.z);
+                float assistSpeed = userSteering ? 2.4f : 6.2f;
+                desired = Vector3.MoveTowards(desired, drop, assistSpeed * dt);
+            }
+            else if (!userSteering)
+            {
+                Vector3 readyPos = new Vector3(0.4f, 0f, _targetTeam == 0 ? -2.8f : -4.6f);
+                desired = Vector3.MoveTowards(desired, readyPos, 2.8f * dt);
+            }
+
+            desired.x = Mathf.Clamp(desired.x, -HalfW + 0.5f, HalfW - 0.5f);
+            desired.z = Mathf.Clamp(desired.z, -HalfL + 0.6f, -0.85f);
+
+            Vector3 step = desired - _playerLocalPos;
+            float spd = step.magnitude / Mathf.Max(0.001f, dt);
+            _playerLocalPos = desired;
+            _player.TeleportTo(transform.TransformPoint(_playerLocalPos), transform.rotation);
+            Vector3 wDir = step.sqrMagnitude > 0.0001f ? transform.TransformDirection(step.normalized) : transform.forward;
+            _player.Humanoid?.SetLocomotion(spd, true, 0f, wDir, sampleGround: false);
+        }
+
+        private void UpdateLandingRing(bool targetIsPlayer, float remaining)
+        {
+            if (_landingRing == null) return;
+            if (!targetIsPlayer)
+            {
+                if (_landingRing.gameObject.activeSelf) _landingRing.gameObject.SetActive(false);
+                return;
+            }
+
+            if (!_landingRing.gameObject.activeSelf) _landingRing.gameObject.SetActive(true);
+            _landingRing.localPosition = new Vector3(_flightEnd.x, 0.032f, _flightEnd.z);
+            float progress = 1f - Mathf.Clamp01(remaining / Mathf.Max(0.25f, _flightDuration));
+            float scale = _playerHitQueued ? 1.05f : Mathf.Lerp(1.85f, 0.90f, progress);
+            _landingRing.localScale = new Vector3(scale, 0.012f, scale);
+
+            if (_landingRingRenderer != null && _ringProps != null)
+            {
+                Color c;
+                Color em;
+                if (_playerHitQueued)
+                {
+                    c = new Color(1.0f, 0.86f, 0.24f, 1f);
+                    em = new Color(0.60f, 0.46f, 0.08f, 1f);
+                }
+                else if (remaining <= PlayerHitWindow)
+                {
+                    c = new Color(0.20f, 0.96f, 0.62f, 1f);
+                    em = new Color(0.10f, 0.62f, 0.36f, 1f);
                 }
                 else
                 {
-                    // Spike over the 2.43 m net to opponent side!
-                    _lastHitWasSpike = true;
-                    _rallyCount++;
-                    bool pointOver = _rallyCount >= 4 && Random.value < 0.42f;
+                    c = new Color(0.95f, 0.76f, 0.28f, 1f);
+                    em = new Color(0.28f, 0.20f, 0.04f, 1f);
+                }
+                _ringProps.SetColor(BaseColorId, c);
+                _ringProps.SetColor(EmissionColorId, em);
+                _landingRingRenderer.SetPropertyBlock(_ringProps);
+            }
+        }
 
-                    if (pointOver)
-                    {
-                        if (_targetTeam == 0) _tealScore++; else _burgundyScore++;
-                        UpdateScoreboard();
-                        for (int i = 0; i < recvTeam.Length; i++) recvTeam[i].PlayWave();
-                        if (IsPlayerNear(24f))
-                        {
-                            GameFeelAudio.SpawnBurst(
-                                transform.TransformPoint(ballPos + Vector3.up * 0.4f),
-                                _targetTeam == 0 ? new Color(0.18f, 0.82f, 0.78f) : new Color(0.78f, 0.22f, 0.34f),
-                                count: 10, spread: 0.45f);
-                        }
-                        _pauseTimer = 1.9f;
-                    }
-                    else
-                    {
-                        _targetTeam = 1 - _targetTeam;
-                        _targetIdx = 1;
-                        _touchStep = 0;
-                        float oppZ = _targetTeam == 0 ? Random.Range(-6.2f, -3.5f) : Random.Range(3.5f, 6.2f);
-                        _flightStart = ballPos;
-                        _flightEnd = new Vector3(Random.Range(-2.8f, 2.8f), 1.05f, oppZ);
-                        _flightDuration = 1.10f;
-                        _flightElapsed = 0f;
-                        _flightArc = 2.05f;
-                    }
+        private void ResolveBallArrival(Vector3 ballPos, bool targetIsPlayer, ProceduralHumanoid[] recvTeam)
+        {
+            if (targetIsPlayer)
+            {
+                Vector3 dp = new Vector3(_flightEnd.x - _playerLocalPos.x, 0f, _flightEnd.z - _playerLocalPos.z);
+                if (!_playerHitQueued || dp.magnitude > 2.35f)
+                {
+                    AwardVolleyPoint(tealWon: false, ballPos);
+                    return;
+                }
+
+                bool doSpike = _playerQueuedSpike || _touchStep >= 1;
+                _playerHitQueued = false;
+                _playerEarlyBuffered = false;
+                _playerInHitWindow = false;
+                PlayHit(doSpike ? 0.62f : 0.42f, alwaysHear: true);
+
+                if (!doSpike)
+                {
+                    // Clean bump/dig to front teammate _teal[0] who will set high for player's spike!
+                    _touchStep = 1;
+                    _targetIdx = 0;
+                    _flightStart = ballPos;
+                    _flightEnd = new Vector3(-1.3f, 2.0f, -2.0f);
+                    _flightDuration = 0.92f;
+                    _flightElapsed = 0f;
+                    _flightArc = 1.75f;
+                    HudRevision++;
+                    return;
+                }
+
+                // Explosive player spike over the 2.43 m net!
+                _rallyCount++;
+                float aimInput = InputHub.Instance != null ? InputHub.Instance.MoveInput.x : 0f;
+                float spikeX = Mathf.Abs(aimInput) >= 0.16f ? Mathf.Clamp(aimInput, -1f, 1f) * 3.4f : Random.Range(-3.1f, 3.1f);
+                GameFeelAudio.SpawnBurst(transform.TransformPoint(ballPos), new Color(1.0f, 0.85f, 0.26f), count: 10, spread: 0.45f);
+
+                // Sharp angled corner spikes or deep rallies score points!
+                bool sharpCorner = Mathf.Abs(spikeX) >= 2.55f;
+                bool rivalMisses = (_rallyCount >= 2 && sharpCorner && Random.value < 0.62f) || (_rallyCount >= 3 && Random.value < 0.55f);
+                if (rivalMisses)
+                {
+                    AwardVolleyPoint(tealWon: true, ballPos);
+                    return;
+                }
+
+                _targetTeam = 1;
+                _targetIdx = 1;
+                _touchStep = 0;
+                _flightStart = ballPos;
+                _flightEnd = new Vector3(spikeX, 1.05f, Random.Range(3.8f, 6.2f));
+                _flightDuration = 1.10f;
+                _flightElapsed = 0f;
+                _flightArc = 1.95f;
+                HudRevision++;
+                return;
+            }
+
+            // NPC receives/sets/spikes
+            ProceduralHumanoid hitter = recvTeam[_targetIdx];
+            PlayHit(_touchStep >= 1 ? 0.50f : 0.34f, alwaysHear: _player != null);
+
+            if (_player != null && _targetTeam == 0 && _targetIdx == 0)
+            {
+                // Player's front teammate sets a gorgeous high ball right into the player's spike zone!
+                hitter.PlaySportAnim(SportAnimKind.VolleyballBump, 0.46f);
+                _touchStep = 2;
+                _targetIdx = 1;
+                _playerHitQueued = false;
+                _playerEarlyBuffered = false;
+                _flightStart = ballPos;
+                _flightEnd = new Vector3(Mathf.Clamp(_playerLocalPos.x * 0.4f + 0.6f, -2.0f, 2.2f), 2.05f, -2.1f);
+                _flightDuration = 1.18f;
+                _flightElapsed = 0f;
+                _flightArc = 2.05f;
+                HudRevision++;
+                return;
+            }
+
+            if (_touchStep == 0)
+            {
+                hitter.PlaySportAnim(SportAnimKind.VolleyballBump, 0.48f);
+                _touchStep = 1;
+                _targetIdx = 0;
+                float frontZ = _targetTeam == 0 ? -1.8f : 1.8f;
+                _flightStart = ballPos;
+                _flightEnd = new Vector3(Random.Range(-2.2f, 2.2f), 2.05f, frontZ);
+                _flightDuration = 0.88f;
+                _flightElapsed = 0f;
+                _flightArc = 1.65f;
+            }
+            else
+            {
+                hitter.PlaySportAnim(SportAnimKind.VolleyballSpike, 0.60f);
+                _rallyCount++;
+                bool ambientPointOver = _player == null && _rallyCount >= 4 && Random.value < 0.42f;
+                if (ambientPointOver)
+                {
+                    AwardVolleyPoint(_targetTeam == 0, ballPos);
+                    return;
+                }
+
+                _targetTeam = 1 - _targetTeam;
+                _targetIdx = 1;
+                _touchStep = 0;
+                _playerHitQueued = false;
+                _playerEarlyBuffered = false;
+                float oppZ = _targetTeam == 0 ? Random.Range(-5.6f, -3.5f) : Random.Range(3.5f, 6.2f);
+                _flightStart = ballPos;
+                _flightEnd = new Vector3(Random.Range(-2.6f, 2.6f), 1.05f, oppZ);
+                _flightDuration = _player != null && _targetTeam == 0 ? 1.38f : 1.12f;
+                _flightElapsed = 0f;
+                _flightArc = 2.15f;
+            }
+        }
+
+        private void AwardVolleyPoint(bool tealWon, Vector3 burstPos)
+        {
+            _lastPointTeal = tealWon;
+            if (tealWon) _tealScore++; else _burgundyScore++;
+            UpdateScoreboard();
+            _playerHitQueued = false;
+            _playerEarlyBuffered = false;
+            _playerInHitWindow = false;
+            if (_landingRing != null) _landingRing.gameObject.SetActive(false);
+
+            ProceduralHumanoid[] winners = tealWon ? _teal : _burgundy;
+            for (int i = 0; i < winners.Length; i++)
+            {
+                if (winners[i] != null && winners[i].gameObject.activeSelf)
+                {
+                    winners[i].PlaySportAnim(SportAnimKind.VictoryJump, 0.64f);
                 }
             }
 
+            if (_player != null)
+            {
+                if (tealWon)
+                {
+                    _player.Humanoid?.PlaySportAnim(SportAnimKind.VictoryJump, 0.72f);
+                    GameFeelAudio.PlayCoinChime();
+                }
+
+                if (_tealScore >= PointsToWin || _burgundyScore >= PointsToWin)
+                {
+                    _matchOver = true;
+                    _playerWonMatch = _tealScore >= PointsToWin;
+                    if (_playerWonMatch)
+                    {
+                        GameFeelAudio.PlayMilestoneFanfare();
+                        SaveManager.Instance?.AddMoney(85);
+                        NeighborhoodReputation.AddReputation(30, LocalizationService.Tr("sports.volleyball.win_toast", "Voleybol Maçı Kazanıldı! (+85 ₺)"));
+                    }
+                    SportMatchEvents.NotifyMatchFinished("sport_volleyball", _playerWonMatch);
+                }
+                HudRevision++;
+            }
+
+            if (_player != null || IsPlayerNear(24f))
+            {
+                GameFeelAudio.SpawnBurst(
+                    transform.TransformPoint(burstPos + Vector3.up * 0.4f),
+                    tealWon ? new Color(0.18f, 0.88f, 0.78f) : new Color(0.78f, 0.22f, 0.34f),
+                    count: 14, spread: 0.55f);
+            }
+            _pauseTimer = _matchOver ? 0.9f : 1.65f;
+        }
+
+        private void UpdateBallAndShadow(Vector3 ballPos, float dt)
+        {
             _ball.localPosition = ballPos;
             _ball.Rotate(Vector3.one * (dt * 180f), Space.Self);
             if (_ballShadow != null)
@@ -946,19 +2415,14 @@ namespace Gridroam.World
             hum.SetLocomotion(spd, true, 0f, wDir, sampleGround: false);
         }
 
-        private void ClearPoses(ProceduralHumanoid[] team)
-        {
-            for (int i = 0; i < team.Length; i++)
-            {
-                team[i].SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
-            }
-        }
-
         private void IdleTeam(ProceduralHumanoid[] team)
         {
             for (int i = 0; i < team.Length; i++)
             {
-                team[i].SetLocomotion(0f, true, 0f, team[i].transform.forward, sampleGround: false);
+                if (team[i] != null && team[i].gameObject.activeSelf)
+                {
+                    team[i].SetLocomotion(0f, true, 0f, team[i].transform.forward, sampleGround: false);
+                }
             }
         }
 
@@ -970,9 +2434,10 @@ namespace Gridroam.World
             }
         }
 
-        private void PlayHit(float vol)
+        private void PlayHit(float vol, bool alwaysHear = false)
         {
-            if (_audio == null || _hitClip == null || !IsPlayerNear(22f)) return;
+            if (_audio == null || _hitClip == null) return;
+            if (!alwaysHear && _player == null && !IsPlayerNear(22f)) return;
             _audio.pitch = Random.Range(0.94f, 1.08f);
             _audio.PlayOneShot(_hitClip, vol);
         }

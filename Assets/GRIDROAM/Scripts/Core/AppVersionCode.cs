@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Platform build versionCode (Android) / CFBundleVersion (iOS) — matches Kube 2026 AppVersionCode.

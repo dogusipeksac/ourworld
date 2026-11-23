@@ -1,14 +1,14 @@
 using System.Collections;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Jobs;
-using Gridroam.Missions;
-using Gridroam.Player;
-using Gridroam.World;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Jobs;
+using OurWorld.Missions;
+using OurWorld.Player;
+using OurWorld.World;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Controls the entire GRIDROAM HUD:
@@ -104,8 +104,86 @@ namespace Gridroam.UI
         private Coroutine _moneyPopRoutine;
         private Coroutine _dlgAnimRoutine;
         private Coroutine _failAnimRoutine;
+        private Coroutine _hudFadeRoutine;
+        private CanvasGroup _hudRootGroup;
         private Text _tennisScoreText;
         private int _tennisHudRevision = -1;
+        private Text _attackBtnLabel;
+        private Text _jumpBtnLabel;
+        private GameObject _jumpBtnObject;
+
+        public bool IsTelemetryVisible => telemetryPanel != null && telemetryPanel.activeSelf;
+
+        public void SetTelemetryVisible(bool visible)
+        {
+            if (telemetryPanel != null)
+            {
+                telemetryPanel.SetActive(visible);
+            }
+        }
+
+        public void SetLegacyTopRightUtilityVisible(bool visible)
+        {
+            if (graphicsTierButton != null) graphicsTierButton.gameObject.SetActive(visible);
+            if (resetSaveButton != null) resetSaveButton.gameObject.SetActive(visible);
+        }
+
+        public void SetInteractBaseY(float baseY)
+        {
+            _interactBaseY = baseY;
+        }
+
+        public void SetHudVisible(bool visible, float fadeSeconds = 0.25f)
+        {
+            if (_hudRootGroup == null)
+            {
+                Transform safeArea = transform.Find("SafeAreaRoot");
+                GameObject targetGo = safeArea != null ? safeArea.gameObject : gameObject;
+                _hudRootGroup = EnsureCanvasGroup(targetGo);
+            }
+
+            if (_hudFadeRoutine != null)
+            {
+                StopCoroutine(_hudFadeRoutine);
+                _hudFadeRoutine = null;
+            }
+
+            if (fadeSeconds <= 0.01f || !isActiveAndEnabled)
+            {
+                _hudRootGroup.alpha = visible ? 1f : 0f;
+                _hudRootGroup.interactable = visible;
+                _hudRootGroup.blocksRaycasts = visible;
+                return;
+            }
+
+            _hudFadeRoutine = StartCoroutine(FadeHudRoutine(visible, fadeSeconds));
+        }
+
+        private IEnumerator FadeHudRoutine(bool visible, float duration)
+        {
+            if (_hudRootGroup == null) yield break;
+            if (!visible)
+            {
+                _hudRootGroup.interactable = false;
+                _hudRootGroup.blocksRaycasts = false;
+            }
+
+            float start = _hudRootGroup.alpha;
+            float end = visible ? 1f : 0f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                _hudRootGroup.alpha = Mathf.Lerp(start, end, t);
+                yield return null;
+            }
+
+            _hudRootGroup.alpha = end;
+            _hudRootGroup.interactable = visible;
+            _hudRootGroup.blocksRaycasts = visible;
+            _hudFadeRoutine = null;
+        }
 
         // Interact prompt 0.15 s fade/slide state
         private CanvasGroup _interactCanvasGroup;
@@ -555,7 +633,13 @@ namespace Gridroam.UI
             if (resetSaveLabel != null) resetSaveLabel.text = LocalizationService.Tr("ui.btn.reset_save", "Sıfırla");
             if (sprintButtonLabel != null) sprintButtonLabel.text = LocalizationService.Tr("ui.btn.sprint", "Koş");
             if (handbrakeLabel != null) handbrakeLabel.text = LocalizationService.Tr("ui.btn.handbrake", "El Freni");
-            if (phoneButtonLabel != null) phoneButtonLabel.text = LocalizationService.Tr("ui.btn.phone", "Rehber (M)");
+            if (phoneButtonLabel != null)
+            {
+                string rawPhone = LocalizationService.Tr("ui.btn.phone", "Rehber (M)");
+                phoneButtonLabel.text = Application.isMobilePlatform
+                    ? rawPhone.Replace(" (M)", string.Empty)
+                    : rawPhone;
+            }
             if (cancelJobButtonLabel != null) cancelJobButtonLabel.text = LocalizationService.Tr("ui.btn.cancel", "İptal");
             if (tiredBadgeText != null) tiredBadgeText.text = LocalizationService.Tr("ui.needs.tired_badge", "Yorgun");
 
@@ -648,14 +732,33 @@ namespace Gridroam.UI
                 }
             }
 
-            if (player != null && _tennisScoreText != null && player.CurrentTennisCourt != null)
+            if (player != null && _tennisScoreText != null)
             {
-                TennisCourt court = player.CurrentTennisCourt;
-                if (_tennisHudRevision != court.HudRevision)
+                if (player.CurrentTennisCourt != null)
                 {
-                    _tennisScoreText.text = court.HudText();
-                    _tennisScoreText.color = court.AcceptsHit ? AccentTealColor : OffWhiteColor;
-                    _tennisHudRevision = court.HudRevision;
+                    TennisCourt court = player.CurrentTennisCourt;
+                    if (_tennisHudRevision != court.HudRevision)
+                    {
+                        _tennisScoreText.text = court.HudText();
+                        _tennisScoreText.color = court.AcceptsHit ? AccentTealColor : OffWhiteColor;
+                        CacheSportActionButtons();
+                        if (_attackBtnLabel != null) _attackBtnLabel.text = court.PrimaryButtonLabel();
+                        _tennisHudRevision = court.HudRevision;
+                    }
+                }
+                else if (player.CurrentArenaSport != null)
+                {
+                    IPlayableSportArena arena = player.CurrentArenaSport;
+                    if (_tennisHudRevision != arena.HudRevision)
+                    {
+                        _tennisScoreText.text = arena.HudText();
+                        _tennisScoreText.color = arena.AcceptsPrimaryAction ? AccentTealColor : OffWhiteColor;
+                        CacheSportActionButtons();
+                        if (_attackBtnLabel != null) _attackBtnLabel.text = arena.PrimaryButtonLabel();
+                        if (_jumpBtnObject != null) _jumpBtnObject.SetActive(arena.HasSecondaryAction);
+                        if (_jumpBtnLabel != null && arena.HasSecondaryAction) _jumpBtnLabel.text = arena.SecondaryButtonLabel();
+                        _tennisHudRevision = arena.HudRevision;
+                    }
                 }
             }
 
@@ -823,11 +926,33 @@ namespace Gridroam.UI
 
         private static bool RidingMotorcycle => PlayerModeController.Instance?.CurrentBicycle?.IsMotorcycle == true;
 
+        private void CacheSportActionButtons()
+        {
+            if (onFootControlsRoot == null) return;
+            if (_attackBtnLabel == null)
+            {
+                Transform atk = onFootControlsRoot.transform.Find("Btn_Attack");
+                if (atk != null) _attackBtnLabel = atk.GetComponentInChildren<Text>(true);
+            }
+            if (_jumpBtnObject == null)
+            {
+                Transform jmp = onFootControlsRoot.transform.Find("Btn_Jump");
+                if (jmp != null)
+                {
+                    _jumpBtnObject = jmp.gameObject;
+                    _jumpBtnLabel = jmp.GetComponentInChildren<Text>(true);
+                }
+            }
+        }
+
         private void HandleModeChanged(ControlMode mode)
         {
             bool driving = mode == ControlMode.Driving;
             bool cycling = mode == ControlMode.Cycling;
             bool tennis = mode == ControlMode.Tennis;
+            bool arenaSport = mode == ControlMode.ArenaSport;
+            bool inMatchSport = tennis || arenaSport;
+
             if (onFootControlsRoot != null) onFootControlsRoot.SetActive(!driving && !cycling);
             if (drivingControlsRoot != null) drivingControlsRoot.SetActive(driving || cycling);
             if (gearText != null) gearText.gameObject.SetActive(!cycling);
@@ -839,12 +964,21 @@ namespace Gridroam.UI
                     LocalizationService.Tr("ui.btn.exit_car", "İn");
             }
             if (sprintButton != null) sprintButton.gameObject.SetActive(!tennis);
-            if (onFootControlsRoot != null)
+
+            CacheSportActionButtons();
+            if (_jumpBtnObject != null)
             {
-                Transform jump = onFootControlsRoot.transform.Find("Btn_Jump");
-                if (jump != null) jump.gameObject.SetActive(!tennis);
+                bool showJump = !tennis && (!arenaSport || (PlayerModeController.Instance?.CurrentArenaSport?.HasSecondaryAction ?? false));
+                _jumpBtnObject.SetActive(showJump);
             }
-            SetTennisScoreVisible(tennis);
+
+            if (!inMatchSport)
+            {
+                if (_attackBtnLabel != null) _attackBtnLabel.text = LocalizationService.Tr("ui.btn.attack", "Vur");
+                if (_jumpBtnLabel != null) _jumpBtnLabel.text = LocalizationService.Tr("ui.btn.jump", "Atla");
+            }
+
+            SetTennisScoreVisible(inMatchSport);
 
             if (PlayerModeController.Instance != null)
             {
@@ -855,13 +989,15 @@ namespace Gridroam.UI
 
             if (editorHintText != null)
             {
-                editorHintText.text = LocalizationService.Tr(mode switch
+                string hintKey = mode switch
                 {
                     ControlMode.Driving => "ui.hint.controls_drive",
                     ControlMode.Cycling => RidingMotorcycle ? "vehicle.motorcycle.controls" : "sports.bicycle.controls",
                     ControlMode.Tennis => "sports.tennis.controls",
+                    ControlMode.ArenaSport => PlayerModeController.Instance?.CurrentArenaSport?.ControlsHintKey() ?? "sports.football.controls",
                     _ => "ui.hint.controls_foot"
-                });
+                };
+                editorHintText.text = LocalizationService.Tr(hintKey);
             }
         }
 
@@ -875,9 +1011,9 @@ namespace Gridroam.UI
                 frame.anchorMin = frame.anchorMax = new Vector2(0.5f, 1f);
                 frame.pivot = new Vector2(0.5f, 1f);
                 frame.anchoredPosition = new Vector2(0f, -16f);
-                frame.sizeDelta = new Vector2(510f, 82f);
+                frame.sizeDelta = new Vector2(560f, 88f);
                 Image background = panel.GetComponent<Image>();
-                background.color = new Color(0.09f, 0.14f, 0.13f, 0.88f);
+                background.color = new Color(0.06f, 0.11f, 0.15f, 0.90f);
                 background.raycastTarget = false;
 
                 GameObject label = new GameObject("Score and instructions", typeof(RectTransform), typeof(Text));
@@ -885,11 +1021,11 @@ namespace Gridroam.UI
                 textRect.SetParent(frame, false);
                 textRect.anchorMin = Vector2.zero;
                 textRect.anchorMax = Vector2.one;
-                textRect.offsetMin = new Vector2(12f, 6f);
-                textRect.offsetMax = new Vector2(-12f, -6f);
+                textRect.offsetMin = new Vector2(16f, 6f);
+                textRect.offsetMax = new Vector2(-16f, -6f);
                 _tennisScoreText = label.GetComponent<Text>();
                 _tennisScoreText.font = interactButtonLabel.font;
-                _tennisScoreText.fontSize = 22;
+                _tennisScoreText.fontSize = 23;
                 _tennisScoreText.fontStyle = FontStyle.Bold;
                 _tennisScoreText.alignment = TextAnchor.MiddleCenter;
                 _tennisScoreText.raycastTarget = false;
@@ -913,15 +1049,23 @@ namespace Gridroam.UI
 
             ControlMode mode = PlayerModeController.Instance != null
                 ? PlayerModeController.Instance.CurrentMode : ControlMode.OnFoot;
-            if (mode == ControlMode.Seated || mode == ControlMode.Tennis)
+            if (mode == ControlMode.Seated || mode == ControlMode.Tennis || mode == ControlMode.ArenaSport)
             {
                 _interactDesiredVisible = true;
                 if (!interactButton.gameObject.activeSelf) interactButton.gameObject.SetActive(true);
                 if (interactButtonLabel != null)
                 {
-                    string key = mode == ControlMode.Tennis ? "ui.btn.leave_tennis" : "ui.btn.stand";
+                    string key = mode == ControlMode.Tennis
+                        ? "ui.btn.leave_tennis"
+                        : (mode == ControlMode.ArenaSport ? "ui.btn.leave_sport" : "ui.btn.stand");
                     string localized = LocalizationService.Tr(key);
                     interactButtonLabel.text = Application.isMobilePlatform ? localized : $"E · {localized}";
+                    if (_interactRect != null)
+                    {
+                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 340f : 316f;
+                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 15f + 78f, minW, 520f);
+                        _interactRect.sizeDelta = new Vector2(desiredW, _interactRect.sizeDelta.y);
+                    }
                 }
                 return;
             }
@@ -937,8 +1081,8 @@ namespace Gridroam.UI
                     interactButtonLabel.text = Application.isMobilePlatform ? prompt : $"E · {prompt}";
                     if (_interactRect != null)
                     {
-                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 316f : 260f;
-                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 13.5f + 56f, minW, 470f);
+                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 340f : 316f;
+                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 15f + 78f, minW, 520f);
                         _interactRect.sizeDelta = new Vector2(desiredW, _interactRect.sizeDelta.y);
                     }
                 }
@@ -958,8 +1102,35 @@ namespace Gridroam.UI
                 return;
             }
 
-            if (missionTitleText != null) missionTitleText.text = LocalizationService.Tr(mission.titleKey, mission.missionId);
-            if (missionObjectiveText != null) missionObjectiveText.text = LocalizationService.Tr(step.objectiveKey, string.Empty);
+            if (missionTitleText != null)
+            {
+                string rawTitle = LocalizationService.Tr(mission.titleKey, mission.missionId);
+                MissionManager mm = MissionManager.Instance;
+                missionTitleText.resizeTextForBestFit = true;
+                missionTitleText.resizeTextMinSize = 14;
+                missionTitleText.resizeTextMaxSize = Mathf.Max(18, missionTitleText.fontSize);
+                if (mm != null && mm.ActiveMissionIndex > 0 && mm.TotalMissionCount > 0)
+                {
+                    missionTitleText.text = $"{mm.ActiveMissionIndex}/{mm.TotalMissionCount} · {rawTitle}";
+                }
+                else
+                {
+                    missionTitleText.text = rawTitle;
+                }
+            }
+            if (missionObjectiveText != null)
+            {
+                string rawObj = LocalizationService.Tr(step.objectiveKey, string.Empty);
+                MissionManager mm = MissionManager.Instance;
+                if (mm != null && mm.CurrentStepNumber > 0 && mm.ActiveMissionStepCount > 1)
+                {
+                    missionObjectiveText.text = $"({mm.CurrentStepNumber}/{mm.ActiveMissionStepCount}) {rawObj}";
+                }
+                else
+                {
+                    missionObjectiveText.text = rawObj;
+                }
+            }
         }
 
         private void HandleDialogueLineShown(string speaker, string body)
@@ -1049,7 +1220,7 @@ namespace Gridroam.UI
         {
             if (PerformanceMonitor.Instance == null) return;
             PerformanceMonitor.Instance.ExportBenchmarkReport();
-            ShowToast(LocalizationService.Tr("ui.hud.perf_saved", "Performans raporu kaydedildi (gridroam_perf_log.txt)"));
+            ShowToast(LocalizationService.Tr("ui.hud.perf_saved", "Performans raporu kaydedildi (ourworld_perf_log.txt)"));
         }
 
         private void ShowToast(string message)

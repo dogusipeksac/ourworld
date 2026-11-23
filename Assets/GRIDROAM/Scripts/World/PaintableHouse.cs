@@ -1,10 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Gridroam.Core;
+using OurWorld.Core;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Tints only the exterior wall renderers of a residential house via MaterialPropertyBlock

@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Gridroam.Vehicle
+namespace OurWorld.Vehicle
 {
     /// <summary>
     /// Procedural Turkish Car Radio (R key while driving):
@@ -50,7 +50,7 @@ namespace Gridroam.Vehicle
         public static TurkishCarRadio EnsureInstance()
         {
             if (Instance != null) return Instance;
-            GameObject go = new GameObject("GRIDROAM_TurkishCarRadio");
+            GameObject go = new GameObject("OurWorld_TurkishCarRadio");
             DontDestroyOnLoad(go);
             Instance = go.AddComponent<TurkishCarRadio>();
             return Instance;

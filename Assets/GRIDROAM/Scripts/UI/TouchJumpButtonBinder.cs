@@ -1,8 +1,8 @@
-using Gridroam.Input;
+using OurWorld.Input;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Binds the On-Foot touch "Atla" (Jump / Parkour Vault / Exit Pool) button to InputHub.TriggerTouchJump().

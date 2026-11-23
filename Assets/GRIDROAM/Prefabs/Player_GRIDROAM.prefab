@@ -1336,13 +1336,13 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a814d89bcb69e454f892ddb073c2d6e8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Player.PlayerFootController
-  walkSpeed: 3.4
-  runSpeed: 6.2
-  acceleration: 10
-  deceleration: 14
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Player.PlayerFootController
+  walkSpeed: 2.25
+  runSpeed: 4.25
+  acceleration: 8
+  deceleration: 11.5
   jumpHeight: 1
-  rotationSpeed: 12
+  rotationSpeed: 9.5
   gravity: -20
   visualRoot: {fileID: 8396918301690457488}
   characterAnimator: {fileID: 0}
@@ -1423,7 +1423,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01328c17a224c409094e4976cf845e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Player.ProceduralHumanoid
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Player.ProceduralHumanoid
   hips: {fileID: 7821044838949580938}
   spine: {fileID: 4408503898588789442}
   neck: {fileID: 4773045112906503777}

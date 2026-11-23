@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Gridroam.Core;
+using OurWorld.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     public enum ShopItemEffect
     {

@@ -102,7 +102,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d9959e6b9bb84732aa5bd10dc22454a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.World.NightLight
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.World.NightLight
   targetLight: {fileID: 0}
   emissiveRenderers:
   - {fileID: 8798806907234193721}

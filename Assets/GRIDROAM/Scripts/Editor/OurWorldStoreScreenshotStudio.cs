@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using Gridroam.World;
+using OurWorld.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
 using Object = UnityEngine.Object;
 
-namespace Gridroam.Editor
+namespace OurWorld.Editor
 {
     /// <summary>
     /// OurWorld Store Screenshot Studio (ported from Kube 2026 StoreScreenshotStudio):
@@ -39,64 +39,64 @@ namespace Gridroam.Editor
             new ShotSpec
             {
                 FileName = "shot1_fatih_saat_kulesi.png",
-                Position = new Vector3(-16.0f, 4.8f, 124.0f),
-                LookAt = new Vector3(0.0f, 5.2f, 142.0f),
-                FieldOfView = 54f,
+                Position = new Vector3(-66.0f, 3.2f, -3.2f),
+                LookAt = new Vector3(-22.0f, 2.2f, 1.4f),
+                FieldOfView = 56f,
                 NightMood = false
             },
             new ShotSpec
             {
                 FileName = "shot2_selman_driving.png",
-                Position = new Vector3(-66.0f, 2.8f, -3.2f),
-                LookAt = new Vector3(-28.0f, 2.2f, 1.8f),
-                FieldOfView = 56f,
+                Position = new Vector3(-28.0f, 3.0f, -2.5f),
+                LookAt = new Vector3(16.0f, 2.0f, 1.5f),
+                FieldOfView = 55f,
                 NightMood = false
             },
             new ShotSpec
             {
                 FileName = "shot3_hz_osman_camii.png",
-                Position = new Vector3(64.0f, 5.2f, -18.0f),
-                LookAt = new Vector3(82.0f, 6.2f, -43.5f),
-                FieldOfView = 54f,
+                Position = new Vector3(68.0f, 6.2f, -15.0f),
+                LookAt = new Vector3(82.0f, 6.6f, -43.5f),
+                FieldOfView = 52f,
                 NightMood = false
             },
             new ShotSpec
             {
                 FileName = "shot4_petrol_aziziye_avenues.png",
-                Position = new Vector3(-48.0f, 9.5f, -66.0f),
-                LookAt = new Vector3(4.0f, 3.0f, -84.0f),
-                FieldOfView = 56f,
-                NightMood = false
-            },
-            new ShotSpec
-            {
-                FileName = "shot5_street_football_life.png",
-                Position = new Vector3(-34.0f, 3.4f, -4.0f),
-                LookAt = new Vector3(-41.0f, 1.4f, -16.5f),
+                Position = new Vector3(-26.0f, 9.2f, -24.0f),
+                LookAt = new Vector3(-14.0f, 1.2f, -44.0f),
                 FieldOfView = 54f,
                 NightMood = false
             },
             new ShotSpec
             {
+                FileName = "shot5_street_football_life.png",
+                Position = new Vector3(28.0f, 8.8f, -24.0f),
+                LookAt = new Vector3(44.0f, 1.2f, -44.0f),
+                FieldOfView = 55f,
+                NightMood = false
+            },
+            new ShotSpec
+            {
                 FileName = "shot6_night_istanbul_lights.png",
-                Position = new Vector3(54.0f, 8.5f, 14.0f),
-                LookAt = new Vector3(82.0f, 4.5f, -36.0f),
+                Position = new Vector3(-24.0f, 4.4f, -3.5f),
+                LookAt = new Vector3(22.0f, 2.4f, 1.2f),
                 FieldOfView = 56f,
                 NightMood = true
             }
         };
 
-        [MenuItem("GRIDROAM/Store/1. Capture Raw Store Screenshots (6 Shots, 1920x1080)", priority = 30)]
+        [MenuItem("OurWorld/Store/1. Capture Raw Store Screenshots (6 Shots, 1920x1080)", priority = 30)]
         public static void CaptureAllInEditor()
         {
             int count = CaptureAllInternal();
             EditorUtility.DisplayDialog(
                 "OurWorld Store Screenshot Studio",
-                $"{count}/{Shots.Length} ham 1920x1080 mağaza ekran görüntüsü kaydedildi:\n{RawOutDir}\n\nŞimdi 'GRIDROAM -> Store -> 2. Generate App Store & Play Store Posters (TR + EN)' ile tüm mağaza afişlerini üretebilirsin.",
+                $"{count}/{Shots.Length} ham 1920x1080 mağaza ekran görüntüsü kaydedildi:\n{RawOutDir}\n\nŞimdi 'OurWorld -> Store -> 2. Generate App Store & Play Store Posters (TR + EN)' ile tüm mağaza afişlerini üretebilirsin.",
                 "Tamam");
         }
 
-        [MenuItem("GRIDROAM/Store/2. Generate App Store & Play Store Posters (TR + EN)", priority = 31)]
+        [MenuItem("OurWorld/Store/2. Generate App Store & Play Store Posters (TR + EN)", priority = 31)]
         public static void GeneratePostersMenu()
         {
             if (!Directory.Exists(RawOutDir) || Directory.GetFiles(RawOutDir, "shot*.png").Length < Shots.Length)
@@ -115,7 +115,7 @@ namespace Gridroam.Editor
                 "Tamam");
         }
 
-        /// <summary>Headless batchmode entry point: -executeMethod Gridroam.Editor.OurWorldStoreScreenshotStudio.CaptureAllBatchmode</summary>
+        /// <summary>Headless batchmode entry point: -executeMethod OurWorld.Editor.OurWorldStoreScreenshotStudio.CaptureAllBatchmode</summary>
         public static void CaptureAllBatchmode()
         {
             try
@@ -135,11 +135,11 @@ namespace Gridroam.Editor
             Debug.Log("[OurWorldStoreScreenshotStudio] === START CAPTURE ALL (6 SHOTS) ===");
 
             Scene active = SceneManager.GetActiveScene();
-            if (!active.IsValid() || active.path != GridroamPrototypeSetup.TestScenePath)
+            if (!active.IsValid() || active.path != OurWorldPrototypeSetup.TestScenePath)
             {
-                if (File.Exists(GridroamPrototypeSetup.TestScenePath))
+                if (File.Exists(OurWorldPrototypeSetup.TestScenePath))
                 {
-                    EditorSceneManager.OpenScene(GridroamPrototypeSetup.TestScenePath, OpenSceneMode.Single);
+                    EditorSceneManager.OpenScene(OurWorldPrototypeSetup.TestScenePath, OpenSceneMode.Single);
                 }
             }
 
@@ -252,13 +252,13 @@ namespace Gridroam.Editor
             {
                 if (sun != null)
                 {
-                    sun.transform.rotation = Quaternion.Euler(12f, -138f, 0f);
-                    sun.intensity = 0.45f;
-                    sun.color = new Color(0.55f, 0.64f, 0.92f);
+                    sun.transform.rotation = Quaternion.Euler(38f, -138f, 0f);
+                    sun.intensity = 0.62f;
+                    sun.color = new Color(0.60f, 0.72f, 0.96f);
                 }
-                RenderSettings.ambientSkyColor = new Color(0.14f, 0.18f, 0.30f);
-                RenderSettings.ambientEquatorColor = new Color(0.24f, 0.22f, 0.32f);
-                RenderSettings.fogColor = new Color(0.12f, 0.15f, 0.24f);
+                RenderSettings.ambientSkyColor = new Color(0.32f, 0.40f, 0.56f);
+                RenderSettings.ambientEquatorColor = new Color(0.28f, 0.27f, 0.34f);
+                RenderSettings.fogColor = new Color(0.14f, 0.19f, 0.30f);
             }
             else
             {

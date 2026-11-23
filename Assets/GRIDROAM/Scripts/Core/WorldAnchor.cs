@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Marks a named point of interest, NPC, vehicle, or delivery bay in the world.

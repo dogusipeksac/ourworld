@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
-namespace Gridroam.Input
+namespace OurWorld.Input
 {
     /// <summary>
     /// Combines mobile UGUI touch controls (floating joystick, camera touch zone, sprint,
@@ -15,8 +15,18 @@ namespace Gridroam.Input
 
         [Header("Sensitivity")]
         [SerializeField] private float mouseLookSensitivity = 0.22f;
-        [SerializeField] private float touchLookSensitivity = 0.28f;
+        [SerializeField] private float touchLookSensitivity = 0.22f;
         [SerializeField] private float keyLookSpeed = 110f;
+
+        private const string PrefSensitivityKey = "ow_cam_sens";
+        public float SensitivityMultiplier { get; private set; } = 1f;
+
+        public void SetSensitivityMultiplier(float multiplier)
+        {
+            SensitivityMultiplier = Mathf.Clamp(multiplier, 0.5f, 1.8f);
+            PlayerPrefs.SetFloat(PrefSensitivityKey, SensitivityMultiplier);
+            PlayerPrefs.Save();
+        }
 
         // Touch / UI virtual inputs
         private Vector2 _touchMove;
@@ -53,6 +63,7 @@ namespace Gridroam.Input
         public event Action OnTogglePerfOverlayPressed;
         public event Action OnCycleGraphicsPressed;
         public event Action OnExportPerfReportPressed;
+        public event Action OnMenuTogglePressed;
 
         private void Awake()
         {
@@ -63,6 +74,7 @@ namespace Gridroam.Input
             }
 
             Instance = this;
+            SensitivityMultiplier = Mathf.Clamp(PlayerPrefs.GetFloat(PrefSensitivityKey, 1f), 0.5f, 1.8f);
         }
 
         private static bool IsTypingInUiField()
@@ -82,6 +94,31 @@ namespace Gridroam.Input
                 kb = null; // Ignore keyboard shortcuts (M, E, WASD...) while typing into a UI text field.
             }
 
+            if (kb != null && kb.escapeKey.wasPressedThisFrame)
+            {
+                OnMenuTogglePressed?.Invoke();
+            }
+
+            if (OurWorld.UI.MainMenuController.IsMenuActive)
+            {
+                MoveInput = Vector2.zero;
+                SprintHeld = false;
+                LookDelta = Vector2.zero;
+                DriveSteer = 0f;
+                DriveThrottle = 0f;
+                DriveBrake = 0f;
+                HandbrakeHeld = false;
+                IsLookingManually = false;
+                _touchLookAccumulator = Vector2.zero;
+                _touchInteractQueued = false;
+                _touchExitVehicleQueued = false;
+                _touchContinueDialogueQueued = false;
+                _touchPhoneQueued = false;
+                _touchAttackQueued = false;
+                _touchJumpQueued = false;
+                return;
+            }
+
             // --- On-foot movement (WASD + Touch Joystick) ---
             Vector2 kbMove = Vector2.zero;
             if (kb != null)
@@ -99,17 +136,17 @@ namespace Gridroam.Input
             }
             MoveInput = combinedMove;
 
-            SprintHeld = (kb != null && kb.leftShiftKey.isPressed) || _touchSprint || _touchMove.magnitude > 0.88f;
+            SprintHeld = (kb != null && kb.leftShiftKey.isPressed) || _touchSprint;
 
             // --- Camera look (Right-side touch drag + RMB drag in Editor + Q/Alt+E fallback) ---
-            Vector2 look = _touchLookAccumulator * touchLookSensitivity;
+            Vector2 look = _touchLookAccumulator * (touchLookSensitivity * SensitivityMultiplier);
             bool manualLook = _touchLookAccumulator.sqrMagnitude > 0.0001f;
             _touchLookAccumulator = Vector2.zero;
 
             if (mouse != null && mouse.rightButton.isPressed)
             {
                 Vector2 mouseDelta = mouse.delta.ReadValue();
-                look += mouseDelta * mouseLookSensitivity;
+                look += mouseDelta * (mouseLookSensitivity * SensitivityMultiplier);
                 if (mouseDelta.sqrMagnitude > 0.0001f)
                 {
                     manualLook = true;

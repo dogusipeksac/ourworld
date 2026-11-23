@@ -1,7 +1,7 @@
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     public sealed partial class NeighborhoodSports
     {
@@ -159,6 +159,14 @@ namespace Gridroam.World
             AudioSource audio = CreateSpatialBallAudio(ball.gameObject);
             AudioClip kick = BuildBallSound("Soccer kick", 145f, 45f, 0.25f);
             pitch.gameObject.AddComponent<LiveFootballMatch>().Configure(red, blue, ball, shadow, scoreboard, audio, kick);
+
+            // Anytime playable triggers at the north open gate and center circle
+            Child(pitch, "FootballEntrance", new Vector3(0f, 0f, 13.0f)).gameObject
+                .AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.SportsArena, "hamidiye_football_arena", "ui.btn.play_football", 5.2f);
+            Child(pitch, "FootballCenterTrigger", Vector3.zero).gameObject
+                .AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.SportsArena, "hamidiye_football_center", "ui.btn.play_football", 8.2f);
         }
 
         private void BuildBasketballCourt(
@@ -247,6 +255,14 @@ namespace Gridroam.World
             AudioSource audio = CreateSpatialBallAudio(ball.gameObject);
             AudioClip bounce = BuildBallSound("Basketball bounce", 130f, 52f, 0.18f);
             court.gameObject.AddComponent<LiveBasketballMatch>().Configure(gold, navy, ball, shadow, scoreboard, audio, bounce);
+
+            // Anytime playable triggers at court approach and center court
+            Child(court, "BasketballEntrance", new Vector3(0f, 0f, 10.6f)).gameObject
+                .AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.SportsArena, "hamidiye_basketball_arena", "ui.btn.play_basketball", 5.2f);
+            Child(court, "BasketballCenterTrigger", Vector3.zero).gameObject
+                .AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.SportsArena, "hamidiye_basketball_center", "ui.btn.play_basketball", 7.4f);
         }
 
         private void BuildVolleyballCourt(
@@ -320,6 +336,14 @@ namespace Gridroam.World
             AudioSource audio = CreateSpatialBallAudio(ball.gameObject);
             AudioClip hit = BuildBallSound("Volleyball hit", 285f, 58f, 0.22f);
             court.gameObject.AddComponent<LiveVolleyballMatch>().Configure(teal, burgundy, ball, shadow, scoreboard, audio, hit);
+
+            // Anytime playable triggers at court approach and sand center
+            Child(court, "VolleyballEntrance", new Vector3(0f, 0f, 8.6f)).gameObject
+                .AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.SportsArena, "hamidiye_volleyball_arena", "ui.btn.play_volleyball", 5.0f);
+            Child(court, "VolleyballCenterTrigger", Vector3.zero).gameObject
+                .AddComponent<InteractableTrigger>()
+                .Configure(InteractableKind.SportsArena, "hamidiye_volleyball_center", "ui.btn.play_volleyball", 6.6f);
         }
 
         private ProceduralHumanoid[] SpawnSportTeam(
@@ -365,13 +389,14 @@ namespace Gridroam.World
         private TextMesh AddLiveScoreboard(Transform parent, Vector3 position, string initialText, Material backing, Color color)
         {
             Transform sign = Child(parent, "LiveScoreboard", position);
-            sign.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            // Face South (-Z) toward the court & stadium camera so the live scoreboard reads cleanly left-to-right!
+            sign.localRotation = Quaternion.identity;
             MeshParts parts = new MeshParts(this);
             parts.Box(backing, Vector3.zero, new Vector3(2.35f, 0.62f, 0.08f));
             parts.Box(backing, new Vector3(0f, -position.y * 0.5f, 0f), new Vector3(0.095f, position.y, 0.095f));
             parts.Emit(sign, "Scoreboard panel", shadows: false);
 
-            Transform letters = Child(sign, "ScoreboardText", new Vector3(0f, 0f, -0.045f));
+            Transform letters = Child(sign, "ScoreboardText", new Vector3(0f, 0f, -0.048f));
             TextMesh text = letters.gameObject.AddComponent<TextMesh>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             letters.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;

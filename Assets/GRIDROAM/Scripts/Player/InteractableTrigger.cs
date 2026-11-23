@@ -1,7 +1,7 @@
-using Gridroam.Core;
+using OurWorld.Core;
 using UnityEngine;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     public enum InteractableKind
     {
@@ -28,7 +28,8 @@ namespace Gridroam.Player
         Bicycle,
         Tennis,
         Motorcycle,
-        ShopItem
+        ShopItem,
+        SportsArena
     }
 
     /// <summary>

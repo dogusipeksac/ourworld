@@ -1,12 +1,12 @@
 using System;
 using System.Collections;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Vehicle;
-using Gridroam.World;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Vehicle;
+using OurWorld.World;
 using UnityEngine;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     /// <summary>
     /// Light, non-punishing player energy & world utility interactions:
@@ -102,7 +102,7 @@ namespace Gridroam.Player
 
         private void Update()
         {
-            if (_isBusy) return;
+            if (_isBusy || OurWorld.UI.MainMenuController.IsMenuActive) return;
 
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
@@ -113,7 +113,7 @@ namespace Gridroam.Player
             PlayerModeController mode = PlayerModeController.Instance;
             if (mode != null && mode.CurrentMode == ControlMode.OnFoot && mode.FootController != null && InputHub.Instance != null)
             {
-                if (InputHub.Instance.SprintHeld && mode.FootController.CurrentSpeed > 4.2f)
+                if (InputHub.Instance.SprintHeld && mode.FootController.CurrentSpeed > 3.1f)
                 {
                     drain += sprintExtraDrainPerSecond * dt;
                 }

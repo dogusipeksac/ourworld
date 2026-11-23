@@ -1,11 +1,11 @@
-using Gridroam.Core;
-using Gridroam.Jobs;
-using Gridroam.Missions;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Jobs;
+using OurWorld.Missions;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Rotates a HUD compass arrow toward the active navigation target

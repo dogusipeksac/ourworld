@@ -1,8 +1,8 @@
 using System.Collections;
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.Jobs
+namespace OurWorld.Jobs
 {
     /// <summary>
     /// Collectible street litter item (crumpled box/can) spawned during the Street Cleanup job.

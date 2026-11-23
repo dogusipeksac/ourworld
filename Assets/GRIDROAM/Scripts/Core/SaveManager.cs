@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Persists GRIDROAM progress locally as JSON inside Application.persistentDataPath,
@@ -14,7 +14,7 @@ namespace Gridroam.Core
     {
         public static SaveManager Instance { get; private set; }
 
-        [SerializeField] private string saveFileName = "gridroam_save.json";
+        [SerializeField] private string saveFileName = "ourworld_save.json";
         [SerializeField] private float autoSaveIntervalSeconds = 60f;
 
         private float _autoSaveTimer;
@@ -48,6 +48,8 @@ namespace Gridroam.Core
 
         private void Update()
         {
+            if (OurWorld.UI.MainMenuController.IsMenuActive) return;
+
             float unscaledDt = Time.unscaledDeltaTime;
             if (unscaledDt > 0f && unscaledDt < 1f && Data != null)
             {
@@ -87,6 +89,15 @@ namespace Gridroam.Core
                 if (loaded != null)
                 {
                     Debug.LogWarning("[SaveManager] Successfully recovered player progress from backup (.bak).");
+                }
+                else
+                {
+                    string legacyPath = Path.Combine(Application.persistentDataPath, "gridroam_save.json");
+                    loaded = TryReadSaveFile(legacyPath);
+                    if (loaded != null)
+                    {
+                        Debug.Log("[SaveManager] Migrated legacy save file to ourworld_save.json.");
+                    }
                 }
             }
 

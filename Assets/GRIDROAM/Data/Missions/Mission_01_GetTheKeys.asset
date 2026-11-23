@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
   m_Name: Mission_01_GetTheKeys
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
   missionId: m01_get_the_keys
   titleKey: m01.title
   summaryKey: m01.summary
@@ -38,6 +38,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 2
     objectiveKey: m01.step2.objective
     targetAnchorId: player_sedan
@@ -54,3 +55,4 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1

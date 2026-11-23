@@ -1,13 +1,13 @@
 using System.Collections;
-using Gridroam.Core;
-using Gridroam.Jobs;
-using Gridroam.Player;
-using Gridroam.World;
+using OurWorld.Core;
+using OurWorld.Jobs;
+using OurWorld.Player;
+using OurWorld.World;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Safe-area HUD modal for painting residential houses.

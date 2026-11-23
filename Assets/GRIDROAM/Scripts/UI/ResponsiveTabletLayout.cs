@@ -1,14 +1,13 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
-    /// Automatically adapts the entire Our World HUD, modals, and touch controls for tablets
-    /// (4:3 iPad / iPad Air / iPad Pro 11"-12.9", 16:10 Android tablets, and foldable/split-screen
-    /// displays) while keeping 16:9 / 20:9 phone layouts completely untouched.
-    /// Runs at runtime with zero scene rebuild required and reacts live to screen/window resizes.
+    /// Ensures ergonomic, mobile-first touch control sizes across phones (16:9 / 20:9 iPhone & Android)
+    /// and tablets (4:3 iPad / 16:10 Android tablets / foldables) at runtime with zero scene rebuild required.
+    /// Enlarges the movement joystick, on-foot action buttons, car steering/pedals, interact pill, and top
+    /// utility buttons to comfortable real-world thumb targets and reacts live to screen/window resizes.
     /// </summary>
     public sealed class ResponsiveTabletLayout : MonoBehaviour
     {
@@ -16,6 +15,7 @@ namespace Gridroam.UI
         private const float BaseRefHeight = 1080f;
 
         private CanvasScaler _hudScaler;
+        private GameHUDController _hudController;
         private RectTransform _safeRoot;
         private RectTransform _missionBox;
         private RectTransform _interactBtn;
@@ -23,15 +23,27 @@ namespace Gridroam.UI
         private RectTransform _joyZone;
         private RectTransform _camZone;
         private RectTransform _phonePanel;
+        private RectTransform _phoneBtn;
+
+        // Touch control RectTransforms resized for real mobile ergonomics
+        private RectTransform _joyBg;
+        private RectTransform _joyRing;
+        private RectTransform _joyHandle;
+        private VirtualJoystick _virtualJoystick;
+        private RectTransform _sprintBtn;
+        private RectTransform _jumpBtn;
+        private RectTransform _attackBtn;
+        private RectTransform _steerLeftBtn;
+        private RectTransform _steerRightBtn;
+        private RectTransform _gasBtn;
+        private RectTransform _brakeBtn;
+        private RectTransform _handbrakeBtn;
+        private RectTransform _exitCarBtn;
 
         private bool _cachedOriginals;
         private Vector2 _origMissionSize;
-        private Vector2 _origInteractPos;
-        private Vector2 _origInteractSize;
         private Vector2 _origSpeedOffsetMin;
         private Vector2 _origSpeedOffsetMax;
-        private Vector2 _origJoyAnchorMax;
-        private Vector2 _origCamAnchorMin;
 
         private int _lastW = -1;
         private int _lastH = -1;
@@ -58,6 +70,8 @@ namespace Gridroam.UI
         private void Awake()
         {
             CacheReferences();
+            // Apply ergonomic touch sizes in Awake so HudIconSkin.Start() & GameHUDController.Start() see final sizes
+            ApplyMobileTouchControlErgonomics(tabletMode: false);
         }
 
         private void Start()
@@ -76,13 +90,18 @@ namespace Gridroam.UI
 
         private void CacheReferences()
         {
+            if (_hudController == null)
+            {
+                _hudController = GetComponent<GameHUDController>();
+                if (_hudController == null) _hudController = FindFirstObjectByType<GameHUDController>();
+            }
+
             if (_hudScaler == null)
             {
                 _hudScaler = GetComponent<CanvasScaler>();
-                if (_hudScaler == null)
+                if (_hudScaler == null && _hudController != null)
                 {
-                    GameHUDController hud = FindFirstObjectByType<GameHUDController>();
-                    if (hud != null) _hudScaler = hud.GetComponent<CanvasScaler>();
+                    _hudScaler = _hudController.GetComponent<CanvasScaler>();
                 }
             }
 
@@ -97,23 +116,33 @@ namespace Gridroam.UI
             if (_joyZone == null) _joyZone = FindChildRect(scope, "JoystickTouchZone");
             if (_camZone == null) _camZone = FindChildRect(scope, "CameraTouchZone");
             if (_phonePanel == null) _phonePanel = FindChildRect(scope, "PhonePanel");
+            if (_phoneBtn == null) _phoneBtn = FindChildRect(scope, "Btn_Phone");
+
+            if (_joyBg == null) _joyBg = FindChildRect(scope, "VirtualJoystick_BG");
+            if (_joyRing == null) _joyRing = FindChildRect(scope, "Joystick_Ring");
+            if (_joyHandle == null) _joyHandle = FindChildRect(scope, "Joystick_Handle");
+            if (_virtualJoystick == null && _joyZone != null) _virtualJoystick = _joyZone.GetComponent<VirtualJoystick>();
+
+            if (_sprintBtn == null) _sprintBtn = FindChildRect(scope, "Btn_Sprint");
+            if (_jumpBtn == null) _jumpBtn = FindChildRect(scope, "Btn_Jump");
+            if (_attackBtn == null) _attackBtn = FindChildRect(scope, "Btn_Attack");
+
+            if (_steerLeftBtn == null) _steerLeftBtn = FindChildRect(scope, "Btn_SteerLeft");
+            if (_steerRightBtn == null) _steerRightBtn = FindChildRect(scope, "Btn_SteerRight");
+            if (_gasBtn == null) _gasBtn = FindChildRect(scope, "Btn_Gas");
+            if (_brakeBtn == null) _brakeBtn = FindChildRect(scope, "Btn_Brake");
+            if (_handbrakeBtn == null) _handbrakeBtn = FindChildRect(scope, "Btn_Handbrake");
+            if (_exitCarBtn == null) _exitCarBtn = FindChildRect(scope, "Btn_ExitCar");
 
             if (!_cachedOriginals)
             {
                 _cachedOriginals = true;
                 if (_missionBox != null) _origMissionSize = _missionBox.sizeDelta;
-                if (_interactBtn != null)
-                {
-                    _origInteractPos = _interactBtn.anchoredPosition;
-                    _origInteractSize = _interactBtn.sizeDelta;
-                }
                 if (_speedGroup != null)
                 {
                     _origSpeedOffsetMin = _speedGroup.offsetMin;
                     _origSpeedOffsetMax = _speedGroup.offsetMax;
                 }
-                if (_joyZone != null) _origJoyAnchorMax = _joyZone.anchorMax;
-                if (_camZone != null) _origCamAnchorMin = _camZone.anchorMin;
             }
         }
 
@@ -134,7 +163,6 @@ namespace Gridroam.UI
             float dpi = (Screen.dpi >= 72f && Screen.dpi <= 700f) ? Screen.dpi : 0f;
             float diagInches = dpi > 0f ? Mathf.Sqrt(w * w + h * h) / dpi : 0f;
 
-            // Detect both real large-screen tablets (iPad / Android Tab >= 7.2") and tablet/foldable aspect ratios (4:3, 16:10, 1:1)
             bool isPhysicalTablet = diagInches >= 7.2f;
             bool isTabletAspect = aspect <= 1.66f;
             bool tabletMode = isPhysicalTablet || isTabletAspect;
@@ -144,23 +172,20 @@ namespace Gridroam.UI
             float physicalScaleBoost = 1.0f;
             if (diagInches >= 8.0f)
             {
-                physicalScaleBoost = Mathf.Lerp(1.06f, 1.22f, Mathf.InverseLerp(8.0f, 13.0f, diagInches));
+                physicalScaleBoost = Mathf.Lerp(1.08f, 1.24f, Mathf.InverseLerp(8.0f, 13.0f, diagInches));
             }
             else if (isTabletAspect)
             {
-                // Even in Unity Editor Game View (DPI unknown) when testing 4:3 iPad / 16:10 tablet
                 physicalScaleBoost = Mathf.Lerp(1.10f, 1.04f, Mathf.InverseLerp(1.25f, 1.66f, aspect));
             }
 
             float targetRefW = BaseRefWidth * physicalScaleBoost;
             float targetRefH = BaseRefHeight * physicalScaleBoost;
-            // On 4:3 iPads, foldables & narrow windows, match width (0.0) so top HUD elements NEVER collide!
             float match = isTabletAspect ? 0.0f : (isPhysicalTablet ? 0.25f : 0.50f);
 
-            // Apply consistently to HUD CanvasScaler and all runtime overlay CanvasScalers
             ApplyToAllCanvasScalers(targetRefW, targetRefH, match);
+            ApplyMobileTouchControlErgonomics(tabletMode);
 
-            // Ergonomic HUD reflow for tablets & narrow/foldable screens
             if (tabletMode)
             {
                 if (_missionBox != null)
@@ -169,47 +194,14 @@ namespace Gridroam.UI
                     _missionBox.sizeDelta = new Vector2(Mathf.Min(_origMissionSize.x, maxMissionW), _origMissionSize.y);
                 }
 
-                if (_interactBtn != null)
-                {
-                    // Center cleanly between left joystick and right action/pedal clusters with roomy pill width
-                    _interactBtn.anchoredPosition = new Vector2(0f, 76f);
-                    _interactBtn.sizeDelta = new Vector2(Mathf.Max(_origInteractSize.x, 316f), _origInteractSize.y);
-                }
-
-                if (_speedGroup != null)
-                {
-                    // Center the driving speedometer + fuel gauge cleanly between left steer & right pedals
-                    float halfW = (_origSpeedOffsetMax.x - _origSpeedOffsetMin.x) * 0.5f;
-                    float height = _origSpeedOffsetMax.y - _origSpeedOffsetMin.y;
-                    _speedGroup.offsetMin = new Vector2(-halfW, 38f);
-                    _speedGroup.offsetMax = new Vector2(halfW, 38f + height);
-                }
-
-                if (_joyZone != null)
-                {
-                    _joyZone.anchorMax = new Vector2(0.36f, 0.64f);
-                }
-                if (_camZone != null)
-                {
-                    _camZone.anchorMin = new Vector2(0.36f, 0f);
-                }
+                if (_joyZone != null) _joyZone.anchorMax = new Vector2(0.38f, 0.64f);
+                if (_camZone != null) _camZone.anchorMin = new Vector2(0.38f, 0f);
             }
             else
             {
-                // Restore exact 16:9 / 20:9 phone geometry
                 if (_missionBox != null) _missionBox.sizeDelta = _origMissionSize;
-                if (_interactBtn != null)
-                {
-                    _interactBtn.anchoredPosition = _origInteractPos;
-                    _interactBtn.sizeDelta = new Vector2(Mathf.Max(_origInteractSize.x, 290f), _origInteractSize.y);
-                }
-                if (_speedGroup != null)
-                {
-                    _speedGroup.offsetMin = _origSpeedOffsetMin;
-                    _speedGroup.offsetMax = _origSpeedOffsetMax;
-                }
-                if (_joyZone != null) _joyZone.anchorMax = _origJoyAnchorMax;
-                if (_camZone != null) _camZone.anchorMin = _origCamAnchorMin;
+                if (_joyZone != null) _joyZone.anchorMax = new Vector2(0.44f, 0.72f);
+                if (_camZone != null) _camZone.anchorMin = new Vector2(0.44f, 0f);
             }
 
             // Guarantee Phone/Map modal fits cleanly inside any aspect ratio (including 4:3 iPad & Split-Screen)
@@ -237,6 +229,100 @@ namespace Gridroam.UI
             }
         }
 
+        private void ApplyMobileTouchControlErgonomics(bool tabletMode)
+        {
+            // 1. Movement Virtual Joystick — generous 284px base, 116px knob, 96px smooth analog range
+            Vector2 joyRestPos = new Vector2(198f, 186f);
+            if (_joyBg != null)
+            {
+                _joyBg.sizeDelta = new Vector2(284f, 284f);
+                _joyBg.anchoredPosition = joyRestPos;
+            }
+            if (_joyRing != null) _joyRing.sizeDelta = new Vector2(284f, 284f);
+            if (_joyHandle != null) _joyHandle.sizeDelta = new Vector2(116f, 116f);
+            if (_virtualJoystick != null) _virtualJoystick.ConfigureSizing(96f, joyRestPos);
+
+            // 2. On-Foot Right-Thumb Action Arc (Sprint / Jump / Attack)
+            if (_sprintBtn != null)
+            {
+                _sprintBtn.anchoredPosition = new Vector2(-42f, 46f);
+                _sprintBtn.sizeDelta = new Vector2(168f, 168f);
+            }
+            if (_jumpBtn != null)
+            {
+                _jumpBtn.anchoredPosition = new Vector2(-52f, 238f);
+                _jumpBtn.sizeDelta = new Vector2(150f, 150f);
+            }
+            if (_attackBtn != null)
+            {
+                _attackBtn.anchoredPosition = new Vector2(-234f, 54f);
+                _attackBtn.sizeDelta = new Vector2(150f, 150f);
+            }
+
+            // 3. Driving Controls — large racing-game thumb steering & pedals
+            if (_steerLeftBtn != null)
+            {
+                _steerLeftBtn.anchoredPosition = new Vector2(38f, 48f);
+                _steerLeftBtn.sizeDelta = new Vector2(196f, 178f);
+            }
+            if (_steerRightBtn != null)
+            {
+                _steerRightBtn.anchoredPosition = new Vector2(258f, 48f);
+                _steerRightBtn.sizeDelta = new Vector2(196f, 178f);
+            }
+            if (_gasBtn != null)
+            {
+                _gasBtn.anchoredPosition = new Vector2(-38f, 48f);
+                _gasBtn.sizeDelta = new Vector2(180f, 228f);
+            }
+            if (_brakeBtn != null)
+            {
+                _brakeBtn.anchoredPosition = new Vector2(-242f, 48f);
+                _brakeBtn.sizeDelta = new Vector2(176f, 178f);
+            }
+            if (_handbrakeBtn != null)
+            {
+                _handbrakeBtn.anchoredPosition = new Vector2(-242f, 248f);
+                _handbrakeBtn.sizeDelta = new Vector2(176f, 82f);
+            }
+            if (_exitCarBtn != null)
+            {
+                _exitCarBtn.anchoredPosition = new Vector2(-38f, 298f);
+                _exitCarBtn.sizeDelta = new Vector2(180f, 82f);
+            }
+
+            // Center speedometer cleanly between left steer arrows and right pedals
+            if (_speedGroup != null)
+            {
+                float halfW = (_origSpeedOffsetMax.x - _origSpeedOffsetMin.x) * 0.5f;
+                float height = _origSpeedOffsetMax.y - _origSpeedOffsetMin.y;
+                if (halfW < 40f) halfW = 82f;
+                if (height < 80f) height = 186f;
+                _speedGroup.offsetMin = new Vector2(-halfW, 40f);
+                _speedGroup.offsetMax = new Vector2(halfW, 40f + height);
+            }
+
+            // 4. Shared Interact Pill — tall, thumb-friendly & centered cleanly between left/right clusters
+            if (_interactBtn != null)
+            {
+                float baseY = tabletMode ? 86f : 74f;
+                _interactBtn.anchoredPosition = new Vector2(0f, baseY);
+                _interactBtn.sizeDelta = new Vector2(Mathf.Max(_interactBtn.sizeDelta.x, 316f), 84f);
+                UnityEngine.UI.Text lbl = _interactBtn.GetComponentInChildren<UnityEngine.UI.Text>(true);
+                if (lbl != null) lbl.fontSize = 26;
+                if (_hudController != null) _hudController.SetInteractBaseY(baseY);
+            }
+
+            // 5. Top-Left Phone / Town Guide button — roomier mobile tap target
+            if (_phoneBtn != null)
+            {
+                _phoneBtn.anchoredPosition = new Vector2(28f, -206f);
+                _phoneBtn.sizeDelta = new Vector2(188f, 64f);
+                UnityEngine.UI.Text pLbl = _phoneBtn.GetComponentInChildren<UnityEngine.UI.Text>(true);
+                if (pLbl != null) pLbl.fontSize = 22;
+            }
+        }
+
         private static void ApplyToAllCanvasScalers(float refW, float refH, float match)
         {
             CanvasScaler[] scalers = FindObjectsByType<CanvasScaler>(FindObjectsInactive.Include);
@@ -245,7 +331,6 @@ namespace Gridroam.UI
                 CanvasScaler sc = scalers[i];
                 if (sc == null || sc.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize) continue;
 
-                // Preserve StoryIntroOverlay's 1280x720 proportional scale while switching its match cleanly for tablets
                 bool is720pOverlay = sc.gameObject.name.Contains("StoryIntro");
                 if (is720pOverlay)
                 {

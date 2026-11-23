@@ -44,7 +44,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 01328c17a224c409094e4976cf845e61, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Player.ProceduralHumanoid
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Player.ProceduralHumanoid
   hips: {fileID: 4317004174546794994}
   spine: {fileID: 7598485567571659191}
   neck: {fileID: 5260153098730812533}
@@ -503,7 +503,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8ae15f44738d1441a8d465e5f7cc287c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Core.WorldAnchor
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Core.WorldAnchor
   anchorId: npc_harbor_receiver
   defaultRadius: 3.4
   beaconOffset: {x: 0, y: 2.3, z: 0}
@@ -518,11 +518,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66cd1278c62a146b8897d40c7b6e3e2d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Player.InteractableTrigger
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Player.InteractableTrigger
   kind: 0
   interactableId: npc_harbor_receiver
   promptLocalizationKey: ui.btn.talk
   interactionRadius: 3.4
+  customPromptText: 
 --- !u!1 &2808732748249872535
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Simple zero-churn GameObject pool for ambient traffic vehicles and pedestrians.

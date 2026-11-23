@@ -1,8 +1,8 @@
 using System;
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Procedural low-volume coastal wind & sea surf ambience positioned along the seawall

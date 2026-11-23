@@ -1,11 +1,11 @@
-using Gridroam.Core;
-using Gridroam.Jobs;
-using Gridroam.Missions;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Jobs;
+using OurWorld.Missions;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Spawns unscripted, optional neighborhood micro-events while exploring Hamidiye Mahallesi

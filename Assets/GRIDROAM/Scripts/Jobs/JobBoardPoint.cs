@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.Jobs
+namespace OurWorld.Jobs
 {
     public enum JobType
     {

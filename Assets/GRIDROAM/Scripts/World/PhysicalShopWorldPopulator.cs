@@ -1,8 +1,8 @@
 using System.Collections;
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Automatically populates every shop shelf, fridge, manav stand, ice-cream chest, tea counter,

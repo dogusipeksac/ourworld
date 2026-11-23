@@ -1,7 +1,7 @@
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     public sealed partial class NeighborhoodSports
     {

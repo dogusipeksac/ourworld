@@ -1,8 +1,8 @@
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Live GPS district street-name tracker across Hamidiye Mahallesi's 8 main avenues

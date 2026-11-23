@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
   m_Name: Mission_10_MahalleSenligi
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
   missionId: m10_mahalle_senligi
   titleKey: m10.title
   summaryKey: m10.summary
@@ -38,6 +38,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 5
     objectiveKey: m10.step2.objective
     targetAnchorId: m10_tea_box
@@ -54,6 +55,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 5
     objectiveKey: m10.step3.objective
     targetAnchorId: m10_simit_tray
@@ -70,6 +72,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 0
     objectiveKey: m10.step4.objective
     targetAnchorId: m10_festival_zone
@@ -86,6 +89,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 1
     objectiveKey: m10.step5.objective
     targetAnchorId: npc_muhtar
@@ -102,3 +106,4 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1

@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Procedural sound-effects & visual juice manager following Unity craft-game-floors:
@@ -12,6 +12,7 @@ namespace Gridroam.Core
     public class GameFeelAudio : MonoBehaviour
     {
         public static GameFeelAudio Instance { get; private set; }
+        public static event Action OnCarHornPlayed;
 
         private AudioSource _sfx2D;
         private AudioClip _coinClip;
@@ -31,7 +32,7 @@ namespace Gridroam.Core
         public static GameFeelAudio EnsureInstance()
         {
             if (Instance != null) return Instance;
-            GameObject go = new GameObject("GRIDROAM_GameFeelAudio");
+            GameObject go = new GameObject("OurWorld_GameFeelAudio");
             DontDestroyOnLoad(go);
             Instance = go.AddComponent<GameFeelAudio>();
             return Instance;
@@ -122,6 +123,7 @@ namespace Gridroam.Core
             if (Time.time - inst._lastHornTime < 0.35f) return false;
             inst._lastHornTime = Time.time;
             inst.PlayOneShotPitched(inst._carHornClip, 0.42f, 0.97f, 1.03f);
+            OnCarHornPlayed?.Invoke();
             return true;
         }
 

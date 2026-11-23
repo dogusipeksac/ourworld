@@ -1,10 +1,10 @@
 using System;
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Fullscreen Force Update / Soft Update / Maintenance Gate overlay (Kube 2026 pattern).

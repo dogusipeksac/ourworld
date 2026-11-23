@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Tracks exploration across 10 iconic Hamidiye Mahallesi landmarks.

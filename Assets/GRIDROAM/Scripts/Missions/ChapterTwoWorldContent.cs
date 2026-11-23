@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Gridroam.Core;
-using Gridroam.Player;
-using Gridroam.World;
+using OurWorld.Core;
+using OurWorld.Player;
+using OurWorld.World;
 using UnityEngine;
 
-namespace Gridroam.Missions
+namespace OurWorld.Missions
 {
     /// <summary>
     /// Spawns the NPCs, pickups and zones used by Chapter 2 (Missions 6-10) at runtime,

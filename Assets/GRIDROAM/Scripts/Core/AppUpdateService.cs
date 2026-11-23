@@ -3,11 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
-using Gridroam.UI;
+using OurWorld.UI;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Fetches Firebase Remote Config over REST (`ourworld-dd8dc`) on launch & foreground resume

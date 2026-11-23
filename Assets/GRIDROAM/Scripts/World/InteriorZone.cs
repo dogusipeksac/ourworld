@@ -1,8 +1,8 @@
-using Gridroam.CameraSystem;
-using Gridroam.Player;
+using OurWorld.CameraSystem;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Interior trigger volume for enterable houses and shops.

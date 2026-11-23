@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using Gridroam.Input;
+using OurWorld.Input;
 using UnityEngine;
 
-namespace Gridroam.CameraSystem
+namespace OurWorld.CameraSystem
 {
     /// <summary>
     /// Smooth third-person camera supporting On-Foot, Seated, Indoor, and Driving modes,
@@ -51,12 +51,78 @@ namespace Gridroam.CameraSystem
         private Vector3 _smoothedPivot;
         private bool _isDrivingMode;
         private bool _isSeatedMode;
+        private bool _sportCameraActive;
+        private float _sportCameraDistance = 7.8f;
+        private float _sportCameraPitch = 24f;
+        private float _sportCameraFov = 62f;
+        private float? _sportLockedYaw;
         private float _timeSinceManualLook = 99f;
+
+        public void SetSportCameraOverride(bool active, float distance = 7.8f, float pitch = 24f, float fov = 62f, float? lockYaw = null)
+        {
+            _sportCameraActive = active;
+            _sportCameraDistance = distance;
+            _sportCameraPitch = pitch;
+            _sportCameraFov = fov;
+            _sportLockedYaw = lockYaw;
+            if (active)
+            {
+                _pitch = pitch;
+                if (lockYaw.HasValue) _yaw = lockYaw.Value;
+                _timeSinceManualLook = 99f;
+            }
+        }
 
         public float Yaw => _yaw;
         public Vector3 FlatForward => Quaternion.Euler(0f, _yaw, 0f) * Vector3.forward;
         public Vector3 FlatRight => Quaternion.Euler(0f, _yaw, 0f) * Vector3.right;
         public bool IsIndoors => _indoorZones.Count > 0;
+        public bool ExternalCameraControl { get; set; }
+
+        public void SnapBehindTargetImmediate()
+        {
+            if (target == null) return;
+            _yaw = target.eulerAngles.y;
+            _pitch = _isDrivingMode ? drivingDefaultPitch : 14f;
+            Vector3 offset = _isDrivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
+            _smoothedPivot = target.position + offset;
+            _currentDistance = _isDrivingMode ? drivingDistance : GetEffectiveFootMaxDistance();
+        }
+
+        public bool TryGetGameplayPose(out Vector3 position, out Quaternion rotation, out float fov)
+        {
+            position = transform.position;
+            rotation = transform.rotation;
+            fov = _camera != null ? _camera.fieldOfView : baseFov;
+            if (target == null) return false;
+
+            Vector3 offset = _isDrivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
+            Vector3 pivot = target.position + offset;
+            float dist = _sportCameraActive
+                ? _sportCameraDistance
+                : (_isDrivingMode ? drivingDistance : GetEffectiveFootMaxDistance());
+            float yaw = (_sportCameraActive && _sportLockedYaw.HasValue) ? _sportLockedYaw.Value : _yaw;
+            float pitch = _sportCameraActive
+                ? _sportCameraPitch
+                : Mathf.Clamp(_pitch, _isDrivingMode ? 4f : footMinPitch, _isDrivingMode ? 42f : footMaxPitch);
+
+            Quaternion rot = Quaternion.Euler(pitch, yaw, 0f);
+            Vector3 backDir = rot * Vector3.back;
+            float safeDist = ComputeCollisionAdjustedDistance(pivot, backDir, dist);
+            position = pivot + backDir * safeDist;
+            if (!_isDrivingMode)
+            {
+                float minCamY = target.position.y + 0.55f;
+                if (position.y < minCamY) position.y = minCamY;
+            }
+            rotation = Quaternion.LookRotation((pivot - position).normalized, Vector3.up);
+
+            if (_camera == null) _camera = GetComponent<Camera>();
+            float aspect = (_camera != null && _camera.aspect > 0.1f) ? _camera.aspect : (16f / 9f);
+            float tabletFovBoost = aspect < 1.70f ? Mathf.Clamp((1.70f - aspect) * 26f, 0f, 12f) : 0f;
+            fov = baseFov + tabletFovBoost;
+            return true;
+        }
 
         private void Start()
         {
@@ -82,11 +148,13 @@ namespace Gridroam.CameraSystem
 
             if (target != null && snapBehindTarget)
             {
-                _yaw = target.eulerAngles.y;
-                _pitch = drivingMode ? drivingDefaultPitch : 14f;
+                _yaw = (_sportCameraActive && _sportLockedYaw.HasValue) ? _sportLockedYaw.Value : target.eulerAngles.y;
+                _pitch = _sportCameraActive ? _sportCameraPitch : (drivingMode ? drivingDefaultPitch : 14f);
                 Vector3 offset = drivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
                 _smoothedPivot = target.position + offset;
-                _currentDistance = drivingMode ? drivingDistance : GetEffectiveFootMaxDistance();
+                _currentDistance = _sportCameraActive
+                    ? _sportCameraDistance
+                    : (drivingMode ? drivingDistance : GetEffectiveFootMaxDistance());
             }
         }
 
@@ -126,7 +194,7 @@ namespace Gridroam.CameraSystem
 
         private void LateUpdate()
         {
-            if (target == null)
+            if (ExternalCameraControl || target == null)
             {
                 return;
             }
@@ -147,7 +215,16 @@ namespace Gridroam.CameraSystem
                 }
             }
 
-            if (_isDrivingMode && _timeSinceManualLook > drivingAutoAlignDelay)
+            if (_sportCameraActive && _sportLockedYaw.HasValue)
+            {
+                _yaw = Mathf.LerpAngle(_yaw, _sportLockedYaw.Value, 1f - Mathf.Exp(-5.5f * Time.deltaTime));
+                _pitch = Mathf.Lerp(_pitch, _sportCameraPitch, 1f - Mathf.Exp(-4.5f * Time.deltaTime));
+            }
+            else if (_sportCameraActive && _timeSinceManualLook > 1.8f)
+            {
+                _pitch = Mathf.Lerp(_pitch, _sportCameraPitch, 1f - Mathf.Exp(-3.0f * Time.deltaTime));
+            }
+            else if (_isDrivingMode && _timeSinceManualLook > drivingAutoAlignDelay)
             {
                 float targetYaw = target.eulerAngles.y;
                 _yaw = Mathf.LerpAngle(_yaw, targetYaw, 1f - Mathf.Exp(-drivingAutoAlignSpeed * Time.deltaTime));
@@ -187,18 +264,22 @@ namespace Gridroam.CameraSystem
                 speedFactor = Mathf.InverseLerp(0f, fovMaxSpeedKmh, speedKmh);
             }
 
-            float desiredDistance = _isDrivingMode
-                ? drivingDistance + speedFactor * drivingSpeedExtraDistance
-                : (hasOverheadCeiling ? Mathf.Min(GetEffectiveFootMaxDistance(), 1.90f) : GetEffectiveFootMaxDistance());
+            float desiredDistance = _sportCameraActive
+                ? _sportCameraDistance
+                : (_isDrivingMode
+                    ? drivingDistance + speedFactor * drivingSpeedExtraDistance
+                    : (hasOverheadCeiling ? Mathf.Min(GetEffectiveFootMaxDistance(), 1.90f) : GetEffectiveFootMaxDistance()));
             float distSpeed = effectivelyIndoors ? distanceBlendSpeed * 2.2f : distanceBlendSpeed;
             _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distSpeed * Time.deltaTime));
 
             if (_camera == null) _camera = GetComponent<Camera>();
             if (_camera != null)
             {
-                float baseTargetFov = _isDrivingMode
-                    ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor)
-                    : (effectivelyIndoors ? 66f : baseFov);
+                float baseTargetFov = _sportCameraActive
+                    ? _sportCameraFov
+                    : (_isDrivingMode
+                        ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor)
+                        : (effectivelyIndoors ? 66f : baseFov));
                 // Preserve wide horizontal view on 4:3 iPads, 16:10 Android tablets & foldables
                 float aspect = _camera.aspect > 0.1f ? _camera.aspect : (16f / 9f);
                 float tabletFovBoost = aspect < 1.70f ? Mathf.Clamp((1.70f - aspect) * 26f, 0f, 12f) : 0f;

@@ -1,11 +1,11 @@
 using System;
 using System.Collections;
-using Gridroam.Core;
+using OurWorld.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     public enum PlayerActionKind
     {

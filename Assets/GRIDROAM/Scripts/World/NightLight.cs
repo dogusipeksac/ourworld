@@ -1,11 +1,13 @@
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Marker & lightweight controller toggled by DayNightCycle:
     /// enables exterior/street/plaza point lights and emissive window/bulb renderers
-    /// at night (20:00-06:00) and disables them during daytime using MaterialPropertyBlock.
+    /// at evening/night (18:30-06:30) and disables them during daytime using MaterialPropertyBlock.
+    /// Automatically enables URP _EMISSION keywords and calibrates legacy streetlamp intensities
+    /// for crisp, readable URP Linear street illumination.
     /// </summary>
     public class NightLight : MonoBehaviour
     {
@@ -14,7 +16,7 @@ namespace Gridroam.World
 
         [SerializeField] private Light targetLight;
         [SerializeField] private Renderer[] emissiveRenderers;
-        [SerializeField] private Color nightEmissionColor = new Color(1.0f, 0.80f, 0.44f, 1f) * 2.0f;
+        [SerializeField] private Color nightEmissionColor = new Color(1.0f, 0.80f, 0.44f, 1f) * 2.4f;
         [SerializeField] private bool overrideBaseColor;
         [SerializeField] private Color dayBaseColor = new Color(0.09f, 0.13f, 0.18f, 1f);
         [SerializeField] private Color nightBaseColor = new Color(1.0f, 0.83f, 0.54f, 1f);
@@ -22,6 +24,12 @@ namespace Gridroam.World
         private MaterialPropertyBlock _mpb;
         private bool _appliedOnce;
         private bool _currentNightState;
+        private bool _distanceCulled;
+        private bool _calibrated;
+
+        public Light TargetLight => targetLight;
+        public bool IsNightActive => _currentNightState;
+        public bool IsManagedOutdoorLight { get; private set; }
 
         public void Configure(
             Light lightComponent,
@@ -40,6 +48,8 @@ namespace Gridroam.World
                 dayBaseColor = dayColor;
                 nightBaseColor = nightColor;
             }
+            _calibrated = false;
+            CalibrateIfNeeded();
         }
 
         private void Awake()
@@ -56,10 +66,37 @@ namespace Gridroam.World
                     emissiveRenderers = new[] { selfRenderer };
                 }
             }
+            CalibrateIfNeeded();
+        }
+
+        private void CalibrateIfNeeded()
+        {
+            if (_calibrated) return;
+            _calibrated = true;
+
+            if (targetLight != null && targetLight.type == LightType.Point && targetLight.range >= 14f)
+            {
+                bool isInterior = GetComponentInParent<InteriorZone>() != null;
+                if (!isInterior)
+                {
+                    IsManagedOutdoorLight = true;
+                    // Calibrate legacy gamma-era outdoor point intensities (2.4..3.8) into crisp URP Linear street pools
+                    if (targetLight.intensity < 12f)
+                    {
+                        targetLight.intensity = Mathf.Clamp(targetLight.intensity * 8.2f, 22f, 34f);
+                    }
+                    if (targetLight.range < 28f)
+                    {
+                        targetLight.range = 28f;
+                    }
+                    targetLight.shadows = LightShadows.None;
+                }
+            }
         }
 
         private void OnEnable()
         {
+            CalibrateIfNeeded();
             DayNightCycle.RegisterNightLight(this);
             if (DayNightCycle.Instance != null)
             {
@@ -72,8 +109,20 @@ namespace Gridroam.World
             DayNightCycle.UnregisterNightLight(this);
         }
 
+        public void SetDistanceCulled(bool culled)
+        {
+            if (_distanceCulled == culled) return;
+            _distanceCulled = culled;
+            if (targetLight != null)
+            {
+                targetLight.enabled = _currentNightState && !_distanceCulled;
+            }
+        }
+
         public void ApplyNightState(bool isNight, bool force = false)
         {
+            CalibrateIfNeeded();
+
             if (_appliedOnce && !force && _currentNightState == isNight)
             {
                 return;
@@ -84,7 +133,7 @@ namespace Gridroam.World
 
             if (targetLight != null)
             {
-                targetLight.enabled = isNight;
+                targetLight.enabled = isNight && !_distanceCulled;
             }
 
             if (emissiveRenderers != null && emissiveRenderers.Length > 0)
@@ -99,6 +148,19 @@ namespace Gridroam.World
                 {
                     Renderer r = emissiveRenderers[i];
                     if (r == null) continue;
+
+                    // Ensure URP Lit materials have _EMISSION keyword enabled so MPB _EmissionColor renders!
+                    if (isNight)
+                    {
+                        Material[] mats = r.sharedMaterials;
+                        for (int m = 0; m < mats.Length; m++)
+                        {
+                            if (mats[m] != null && !mats[m].IsKeywordEnabled("_EMISSION"))
+                            {
+                                mats[m].EnableKeyword("_EMISSION");
+                            }
+                        }
+                    }
 
                     r.GetPropertyBlock(_mpb);
                     _mpb.SetColor(EmissionColorId, targetEmission);

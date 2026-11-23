@@ -1,0 +1,401 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Uploads complete App Store Connect metadata (tr + en-US), Categories, Review Detail,
+# iPhone 6.7" & iPad 12.9"/13" screenshots, and optionally attaches a processed build
+# for Our World (com.dogusipeksac.ourworld, APP_ID=6838324963).
+
+require "jwt"
+require "net/http"
+require "json"
+require "openssl"
+require "digest"
+
+APP_ID = ENV.fetch("ASC_APP_ID", "6838324963")
+KEY_ID = ENV.fetch("ASC_KEY_ID")
+ISSUER_ID = ENV.fetch("ASC_ISSUER_ID")
+KEY_PATH = ENV.fetch("ASC_KEY_PATH")
+VERSION_STR = ENV.fetch("IOS_MARKETING_VERSION", "1.0.0")
+BUILD_NUM = ENV["IOS_BUILD_NUMBER"]
+ATTACH_BUILD = ARGV.include?("--attach-build")
+SKIP_SCREENSHOTS = ARGV.include?("--skip-screenshots")
+
+PROJECT_ROOT = File.expand_path("..", __dir__)
+SHOTS_ROOT = File.join(PROJECT_ROOT, "release", "store_screenshots")
+
+KEY = OpenSSL::PKey::EC.new(File.read(KEY_PATH))
+
+def make_token
+  now = Time.now.to_i
+  JWT.encode(
+    { iss: ISSUER_ID, iat: now, exp: now + 600, aud: "appstoreconnect-v1" },
+    KEY,
+    "ES256",
+    { kid: KEY_ID }
+  )
+end
+
+def api_req(method, url, body = nil)
+  uri = URI(url)
+  cls = {
+    "GET" => Net::HTTP::Get,
+    "POST" => Net::HTTP::Post,
+    "PATCH" => Net::HTTP::Patch,
+    "DELETE" => Net::HTTP::Delete
+  }[method]
+  req = cls.new(uri)
+  req["Authorization"] = "Bearer #{make_token}"
+  req["Content-Type"] = "application/json" if body
+  req.body = JSON.generate(body) if body
+  res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |h| h.request(req) }
+  parsed = res.body && !res.body.empty? ? JSON.parse(res.body) : {}
+  [res.code.to_i, parsed]
+end
+
+def check!(label, code, resp)
+  if code >= 300
+    warn "[ERR] #{label} (HTTP #{code}): #{JSON.pretty_generate(resp)}"
+    false
+  else
+    puts "[OK] #{label} (HTTP #{code})"
+    true
+  end
+end
+
+# 1. Fetch App Store Version & update versionString + copyright
+code, vers = api_req("GET", "https://api.appstoreconnect.apple.com/v1/apps/#{APP_ID}/appStoreVersions?limit=5")
+abort("Failed to list versions: #{vers}") if code >= 300
+ver = (vers["data"] || []).find { |v| v.dig("attributes", "appStoreState") == "PREPARE_FOR_SUBMISSION" } || (vers["data"] || []).first
+abort("No App Store version found!") unless ver
+ver_id = ver["id"]
+puts "Target Version ID=#{ver_id} current=#{ver.dig('attributes', 'versionString')} state=#{ver.dig('attributes', 'appStoreState')}"
+
+code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appStoreVersions/#{ver_id}", {
+  data: {
+    type: "appStoreVersions",
+    id: ver_id,
+    attributes: {
+      versionString: VERSION_STR,
+      copyright: "2026 Doğuş İpeksaç",
+      releaseType: "AFTER_APPROVAL"
+    }
+  }
+})
+check!("Update AppStoreVersion (#{VERSION_STR}, copyright)", code, resp)
+
+# 2. Update AppInfo categories & localizations (tr + en-US)
+_, infos = api_req("GET", "https://api.appstoreconnect.apple.com/v1/apps/#{APP_ID}/appInfos?limit=5")
+app_info = (infos["data"] || []).first
+if app_info
+  info_id = app_info["id"]
+  code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appInfos/#{info_id}", {
+    data: {
+      type: "appInfos",
+      id: info_id,
+      relationships: {
+        primaryCategory: { data: { type: "appCategories", id: "GAMES" } },
+        primarySubcategoryOne: { data: { type: "appCategories", id: "GAMES_SIMULATION" } },
+        primarySubcategoryTwo: { data: { type: "appCategories", id: "GAMES_ADVENTURE" } }
+      }
+    }
+  })
+  check!("Set App Categories (Games -> Simulation / Adventure)", code, resp)
+
+  _, ilocs = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appInfos/#{info_id}/appInfoLocalizations")
+  iloc_map = {}
+  (ilocs["data"] || []).each { |l| iloc_map[l.dig("attributes", "locale")] = l["id"] }
+
+  app_info_locs = {
+    "tr" => {
+      name: "Bizim Dünyamız · Açık Dünya",
+      subtitle: "Sür, Spor Yap, Mahalleni Yaşa",
+      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+    },
+    "en-US" => {
+      name: "Our World · Living Open World",
+      subtitle: "Drive, Play Sports & Roam 3D!",
+      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+    }
+  }
+
+  app_info_locs.each do |loc, attrs|
+    if iloc_map[loc]
+      code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appInfoLocalizations/#{iloc_map[loc]}", {
+        data: { type: "appInfoLocalizations", id: iloc_map[loc], attributes: attrs }
+      })
+      check!("Update AppInfoLocalization (#{loc})", code, resp)
+    else
+      code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/appInfoLocalizations", {
+        data: {
+          type: "appInfoLocalizations",
+          attributes: attrs.merge(locale: loc),
+          relationships: { appInfo: { data: { type: "appInfos", id: info_id } } }
+        }
+      })
+      check!("Create AppInfoLocalization (#{loc})", code, resp)
+    end
+  end
+end
+
+# 3. Update Version Localizations (tr + en-US)
+_, vlocs = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appStoreVersions/#{ver_id}/appStoreVersionLocalizations")
+vloc_map = {}
+(vlocs["data"] || []).each { |l| vloc_map[l.dig("attributes", "locale")] = l["id"] }
+
+desc_tr = <<~TEXT.strip
+  Bizim Dünyamız (Our World), oyuncuların fikirleriyle birlikte büyüyen, capcanlı bir 3D açık dünya yaşam, sürüş ve spor oyunudur!
+
+  Hamidiye Mahallesi'nin samimi sokaklarından 8 ana caddeye uzanan özgür bir şehre adım at. Yaya olarak mahalleni gez, dilediğin araca binip sür, dilediğin an halı saha, tenis, basketbol ve voleybol maçlarına katıl, konuşan komşularla tanış ve günlük hayatın tadını çıkar.
+
+  ÖNE ÇIKAN ÖZELLİKLER:
+  • Yaşayan 3D Açık Dünya: Selman Sokağı, Fatih Bulvarı Saat Kulesi, Hz. Osman Camii, Çay Bahçesi, Açık Yüzme Havuzu ve 8 ana cadde.
+  • 5 Bölümlük 20 Hikâye Görevi + 4 Yan İş: Büyük Spor Kupası, Gece Yarısı Kesintisi, Sekiz Cadde Rallisi ve Büyük Final dâhil 20 görev; ayrıca Taksi, Pizza, Temizlik ve Ev Boyama işleriyle para kazan.
+  • 4 Oynanabilir Spor (İstediğin An Maç!): 1v1 Toprak Kort Tenis, 3v3 Halı Saha Futbolu, 2v2 Sokak Basketbolu ve 2v2 Voleybol maçlarına dilediğin zaman gir, ödül kazan.
+  • Akıllı & Konuşan Mahalle NPC'leri: Birbiriyle sohbet eden, korna ve yağmura tepki veren, sokak kedilerini seven ve saygınlığına göre seni selamlayan canlı komşular.
+  • Gerçekçi Fiziksel Etkileşimler: Menü açmadan bakkal raflarından alışveriş yap, çay iç, evinde dinlen, havuzda yüz ve camide ibadet et.
+  • Çoklu Araç & Işıklı Geceler: Araba, bisiklet ve motosiklet sür; driftle nitro doldur, Türkçe radyo aç, akşam 18:30'dan itibaren yanan sokak lambaları ve farlarla şehri keşfet.
+  • Birlikte Büyüyen Dünya: Oyun içi Öneri sekmesinden fikrini yaz, sıradaki güncellemeleri birlikte şekillendirelim!
+TEXT
+
+desc_en = <<~TEXT.strip
+  Our World is a vibrant, living 3D open-world life, driving & sports game built to grow together with its community!
+
+  Step into a lively handcrafted neighborhood spanning 8 bustling avenues — drive cars, bikes, and motorcycles, jump into playable tennis, football, basketball, and volleyball matches anytime, meet talking smart NPCs, and shape the city's story.
+
+  KEY FEATURES:
+  • Living 3D Open World: Explore 8 connected avenues, Clock Tower Plaza, local shops, parks, a swimmable pool, and enterable interiors.
+  • 5-Chapter Story (20 Missions) + 4 Side Jobs: Compete in the Sports Cup, restore a midnight blackout, race the 8-Avenue Rally, and choose the neighborhood's legacy — plus Taxi, Pizza, Cleanup, and House Painting jobs.
+  • 4 Playable Sports Anytime: Jump straight into 1v1 Clay Tennis, 3v3 Street Football, 2v2 Street Basketball, and 2v2 Volleyball with crisp controls and animations.
+  • Smart Talking Neighborhood NPCs: Citizens chat with neighbors via speech bubbles, react to car horns, rain, and fights, pet street cats, and remember how you treat them.
+  • Physical Zero-Menu Interactions: Pick products right off market shelves and pay at the counter, brew hot tea, swim freely, and rest in your own home.
+  • Multi-Vehicle Driving & Glowing Nights: Cruise with realistic handling, drift nitro, headlights, glowing streetlamps, lit apartment windows, and stadium floodlights after dusk.
+  • Shaped by Players: Share your ideas directly via the in-game Suggestions tab to help guide every update!
+TEXT
+
+version_locs = {
+  "tr" => {
+    promotionalText: "20 görev, 4 oynanabilir spor (Tenis, Futbol, Basketbol, Voleybol), akıllı komşular, araba sürüşü ve ışıklı İstanbul geceleri seni bekliyor!",
+    description: desc_tr,
+    keywords: "araba,sürme,istanbul,simülasyon,tenis,futbol,basketbol,voleybol,taksi,görev,3d,şehir,drift,offline",
+    supportUrl: "https://dogusipeksac.com",
+    marketingUrl: "https://dogusipeksac.com"
+  },
+  "en-US" => {
+    promotionalText: "20 story missions, 4 playable sports (Tennis, Football, Basketball, Volleyball), smart talking NPCs, multi-vehicle driving & glowing nights!",
+    description: desc_en,
+    keywords: "sandbox,car,driving,life,sim,city,tennis,football,basketball,volleyball,taxi,missions,drift,offline",
+    supportUrl: "https://dogusipeksac.com",
+    marketingUrl: "https://dogusipeksac.com"
+  }
+}
+
+version_locs.each do |loc, attrs|
+  if vloc_map[loc]
+    code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/#{vloc_map[loc]}", {
+      data: { type: "appStoreVersionLocalizations", id: vloc_map[loc], attributes: attrs }
+    })
+    check!("Update VersionLocalization (#{loc})", code, resp)
+  else
+    code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations", {
+      data: {
+        type: "appStoreVersionLocalizations",
+        attributes: attrs.merge(locale: loc),
+        relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: ver_id } } }
+      }
+    })
+    if check!("Create VersionLocalization (#{loc})", code, resp)
+      vloc_map[loc] = resp.dig("data", "id")
+    end
+  end
+end
+
+# 4. Update App Store Review Detail
+review_notes = <<~NOTES.strip
+  Our World (Bizim Dünyamız) is an offline-playable 3D open-world neighborhood life, driving, and sports game. No account, login, or in-app purchases are required.
+
+  How to review:
+  1. Launch the app. The living open-world Main Menu appears over a live 3D camera tour of the neighborhood — tap "Mahalleye Gir / Enter Neighborhood" (or pick any District / Sport directly).
+  2. Use the left virtual joystick to walk, drag the right side of the screen to orbit the camera, and tap Sprint/Jump/Interact buttons on the right.
+  3. Follow the 20-mission story tracker or explore freely: drive cars/bikes/motorcycles, jump anytime into playable Tennis, 3v3 Football, 2v2 Basketball, or 2v2 Volleyball, walk into shops to buy off shelves, swim in the pool, or talk to smart NPCs with floating speech bubbles.
+  4. Open Menu -> Settings & World to switch language (TR/EN), graphics tier, or Day/Evening/Night time (streetlamps, apartment lights, court floodlights, and headlights turn on automatically from 18:30).
+  5. No ads, no IAP, no chat, no demo account required. Firebase Crashlytics is used for crash diagnostics only.
+NOTES
+
+_, rev_get = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appStoreVersions/#{ver_id}/appStoreReviewDetail")
+rev_id = rev_get.dig("data", "id")
+rev_attrs = {
+  contactFirstName: ENV.fetch("ASC_REVIEW_FIRST_NAME", "Doğuş"),
+  contactLastName: ENV.fetch("ASC_REVIEW_LAST_NAME", "İpeksaç"),
+  contactEmail: ENV.fetch("ASC_REVIEW_EMAIL", "contact@dogusipeksac.com"),
+  demoAccountRequired: false,
+  notes: review_notes
+}
+rev_attrs[:contactPhone] = ENV["ASC_REVIEW_PHONE"] if ENV["ASC_REVIEW_PHONE"] && !ENV["ASC_REVIEW_PHONE"].empty?
+if rev_id
+  code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appStoreReviewDetails/#{rev_id}", {
+    data: { type: "appStoreReviewDetails", id: rev_id, attributes: rev_attrs }
+  })
+  check!("Update AppStoreReviewDetail", code, resp)
+else
+  code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/appStoreReviewDetails", {
+    data: {
+      type: "appStoreReviewDetails",
+      attributes: rev_attrs,
+      relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: ver_id } } }
+    }
+  })
+  check!("Create AppStoreReviewDetail", code, resp)
+end
+
+# 4b. Fill TestFlight Beta App Review Detail & Beta Localizations (tr + en-US)
+_, beta_rev = api_req("GET", "https://api.appstoreconnect.apple.com/v1/apps/#{APP_ID}/betaAppReviewDetail")
+beta_rev_id = beta_rev.dig("data", "id")
+if beta_rev_id
+  code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/betaAppReviewDetails/#{beta_rev_id}", {
+    data: { type: "betaAppReviewDetails", id: beta_rev_id, attributes: rev_attrs }
+  })
+  check!("Update BetaAppReviewDetail", code, resp)
+end
+
+_, blocs = api_req("GET", "https://api.appstoreconnect.apple.com/v1/apps/#{APP_ID}/betaAppLocalizations")
+bloc_map = {}
+(blocs["data"] || []).each { |l| bloc_map[l.dig("attributes", "locale")] = l["id"] }
+beta_email = ENV.fetch("ASC_REVIEW_EMAIL", "contact@dogusipeksac.com")
+beta_locs = {
+  "tr" => {
+    description: "Bizim Dünyamız (Our World) TestFlight test sürümü: 20 hikâye görevi, 4 oynanabilir spor (Tenis, Futbol, Basketbol, Voleybol), akıllı konuşan mahalle NPC'leri, canlı menü, çoklu araç sürüşü ve akşam sokak aydınlatması.",
+    feedbackEmail: beta_email,
+    marketingUrl: "https://dogusipeksac.com",
+    privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+  },
+  "en-US" => {
+    description: "Our World TestFlight beta: 20 story missions, 4 playable sports (Tennis, Football, Basketball, Volleyball), smart talking NPCs, living open-world menu, multi-vehicle driving, and glowing evening street lights.",
+    feedbackEmail: beta_email,
+    marketingUrl: "https://dogusipeksac.com",
+    privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+  }
+}
+beta_locs.each do |loc, attrs|
+  if bloc_map[loc]
+    code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/betaAppLocalizations/#{bloc_map[loc]}", {
+      data: { type: "betaAppLocalizations", id: bloc_map[loc], attributes: attrs }
+    })
+    check!("Update BetaAppLocalization (#{loc})", code, resp)
+  else
+    code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/betaAppLocalizations", {
+      data: {
+        type: "betaAppLocalizations",
+        attributes: attrs.merge(locale: loc),
+        relationships: { app: { data: { type: "apps", id: APP_ID } } }
+      }
+    })
+    check!("Create BetaAppLocalization (#{loc})", code, resp)
+  end
+end
+
+# 5. Upload Screenshots for both tr and en-US (iPhone 6.7", iPhone 6.5" & iPad 12.9"/13")
+def upload_screenshot_set(vloc_id, display_type, files)
+  return if files.empty?
+  _, sets = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appStoreVersionLocalizations/#{vloc_id}/appScreenshotSets")
+  set = (sets["data"] || []).find { |s| s.dig("attributes", "screenshotDisplayType") == display_type }
+  if set
+    set_id = set["id"]
+    # Clear existing screenshots in this set so order & count are exact
+    _, existing = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appScreenshotSets/#{set_id}/appScreenshots")
+    (existing["data"] || []).each do |sh|
+      api_req("DELETE", "https://api.appstoreconnect.apple.com/v1/appScreenshots/#{sh['id']}")
+    end
+  else
+    code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/appScreenshotSets", {
+      data: {
+        type: "appScreenshotSets",
+        attributes: { screenshotDisplayType: display_type },
+        relationships: {
+          appStoreVersionLocalization: { data: { type: "appStoreVersionLocalizations", id: vloc_id } }
+        }
+      }
+    })
+    return unless check!("Create screenshot set #{display_type}", code, resp)
+    set_id = resp.dig("data", "id")
+  end
+
+  files.each do |path|
+    data = File.binread(path)
+    md5 = Digest::MD5.hexdigest(data)
+    code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/appScreenshots", {
+      data: {
+        type: "appScreenshots",
+        attributes: { fileName: File.basename(path), fileSize: data.bytesize },
+        relationships: { appScreenshotSet: { data: { type: "appScreenshotSets", id: set_id } } }
+      }
+    })
+    next unless check!("Reserve #{display_type}/#{File.basename(path)}", code, resp)
+    shot_id = resp.dig("data", "id")
+    ops = resp.dig("data", "attributes", "uploadOperations") || []
+    ops.each do |op|
+      uri = URI(op["url"])
+      req = Net::HTTP::Put.new(uri)
+      (op["requestHeaders"] || []).each { |h| req[h["name"]] = h["value"] }
+      req.body = data.byteslice(op["offset"], op["length"])
+      res = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |h| h.request(req) }
+      abort("Screenshot PUT failed (#{res.code}): #{res.body}") if res.code.to_i >= 300
+    end
+    code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appScreenshots/#{shot_id}", {
+      data: {
+        type: "appScreenshots",
+        id: shot_id,
+        attributes: { uploaded: true, sourceFileChecksum: md5 }
+      }
+    })
+    check!("Commit #{display_type}/#{File.basename(path)}", code, resp)
+  end
+end
+
+unless SKIP_SCREENSHOTS
+  {
+    "tr" => SHOTS_ROOT,
+    "en-US" => File.join(SHOTS_ROOT, "en-US")
+  }.each do |loc, dir_root|
+    vloc_id = vloc_map[loc]
+    next unless vloc_id
+    iphone67_files = Dir.glob(File.join(dir_root, "app_store_6.7", "*.png")).sort
+    iphone65_files = Dir.glob(File.join(dir_root, "app_store_6.5", "*.png")).sort
+    ipad_files     = Dir.glob(File.join(dir_root, "app_store_ipad_12.9", "*.png")).sort
+    puts "=== Uploading screenshots for #{loc}: iPhone67=#{iphone67_files.length}, iPhone65=#{iphone65_files.length}, iPad=#{ipad_files.length} ==="
+    upload_screenshot_set(vloc_id, "APP_IPHONE_67", iphone67_files)
+    upload_screenshot_set(vloc_id, "APP_IPHONE_65", iphone65_files)
+    upload_screenshot_set(vloc_id, "APP_IPAD_PRO_3GEN_129", ipad_files)
+  end
+end
+
+# 6. Optionally attach processed build to App Store Version
+if ATTACH_BUILD
+  puts "Polling App Store Connect for processed build (version=#{BUILD_NUM || 'latest'})..."
+  build_id = nil
+  40.times do |i|
+    _, bresp = api_req("GET", "https://api.appstoreconnect.apple.com/v1/builds?filter[app]=#{APP_ID}&sort=-uploadedDate&limit=5")
+    b = (bresp["data"] || []).find do |item|
+      st = item.dig("attributes", "processingState")
+      ver_match = BUILD_NUM.nil? || BUILD_NUM.empty? || item.dig("attributes", "version") == BUILD_NUM
+      ver_match && st == "VALID"
+    end
+    if b
+      build_id = b["id"]
+      puts "Found VALID build id=#{build_id} version=#{b.dig('attributes', 'version')}"
+      break
+    end
+    first_st = bresp.dig("data", 0, "attributes", "processingState")
+    puts "  Wait #{i + 1}/40: latest build state=#{first_st || 'NONE'}"
+    sleep 15
+  end
+  if build_id
+    code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/appStoreVersions/#{ver_id}/relationships/build", {
+      data: { type: "builds", id: build_id }
+    })
+    check!("Attach build #{build_id} to version #{VERSION_STR}", code, resp)
+  else
+    warn "Build not VALID yet — it is still processing in App Store Connect; attach once processing completes."
+  end
+end
+
+puts "=== App Store Connect sync complete! ==="

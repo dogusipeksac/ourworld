@@ -1,9 +1,9 @@
 using System;
-using Gridroam.Input;
-using Gridroam.Player;
+using OurWorld.Input;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     [RequireComponent(typeof(CharacterController))]
     public sealed class BicycleController : MonoBehaviour

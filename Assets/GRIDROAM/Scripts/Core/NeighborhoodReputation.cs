@@ -1,7 +1,7 @@
-using Gridroam.Player;
+using OurWorld.Player;
 using UnityEngine;
 
-namespace Gridroam.Core
+namespace OurWorld.Core
 {
     /// <summary>
     /// Tracks Hamidiye Mahallesi Reputation ("Mahalle Saygınlığı") across 5 ranks,

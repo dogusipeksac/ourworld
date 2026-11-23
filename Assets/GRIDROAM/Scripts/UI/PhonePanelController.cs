@@ -1,17 +1,17 @@
 using System.Collections;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Jobs;
-using Gridroam.Missions;
-using Gridroam.Player;
-using Gridroam.Vehicle;
-using Gridroam.World;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Jobs;
+using OurWorld.Missions;
+using OurWorld.Player;
+using OurWorld.Vehicle;
+using OurWorld.World;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Full-screen minimal Phone / Town Guide overlay (HUD button or M key):

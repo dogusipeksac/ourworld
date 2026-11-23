@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     /// <summary>
     /// Represents a single sittable slot on a sofa, armchair, dining chair, or outdoor bench.

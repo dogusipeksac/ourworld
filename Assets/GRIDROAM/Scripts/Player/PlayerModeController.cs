@@ -1,17 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Gridroam.CameraSystem;
-using Gridroam.Core;
-using Gridroam.Input;
-using Gridroam.Jobs;
-using Gridroam.UI;
-using Gridroam.Vehicle;
-using Gridroam.World;
+using OurWorld.CameraSystem;
+using OurWorld.Core;
+using OurWorld.Input;
+using OurWorld.Jobs;
+using OurWorld.UI;
+using OurWorld.Vehicle;
+using OurWorld.World;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Gridroam.Player
+namespace OurWorld.Player
 {
     public enum ControlMode
     {
@@ -19,7 +19,8 @@ namespace Gridroam.Player
         Driving,
         Seated,
         Cycling,
-        Tennis
+        Tennis,
+        ArenaSport
     }
 
     /// <summary>
@@ -45,6 +46,7 @@ namespace Gridroam.Player
         private SedanVehicleController _currentVehicle;
         private BicycleController _currentBicycle;
         private TennisCourt _currentTennisCourt;
+        private IPlayableSportArena _currentArenaSport;
         private SeatInteractable _currentSeat;
         private Vector3 _seatApproachPos;
         private Quaternion _seatApproachRot = Quaternion.identity;
@@ -69,6 +71,7 @@ namespace Gridroam.Player
         public SedanVehicleController CurrentVehicle => _currentVehicle;
         public BicycleController CurrentBicycle => _currentBicycle;
         public TennisCourt CurrentTennisCourt => _currentTennisCourt;
+        public IPlayableSportArena CurrentArenaSport => _currentArenaSport;
         public InteractableTrigger NearestInteractable => _nearestInteractable;
         public InteractableTrigger ClosestInteractableWithin4m => _closestWithin4m;
 
@@ -117,6 +120,7 @@ namespace Gridroam.Player
                 InputHub.Instance.OnInteractPressed += HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed += HandleExitVehiclePressed;
                 InputHub.Instance.OnAttackPressed += HandleSportAction;
+                InputHub.Instance.OnJumpPressed += HandleSportSecondaryAction;
             }
 
             if (SaveManager.Instance != null)
@@ -139,6 +143,7 @@ namespace Gridroam.Player
                 InputHub.Instance.OnInteractPressed -= HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed -= HandleExitVehiclePressed;
                 InputHub.Instance.OnAttackPressed -= HandleSportAction;
+                InputHub.Instance.OnJumpPressed -= HandleSportSecondaryAction;
             }
 
             if (SaveManager.Instance != null)
@@ -300,6 +305,11 @@ namespace Gridroam.Player
                 {
                     fp = _currentTennisCourt.ReturnPosition;
                     yaw = _currentTennisCourt.ReturnRotation.eulerAngles.y;
+                }
+                if (_currentArenaSport != null)
+                {
+                    fp = _currentArenaSport.ReturnPosition;
+                    yaw = _currentArenaSport.ReturnRotation.eulerAngles.y;
                 }
                 data.playerPosX = fp.x;
                 data.playerPosY = fp.y;
@@ -518,11 +528,13 @@ namespace Gridroam.Player
                 float radius = trigger.InteractionRadius;
                 if (distSq <= radius * radius)
                 {
-                    // Prevent selecting triggers behind solid walls (except doors & vehicles which have large colliders)
+                    // Prevent selecting triggers behind solid walls (except doors, vehicles & outdoor sports arenas)
                     bool checkLos = trigger.Kind != InteractableKind.Door &&
                                     trigger.Kind != InteractableKind.PlayerVehicle &&
                                     trigger.Kind != InteractableKind.TownVehicle &&
-                                    trigger.Kind != InteractableKind.PaintableHouse;
+                                    trigger.Kind != InteractableKind.PaintableHouse &&
+                                    trigger.Kind != InteractableKind.Tennis &&
+                                    trigger.Kind != InteractableKind.SportsArena;
                     if (checkLos && distSq > 0.45f)
                     {
                         float probeUp = trigger.Kind == InteractableKind.ShopItem ? 0.12f : 0.85f;
@@ -589,6 +601,13 @@ namespace Gridroam.Player
             {
                 _interactConsumedFrame = Time.frameCount;
                 ExitTennis();
+                return;
+            }
+
+            if (CurrentMode == ControlMode.ArenaSport)
+            {
+                _interactConsumedFrame = Time.frameCount;
+                ExitArenaSport();
                 return;
             }
 
@@ -664,9 +683,15 @@ namespace Gridroam.Player
                 {
                     TennisCourt court = _nearestInteractable.GetComponentInParent<TennisCourt>();
                     if (court == null || footController == null) return;
-                    _currentTennisCourt = court;
-                    court.Begin(footController);
-                    SetSportMode(ControlMode.Tennis, footController.transform);
+                    StartTennisMatch(court);
+                    return;
+                }
+
+                case InteractableKind.SportsArena:
+                {
+                    IPlayableSportArena arena = _nearestInteractable.GetComponentInParent<IPlayableSportArena>();
+                    if (arena == null || footController == null) return;
+                    StartArenaSport(arena);
                     return;
                 }
 
@@ -893,6 +918,43 @@ namespace Gridroam.Player
                 case ControlMode.Tennis:
                     ExitTennis();
                     break;
+                case ControlMode.ArenaSport:
+                    ExitArenaSport();
+                    break;
+            }
+        }
+
+        public void StartTennisMatch(TennisCourt court, Vector3? exitPositionOverride = null, Quaternion? exitRotationOverride = null)
+        {
+            if (court == null || footController == null) return;
+            PrepareForDirectSportEntry(exitPositionOverride, exitRotationOverride);
+            _currentTennisCourt = court;
+            court.Begin(footController);
+            SetSportMode(ControlMode.Tennis, footController.transform);
+        }
+
+        public void StartArenaSport(IPlayableSportArena arena, Vector3? exitPositionOverride = null, Quaternion? exitRotationOverride = null)
+        {
+            if (arena == null || footController == null) return;
+            PrepareForDirectSportEntry(exitPositionOverride, exitRotationOverride);
+            _currentArenaSport = arena;
+            arena.BeginPlayerMatch(footController);
+            SetSportMode(ControlMode.ArenaSport, footController.transform);
+        }
+
+        private void PrepareForDirectSportEntry(Vector3? exitPositionOverride, Quaternion? exitRotationOverride)
+        {
+            if (CurrentMode != ControlMode.OnFoot)
+            {
+                SetOnFootMode(snapCamera: false);
+            }
+            CarryableProp.DropHeldPropIfAny();
+            StreetCatController.CancelActivePet();
+            MosquePrayerInteractable.CancelActivePrayerIfAny();
+            if (exitPositionOverride.HasValue)
+            {
+                Quaternion rot = exitRotationOverride ?? Quaternion.identity;
+                footController.TeleportTo(exitPositionOverride.Value, rot);
             }
         }
 
@@ -911,10 +973,37 @@ namespace Gridroam.Player
 
         private void HandleSportAction()
         {
-            if (_currentTennisCourt != null && !IsModalLocked &&
-                Time.frameCount != _interactConsumedFrame && Time.frameCount != _dialogueClosedFrame)
+            if (IsModalLocked ||
+                Time.frameCount == _interactConsumedFrame ||
+                Time.frameCount == _dialogueClosedFrame)
+            {
+                return;
+            }
+
+            if (_currentTennisCourt != null)
             {
                 _currentTennisCourt.Hit();
+                return;
+            }
+
+            if (_currentArenaSport != null)
+            {
+                _currentArenaSport.TriggerPrimaryAction();
+            }
+        }
+
+        private void HandleSportSecondaryAction()
+        {
+            if (IsModalLocked ||
+                Time.frameCount == _interactConsumedFrame ||
+                Time.frameCount == _dialogueClosedFrame)
+            {
+                return;
+            }
+
+            if (_currentArenaSport != null)
+            {
+                _currentArenaSport.TriggerSecondaryAction();
             }
         }
 
@@ -961,12 +1050,26 @@ namespace Gridroam.Player
             footController.SetMovementEnabled(!IsModalLocked);
         }
 
+        private void ExitArenaSport()
+        {
+            if (_currentArenaSport == null) return;
+            Vector3 position = _currentArenaSport.ReturnPosition;
+            Quaternion rotation = _currentArenaSport.ReturnRotation;
+            ClearActiveSport();
+            footController.TeleportTo(position, rotation);
+            SetSportMode(ControlMode.OnFoot, footController.transform);
+            footController.SetMovementEnabled(!IsModalLocked);
+        }
+
         private void ClearActiveSport()
         {
             if (_currentBicycle != null) _currentBicycle.Release();
             if (_currentTennisCourt != null) _currentTennisCourt.End();
+            if (_currentArenaSport != null) _currentArenaSport.EndPlayerMatch();
             _currentBicycle = null;
             _currentTennisCourt = null;
+            _currentArenaSport = null;
+            if (cameraRig != null) cameraRig.SetSportCameraOverride(false);
         }
 
         public void TryEnterVehicle()

@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Places 12 collectible golden "Hamidiye Hatıra Kartpostalı" (Neighborhood Memories)

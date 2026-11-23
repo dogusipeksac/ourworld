@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6fbf2695678364565a2c8c368a334a1b, type: 3}
   m_Name: DLG_M06_Ayse_Request
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.DialogueData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.DialogueData
   lines:
   - speakerKey: npc.ayse.name
     textKey: m06.dlg.a1

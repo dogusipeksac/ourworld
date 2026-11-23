@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Gridroam.World
+namespace OurWorld.World
 {
     /// <summary>
     /// Gently animates the pool water normal-map UV offset and subtle vertical swell

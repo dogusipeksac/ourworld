@@ -1,10 +1,10 @@
 using System.Collections;
-using Gridroam.Core;
-using Gridroam.Player;
+using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Gridroam.UI
+namespace OurWorld.UI
 {
     /// <summary>
     /// Atmospheric one-time story prologue card shown on a brand-new save to introduce
@@ -43,13 +43,20 @@ namespace Gridroam.UI
             if (sm == null || sm.Data == null) yield break;
             if (sm.Data.hasSeenStoryIntro || sm.Data.completedMissionIds.Count > 0) yield break;
 
-            // Wait while any higher-priority modal (Update / What's New) is active
+            // Wait while the Main Menu, any higher-priority modal (Update / What's New), or an active Sport Match is in progress
             int guard = 0;
-            while (PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked && guard < 120)
+            while ((MainMenuController.IsMenuActive ||
+                    (PlayerModeController.Instance != null &&
+                     (PlayerModeController.Instance.IsModalLocked ||
+                      PlayerModeController.Instance.CurrentMode == ControlMode.Tennis ||
+                      PlayerModeController.Instance.CurrentMode == ControlMode.ArenaSport))) && guard < 1200)
             {
                 guard++;
                 yield return new WaitForSecondsRealtime(0.25f);
             }
+
+            // Re-verify save data in case the player reset or completed missions before dismissing
+            if (sm == null || sm.Data == null || sm.Data.hasSeenStoryIntro || sm.Data.completedMissionIds.Count > 0) yield break;
 
             ShowCard();
         }

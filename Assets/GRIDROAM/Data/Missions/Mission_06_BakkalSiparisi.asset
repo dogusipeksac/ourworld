@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
   m_Name: Mission_06_BakkalSiparisi
-  m_EditorClassIdentifier: Assembly-CSharp::Gridroam.Missions.MissionData
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
   missionId: m06_bakkal_siparisi
   titleKey: m06.title
   summaryKey: m06.summary
@@ -38,6 +38,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 5
     objectiveKey: m06.step2.objective
     targetAnchorId: m06_grocery_bag
@@ -54,6 +55,7 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1
   - stepType: 1
     objectiveKey: m06.step3.objective
     targetAnchorId: npc_ayse_teyze
@@ -70,3 +72,4 @@ MonoBehaviour:
     secondaryDialogueAsset: {fileID: 0}
     primaryChoiceId: 
     secondaryChoiceId: 
+    setTimeOfDayHours: -1

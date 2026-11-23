@@ -1,0 +1,126 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_17_GeceKesintisi
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
+  missionId: m17_gece_kesintisi
+  titleKey: m17.title
+  summaryKey: m17.summary
+  rewardMoney: 1100
+  nextMissionId: m18_sekiz_cadde_rallisi
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 1
+  steps:
+  - stepType: 1
+    objectiveKey: m17.step1.objective
+    targetAnchorId: npc_electrician_hasan
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: e3e4f3c5cc022408a8fa8784c9f89980, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: 21.5
+  - stepType: 5
+    objectiveKey: m17.step2.objective
+    targetAnchorId: m17_fuse_box
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 96d5f5c85c7d84119a9a38a730887aa8, type: 2}
+    timeLimitSeconds: 130
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m17.step3.objective
+    targetAnchorId: m17_gen_fuel
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: e2215d607d0cf4575ad06f275d2602b4, type: 2}
+    timeLimitSeconds: 130
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m17.step4.objective
+    targetAnchorId: m17_relay_panel
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 32b1373faa7b743479b8b4fb11ae3e10, type: 2}
+    timeLimitSeconds: 130
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 4
+    objectiveKey: m17.step5.objective
+    targetAnchorId: m17_trafo_zone
+    triggerRadius: 11
+    dialogueAsset: {fileID: 0}
+    timeLimitSeconds: 120
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 1
+    objectiveKey: m17.step6.objective
+    targetAnchorId: npc_electrician_hasan
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: c5e4c311b91af4efa9c8a78247e8df4e, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: 9.5

@@ -1,0 +1,126 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a40d8dbf3ad5b48518e1644e15710a7a, type: 3}
+  m_Name: Mission_15_DedeminSandigi
+  m_EditorClassIdentifier: Assembly-CSharp::OurWorld.Missions.MissionData
+  missionId: m15_dedemin_sandigi
+  titleKey: m15.title
+  summaryKey: m15.summary
+  rewardMoney: 900
+  nextMissionId: m16_buyuk_spor_kupasi
+  autoStartNextMission: 1
+  retryPlayerAnchorId: spawn_garage_foot
+  retryVehicleAnchorId: spawn_garage_sedan
+  retryStartInVehicle: 0
+  steps:
+  - stepType: 1
+    objectiveKey: m15.step1.objective
+    targetAnchorId: npc_ayse_teyze
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 1108e3c6ef61346329daab7fa9533d9e, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m15.step2.objective
+    targetAnchorId: m15_clue_mosque
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 6c4aced9805d1481495dda707353525a, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m15.step3.objective
+    targetAnchorId: m15_clue_park
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 470fccab46308405b8855fed89e7d349, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 5
+    objectiveKey: m15.step4.objective
+    targetAnchorId: m15_clue_zubeyde
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: d057d311587014d4e9eca2ef78dfab27, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: 18.5
+  - stepType: 5
+    objectiveKey: m15.step5.objective
+    targetAnchorId: m15_grandfather_chest
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: cd1aab77674464387adb50608ea693b8, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 1
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
+  - stepType: 1
+    objectiveKey: m15.step6.objective
+    targetAnchorId: npc_muhtar_plaza
+    triggerRadius: 0
+    dialogueAsset: {fileID: 11400000, guid: 9ce68dd7ba76746febb7848ee669a3ed, type: 2}
+    timeLimitSeconds: 0
+    unlocksVehicleKeys: 0
+    requiresVehicle: 0
+    requiresOnFoot: 0
+    tailMinDistance: 12
+    tailMaxDistance: 65
+    tailGraceSeconds: 6
+    secondaryTargetAnchorId: 
+    secondaryDialogueAsset: {fileID: 0}
+    primaryChoiceId: 
+    secondaryChoiceId: 
+    setTimeOfDayHours: -1
