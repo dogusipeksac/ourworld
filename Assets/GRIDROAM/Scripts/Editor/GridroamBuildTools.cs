@@ -306,7 +306,7 @@ namespace Gridroam.Editor
             PlistElementDict root = plist.root;
 
             // Avoid repeated manual export compliance prompts on TestFlight / App Store uploads.
-            root.SetString("CFBundleDisplayName", "OurWorld");
+            root.SetString("CFBundleDisplayName", "Our World");
             root.SetBoolean("ITSAppUsesNonExemptEncryption", false);
             root.SetBoolean("UIRequiresFullScreen", true);
 

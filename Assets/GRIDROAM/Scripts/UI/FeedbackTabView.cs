@@ -193,7 +193,7 @@ namespace Gridroam.UI
         public void RefreshTexts()
         {
             if (_title == null) return;
-            _title.text = LocalizationService.Tr("feedback.title", "OurWorld Topluluk & Öneri");
+            _title.text = LocalizationService.Tr("feedback.title", "Our World Topluluk & Öneri");
             _info.text = LocalizationService.Tr("feedback.info", "Oyunda ne olsun istersin? Yaz, Firestore'a düşsün ve yeni sürümde ekleyelim!");
             _namePlaceholder.text = LocalizationService.Tr("feedback.name_placeholder", "Adın / Takma ad (isteğe bağlı)");
             _placeholder.text = LocalizationService.Tr("feedback.placeholder", "Fikrini, isteğini veya mesajını yaz…");

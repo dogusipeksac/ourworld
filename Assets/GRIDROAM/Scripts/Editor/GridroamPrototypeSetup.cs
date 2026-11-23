@@ -95,8 +95,8 @@ namespace Gridroam.Editor
         {
             const string bundleId = "com.dogusipeksac.ourworld";
 
-            PlayerSettings.companyName = "Dogus Store";
-            PlayerSettings.productName = "OurWorld";
+            PlayerSettings.companyName = "Doğuş İpeksaç";
+            PlayerSettings.productName = "Our World";
             PlayerSettings.bundleVersion = "1.0.0";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;

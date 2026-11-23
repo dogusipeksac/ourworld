@@ -237,7 +237,7 @@ namespace Gridroam.UI
             if (_requesterText != null)
             {
                 string requester = string.IsNullOrWhiteSpace(item.requestedBy)
-                    ? (_isTr ? "OurWorld Topluluğu" : "OurWorld Community")
+                    ? (_isTr ? "Our World Topluluğu" : "Our World Community")
                     : item.requestedBy.Trim();
                 _requesterText.text = _isTr
                     ? $"★   BU ÖZELLİĞİ  {requester.ToUpperInvariant()}  İSTEDİ!"
