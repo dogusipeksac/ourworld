@@ -1,0 +1,225 @@
+using System;
+using Gridroam.Input;
+using Gridroam.Player;
+using UnityEngine;
+
+namespace Gridroam.World
+{
+    [RequireComponent(typeof(CharacterController))]
+    public sealed class BicycleController : MonoBehaviour
+    {
+        private const float WheelRadius = 0.34f;
+        private const float TopSpeed = 7.8f;
+        private const float CrankRadius = 0.15f;
+
+        private CharacterController _body;
+        private Transform _visual;
+        private Transform _fork;
+        private Transform _frontWheel;
+        private Transform _rearWheel;
+        private Transform _crank;
+        private PlayerFootController _rider;
+        private float _speed;
+        private float _fallSpeed;
+        private float _wheelAngle;
+        private float _crankAngle;
+        private float _lean;
+        private float _mountProgress = 1f;
+        private Vector3 _mountPosition;
+        private Quaternion _mountRotation;
+        private Action _dismountFinished;
+        private AudioSource _engine;
+
+        public float SpeedKmh => _speed * 3.6f;
+        public float MaxSpeedKmh => (IsMotorcycle ? 20f : TopSpeed) * 3.6f;
+        public bool IsMotorcycle { get; private set; }
+        public bool IsMounting => _mountProgress < 1f && _dismountFinished == null;
+        public bool IsTransitioning => IsMounting || _dismountFinished != null;
+
+        public void Configure(Transform visual, Transform fork, Transform frontWheel, Transform rearWheel, Transform crank)
+        {
+            _visual = visual;
+            _fork = fork;
+            _frontWheel = frontWheel;
+            _rearWheel = rearWheel;
+            _crank = crank;
+            _body = GetComponent<CharacterController>();
+            _body.radius = 0.31f;
+            _body.height = 1.62f;
+            _body.center = Vector3.up * 0.81f;
+            _body.stepOffset = 0.22f;
+            _body.slopeLimit = 35f;
+            _body.minMoveDistance = 0f;
+            enabled = false;
+        }
+
+        public void ConfigureMotorcycle(Transform visual, Transform fork, Transform frontWheel, Transform rearWheel,
+            AudioSource engine)
+        {
+            Configure(visual, fork, frontWheel, rearWheel, null);
+            IsMotorcycle = true;
+            _engine = engine;
+            _body.radius = 0.42f;
+            _body.height = 1.75f;
+            _body.center = Vector3.up * 0.875f;
+            _body.stepOffset = 0.12f;
+        }
+
+        public void Mount(PlayerFootController rider)
+        {
+            _rider = rider;
+            _speed = 0f;
+            _fallSpeed = 0f;
+            _mountPosition = rider.transform.position;
+            _mountRotation = rider.transform.rotation;
+            _mountProgress = IsMotorcycle ? 0f : 1f;
+            rider.SetSeatedState(true);
+            UpdateRider();
+            if (_engine != null) _engine.Play();
+            enabled = true;
+        }
+
+        public void Release()
+        {
+            if (_rider != null)
+            {
+                if (_rider.Humanoid != null) _rider.Humanoid.SetCycling(false);
+                _rider.SetSeatedState(false);
+            }
+
+            _rider = null;
+            _dismountFinished = null;
+            _speed = 0f;
+            _mountProgress = 1f;
+            _lean = 0f;
+            _visual.localRotation = Quaternion.identity;
+            _fork.localRotation = Quaternion.identity;
+            if (_engine != null) _engine.Stop();
+            enabled = false;
+        }
+
+        public bool TryGetDismount(out Vector3 position)
+        {
+            if (IsMotorcycle && TryDismountAt(-transform.right, out position)) return true;
+            if (TryDismountAt(transform.right, out position)) return true;
+            if (TryDismountAt(-transform.right, out position)) return true;
+            return TryDismountAt(-transform.forward, out position);
+        }
+
+        public void Dismount(Vector3 position, Quaternion rotation, Action finished)
+        {
+            _mountPosition = position;
+            _mountRotation = rotation;
+            _speed = 0f;
+            _dismountFinished = finished;
+        }
+
+        private bool TryDismountAt(Vector3 direction, out Vector3 position)
+        {
+            position = transform.position + direction * 1.1f;
+            if (!Physics.Raycast(position + Vector3.up * 0.65f, Vector3.down, out RaycastHit ground, 1.3f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || ground.normal.y < 0.65f)
+            {
+                return false;
+            }
+
+            position.y = ground.point.y + 0.07f;
+            return !Physics.CheckCapsule(position + Vector3.up * 0.36f, position + Vector3.up * 1.44f, 0.27f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+        }
+
+        private void Update()
+        {
+            if (_rider == null || InputHub.Instance == null) return;
+
+            float dt = Time.deltaTime;
+            if (dt <= 0f) return;
+
+            if (_dismountFinished != null)
+            {
+                _mountProgress = Mathf.MoveTowards(_mountProgress, 0f, dt / 0.52f);
+                UpdateRider();
+                if (_mountProgress <= 0f) _dismountFinished.Invoke();
+                return;
+            }
+
+            if (IsMounting)
+            {
+                _mountProgress = Mathf.MoveTowards(_mountProgress, 1f, dt / 0.58f);
+                UpdateRider();
+                return;
+            }
+
+            InputHub input = InputHub.Instance;
+            bool locked = PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked;
+            float throttle = locked ? 0f : input.DriveThrottle;
+            float brake = locked || input.HandbrakeHeld ? 1f : input.DriveBrake;
+            float steer = locked ? 0f : input.DriveSteer;
+            float topSpeed = MaxSpeedKmh / 3.6f;
+            float targetSpeed = brake > 0f ? 0f : throttle * topSpeed;
+            float rate = brake > 0f ? (IsMotorcycle ? 15f : 10f) * brake :
+                throttle > 0f ? (IsMotorcycle ? 6.1f : 3.2f) : (IsMotorcycle ? 2.1f : 0.9f);
+            _speed = Mathf.MoveTowards(_speed, targetSpeed, rate * dt);
+
+            float speedFactor = Mathf.InverseLerp(0.12f, 2.1f, _speed);
+            float turnRate = Mathf.Lerp(95f, IsMotorcycle ? 31f : 43f, _speed / topSpeed);
+            transform.Rotate(0f, steer * speedFactor * turnRate * dt, 0f, Space.World);
+            _fallSpeed = _body.isGrounded ? -2f : Mathf.Max(-15f, _fallSpeed - 16f * dt);
+            Vector3 before = transform.position;
+            CollisionFlags collisions = _body.Move((transform.forward * _speed + Vector3.up * _fallSpeed) * dt);
+            if ((collisions & CollisionFlags.Sides) != 0) _speed = Mathf.Min(_speed, 2f);
+
+            Vector3 travel = transform.position - before;
+            travel.y = 0f;
+            float tireRadius = IsMotorcycle ? 0.36f : WheelRadius;
+            _wheelAngle = Mathf.Repeat(_wheelAngle + travel.magnitude / tireRadius * Mathf.Rad2Deg, 360f);
+            if (_crank != null && throttle > 0f && brake <= 0f)
+            {
+                _crankAngle = Mathf.Repeat(_crankAngle + Mathf.Lerp(105f, 340f, _speed / TopSpeed) * throttle * dt, 360f);
+            }
+
+            _lean = Mathf.Lerp(_lean, -steer * (IsMotorcycle ? 26f : 15f) * speedFactor, 1f - Mathf.Exp(-8f * dt));
+            _visual.localRotation = Quaternion.Euler(0f, 0f, _lean);
+            _fork.localRotation = Quaternion.Euler(0f, steer * Mathf.Lerp(23f, 12f, IsMotorcycle ? _speed / topSpeed : 0f), 0f);
+            _frontWheel.localRotation = Quaternion.Euler(_wheelAngle, 0f, 0f);
+            _rearWheel.localRotation = _frontWheel.localRotation;
+            if (_crank != null) _crank.localRotation = Quaternion.Euler(_crankAngle, 0f, 0f);
+            if (_engine != null)
+            {
+                _engine.pitch = Mathf.Lerp(0.75f, 1.75f, _speed / topSpeed) + throttle * 0.28f;
+                _engine.volume = Mathf.Lerp(0.14f, 0.29f, throttle);
+            }
+            UpdateRider();
+        }
+
+        private void UpdateRider()
+        {
+            // The rider shares the bicycle's lean and yaw while the normal foot collider is disabled.
+            float mount = Mathf.SmoothStep(0f, 1f, _mountProgress);
+            Vector3 position = Vector3.Lerp(_mountPosition, _visual.position, mount);
+            position.y += Mathf.Sin(mount * Mathf.PI) * 0.14f;
+            _rider.transform.SetPositionAndRotation(position, Quaternion.Slerp(_mountRotation, _visual.rotation, mount));
+            if (_rider.Humanoid == null) return;
+
+            if (IsMotorcycle)
+            {
+                float footPeg = Mathf.SmoothStep(0f, 1f, _speed / 2.2f);
+                Vector3 leftStand = transform.TransformPoint(new Vector3(-0.40f, 0.015f, -0.14f));
+                Vector3 leftPeg = _visual.TransformPoint(new Vector3(-0.25f, 0.31f, -0.10f));
+                _rider.Humanoid.SetMotorcyclePose(
+                    Vector3.Lerp(leftStand, leftPeg, footPeg),
+                    _visual.TransformPoint(new Vector3(0.25f, 0.31f, -0.10f)),
+                    _fork.TransformPoint(new Vector3(-0.33f, 0.70f, -0.38f)),
+                    _fork.TransformPoint(new Vector3(0.33f, 0.70f, -0.38f)), mount, footPeg);
+            }
+            else
+            {
+                Vector3 leftPedal = _crank.TransformPoint(new Vector3(-0.16f, 0f, -CrankRadius));
+                Vector3 rightPedal = _crank.TransformPoint(new Vector3(0.16f, 0f, CrankRadius));
+                Vector3 leftGrip = _fork.TransformPoint(new Vector3(-0.24f, 0.69f, -0.18f));
+                Vector3 rightGrip = _fork.TransformPoint(new Vector3(0.24f, 0.69f, -0.18f));
+                _rider.Humanoid.SetCycling(true, leftPedal, rightPedal, leftGrip, rightGrip);
+            }
+        }
+    }
+}

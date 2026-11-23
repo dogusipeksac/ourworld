@@ -1,4 +1,5 @@
 using System;
+using Gridroam.World;
 using UnityEngine;
 
 namespace Gridroam.Player
@@ -39,14 +40,41 @@ namespace Gridroam.Player
         private const float RunSpeedRef = 6.2f;
         private const float WaveDuration = 1.5f;
         private const float LandSquatDuration = 0.15f;
+        private const float HandLength = 0.30f;
+        private const float AnkleHeight = 0.081f;
+        private const float TwoPi = 2f * Mathf.PI;
 
         private float _speedMs;
+        private Vector3 _travelDirection = Vector3.forward;
+        private bool _sampleGround;
+        private float _gaitWeight;
         private bool _grounded = true;
         private bool _wasGrounded = true;
         private float _airborneTimer;
         private float _landSquatTimer = -1f;
         private float _verticalVelocity;
         private float _steerAngleDeg;
+        private Transform _steeringWheel;
+        private float? _seatFloor;
+        private float _seatAmount;
+        private Transform _doorHandle;
+        private float _doorReachStarted;
+        private float _doorReachDuration;
+        private bool _doorReachRight;
+        private bool _cycling;
+        private bool _motorcyclePose;
+        private float _motorcycleMount;
+        private float _motorcycleFootPeg;
+        private Vector3 _leftPedal, _rightPedal, _leftGrip, _rightGrip;
+        private Transform _tennisRacket;
+        private Vector3 _tennisContact;
+        private float _tennisContactAt = float.NegativeInfinity;
+        private bool _tennisServing;
+        private Vector3? _tennisLeftHand;
+        private const float TennisWindup = 0.19f;
+        private const float TennisFollowThrough = 0.29f;
+        private const float RacketHandleCenter = 0.09f;
+        private const float RacketHeadFromHand = 0.39f;
 
         private float _phase;
         private int _lastStepCount;
@@ -66,6 +94,7 @@ namespace Gridroam.Player
         private float _hitReactTimer = -1f;
         private float _knockdownTimer = -1f;
         private float _vaultTimer = -1f;
+        private Vector3? _vaultSupport;
         private bool _isSwimming;
         private float _swimSpeed;
         private float _swimPhase;
@@ -311,7 +340,8 @@ namespace Gridroam.Player
             autoRandomWave = enabled;
         }
 
-        public void SetLocomotion(float speedMs, bool grounded, float verticalVelocity)
+        public void SetLocomotion(float speedMs, bool grounded, float verticalVelocity,
+            Vector3 travelDirection = default, bool sampleGround = false)
         {
             if (_initialized && !_wasGrounded && grounded && _airborneTimer > 0.08f)
             {
@@ -328,6 +358,15 @@ namespace Gridroam.Player
             _speedMs = Mathf.Max(0f, speedMs);
             _grounded = grounded;
             _verticalVelocity = verticalVelocity;
+            _sampleGround = sampleGround;
+            if (travelDirection.sqrMagnitude > 0.0001f)
+            {
+                _travelDirection = travelDirection.normalized;
+            }
+            else if (_speedMs > 0.05f)
+            {
+                _travelDirection = transform.forward;
+            }
         }
 
         public void SetLookAtPoint(bool active, Vector3 worldPoint)
@@ -369,10 +408,18 @@ namespace Gridroam.Player
             _waveTimer = -1f;
         }
 
-        public void PlayVault()
+        public void PlayVault(Vector3? support = null)
         {
             _vaultTimer = 0f;
+            _vaultSupport = support;
             _waveTimer = -1f;
+        }
+
+        public void PlayLanding()
+        {
+            _landSquatTimer = 0f;
+            _vaultTimer = -1f;
+            OnLanded?.Invoke();
         }
 
         public void SetSwimming(bool swimming, float swimSpeed)
@@ -408,6 +455,7 @@ namespace Gridroam.Player
         {
             isSitting = sitting;
             isDrivingSeat = sitting && driving;
+            if (!sitting || driving) _seatFloor = null;
             if (!Application.isPlaying && sitting)
             {
                 ApplySittingPoseImmediate();
@@ -422,6 +470,25 @@ namespace Gridroam.Player
         public void SetSteeringAngle(float wheelDegrees)
         {
             _steerAngleDeg = wheelDegrees;
+        }
+
+        public void SetSteeringWheel(Transform wheel)
+        {
+            _steeringWheel = wheel;
+        }
+
+        public void SetSeatContact(float floorHeight, float seatedAmount)
+        {
+            _seatFloor = floorHeight;
+            _seatAmount = seatedAmount;
+        }
+
+        public void PlayDoorReach(Transform handle, float duration)
+        {
+            _doorHandle = handle;
+            _doorReachStarted = Time.time;
+            _doorReachDuration = duration;
+            _doorReachRight = transform.InverseTransformPoint(handle.position).x >= -0.08f;
         }
 
         private void Start()
@@ -499,6 +566,12 @@ namespace Gridroam.Player
 
             float dt = Time.deltaTime;
             if (dt <= 0.00001f) return;
+
+            if (_cycling)
+            {
+                AnimateCycling();
+                return;
+            }
 
             _idleTime += dt;
             if (!_grounded)
@@ -599,15 +672,20 @@ namespace Gridroam.Player
             float moveBlend = Mathf.Clamp01((_speedMs - 0.08f) / 1.2f);
             float runBlend = Mathf.InverseLerp(WalkSpeedRef, RunSpeedRef, _speedMs);
 
+            _gaitWeight = Mathf.MoveTowards(_gaitWeight, moveBlend, 9f * dt);
+            bool tennisStance = _tennisRacket != null;
+            float stance = tennisStance ? 0.54f : Mathf.Lerp(0.61f, 0.44f, runBlend);
+            float strideLength = tennisStance ? 1.12f : Mathf.Lerp(1.22f, 1.72f, runBlend);
+            strideLength *= Mathf.Lerp(0.68f, 1f, _gaitWeight);
+
             // Advance gait phase by distance travelled & fire footstep contact events
             if (_speedMs > 0.05f && _grounded)
             {
-                float strideLength = Mathf.Lerp(1.4f, 2.2f, runBlend);
-                _phase += (_speedMs * dt / strideLength) * (Mathf.PI * 2f);
+                _phase += _speedMs * dt / (strideLength * transform.lossyScale.y) * TwoPi;
 
                 if (_speedMs > 0.25f)
                 {
-                    int currentStepCount = Mathf.FloorToInt((_phase + Mathf.PI * 0.5f) / Mathf.PI);
+                    int currentStepCount = Mathf.FloorToInt(_phase / Mathf.PI);
                     if (currentStepCount != _lastStepCount)
                     {
                         _lastStepCount = currentStepCount;
@@ -618,7 +696,7 @@ namespace Gridroam.Player
                 if (_phase > Mathf.PI * 200f)
                 {
                     _phase -= Mathf.PI * 200f;
-                    _lastStepCount = Mathf.FloorToInt((_phase + Mathf.PI * 0.5f) / Mathf.PI);
+                    _lastStepCount = Mathf.FloorToInt(_phase / Mathf.PI);
                 }
             }
 
@@ -653,51 +731,24 @@ namespace Gridroam.Player
             _smoothedLookYaw = Mathf.Lerp(_smoothedLookYaw, useLookIk ? desiredLookYaw : 0f, lookBlendRate);
             _smoothedLookPitch = Mathf.Lerp(_smoothedLookPitch, useLookIk ? desiredLookPitch : 0f, lookBlendRate);
 
-            // --- Biomechanical Walk / Run Gait (grounded double-bounce, pelvic weight shift, arm lag, heel-to-toe) ---
-            float sinL = Mathf.Sin(_phase);
-            float sinR = Mathf.Sin(_phase + Mathf.PI);
-            float armLagL = Mathf.Sin(_phase - 0.42f);
-            float armLagR = Mathf.Sin(_phase + Mathf.PI - 0.42f);
-
-            float thighAmp = Mathf.Lerp(26f, 48f, runBlend);
-            float maxKneeBend = Mathf.Lerp(58f, 96f, runBlend);
-            float armAmp = Mathf.Lerp(20f, 52f, runBlend);
-            float elbowBaseBend = Mathf.Lerp(18f, 82f, runBlend);
-            float bobAmp = Mathf.Lerp(0.026f, 0.056f, runBlend);
-            float torsoForwardLean = Mathf.Lerp(4.5f, 14.5f, runBlend);
-
-            float walkThighL = -sinL * thighAmp;
-            float walkThighR = -sinR * thighAmp;
-
-            // Swing phase clearance + subtle stance-phase weight absorption knee bend (~11 deg)
-            float swingL = Mathf.Max(0f, Mathf.Sin(_phase + 1.12f));
-            float swingR = Mathf.Max(0f, Mathf.Sin(_phase + Mathf.PI + 1.12f));
-            float stanceLoadL = Mathf.Max(0f, -Mathf.Sin(_phase - 0.35f)) * 11f;
-            float stanceLoadR = Mathf.Max(0f, -Mathf.Sin(_phase + Mathf.PI - 0.35f)) * 11f;
-            float walkKneeL = swingL * maxKneeBend + stanceLoadL;
-            float walkKneeR = swingR * maxKneeBend + stanceLoadR;
-
-            // Realistic heel-strike dorsiflexion -> flat stance -> toe-off plantarflexion
-            float heelToeL = Mathf.Cos(_phase - 0.45f) * 16f;
-            float heelToeR = Mathf.Cos(_phase + Mathf.PI - 0.45f) * 16f;
-            float walkAnkleL = Mathf.Clamp(-(walkThighL + walkKneeL) * 0.48f + heelToeL, -28f, 28f);
-            float walkAnkleR = Mathf.Clamp(-(walkThighR + walkKneeR) * 0.48f + heelToeR, -28f, 28f);
-
-            float walkShoulderL = sinL * armAmp;
-            float walkShoulderR = sinR * armAmp;
-            float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -armLagL) * 20f);
-            float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, -armLagR) * 20f);
-
-            // Double-frequency vertical center-of-mass bounce & natural pelvic sway/roll onto stance leg
-            float walkBobY = -Mathf.Cos(_phase * 2f) * bobAmp;
-            float walkHipYaw = sinL * Mathf.Lerp(7.5f, 11f, runBlend);
-            float walkHipRoll = -sinL * Mathf.Lerp(3.8f, 5.2f, runBlend);
-            float walkHipSwayX = -Mathf.Cos(_phase) * Mathf.Lerp(0.022f, 0.012f, runBlend);
+            // The opposite arm is forward at heel strike. The torso counter-rotates against the pelvis.
+            float armCycle = Mathf.Cos(_phase - 0.19f);
+            float armAmp = Mathf.Lerp(17f, 39f, runBlend);
+            float elbowBaseBend = Mathf.Lerp(16f, 65f, runBlend);
+            float walkShoulderL = armCycle * armAmp;
+            float walkShoulderR = -walkShoulderL;
+            float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -armCycle) * 15f);
+            float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, armCycle) * 15f);
+            float torsoForwardLean = Mathf.Lerp(3f, 10f, runBlend);
+            float walkBobY = -Mathf.Cos(_phase * 2f) * Mathf.Lerp(0.017f, 0.035f, runBlend);
+            float walkHipYaw = Mathf.Cos(_phase) * Mathf.Lerp(5f, 8f, runBlend);
+            float walkHipRoll = -Mathf.Sin(_phase) * Mathf.Lerp(2.5f, 3.5f, runBlend);
+            float walkHipSwayX = -Mathf.Sin(_phase) * Mathf.Lerp(0.017f, 0.012f, runBlend);
 
             // Blend Idle <-> Locomotion
             Vector3 targetHipsPos = new Vector3(
                 Mathf.Lerp(idleWeightShiftX, walkHipSwayX, moveBlend),
-                hipsBaseY + walkBobY * moveBlend,
+                hipsBaseY - _gaitWeight * 0.064f + walkBobY * moveBlend,
                 0f);
 
             float defaultHeadYaw = Mathf.Lerp(idleHeadYaw, 0f, moveBlend);
@@ -716,13 +767,12 @@ namespace Gridroam.Player
                 -_smoothedTurnLean * 0.35f);
             Vector3 targetHeadRot = new Vector3(_smoothedLookPitch * 0.75f, finalHeadYaw, 0f);
 
-            // Natural relaxed human idle stance (feet slightly apart, relaxed shoulders & soft elbow bend — never stiff!)
-            Vector3 targetLHipRot = new Vector3(walkThighL * moveBlend, 0f, Mathf.Lerp(-3.2f, 0f, moveBlend));
-            Vector3 targetRHipRot = new Vector3(walkThighR * moveBlend, 0f, Mathf.Lerp(3.2f, 0f, moveBlend));
-            Vector3 targetLKneeRot = new Vector3(Mathf.Lerp(3.5f, walkKneeL, moveBlend), 0f, 0f);
-            Vector3 targetRKneeRot = new Vector3(Mathf.Lerp(3.5f, walkKneeR, moveBlend), 0f, 0f);
-            Vector3 targetLAnkleRot = new Vector3(Mathf.Lerp(-3.5f, walkAnkleL, moveBlend), 0f, 0f);
-            Vector3 targetRAnkleRot = new Vector3(Mathf.Lerp(-3.5f, walkAnkleR, moveBlend), 0f, 0f);
+            Vector3 targetLHipRot = new Vector3(0f, 0f, -3.2f);
+            Vector3 targetRHipRot = new Vector3(0f, 0f, 3.2f);
+            Vector3 targetLKneeRot = new Vector3(3.5f, 0f, 0f);
+            Vector3 targetRKneeRot = targetLKneeRot;
+            Vector3 targetLAnkleRot = Vector3.zero;
+            Vector3 targetRAnkleRot = Vector3.zero;
 
             float idleArmBreath = breathWave * 1.4f;
             Vector3 targetLShoulderRot = new Vector3(Mathf.Lerp(3.5f + idleArmBreath, walkShoulderL, moveBlend), 0f, Mathf.Lerp(-9.5f, -4.5f, moveBlend));
@@ -927,14 +977,16 @@ namespace Gridroam.Player
             {
                 float vNorm = Mathf.Clamp01(_vaultTimer / VaultDuration);
                 float vEnv = Mathf.Sin(vNorm * Mathf.PI);
-                targetHipsPos.y = hipsBaseY + 0.16f * vEnv;
-                targetSpineRot = new Vector3(32f * vEnv, -12f * vEnv, 14f * vEnv);
+                targetHipsPos.y = hipsBaseY - 0.11f * vEnv;
+                targetSpineRot = new Vector3(49f * vEnv, -12f * vEnv, 14f * vEnv);
                 targetLShoulderRot = new Vector3(-86f * vEnv, 12f * vEnv, -16f * vEnv);
                 targetRShoulderRot = new Vector3(-72f * vEnv, -12f * vEnv, 24f * vEnv);
                 targetLElbowRot = new Vector3(-24f * vEnv, 0f, 0f);
                 targetRElbowRot = new Vector3(-34f * vEnv, 0f, 0f);
-                targetLHipRot = new Vector3(-84f * vEnv, 0f, -14f * vEnv);
-                targetRHipRot = new Vector3(-68f * vEnv, 0f, 18f * vEnv);
+                float leadingLeg = Mathf.Sin(Mathf.Clamp01(vNorm * 1.24f) * Mathf.PI);
+                float trailingLeg = Mathf.Sin(Mathf.Clamp01((vNorm - 0.15f) * 1.17f) * Mathf.PI);
+                targetLHipRot = new Vector3(-89f * leadingLeg, 0f, -14f * vEnv);
+                targetRHipRot = new Vector3(-72f * trailingLeg, 0f, 18f * vEnv);
                 targetLKneeRot = new Vector3(105f * vEnv, 0f, 0f);
                 targetRKneeRot = new Vector3(95f * vEnv, 0f, 0f);
             }
@@ -1034,15 +1086,51 @@ namespace Gridroam.Player
             else if (_waveTimer >= 0f)
             {
                 float norm = _waveTimer / WaveDuration;
-                float env = Mathf.Sin(Mathf.Clamp01(norm) * Mathf.PI);
-                env = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(env * 2.2f));
-                float waveOsc = Mathf.Sin(_waveTimer * 15f) * 24f;
+                float env = Mathf.SmoothStep(0f, 1f, norm / 0.24f) *
+                    (1f - Mathf.SmoothStep(0f, 1f, (norm - 0.73f) / 0.27f));
+                float waveOsc = Mathf.Sin(_waveTimer * 15f) * 18f * env;
 
-                Vector3 waveShoulder = new Vector3(-22f, 0f, 132f);
+                Vector3 waveShoulder = new Vector3(-31f, 0f, 113f);
                 Vector3 waveElbow = new Vector3(-18f, 0f, 22f + waveOsc);
                 targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, waveShoulder, env);
                 targetRElbowRot = Vector3.Lerp(targetRElbowRot, waveElbow, env);
                 targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, 8f, env * 0.5f);
+            }
+
+            CarryableProp carry = CarryableProp.CurrentlyHeld;
+            bool carrying = carry != null && carry.UsesRig(this);
+            Vector3 petHand = Vector3.zero;
+            float petCrouch = 0f;
+            float petWeight = 0f;
+            StreetCatController cat = StreetCatController.ActivePet;
+            bool petting = cat != null && cat.TryGetPetPose(this, out petCrouch, out petWeight, out petHand);
+            if (petting)
+            {
+                targetHipsPos.y -= 0.42f * petCrouch;
+                targetHipsPos.z -= 0.04f * petCrouch;
+                targetSpineRot = Vector3.Lerp(targetSpineRot, new Vector3(43f, -7f, -5f), petCrouch);
+                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 14f, petCrouch);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 12f, petCrouch);
+            }
+            if (carrying)
+            {
+                float crouch = carry.PickupCrouch;
+                targetHipsPos.y -= 0.52f * crouch;
+                targetHipsPos.z -= 0.075f * crouch;
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x * 0.55f + 5f, 53f, crouch);
+                targetSpineRot.y *= 0.35f;
+                targetHeadRot.x += 14f * crouch;
+            }
+
+            float swingTime = Time.time - _tennisContactAt;
+            if (tennisStance)
+            {
+                targetHipsPos.y -= 0.064f;
+                targetHipsRot.y *= 0.35f;
+                targetSpineRot.x = _tennisServing && swingTime < 0.09f ? 1f : 12f;
+                float windup = 1f - Mathf.Abs(swingTime + 0.12f) / 0.15f;
+                float follow = 1f - Mathf.Abs(swingTime - 0.10f) / 0.17f;
+                targetSpineRot.y += 32f * Mathf.Clamp01(windup) - 37f * Mathf.Clamp01(follow);
             }
 
             if (chestVisual != null)
@@ -1055,7 +1143,7 @@ namespace Gridroam.Player
                 chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * dt));
             }
 
-            float damp = _prayerStage > 0 ? 6.5f : (_landSquatTimer >= 0f ? 28f : (_grounded ? 14f : 10f));
+            float damp = _prayerStage > 0 ? 6.5f : (_landSquatTimer >= 0f || carrying || petting ? 25f : (_grounded ? 14f : 10f));
             hips.localPosition = Vector3.Lerp(hips.localPosition, targetHipsPos, 1f - Mathf.Exp(-damp * dt));
             SmoothRotate(hips, targetHipsRot, damp, dt);
             SmoothRotate(spine, targetSpineRot, damp, dt);
@@ -1073,6 +1161,149 @@ namespace Gridroam.Player
             SmoothRotate(rShoulder, targetRShoulderRot, damp, dt);
             SmoothRotate(lElbow, targetLElbowRot, damp, dt);
             SmoothRotate(rElbow, targetRElbowRot, damp, dt);
+
+            Vector3 leftGrip = Vector3.zero;
+            Vector3 rightGrip = Vector3.zero;
+            float carryWeight = 0f;
+            if (carrying)
+            {
+                carryWeight = carry.UpdateGrip(this, hips.position, out leftGrip, out rightGrip);
+                Vector3 leftReach = ShoulderReach(lShoulder, lElbow, leftGrip);
+                Vector3 rightReach = ShoulderReach(rShoulder, rElbow, rightGrip);
+                Vector3 reach = leftReach.sqrMagnitude > rightReach.sqrMagnitude ? leftReach : rightReach;
+                hips.position += Vector3.ClampMagnitude(reach, 0.16f * transform.lossyScale.y) * carryWeight;
+            }
+            if (petting)
+            {
+                Vector3 reach = ShoulderReach(rShoulder, rElbow, petHand);
+                hips.position += Vector3.ClampMagnitude(reach, 0.13f * transform.lossyScale.y) * petWeight;
+            }
+
+            if (_grounded && !_isSwimming && _prayerStage == 0 && _vaultTimer < 0f &&
+                _knockdownTimer < 0f && _hitReactTimer < 0f && _punchTimer < 0f &&
+                lAnkle != null && rAnkle != null)
+            {
+                PlantFeet(strideLength, stance, runBlend, tennisStance, idleW);
+            }
+
+            if (carryWeight > 0f)
+            {
+                AimHand(lShoulder, lElbow, leftGrip, -transform.right, carryWeight);
+                AimHand(rShoulder, rElbow, rightGrip, transform.right, carryWeight);
+            }
+            if (petting)
+            {
+                AimHand(rShoulder, rElbow, petHand, transform.right, petWeight);
+                if (lKnee != null)
+                    AimHand(lShoulder, lElbow, lKnee.position + transform.up * 0.11f - transform.right * 0.04f,
+                        -transform.right, petWeight);
+            }
+            if (_vaultTimer >= 0f && _vaultSupport.HasValue && rShoulder != null)
+            {
+                Vector3 palm = _vaultSupport.Value + transform.right * 0.12f;
+                float time = _vaultTimer / VaultDuration;
+                float plant = Mathf.SmoothStep(0f, 1f, (time - 0.13f) / 0.15f) *
+                    (1f - Mathf.SmoothStep(0f, 1f, (time - 0.50f) / 0.18f));
+                float reachable = 1f - Mathf.InverseLerp(0.51f, 0.74f, Vector3.Distance(rShoulder.position, palm));
+                AimHand(rShoulder, rElbow, palm, transform.right, plant * reachable);
+            }
+            if (_isSwimming)
+            {
+                float strokeBlend = Mathf.SmoothStep(0f, 1f, _swimSpeed / 1.70f);
+                AimHand(lShoulder, lElbow, SwimHand(-1f, _swimPhase), -transform.right, strokeBlend);
+                AimHand(rShoulder, rElbow, SwimHand(1f, _swimPhase + Mathf.PI), transform.right, strokeBlend);
+            }
+            else if (!carrying && !petting && !tennisStance && _doorHandle != null && _grounded)
+            {
+                float elapsed = Time.time - _doorReachStarted;
+                float weight = Mathf.SmoothStep(0f, 1f, elapsed / 0.16f) *
+                    (1f - Mathf.SmoothStep(0f, 1f, (elapsed - _doorReachDuration * 0.66f) / (_doorReachDuration * 0.34f)));
+                if (weight > 0f)
+                    AimHand(_doorReachRight ? rShoulder : lShoulder, _doorReachRight ? rElbow : lElbow,
+                        _doorHandle.position, transform.right * (_doorReachRight ? 1f : -1f), weight);
+                if (elapsed >= _doorReachDuration) _doorHandle = null;
+            }
+
+            if (tennisStance) ApplyTennisRacketPose(swingTime);
+        }
+
+        private Vector3 ShoulderReach(Transform shoulder, Transform elbow, Vector3 target)
+        {
+            if (shoulder == null || elbow == null) return Vector3.zero;
+            Vector3 delta = target - shoulder.position;
+            float reach = (elbow.localPosition.magnitude + HandLength - 0.014f) * transform.lossyScale.y;
+            return delta.normalized * Mathf.Max(0f, delta.magnitude - reach);
+        }
+
+        private void PlantFeet(float strideLength, float stance, float runBlend, bool tennisStance, float idleWeight)
+        {
+            Vector3 direction = transform.InverseTransformDirection(_travelDirection);
+            Vector3 left = GaitFoot(Mathf.Repeat(_phase / TwoPi, 1f), -1f, direction,
+                strideLength, stance, runBlend, tennisStance, idleWeight, out Quaternion leftRotation);
+            Vector3 right = GaitFoot(Mathf.Repeat(_phase / TwoPi + 0.5f, 1f), 1f, direction,
+                strideLength, stance, runBlend, tennisStance, idleWeight, out Quaternion rightRotation);
+
+            // Keep both targets within reach when a long step or a low curb extends the support leg.
+            float pelvisDrop = Mathf.Max(0f, Mathf.Max(LegExtension(lHip, lKnee, lAnkle, left),
+                LegExtension(rHip, rKnee, rAnkle, right)));
+            hips.position -= transform.up * pelvisDrop;
+            AimLimb(lHip, lKnee, left, transform.forward, lAnkle.localPosition.magnitude);
+            AimLimb(rHip, rKnee, right, transform.forward, rAnkle.localPosition.magnitude);
+            lAnkle.rotation = leftRotation;
+            rAnkle.rotation = rightRotation;
+        }
+
+        private Vector3 GaitFoot(float phase, float side, Vector3 direction, float strideLength, float stance,
+            float runBlend, bool tennisStance, float idleWeight, out Quaternion rotation)
+        {
+            float halfStep = strideLength * stance * 0.5f;
+            float offset;
+            float lift = 0f;
+            float pitch;
+            if (phase < stance)
+            {
+                float load = phase / stance;
+                offset = Mathf.Lerp(halfStep, -halfStep, load);
+                pitch = -9f * (1f - Mathf.SmoothStep(0f, 1f, load / 0.22f)) +
+                    16f * Mathf.SmoothStep(0f, 1f, (load - 0.74f) / 0.26f);
+            }
+            else
+            {
+                float swing = (phase - stance) / (1f - stance);
+                offset = Mathf.SmoothStep(-halfStep, halfStep, swing);
+                lift = Mathf.Sin(swing * Mathf.PI) * (tennisStance ? 0.085f : Mathf.Lerp(0.11f, 0.20f, runBlend));
+                pitch = Mathf.Lerp(16f, -9f, swing);
+            }
+
+            float width = tennisStance ? 0.22f : Mathf.Lerp(0.13f, 0.102f, _gaitWeight);
+            Vector3 local = new Vector3(side * width, 0f, -side * idleWeight * 0.035f) +
+                direction * (offset * _gaitWeight);
+            local.x = side * Mathf.Max(0.052f, side * local.x);
+            Vector3 ground = transform.TransformPoint(local);
+            Vector3 normal = transform.up;
+            if (_sampleGround && Physics.Raycast(ground + transform.up * 0.32f, -transform.up,
+                    out RaycastHit hit, 0.53f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                hit.normal.y >= 0.65f && hit.collider.transform.root != transform.root)
+            {
+                ground = hit.point;
+                normal = hit.normal;
+            }
+
+            pitch *= _gaitWeight * (tennisStance ? 0.4f : 1f);
+            float soleReach = pitch > 0f ? 0.19f : 0.075f;
+            float soleLift = Mathf.Abs(Mathf.Sin(pitch * Mathf.Deg2Rad)) * soleReach;
+            rotation = Quaternion.FromToRotation(transform.up, normal) * transform.rotation *
+                Quaternion.Euler(pitch, side * Mathf.Lerp(6f, 2f, _gaitWeight), 0f);
+            return ground + normal * ((AnkleHeight + soleLift + lift * _gaitWeight) * transform.lossyScale.y);
+        }
+
+        private float LegExtension(Transform hip, Transform knee, Transform ankle, Vector3 target)
+        {
+            float reach = (knee.localPosition.magnitude + ankle.localPosition.magnitude - 0.009f) * transform.lossyScale.y;
+            Vector3 delta = hip.position - target;
+            float vertical = Vector3.Dot(delta, transform.up);
+            float horizontalSquared = Vector3.ProjectOnPlane(delta, transform.up).sqrMagnitude;
+            return vertical - Mathf.Sqrt(Mathf.Max(0f, reach * reach - horizontalSquared));
         }
 
         private void AnimateSitting(float dt)
@@ -1085,7 +1316,8 @@ namespace Gridroam.Player
 
                 hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.17f, 0f), 1f - Mathf.Exp(-12f * dt));
                 SmoothRotate(hips, Vector3.zero, 12f, dt);
-                SmoothRotate(spine, new Vector3(-6f + breath, steerNorm * 5f, -steerNorm * 3f), 10f, dt);
+                float wheelLean = _steeringWheel != null ? 8f : -6f;
+                SmoothRotate(spine, new Vector3(wheelLean + breath, steerNorm * 5f, -steerNorm * 3f), 10f, dt);
                 SmoothRotate(neck, new Vector3(4f, 0f, 0f), 10f, dt);
                 SmoothRotate(head, new Vector3(0f, steerNorm * 14f, 0f), 8f, dt);
 
@@ -1102,6 +1334,15 @@ namespace Gridroam.Player
                 SmoothRotate(rShoulder, new Vector3(rightReach, -10f + steerNorm * 10f, 10f - steerNorm * 8f), 14f, dt);
                 SmoothRotate(lElbow, new Vector3(-32f + steerNorm * 10f, 0f, 0f), 14f, dt);
                 SmoothRotate(rElbow, new Vector3(-32f - steerNorm * 10f, 0f, 0f), 14f, dt);
+                if (_steeringWheel != null)
+                {
+                    AimHand(lShoulder, lElbow, _steeringWheel.TransformPoint(new Vector3(-0.145f, 0f, 0.055f)), -transform.right, 1f);
+                    AimHand(rShoulder, rElbow, _steeringWheel.TransformPoint(new Vector3(0.145f, 0f, 0.055f)), transform.right, 1f);
+                }
+            }
+            else if (_seatFloor.HasValue)
+            {
+                AnimateSeatContact(_seatFloor.Value, _seatAmount, breath, dt);
             }
             else
             {
@@ -1127,6 +1368,231 @@ namespace Gridroam.Player
                 SmoothRotate(lElbow, new Vector3(-44f, 0f, 10f), 12f, dt);
                 SmoothRotate(rElbow, new Vector3(-44f, 0f, -10f), 12f, dt);
             }
+        }
+
+        private void AnimateSeatContact(float floor, float seated, float breath, float dt)
+        {
+            float shift = Mathf.Sin(seated * Mathf.PI);
+            hips.localPosition = new Vector3(0f, Mathf.Lerp(hipsBaseY, 0.08f, seated), 0.09f * shift);
+            SmoothRotate(hips, Vector3.zero, 15f, dt);
+            SmoothRotate(spine, new Vector3(24f * shift - 5f * seated + breath, 0f, 0f), 16f, dt);
+            SmoothRotate(neck, new Vector3(-8f * shift + 5f * seated, 0f, 0f), 14f, dt);
+            SmoothRotate(head, Vector3.zero, 12f, dt);
+            Vector3 left = transform.TransformPoint(new Vector3(-0.14f, 0f, Mathf.Lerp(0.04f, 0.46f, seated)));
+            Vector3 right = transform.TransformPoint(new Vector3(0.14f, 0f, Mathf.Lerp(0.09f, 0.44f, seated)));
+            left.y = right.y = floor + AnkleHeight * transform.lossyScale.y;
+            if (lAnkle != null && rAnkle != null)
+            {
+                float drop = Mathf.Max(0f, Mathf.Max(LegExtension(lHip, lKnee, lAnkle, left),
+                    LegExtension(rHip, rKnee, rAnkle, right)));
+                hips.position -= transform.up * drop;
+                AimLimb(lHip, lKnee, left, transform.forward, lAnkle.localPosition.magnitude);
+                AimLimb(rHip, rKnee, right, transform.forward, rAnkle.localPosition.magnitude);
+                lAnkle.rotation = transform.rotation;
+                rAnkle.rotation = transform.rotation;
+            }
+            if (lKnee != null && rKnee != null)
+            {
+                Vector3 lRest = Vector3.Lerp(transform.TransformPoint(new Vector3(-0.27f, 0.82f, 0.06f)),
+                    lKnee.position + transform.up * 0.10f, seated);
+                Vector3 rRest = Vector3.Lerp(transform.TransformPoint(new Vector3(0.27f, 0.82f, 0.06f)),
+                    rKnee.position + transform.up * 0.10f, seated);
+                AimHand(lShoulder, lElbow, lRest, -transform.right, 1f);
+                AimHand(rShoulder, rElbow, rRest, transform.right, 1f);
+            }
+        }
+
+        private Vector3 SwimHand(float side, float phase)
+        {
+            float stroke = Mathf.Repeat(phase / TwoPi, 1f);
+            const float pullEnd = 0.62f;
+            float pull = Mathf.Clamp01(stroke / pullEnd);
+            float recovery = Mathf.InverseLerp(pullEnd, 1f, stroke);
+            float forward = stroke < pullEnd ? Mathf.Lerp(1.04f, -0.07f, pull) : Mathf.SmoothStep(-0.07f, 1.04f, recovery);
+            float height = 0.83f - 0.30f * Mathf.Sin(pull * Mathf.PI) + 0.32f * Mathf.Sin(recovery * Mathf.PI);
+            float width = 0.22f + 0.15f * Mathf.Sin(recovery * Mathf.PI);
+            return transform.TransformPoint(new Vector3(side * width, height, forward));
+        }
+
+        public void SetCycling(bool active)
+        {
+            _cycling = active;
+            _motorcyclePose = false;
+        }
+
+        public void SetCycling(bool active, Vector3 leftPedal, Vector3 rightPedal, Vector3 leftGrip, Vector3 rightGrip)
+        {
+            _cycling = active;
+            _motorcyclePose = false;
+            _leftPedal = leftPedal;
+            _rightPedal = rightPedal;
+            _leftGrip = leftGrip;
+            _rightGrip = rightGrip;
+        }
+
+        public void SetMotorcyclePose(Vector3 leftPeg, Vector3 rightPeg, Vector3 leftGrip, Vector3 rightGrip, float mount, float footPeg)
+        {
+            SetCycling(true, leftPeg, rightPeg, leftGrip, rightGrip);
+            _motorcyclePose = true;
+            _motorcycleMount = mount;
+            _motorcycleFootPeg = footPeg;
+        }
+
+        public void SetTennisRacket(Transform racket)
+        {
+            _tennisRacket = rElbow != null ? racket : null;
+            if (_tennisRacket != null) _tennisRacket.SetParent(rElbow, false);
+            ClearTennisSwing();
+            _tennisLeftHand = null;
+        }
+
+        public void SetTennisLeftHand(Vector3? point)
+        {
+            _tennisLeftHand = point;
+        }
+
+        public void PlayTennisSwing(Vector3 contact, float secondsToContact, bool serving = false)
+        {
+            _tennisContact = contact;
+            _tennisContactAt = Time.time + secondsToContact;
+            _tennisServing = serving;
+        }
+
+        public void ClearTennisSwing()
+        {
+            _tennisContactAt = float.NegativeInfinity;
+            _tennisServing = false;
+        }
+
+        private void ApplyTennisRacketPose(float swingTime)
+        {
+            Vector3 readyHand = transform.TransformPoint(new Vector3(0.24f, 1.06f, 0.28f));
+            Vector3 readyAxis = new Vector3(0.42f, 0.86f, 0.28f);
+            Vector3 axis = readyAxis;
+            Vector3 hand = readyHand;
+            if (swingTime >= -TennisWindup && swingTime < TennisFollowThrough)
+            {
+                Vector3 strikeAxis = _tennisServing
+                    ? new Vector3(0.45f, 0.86f, 0.22f)
+                    : new Vector3(0.89f, 0.25f, 0.38f);
+                Vector3 strikeUp = transform.TransformDirection(strikeAxis.normalized);
+                Vector3 strikeFace = Vector3.ProjectOnPlane(transform.forward, strikeUp).normalized;
+                Vector3 strikeHand = _tennisContact - strikeFace * TennisCourt.BallRadius -
+                    strikeUp * (RacketHeadFromHand * transform.lossyScale.y);
+                if (swingTime < 0f)
+                {
+                    const float backswingTime = -0.11f;
+                    Vector3 backswingHand = transform.TransformPoint(_tennisServing
+                        ? new Vector3(0.27f, 1.42f, -0.14f)
+                        : new Vector3(0.43f, 1.02f, -0.23f));
+                    Vector3 backswingAxis = new Vector3(0.64f, 0.45f, -0.62f);
+                    if (swingTime < backswingTime)
+                    {
+                        float windup = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-TennisWindup, backswingTime, swingTime));
+                        hand = Vector3.Lerp(readyHand, backswingHand, windup);
+                        axis = Vector3.Slerp(readyAxis, backswingAxis, windup);
+                    }
+                    else
+                    {
+                        float strike = Mathf.InverseLerp(backswingTime, 0f, swingTime);
+                        hand = Vector3.Lerp(backswingHand, strikeHand, strike * strike);
+                        axis = Vector3.Slerp(backswingAxis, strikeAxis, strike * strike);
+                    }
+                }
+                else
+                {
+                    Vector3 finishHand = transform.TransformPoint(new Vector3(-0.10f, 1.28f, 0.32f));
+                    Vector3 finishAxis = new Vector3(-0.75f, 0.62f, 0.22f);
+                    const float finishTime = 0.12f;
+                    if (swingTime < finishTime)
+                    {
+                        float follow = Mathf.SmoothStep(0f, 1f, swingTime / finishTime);
+                        hand = Vector3.Lerp(strikeHand, finishHand, follow);
+                        axis = Vector3.Slerp(strikeAxis, finishAxis, follow);
+                    }
+                    else
+                    {
+                        float recover = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(finishTime, TennisFollowThrough, swingTime));
+                        hand = Vector3.Lerp(finishHand, readyHand, recover);
+                        axis = Vector3.Slerp(finishAxis, readyAxis, recover);
+                    }
+                }
+            }
+
+            AimHand(rShoulder, rElbow, hand, transform.right, 1f);
+            AimHand(lShoulder, lElbow,
+                _tennisLeftHand ?? transform.TransformPoint(new Vector3(-0.27f, 1.03f, 0.29f)),
+                -transform.right, 1f);
+            Vector3 racketUp = transform.TransformDirection(axis.normalized);
+            Vector3 racketForward = Vector3.ProjectOnPlane(transform.forward, racketUp).normalized;
+            Quaternion rotation = Quaternion.LookRotation(racketForward, racketUp);
+            Vector3 handCenter = rElbow.TransformPoint(Vector3.down * HandLength);
+            _tennisRacket.SetPositionAndRotation(handCenter - racketUp * (RacketHandleCenter * transform.lossyScale.y), rotation);
+        }
+
+        private void AimHand(Transform shoulder, Transform elbow, Vector3 target, Vector3 outward, float weight)
+        {
+            if (shoulder == null || elbow == null) return;
+            Quaternion shoulderPose = shoulder.localRotation;
+            Quaternion elbowPose = elbow.localRotation;
+            AimLimb(shoulder, elbow, target, -transform.up + outward * 0.55f, HandLength);
+            shoulder.localRotation = Quaternion.Slerp(shoulderPose, shoulder.localRotation, weight);
+            elbow.localRotation = Quaternion.Slerp(elbowPose, elbow.localRotation, weight);
+        }
+
+        private void AnimateCycling()
+        {
+            float mount = _motorcyclePose ? _motorcycleMount : 1f;
+            Vector3 seatedHips = _motorcyclePose
+                ? new Vector3(Mathf.Lerp(-0.11f, 0f, _motorcycleFootPeg), Mathf.Lerp(0.91f, 0.97f, _motorcycleFootPeg), -0.25f)
+                : new Vector3(0f, hipsBaseY + 0.12f, -0.235f);
+            hips.localPosition = Vector3.Lerp(new Vector3(0f, hipsBaseY, 0f), seatedHips, mount);
+            hips.localRotation = Quaternion.identity;
+            float lean = (_motorcyclePose ? 19f : 33f) * mount;
+            if (spine != null) spine.localRotation = Quaternion.Euler(lean, 0f, 0f);
+            if (neck != null) neck.localRotation = Quaternion.Euler(-lean * 0.7f, 0f, 0f);
+            if (head != null) head.localRotation = Quaternion.Euler(-7f * mount, 0f, 0f);
+
+            Vector3 ankleOffset = transform.up * 0.065f - transform.forward * 0.04f;
+            Vector3 leftFoot = Vector3.Lerp(transform.TransformPoint(new Vector3(-0.13f, AnkleHeight, 0f)),
+                _leftPedal + ankleOffset, mount);
+            Vector3 rightFoot = Vector3.Lerp(transform.TransformPoint(new Vector3(0.13f,
+                AnkleHeight + Mathf.Sin(mount * Mathf.PI) * 0.30f, 0f)), _rightPedal + ankleOffset, mount);
+            AimLimb(lHip, lKnee, leftFoot, transform.forward, 0.42f);
+            AimLimb(rHip, rKnee, rightFoot, transform.forward, 0.42f);
+            if (lAnkle != null) lAnkle.rotation = transform.rotation;
+            if (rAnkle != null) rAnkle.rotation = transform.rotation;
+            Vector3 leftHand = Vector3.Lerp(transform.TransformPoint(new Vector3(-0.26f, 0.83f, 0.08f)), _leftGrip, mount);
+            Vector3 rightHand = Vector3.Lerp(transform.TransformPoint(new Vector3(0.26f, 0.83f, 0.08f)), _rightGrip, mount);
+            AimHand(lShoulder, lElbow, leftHand, -transform.right, 1f);
+            AimHand(rShoulder, rElbow, rightHand, transform.right, 1f);
+        }
+
+        private void AimLimb(Transform first, Transform second, Vector3 target, Vector3 bendToward, float lowerLength)
+        {
+            if (first == null || second == null) return;
+
+            Vector3 start = first.position;
+            Vector3 delta = target - start;
+            Vector3 direction = delta.sqrMagnitude > 0.000001f ? delta.normalized : -transform.up;
+            float upperLength = second.localPosition.magnitude * transform.lossyScale.y;
+            lowerLength *= transform.lossyScale.y;
+            float distance = Mathf.Clamp(delta.magnitude,
+                Mathf.Abs(upperLength - lowerLength) + 0.001f, upperLength + lowerLength - 0.001f);
+            float along = (upperLength * upperLength - lowerLength * lowerLength + distance * distance) / (2f * distance);
+            float bend = Mathf.Sqrt(Mathf.Max(0f, upperLength * upperLength - along * along));
+            Vector3 pole = Vector3.ProjectOnPlane(bendToward, direction).normalized;
+            if (pole.sqrMagnitude < 0.0001f) pole = Vector3.ProjectOnPlane(transform.right, direction).normalized;
+            Vector3 elbowOrKnee = start + direction * along + pole * bend;
+            AimBone(first, elbowOrKnee - start);
+            AimBone(second, start + direction * distance - second.position);
+        }
+
+        private void AimBone(Transform bone, Vector3 direction)
+        {
+            Vector3 forward = Vector3.Cross(direction, transform.right);
+            if (forward.sqrMagnitude < 0.000001f) forward = Vector3.ProjectOnPlane(transform.forward, direction);
+            bone.rotation = Quaternion.LookRotation(forward, -direction);
         }
 
         private static void SmoothRotate(Transform target, Vector3 targetEuler, float damp, float dt)

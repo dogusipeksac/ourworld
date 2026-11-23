@@ -1002,6 +1002,7 @@ namespace Gridroam.Vehicle
             if (_isPlayerDriving && _seatedDriverHumanoid != null)
             {
                 _seatedDriverHumanoid.SetSteeringAngle(_currentSteerAngle);
+                _seatedDriverHumanoid.SetSteeringWheel(steeringWheelTransform);
             }
         }
 

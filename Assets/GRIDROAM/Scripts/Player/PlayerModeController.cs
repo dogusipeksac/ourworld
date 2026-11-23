@@ -17,7 +17,9 @@ namespace Gridroam.Player
     {
         OnFoot,
         Driving,
-        Seated
+        Seated,
+        Cycling,
+        Tennis
     }
 
     /// <summary>
@@ -41,6 +43,8 @@ namespace Gridroam.Player
         private readonly HashSet<object> _modalLocks = new HashSet<object>();
 
         private SedanVehicleController _currentVehicle;
+        private BicycleController _currentBicycle;
+        private TennisCourt _currentTennisCourt;
         private SeatInteractable _currentSeat;
         private Vector3 _seatApproachPos;
         private Quaternion _seatApproachRot = Quaternion.identity;
@@ -63,12 +67,15 @@ namespace Gridroam.Player
         public PlayerFootController FootController => footController;
         public SedanVehicleController PlayerSedan => playerSedan;
         public SedanVehicleController CurrentVehicle => _currentVehicle;
+        public BicycleController CurrentBicycle => _currentBicycle;
+        public TennisCourt CurrentTennisCourt => _currentTennisCourt;
         public InteractableTrigger NearestInteractable => _nearestInteractable;
         public InteractableTrigger ClosestInteractableWithin4m => _closestWithin4m;
 
         public Vector3 ActiveWorldPosition =>
             IsDriving && _currentVehicle != null
                 ? _currentVehicle.transform.position
+                : _currentBicycle != null ? _currentBicycle.transform.position
                 : (footController != null ? footController.transform.position : transform.position);
 
         public event Action<ControlMode> OnModeChanged;
@@ -102,12 +109,14 @@ namespace Gridroam.Player
             if (playerSedan == null) playerSedan = FindAnyObjectByType<SedanVehicleController>();
             if (cameraRig == null) cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
 
+            if (footController != null) NeighborhoodSports.Install(gameObject.scene, footController.Humanoid);
             RefreshInteractablesCache();
 
             if (InputHub.Instance != null)
             {
                 InputHub.Instance.OnInteractPressed += HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed += HandleExitVehiclePressed;
+                InputHub.Instance.OnAttackPressed += HandleSportAction;
             }
 
             if (SaveManager.Instance != null)
@@ -129,6 +138,7 @@ namespace Gridroam.Player
             {
                 InputHub.Instance.OnInteractPressed -= HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed -= HandleExitVehiclePressed;
+                InputHub.Instance.OnAttackPressed -= HandleSportAction;
             }
 
             if (SaveManager.Instance != null)
@@ -240,10 +250,20 @@ namespace Gridroam.Player
                 Vector3 fp = IsSeated
                     ? _seatApproachPos
                     : (footController != null ? footController.transform.position : transform.position);
+                float yaw = footController != null ? footController.transform.eulerAngles.y : 0f;
+                if (_currentBicycle != null && _currentBicycle.TryGetDismount(out Vector3 dismount))
+                {
+                    fp = dismount;
+                }
+                if (_currentTennisCourt != null)
+                {
+                    fp = _currentTennisCourt.ReturnPosition;
+                    yaw = _currentTennisCourt.ReturnRotation.eulerAngles.y;
+                }
                 data.playerPosX = fp.x;
                 data.playerPosY = fp.y;
                 data.playerPosZ = fp.z;
-                data.playerRotY = footController != null ? footController.transform.eulerAngles.y : 0f;
+                data.playerRotY = yaw;
             }
         }
 
@@ -346,6 +366,7 @@ namespace Gridroam.Player
                 footController != null && Keyboard.current != null && Keyboard.current.gKey.wasPressedThisFrame)
             {
                 CarryableProp.DropHeldPropIfAny();
+                StreetCatController.CancelActivePet();
                 var spot = FastTravelSpots[_fastTravelIndex % FastTravelSpots.Length];
                 _fastTravelIndex = (_fastTravelIndex + 1) % FastTravelSpots.Length;
                 footController.TeleportTo(spot.pos, Quaternion.Euler(0f, spot.yaw, 0f));
@@ -520,6 +541,13 @@ namespace Gridroam.Player
                 return;
             }
 
+            if (CurrentMode == ControlMode.Tennis)
+            {
+                _interactConsumedFrame = Time.frameCount;
+                ExitTennis();
+                return;
+            }
+
             if (MosquePrayerInteractable.IsPlayerPraying)
             {
                 _interactConsumedFrame = Time.frameCount;
@@ -527,10 +555,16 @@ namespace Gridroam.Player
                 return;
             }
 
-            if (CurrentMode == ControlMode.OnFoot && CarryableProp.IsHoldingProp)
+            if (CurrentMode == ControlMode.OnFoot && CarryableProp.CurrentlyHeld != null)
             {
                 _interactConsumedFrame = Time.frameCount;
                 CarryableProp.CurrentlyHeld.ToggleCarry(this);
+                return;
+            }
+
+            if (CurrentMode == ControlMode.OnFoot && StreetCatController.ActivePet != null)
+            {
+                StreetCatController.CancelActivePet();
                 return;
             }
 
@@ -571,6 +605,27 @@ namespace Gridroam.Player
 
             switch (_nearestInteractable.Kind)
             {
+                case InteractableKind.Bicycle:
+                case InteractableKind.Motorcycle:
+                {
+                    BicycleController bicycle = _nearestInteractable.GetComponentInParent<BicycleController>();
+                    if (bicycle == null || footController == null) return;
+                    _currentBicycle = bicycle;
+                    bicycle.Mount(footController);
+                    SetSportMode(ControlMode.Cycling, bicycle.transform);
+                    return;
+                }
+
+                case InteractableKind.Tennis:
+                {
+                    TennisCourt court = _nearestInteractable.GetComponentInParent<TennisCourt>();
+                    if (court == null || footController == null) return;
+                    _currentTennisCourt = court;
+                    court.Begin(footController);
+                    SetSportMode(ControlMode.Tennis, footController.transform);
+                    return;
+                }
+
                 case InteractableKind.PlayerVehicle:
                 case InteractableKind.TownVehicle:
                 {
@@ -592,7 +647,7 @@ namespace Gridroam.Player
                     DoorInteractable door = _nearestInteractable.GetComponentInParent<DoorInteractable>();
                     if (door != null)
                     {
-                        door.Toggle(ActiveWorldPosition);
+                        door.Toggle(ActiveWorldPosition, footController != null ? footController.Humanoid : null);
                     }
                     return;
                 }
@@ -745,13 +800,96 @@ namespace Gridroam.Player
         {
             if (IsModalLocked ||
                 Time.frameCount == _dialogueClosedFrame ||
-                Time.frameCount == _interactConsumedFrame ||
-                CurrentMode != ControlMode.Driving)
+                Time.frameCount == _interactConsumedFrame)
             {
                 return;
             }
 
-            TryExitVehicle();
+            switch (CurrentMode)
+            {
+                case ControlMode.Driving:
+                    TryExitVehicle();
+                    break;
+                case ControlMode.Cycling:
+                    ExitBicycle();
+                    break;
+                case ControlMode.Tennis:
+                    ExitTennis();
+                    break;
+            }
+        }
+
+        private void SetSportMode(ControlMode mode, Transform cameraTarget)
+        {
+            CurrentMode = mode;
+            _closestWithin4m = null;
+            SetNearestInteractable(null);
+            if (cameraRig != null)
+            {
+                cameraRig.SetSeatedMode(false);
+                cameraRig.SetTarget(cameraTarget, drivingMode: mode == ControlMode.Cycling, snapBehindTarget: true);
+            }
+            OnModeChanged?.Invoke(mode);
+        }
+
+        private void HandleSportAction()
+        {
+            if (_currentTennisCourt != null && !IsModalLocked &&
+                Time.frameCount != _interactConsumedFrame && Time.frameCount != _dialogueClosedFrame)
+            {
+                _currentTennisCourt.Hit();
+            }
+        }
+
+        private void ExitBicycle()
+        {
+            if (_currentBicycle == null || _currentBicycle.IsTransitioning) return;
+            if (_currentBicycle.SpeedKmh > 5f)
+            {
+                RaiseStatusMessage(LocalizationService.Tr(_currentBicycle.IsMotorcycle
+                    ? "vehicle.motorcycle.slow_down" : "sports.bicycle.slow_down"));
+                return;
+            }
+            if (!_currentBicycle.TryGetDismount(out Vector3 position))
+            {
+                RaiseStatusMessage(LocalizationService.Tr("sports.bicycle.no_space"));
+                return;
+            }
+
+            Quaternion rotation = _currentBicycle.transform.rotation;
+            if (_currentBicycle.IsMotorcycle)
+            {
+                _currentBicycle.Dismount(position, rotation, () => FinishBicycleExit(position, rotation));
+                return;
+            }
+            FinishBicycleExit(position, rotation);
+        }
+
+        private void FinishBicycleExit(Vector3 position, Quaternion rotation)
+        {
+            ClearActiveSport();
+            footController.TeleportTo(position, rotation);
+            SetSportMode(ControlMode.OnFoot, footController.transform);
+            footController.SetMovementEnabled(!IsModalLocked);
+        }
+
+        private void ExitTennis()
+        {
+            if (_currentTennisCourt == null) return;
+            Vector3 position = _currentTennisCourt.ReturnPosition;
+            Quaternion rotation = _currentTennisCourt.ReturnRotation;
+            ClearActiveSport();
+            footController.TeleportTo(position, rotation);
+            SetSportMode(ControlMode.OnFoot, footController.transform);
+            footController.SetMovementEnabled(!IsModalLocked);
+        }
+
+        private void ClearActiveSport()
+        {
+            if (_currentBicycle != null) _currentBicycle.Release();
+            if (_currentTennisCourt != null) _currentTennisCourt.End();
+            _currentBicycle = null;
+            _currentTennisCourt = null;
         }
 
         public void TryEnterVehicle()
@@ -763,6 +901,7 @@ namespace Gridroam.Player
         {
             if (v == null) return;
 
+            ClearActiveSport();
             ClearActiveSeatImmediate();
 
             if (_currentVehicle != null && _currentVehicle != v)
@@ -847,6 +986,7 @@ namespace Gridroam.Player
             if (footController.Humanoid != null)
             {
                 footController.Humanoid.SetSitting(true, driving: false);
+                footController.Humanoid.SetSeatContact(SeatFloor(seat.SitPoint), 0f);
             }
 
             if (cameraRig != null)
@@ -897,10 +1037,6 @@ namespace Gridroam.Player
             bool capsuleFree = !Physics.CheckCapsule(capBottom, capTop, 0.34f, ~0, QueryTriggerInteraction.Ignore);
             Vector3 finalPos = capsuleFree ? candidate : _seatApproachPos;
 
-            if (footController.Humanoid != null)
-            {
-                footController.Humanoid.SetSitting(false, driving: false);
-            }
             if (cameraRig != null)
             {
                 cameraRig.SetSeatedMode(false);
@@ -918,7 +1054,8 @@ namespace Gridroam.Player
             _isSeatTransitioning = true;
             Vector3 startPos = footController.transform.position;
             Quaternion startRot = footController.transform.rotation;
-            float duration = Mathf.Max(0.05f, seatTransitionSeconds);
+            float floor = _currentSeat != null ? SeatFloor(_currentSeat.SitPoint) : _seatApproachPos.y;
+            float duration = Mathf.Max(0.54f, seatTransitionSeconds);
             float elapsed = 0f;
 
             while (elapsed < duration)
@@ -927,11 +1064,13 @@ namespace Gridroam.Player
                 float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
                 footController.transform.SetPositionAndRotation(
                     Vector3.Lerp(startPos, targetPos, t),
-                    Quaternion.Slerp(startRot, targetRot, t));
+                    Quaternion.Slerp(startRot, targetRot, Mathf.SmoothStep(0f, 1f, elapsed / (duration * 0.66f))));
+                footController.Humanoid?.SetSeatContact(floor, t);
                 yield return null;
             }
 
             footController.transform.SetPositionAndRotation(targetPos, targetRot);
+            footController.Humanoid?.SetSeatContact(floor, 1f);
             _isSeatTransitioning = false;
             _seatRoutine = null;
         }
@@ -941,7 +1080,8 @@ namespace Gridroam.Player
             _isSeatTransitioning = true;
             Vector3 startPos = footController.transform.position;
             Quaternion startRot = footController.transform.rotation;
-            float duration = Mathf.Max(0.05f, seatTransitionSeconds);
+            float floor = _currentSeat != null ? SeatFloor(_currentSeat.SitPoint) : targetPos.y;
+            float duration = Mathf.Max(0.51f, seatTransitionSeconds);
             float elapsed = 0f;
 
             while (elapsed < duration)
@@ -951,6 +1091,7 @@ namespace Gridroam.Player
                 footController.transform.SetPositionAndRotation(
                     Vector3.Lerp(startPos, targetPos, t),
                     Quaternion.Slerp(startRot, targetRot, t));
+                footController.Humanoid?.SetSeatContact(floor, 1f - t);
                 yield return null;
             }
 
@@ -961,6 +1102,7 @@ namespace Gridroam.Player
             }
 
             footController.SetSeatedState(false);
+            footController.Humanoid?.SetSitting(false, driving: false);
             footController.TeleportTo(targetPos, targetRot);
             footController.SetMovementEnabled(!IsModalLocked);
 
@@ -968,6 +1110,15 @@ namespace Gridroam.Player
             _seatRoutine = null;
             CurrentMode = ControlMode.OnFoot;
             OnModeChanged?.Invoke(CurrentMode);
+        }
+
+        private float SeatFloor(Transform seat)
+        {
+            Vector3 origin = seat.position + seat.forward * 0.47f + Vector3.up * 0.2f;
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 1.35f, Physics.DefaultRaycastLayers,
+                    QueryTriggerInteraction.Ignore) && hit.point.y < seat.position.y - 0.15f)
+                return hit.point.y;
+            return _seatApproachPos.y;
         }
 
         private void ClearActiveSeatImmediate()
@@ -999,6 +1150,7 @@ namespace Gridroam.Player
 
         public void SetOnFootMode(bool snapCamera)
         {
+            ClearActiveSport();
             ClearActiveSeatImmediate();
             CurrentMode = ControlMode.OnFoot;
 
@@ -1029,6 +1181,7 @@ namespace Gridroam.Player
         {
             if (playerSedan == null) return;
 
+            ClearActiveSport();
             ClearActiveSeatImmediate();
 
             if (_currentVehicle != null && _currentVehicle != playerSedan)

@@ -104,14 +104,26 @@ namespace Gridroam.World
             }
         }
 
-        public void Toggle(Vector3 interactorWorldPos)
+        public void Toggle(Vector3 interactorWorldPos, ProceduralHumanoid interactor = null)
         {
             _autoOpened = false;
             _manualCooldown = 2.0f;
-            SetOpenState(!_isOpen, interactorWorldPos);
+            EnsureInitialized();
+            Transform handle = null;
+            if (doorPivot != null)
+            {
+                string handleName = Vector3.Dot(doorPivot.right, interactorWorldPos - doorPivot.position) >= 0f
+                    ? "HandleOuter" : "HandleInner";
+                handle = doorPivot.Find(handleName);
+            }
+            bool canReach = interactor != null && handle != null &&
+                Vector3.ProjectOnPlane(handle.position - interactorWorldPos, Vector3.up).sqrMagnitude < 0.68f * 0.68f;
+            float reachTime = canReach ? 0.16f : 0f;
+            if (canReach) interactor.PlayDoorReach(handle, Mathf.Max(0.05f, transitionSeconds) + reachTime);
+            SetOpenState(!_isOpen, interactorWorldPos, reachTime);
         }
 
-        private void SetOpenState(bool open, Vector3 interactorWorldPos)
+        private void SetOpenState(bool open, Vector3 interactorWorldPos, float reachTime = 0f)
         {
             EnsureInitialized();
             if (doorPivot == null) return;
@@ -144,7 +156,7 @@ namespace Gridroam.World
                 StopCoroutine(_animRoutine);
             }
 
-            _animRoutine = StartCoroutine(AnimateDoorRoutine(targetRot, open));
+            _animRoutine = StartCoroutine(AnimateDoorRoutine(targetRot, open, reachTime));
         }
 
         private void SetDoorColliderEnabled(bool enabledState)
@@ -163,11 +175,11 @@ namespace Gridroam.World
                 : inParentSpace;
         }
 
-        private IEnumerator AnimateDoorRoutine(Quaternion targetLocalRot, bool opening)
+        private IEnumerator AnimateDoorRoutine(Quaternion targetLocalRot, bool opening, float reachTime)
         {
             Quaternion startRot = doorPivot.localRotation;
             float duration = Mathf.Max(0.05f, transitionSeconds);
-            float elapsed = 0f;
+            float elapsed = -reachTime;
 
             while (elapsed < duration)
             {

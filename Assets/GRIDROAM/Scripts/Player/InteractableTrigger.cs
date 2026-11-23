@@ -24,7 +24,10 @@ namespace Gridroam.Player
         StreetCat,
         Football,
         CarryableProp,
-        AtmTerminal
+        AtmTerminal,
+        Bicycle,
+        Tennis,
+        Motorcycle
     }
 
     /// <summary>

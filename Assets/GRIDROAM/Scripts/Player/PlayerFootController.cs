@@ -202,6 +202,8 @@ namespace Gridroam.Player
                 mode.RaiseStatusMessage("Eşyayı fırlattın!");
                 return;
             }
+            CarryableProp.DropHeldPropIfAny();
+            StreetCatController.CancelActivePet();
 
             // If standing next to a street football, unleash a curved power shot!
             Collider[] ballProbe = Physics.OverlapSphere(transform.position + transform.forward * 0.9f + Vector3.up * 0.45f, 1.35f);
@@ -388,19 +390,23 @@ namespace Gridroam.Player
                 return;
             }
 
-            if (TryDetectVaultObstacle(out Vector3 vaultPeak, out Vector3 vaultLand))
+            StreetCatController.CancelActivePet();
+            if (TryDetectVaultObstacle(out Vector3 vaultPeak, out Vector3 vaultLand, out Vector3 vaultSupport))
             {
-                StartVault(vaultPeak, vaultLand);
+                CarryableProp.DropHeldPropIfAny();
+                StartVault(vaultPeak, vaultLand, vaultSupport);
                 return;
             }
+            if (!CarryableProp.IsHoldingProp) CarryableProp.DropHeldPropIfAny();
 
             _verticalVelocity = Mathf.Sqrt(2f * Mathf.Abs(gravity) * jumpHeight);
         }
 
-        private bool TryDetectVaultObstacle(out Vector3 peakPos, out Vector3 landPos)
+        private bool TryDetectVaultObstacle(out Vector3 peakPos, out Vector3 landPos, out Vector3 support)
         {
             peakPos = Vector3.zero;
             landPos = Vector3.zero;
+            support = Vector3.zero;
 
             Vector3 fwd = transform.forward;
             fwd.y = 0f;
@@ -459,20 +465,22 @@ namespace Gridroam.Player
             }
 
             peakPos = Vector3.Lerp(transform.position, landPos, 0.50f);
-            peakPos.y = Mathf.Max(topHit.point.y, Mathf.Max(transform.position.y, landPos.y)) + 0.36f;
+            float baseHeight = Mathf.Max(transform.position.y, landPos.y);
+            peakPos.y = baseHeight + 0.27f + Mathf.Max(0f, topHit.point.y - baseHeight) * 0.63f;
+            support = topHit.point + Vector3.up * 0.028f;
             return true;
         }
 
-        private void StartVault(Vector3 peakPos, Vector3 landPos)
+        private void StartVault(Vector3 peakPos, Vector3 landPos, Vector3? support = null)
         {
             if (_vaultRoutine != null)
             {
                 StopCoroutine(_vaultRoutine);
             }
-            _vaultRoutine = StartCoroutine(VaultRoutine(transform.position, peakPos, landPos));
+            _vaultRoutine = StartCoroutine(VaultRoutine(transform.position, peakPos, landPos, support));
         }
 
-        private IEnumerator VaultRoutine(Vector3 startPos, Vector3 peakPos, Vector3 landPos)
+        private IEnumerator VaultRoutine(Vector3 startPos, Vector3 peakPos, Vector3 landPos, Vector3? support)
         {
             _isVaulting = true;
             _verticalVelocity = 0f;
@@ -485,7 +493,7 @@ namespace Gridroam.Player
 
             if (humanoid != null)
             {
-                humanoid.PlayVault();
+                humanoid.PlayVault(support);
             }
 
             if (_footstepAudio != null && _sharedPunchWhooshClip != null)
@@ -502,15 +510,16 @@ namespace Gridroam.Player
             {
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
-                float u = 1f - t;
-                // Quadratic Bezier arc over the obstacle
-                Vector3 pos = (u * u) * startPos + (2f * u * t) * peakPos + (t * t) * landPos;
+                Vector3 pos = Vector3.Lerp(startPos, landPos, Mathf.SmoothStep(0f, 1f, t));
+                float lift = Mathf.Max(0f, peakPos.y - (startPos.y + landPos.y) * 0.5f);
+                pos.y += lift * Mathf.Sin(t * Mathf.PI);
                 transform.position = pos;
                 yield return null;
             }
 
             transform.position = landPos;
             _controller.enabled = true;
+            humanoid?.PlayLanding();
             _isVaulting = false;
             _vaultRoutine = null;
 
@@ -674,6 +683,11 @@ namespace Gridroam.Player
 
         public void SetCharacterActive(bool active)
         {
+            if (!active)
+            {
+                CarryableProp.DropHeldPropIfAny();
+                StreetCatController.CancelActivePet();
+            }
             if (_controller == null) _controller = GetComponent<CharacterController>();
             _controller.enabled = active;
             if (visualRoot != null)
@@ -689,6 +703,11 @@ namespace Gridroam.Player
 
         public void SetSeatedState(bool seated)
         {
+            if (seated)
+            {
+                CarryableProp.DropHeldPropIfAny();
+                StreetCatController.CancelActivePet();
+            }
             if (_controller == null) _controller = GetComponent<CharacterController>();
             if (visualRoot != null)
             {
@@ -771,7 +790,21 @@ namespace Gridroam.Player
 
             Vector3 desiredDir = forward * moveInput.y + right * moveInput.x;
             float inputMag = Mathf.Clamp01(desiredDir.magnitude);
-            if (inputMag > 0.01f)
+            float pickupSpeed = 0f;
+            Vector3 desiredPickupDirection = Vector3.zero;
+            CarryableProp carry = CarryableProp.CurrentlyHeld;
+            bool pickingUp = carry != null && carry.TryGetPickupMotion(this,
+                _movementEnabled && _controller.isGrounded && !_isSwimming, desiredDir,
+                out desiredPickupDirection, out pickupSpeed);
+            bool autoApproach = pickingUp;
+            if (!pickingUp && StreetCatController.ActivePet != null)
+            {
+                autoApproach = StreetCatController.ActivePet.TryGetPetMotion(this,
+                    _movementEnabled && _controller.isGrounded && !_isSwimming, desiredDir,
+                    out desiredPickupDirection, out pickupSpeed);
+            }
+            if (autoApproach) desiredDir = desiredPickupDirection;
+            if (desiredDir.sqrMagnitude > 0.0001f)
             {
                 desiredDir.Normalize();
                 _moveDirection = desiredDir;
@@ -785,6 +818,7 @@ namespace Gridroam.Player
 
             if (shouldSwim && !_isSwimming)
             {
+                CarryableProp.DropHeldPropIfAny();
                 _isSwimming = true;
                 _waterSurfaceY = surfaceY;
                 _verticalVelocity *= 0.25f;
@@ -830,7 +864,7 @@ namespace Gridroam.Player
             bool hasShoes = SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasRunningShoes;
             float baseRun = hasShoes ? (runSpeed * 1.22f) : runSpeed;
             float effectiveRunSpeed = isTired ? (baseRun * 0.75f) : baseRun;
-            float targetSpeed = (sprint ? effectiveRunSpeed : walkSpeed) * inputMag;
+            float targetSpeed = autoApproach ? pickupSpeed : (sprint ? effectiveRunSpeed : walkSpeed) * inputMag;
             float rate = targetSpeed > _currentSpeed ? acceleration : deceleration;
             _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, rate * dt);
 
@@ -848,11 +882,14 @@ namespace Gridroam.Player
 
             Vector3 velocity = _moveDirection * _currentSpeed + _combatLungeVelocity + Vector3.up * _verticalVelocity;
             _combatLungeVelocity = Vector3.MoveTowards(_combatLungeVelocity, Vector3.zero, 16f * dt);
+            Vector3 start = transform.position;
             _controller.Move(velocity * dt);
+            Vector3 travel = Vector3.ProjectOnPlane(transform.position - start, Vector3.up);
+            float actualSpeed = dt > 0f ? travel.magnitude / dt : 0f;
 
             if (characterAnimator != null)
             {
-                characterAnimator.SetFloat(SpeedHash, _currentSpeed, 0.08f, dt);
+                characterAnimator.SetFloat(SpeedHash, actualSpeed, 0.08f, dt);
                 characterAnimator.SetBool(GroundedHash, _controller.isGrounded);
             }
 
@@ -870,7 +907,7 @@ namespace Gridroam.Player
                     humanoid.SetLookAtPoint(false, Vector3.zero);
                 }
 
-                humanoid.SetLocomotion(_currentSpeed, _controller.isGrounded, _verticalVelocity);
+                humanoid.SetLocomotion(actualSpeed, _controller.isGrounded, _verticalVelocity, travel.normalized, sampleGround: true);
             }
         }
     }

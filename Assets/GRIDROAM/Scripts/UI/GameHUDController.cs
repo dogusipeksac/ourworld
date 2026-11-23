@@ -104,6 +104,8 @@ namespace Gridroam.UI
         private Coroutine _moneyPopRoutine;
         private Coroutine _dlgAnimRoutine;
         private Coroutine _failAnimRoutine;
+        private Text _tennisScoreText;
+        private int _tennisHudRevision = -1;
 
         // Interact prompt 0.15 s fade/slide state
         private CanvasGroup _interactCanvasGroup;
@@ -480,6 +482,7 @@ namespace Gridroam.UI
 
         private void HandleLanguageChanged(string _)
         {
+            _tennisHudRevision = -1;
             RefreshStaticLabels();
             if (MissionManager.Instance != null)
             {
@@ -539,7 +542,13 @@ namespace Gridroam.UI
 
         private void RefreshStaticLabels()
         {
-            if (exitCarLabel != null) exitCarLabel.text = LocalizationService.Tr("ui.btn.exit_car", "İn");
+            if (exitCarLabel != null)
+            {
+                bool cycling = PlayerModeController.Instance != null &&
+                               PlayerModeController.Instance.CurrentMode == ControlMode.Cycling;
+                exitCarLabel.text = cycling ? LocalizationService.Tr(RidingMotorcycle ? "ui.btn.exit_motorcycle" : "ui.btn.exit_bike") :
+                    LocalizationService.Tr("ui.btn.exit_car", "İn");
+            }
             if (dialogueContinueLabel != null) dialogueContinueLabel.text = LocalizationService.Tr("ui.btn.continue", "Devam");
             if (failedTitleText != null) failedTitleText.text = LocalizationService.Tr("ui.hud.mission_failed", "Görev Başarısız");
             if (retryButtonLabel != null) retryButtonLabel.text = LocalizationService.Tr("ui.btn.retry", "Tekrar Dene");
@@ -599,7 +608,13 @@ namespace Gridroam.UI
 
             // 3. Circular Speedometer + Gear + Fuel Bar while driving
             PlayerModeController player = PlayerModeController.Instance;
-            if (player != null && player.IsDriving && player.CurrentVehicle != null)
+            if (player != null && player.CurrentBicycle != null)
+            {
+                float kmh = player.CurrentBicycle.SpeedKmh;
+                if (speedText != null) speedText.text = Mathf.RoundToInt(kmh).ToString();
+                if (speedRingFillImage != null) speedRingFillImage.fillAmount = Mathf.Clamp01(kmh / player.CurrentBicycle.MaxSpeedKmh) * 0.75f;
+            }
+            else if (player != null && player.IsDriving && player.CurrentVehicle != null)
             {
                 var veh = player.CurrentVehicle;
                 float kmhFloat = veh.SpeedKmh;
@@ -630,6 +645,17 @@ namespace Gridroam.UI
                     float f = Mathf.Clamp01(veh.Fuel);
                     fuelFillImage.fillAmount = f;
                     fuelFillImage.color = f < 0.18f ? DangerRedColor : AccentTealColor;
+                }
+            }
+
+            if (player != null && _tennisScoreText != null && player.CurrentTennisCourt != null)
+            {
+                TennisCourt court = player.CurrentTennisCourt;
+                if (_tennisHudRevision != court.HudRevision)
+                {
+                    _tennisScoreText.text = court.HudText();
+                    _tennisScoreText.color = court.AcceptsHit ? AccentTealColor : OffWhiteColor;
+                    _tennisHudRevision = court.HudRevision;
                 }
             }
 
@@ -795,11 +821,30 @@ namespace Gridroam.UI
             _objectiveUnchangedSeconds = 0f;
         }
 
+        private static bool RidingMotorcycle => PlayerModeController.Instance?.CurrentBicycle?.IsMotorcycle == true;
+
         private void HandleModeChanged(ControlMode mode)
         {
             bool driving = mode == ControlMode.Driving;
-            if (onFootControlsRoot != null) onFootControlsRoot.SetActive(!driving);
-            if (drivingControlsRoot != null) drivingControlsRoot.SetActive(driving);
+            bool cycling = mode == ControlMode.Cycling;
+            bool tennis = mode == ControlMode.Tennis;
+            if (onFootControlsRoot != null) onFootControlsRoot.SetActive(!driving && !cycling);
+            if (drivingControlsRoot != null) drivingControlsRoot.SetActive(driving || cycling);
+            if (gearText != null) gearText.gameObject.SetActive(!cycling);
+            if (fuelFillImage != null) fuelFillImage.transform.parent.gameObject.SetActive(!cycling);
+            if (handbrakeButton != null) handbrakeButton.gameObject.SetActive(!cycling);
+            if (exitCarLabel != null)
+            {
+                exitCarLabel.text = cycling ? LocalizationService.Tr(RidingMotorcycle ? "ui.btn.exit_motorcycle" : "ui.btn.exit_bike") :
+                    LocalizationService.Tr("ui.btn.exit_car", "İn");
+            }
+            if (sprintButton != null) sprintButton.gameObject.SetActive(!tennis);
+            if (onFootControlsRoot != null)
+            {
+                Transform jump = onFootControlsRoot.transform.Find("Btn_Jump");
+                if (jump != null) jump.gameObject.SetActive(!tennis);
+            }
+            SetTennisScoreVisible(tennis);
 
             if (PlayerModeController.Instance != null)
             {
@@ -810,9 +855,50 @@ namespace Gridroam.UI
 
             if (editorHintText != null)
             {
-                editorHintText.text = driving
-                    ? LocalizationService.Tr("ui.hint.controls_drive")
-                    : LocalizationService.Tr("ui.hint.controls_foot");
+                editorHintText.text = LocalizationService.Tr(mode switch
+                {
+                    ControlMode.Driving => "ui.hint.controls_drive",
+                    ControlMode.Cycling => RidingMotorcycle ? "vehicle.motorcycle.controls" : "sports.bicycle.controls",
+                    ControlMode.Tennis => "sports.tennis.controls",
+                    _ => "ui.hint.controls_foot"
+                });
+            }
+        }
+
+        private void SetTennisScoreVisible(bool visible)
+        {
+            if (visible && _tennisScoreText == null && interactButtonLabel != null && interactButton != null)
+            {
+                GameObject panel = new GameObject("TennisScore", typeof(RectTransform), typeof(Image));
+                RectTransform frame = (RectTransform)panel.transform;
+                frame.SetParent(interactButton.transform.parent, false);
+                frame.anchorMin = frame.anchorMax = new Vector2(0.5f, 1f);
+                frame.pivot = new Vector2(0.5f, 1f);
+                frame.anchoredPosition = new Vector2(0f, -16f);
+                frame.sizeDelta = new Vector2(510f, 82f);
+                Image background = panel.GetComponent<Image>();
+                background.color = new Color(0.09f, 0.14f, 0.13f, 0.88f);
+                background.raycastTarget = false;
+
+                GameObject label = new GameObject("Score and instructions", typeof(RectTransform), typeof(Text));
+                RectTransform textRect = (RectTransform)label.transform;
+                textRect.SetParent(frame, false);
+                textRect.anchorMin = Vector2.zero;
+                textRect.anchorMax = Vector2.one;
+                textRect.offsetMin = new Vector2(12f, 6f);
+                textRect.offsetMax = new Vector2(-12f, -6f);
+                _tennisScoreText = label.GetComponent<Text>();
+                _tennisScoreText.font = interactButtonLabel.font;
+                _tennisScoreText.fontSize = 22;
+                _tennisScoreText.fontStyle = FontStyle.Bold;
+                _tennisScoreText.alignment = TextAnchor.MiddleCenter;
+                _tennisScoreText.raycastTarget = false;
+            }
+
+            if (_tennisScoreText != null)
+            {
+                _tennisScoreText.transform.parent.gameObject.SetActive(visible);
+                _tennisHudRevision = -1;
             }
         }
 
@@ -825,13 +911,16 @@ namespace Gridroam.UI
         {
             if (interactButton == null) return;
 
-            if (PlayerModeController.Instance != null && PlayerModeController.Instance.CurrentMode == ControlMode.Seated)
+            ControlMode mode = PlayerModeController.Instance != null
+                ? PlayerModeController.Instance.CurrentMode : ControlMode.OnFoot;
+            if (mode == ControlMode.Seated || mode == ControlMode.Tennis)
             {
                 _interactDesiredVisible = true;
                 if (!interactButton.gameObject.activeSelf) interactButton.gameObject.SetActive(true);
                 if (interactButtonLabel != null)
                 {
-                    interactButtonLabel.text = $"E · {LocalizationService.Tr("ui.btn.stand", "Kalk")}";
+                    string key = mode == ControlMode.Tennis ? "ui.btn.leave_tennis" : "ui.btn.stand";
+                    interactButtonLabel.text = $"E · {LocalizationService.Tr(key)}";
                 }
                 return;
             }
