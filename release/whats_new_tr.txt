@@ -1,6 +1,4 @@
-Bizim Dünyamız (Our World) v1.0.0 · Build 3 (Açık Dünya Yaşamı & İskeletli Animasyonlar)
-• Genişletilen Harita & Aydos Yeşil Vadi: 980×980 m açık dünya, 360° Aydos tepeleri, Aydos Çiftliği ve Sultanbeyli Göleti
-• Tarım & Hayvancılık: 16 bostan tarlasında ayçiçeği, domates, biber ve çilek yetiştirme; inek sağma, koyun kırpma, tavuklardan yumurta toplama ve Köy Pazarı satışı
-• No:73 Oto Tamir & Modifiye + Oto Yıkama: Hidrolik lifte çıkan müşteri araçlarını 3 aşamada tamir et; kendi aracına metalik boya, jant, rüzgarlık, tavan bagajı ve performans yükseltmeleri tak
-• Sultanbeyli Göleti Balıkçılık & Ev Dekorasyonu: İskeleden 5 balık türü avla, evin No:48'i lüks koltuk, akvaryum ve bahçe mangalıyla yenile
-• Yeni 3D Modeller & Gerçekçi İskelet Animasyonları: Blender MCP + CC0 iskeletli inek, koyun, tavuk, Kangal Karabaş, gölet ördekleri, balık, spor sedan ve 8 kanatlı yel değirmeni; 2-kemik IK sulama, süt sağımı, olta çekme ve doğal konuşma jestleri
+Bizim Dünyamız (Our World) v1.0.0 · Build 4 (Gece Işıklandırması & Gerçekçi Çiftlik Animasyonları)
+• Gece Işıklandırması & Görünürlük Düzeltmesi: Gece ACES karanlık ezilmesi giderildi; mahalle, Gürsu Sokağı, spor sahaları, yüzme havuzu, Aydos Çiftliği, Sultanbeyli Göleti ve ev/dükkan iç mekanları direkli sokak lambaları, stadyum projektörleri, çiftlik fenerleri ve güçlü araç farlarıyla gece de pırıl pırıl
+• Gerçekçi Çiftlik Etkileşimleri: Hasır yumurta sepetiyle yerden yumurta toplama, 3 ayaklı sağım taburesinde gerçek süt fışkırması ve kovada dolan süt seviyesiyle inek sağma, hareketli çift bıçaklı makas ve biriken yün yığınıyla koyun kırpma, yem kepçesiyle besleme/okşama ve animasyon doruğuna senkronize hasat
+• Açık Dünya Yaşamı: 980×980 m Aydos Yeşil Vadi, 16 bostan tarlası, No:73 Oto Tamir & Modifiye, Oto Yıkama, gölette balıkçılık ve ev dekorasyonu

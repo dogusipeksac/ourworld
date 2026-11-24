@@ -18,8 +18,34 @@ namespace OurWorld.EditorTools
             "OW_ShepherdDog",
             "OW_Chicken",
             "OW_PondDuck",
-            "OW_LakeFish"
+            "OW_LakeFish",
+            "OW_StreetCat",
+            "OW_StreetDog",
+            "OW_Pigeon",
+            "OW_LakeSwan",
+            "OW_FarmGoat"
         };
+
+        private bool IsOurWorldThemeTexture =>
+            !string.IsNullOrEmpty(assetPath) &&
+            assetPath.IndexOf("Assets/GRIDROAM/Resources/OurWorldTheme/Textures/", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        private void OnPreprocessTexture()
+        {
+            if (!IsOurWorldThemeTexture) return;
+            TextureImporter importer = assetImporter as TextureImporter;
+            if (importer == null) return;
+
+            bool isNormal = assetPath.IndexOf("_normal.", StringComparison.OrdinalIgnoreCase) >= 0;
+            importer.textureType = isNormal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            importer.sRGBTexture = !isNormal;
+            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.filterMode = FilterMode.Trilinear;
+            importer.anisoLevel = 4;
+            importer.mipmapEnabled = true;
+            importer.maxTextureSize = 512;
+            importer.textureCompression = TextureImporterCompression.Compressed;
+        }
 
         private bool IsOurWorldLifeFbx =>
             !string.IsNullOrEmpty(assetPath) &&

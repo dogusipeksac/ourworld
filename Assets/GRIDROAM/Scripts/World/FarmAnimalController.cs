@@ -47,7 +47,9 @@ namespace OurWorld.World
         private bool _productReady;
         private float _soundCooldown;
         private float _happyAnimTimer;
+        private float _feedEatingTimer;
         private float _woolScaleCurrent = 1f;
+        private float _shearVisualBlend;
         private float _tailFlickTimer;
         private float _tailFlickCooldown = 3.5f;
         private float _animSeed;
@@ -157,6 +159,10 @@ namespace OurWorld.World
             {
                 _happyAnimTimer = Mathf.Max(0f, _happyAnimTimer - dt);
             }
+            if (_feedEatingTimer > 0f)
+            {
+                _feedEatingTimer = Mathf.Max(0f, _feedEatingTimer - dt);
+            }
 
             float tNow = Time.time + _animSeed;
 
@@ -190,6 +196,11 @@ namespace OurWorld.World
                     if (!_skeletal.PlayClip("Happy", 0.14f, 1.15f))
                         _skeletal.PlayClip("Idle", 0.14f, 1.2f);
                 }
+                else if (_feedEatingTimer > 0f)
+                {
+                    if (!_skeletal.PlayClip("Eating", 0.24f, 1.15f))
+                        _skeletal.PlayClip("Idle", 0.24f, 1.0f);
+                }
                 else if (walking)
                 {
                     float walkSpd = _kind == FarmAnimalKind.Chicken ? 1.25f : (_kind == FarmAnimalKind.Sheep ? 1.10f : 0.95f);
@@ -213,14 +224,18 @@ namespace OurWorld.World
                     }
                 }
 
-                // Visual sheared wool feedback on rigged Sheep (subtle slimmer coat & warmer sheared cream tint!)
+                // Visual sheared wool feedback on rigged Sheep (live progressive shrink during shearing + regrowth!)
                 if (_kind == FarmAnimalKind.Sheep && _visualRoot != null)
                 {
                     float targetWool = _productReady
-                        ? 1f
+                        ? Mathf.Lerp(1f, 0.88f, _shearVisualBlend)
                         : Mathf.Lerp(0.88f, 0.98f, Mathf.Clamp01(1f - (_produceTimer / Mathf.Max(1f, _produceInterval))));
-                    _woolScaleCurrent = Mathf.Lerp(_woolScaleCurrent, targetWool, 1f - Mathf.Exp(-5f * dt));
+                    _woolScaleCurrent = Mathf.Lerp(_woolScaleCurrent, targetWool, 1f - Mathf.Exp(-7f * dt));
                     _visualRoot.localScale = new Vector3(_woolScaleCurrent, 1f, _woolScaleCurrent);
+                    if (_productReady && _shearVisualBlend <= 0.01f)
+                    {
+                        // Regrown lush snowy white wool!
+                    }
                 }
 
                 if (_readyVisual != null && _readyVisual.activeSelf && _kind != FarmAnimalKind.Chicken)
@@ -411,82 +426,164 @@ namespace OurWorld.World
             }
         }
 
-        public void PauseForInteraction(float seconds = 3.2f)
+        public void PauseForInteraction(float seconds = 3.6f)
         {
             _idleTimer = Mathf.Max(_idleTimer, seconds);
         }
 
+        private void ApplySheepWoolTint(float sheared01)
+        {
+            if (_kind != FarmAnimalKind.Sheep || _visualRoot == null) return;
+            _shearVisualBlend = Mathf.Clamp01(sheared01);
+            Color woolCol = Color.Lerp(new Color(0.96f, 0.94f, 0.89f), new Color(0.82f, 0.74f, 0.62f), _shearVisualBlend);
+            OurWorldModelLibrary.TintMaterialByKeyword(_visualRoot.gameObject, "SheepWool", woolCol);
+        }
+
         public void Interact(PlayerModeController mode)
         {
-            if (mode == null) return;
-            _idleTimer = 3.2f;
+            if (mode == null || PlayerActionAnimator.IsBusyOn(mode)) return;
 
-            // Face player gently
-            Vector3 toP = mode.ActiveWorldPosition - transform.position;
-            toP.y = 0f;
-            if (toP.sqrMagnitude > 0.04f)
-            {
-                transform.rotation = Quaternion.LookRotation(toP.normalized, Vector3.up);
-            }
-
-            PlayAnimalSound();
-            _happyAnimTimer = 1.35f;
-            PlayerActionKind animKind = _productReady
-                ? (_kind == FarmAnimalKind.Cow ? PlayerActionKind.MilkCow
-                    : (_kind == FarmAnimalKind.Sheep ? PlayerActionKind.ShearSheep : PlayerActionKind.FarmHarvest))
-                : PlayerActionKind.InspectReach;
-            PlayerActionAnimator.Play(mode, transform, animKind);
+            // Keep animal calm & stationary during the entire physical interaction (NEVER snap nose-to-nose during flank milking/shearing!)
+            PauseForInteraction(4.2f);
 
             if (_productReady)
             {
-                _productReady = false;
-                _produceTimer = _produceInterval;
-                FarmEconomyManager.AddAnimalProduct(_kind, 1);
-                RefreshReadyVisualsAndPrompt();
-
-                GameFeelAudio.PlayCoinChime();
-
-                Color burstCol;
-                string bubble;
-                string status;
-
                 if (_kind == FarmAnimalKind.Chicken)
                 {
-                    burstCol = new Color(1.0f, 0.94f, 0.72f);
-                    bubble = IsEn ? "Bawk-bawk! (+1 Fresh Egg)" : "Gıt-gıt-gıdak! (+1 Köy Yumurtası)";
-                    status = IsEn ? $"Collected +1 Fresh Egg from {_displayName}!" : $"{_displayName} kümesten +1 Taze Köy Yumurtası verdi!";
+                    // Target the actual 3D egg resting on the grass so Deniz walks to IT, squats, picks it up & places it in his wicker basket!
+                    Transform eggTarget = (_readyVisual != null && _readyVisual.activeSelf) ? _readyVisual.transform : transform;
+                    bool groundEggHidden = false;
+                    string startMsg = IsEn ? $"Reaching down for {_displayName}'s fresh egg..." : $"{_displayName}'nin yumurtası toplanıyor...";
+
+                    PlayerActionAnimator.Play(
+                        mode,
+                        eggTarget,
+                        PlayerActionKind.CollectEgg,
+                        onClimax: () =>
+                        {
+                            _productReady = false;
+                            _produceTimer = _produceInterval;
+                            FarmEconomyManager.AddAnimalProduct(_kind, 1);
+                            RefreshReadyVisualsAndPrompt();
+
+                            PlayAnimalSound();
+                            _happyAnimTimer = 1.35f;
+                            GameFeelAudio.PlayCoinChime();
+                            GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.7f, new Color(1.0f, 0.94f, 0.72f), count: 12, spread: 0.48f);
+                            string bubble = IsEn ? "Bawk-bawk! (+1 Fresh Egg)" : "Gıt-gıt-gıdak! (+1 Köy Yumurtası)";
+                            string status = IsEn ? $"Collected +1 Fresh Egg from {_displayName}!" : $"{_displayName} kümesten +1 Taze Köy Yumurtası verdi!";
+                            NpcSpeechBubbleManager.Say(transform, _displayName, bubble, 3.0f, NpcBubbleMood.Friendly, 1.35f);
+                            mode.RaiseStatusMessage(status);
+                        },
+                        startStatus: startMsg,
+                        onProgress: p =>
+                        {
+                            // Hide the ground egg at the exact millisecond Deniz's right fingers grasp it!
+                            if (!groundEggHidden && p >= 0.45f)
+                            {
+                                groundEggHidden = true;
+                                if (_readyVisual != null) _readyVisual.SetActive(false);
+                            }
+                        });
                 }
                 else if (_kind == FarmAnimalKind.Cow)
                 {
-                    burstCol = new Color(0.95f, 0.98f, 1.0f);
-                    bubble = IsEn ? "Moooo! (+1 Organic Milk)" : "Möööö! (+1 Taze Süt)";
-                    status = IsEn ? $"Milked {_displayName}: +1 Fresh Organic Milk!" : $"{_displayName} sağıldı: +1 Organik Taze Süt!";
+                    // Cow stands calmly while Deniz approaches her flank, crouches on stool, milks into rising pail, and celebrates on climax!
+                    string startMsg = IsEn ? $"Milking {_displayName}..." : $"{_displayName} sağılıyor...";
+
+                    PlayerActionAnimator.Play(
+                        mode,
+                        transform,
+                        PlayerActionKind.MilkCow,
+                        onClimax: () =>
+                        {
+                            _productReady = false;
+                            _produceTimer = _produceInterval;
+                            FarmEconomyManager.AddAnimalProduct(_kind, 1);
+                            RefreshReadyVisualsAndPrompt();
+
+                            PlayAnimalSound();
+                            _happyAnimTimer = 1.45f;
+                            GameFeelAudio.PlayCoinChime();
+                            GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.0f, new Color(0.95f, 0.98f, 1.0f), count: 14, spread: 0.55f);
+                            string bubble = IsEn ? "Moooo! (+1 Organic Milk)" : "Möööö! (+1 Taze Süt)";
+                            string status = IsEn ? $"Milked {_displayName}: +1 Fresh Organic Milk!" : $"{_displayName} sağıldı: +1 Organik Taze Süt!";
+                            NpcSpeechBubbleManager.Say(transform, _displayName, bubble, 3.0f, NpcBubbleMood.Friendly, 2.0f);
+                            mode.RaiseStatusMessage(status);
+                        },
+                        startStatus: startMsg);
                 }
                 else
                 {
-                    burstCol = new Color(0.96f, 0.94f, 0.88f);
-                    bubble = IsEn ? "Baaaa! (+1 Natural Wool)" : "Meeee! (+1 Doğal Yün)";
-                    status = IsEn ? $"Sheared {_displayName}: +1 Natural Wool!" : $"{_displayName} kırpıldı: +1 Doğal Koyun Yünü!";
-                }
+                    // Sheep stands calmly while Deniz shears 3 passes along its flank; fleece visibly thins live across every pass!
+                    string startMsg = IsEn ? $"Shearing {_displayName}'s wool..." : $"{_displayName}'nin yünü kırpılıyor...";
 
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.9f, burstCol, count: 14, spread: 0.55f);
-                NpcSpeechBubbleManager.Say(transform, _displayName, bubble, 3.0f, NpcBubbleMood.Friendly, _kind == FarmAnimalKind.Cow ? 2.0f : 1.35f);
-                mode.RaiseStatusMessage(status);
+                    PlayerActionAnimator.Play(
+                        mode,
+                        transform,
+                        PlayerActionKind.ShearSheep,
+                        onClimax: () =>
+                        {
+                            _productReady = false;
+                            _produceTimer = _produceInterval;
+                            ApplySheepWoolTint(1f);
+                            FarmEconomyManager.AddAnimalProduct(_kind, 1);
+                            RefreshReadyVisualsAndPrompt();
+
+                            PlayAnimalSound();
+                            _happyAnimTimer = 1.40f;
+                            GameFeelAudio.PlayCoinChime();
+                            GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(0.96f, 0.94f, 0.88f), count: 14, spread: 0.55f);
+                            string bubble = IsEn ? "Baaaa! (+1 Natural Wool)" : "Meeee! (+1 Doğal Yün)";
+                            string status = IsEn ? $"Sheared {_displayName}: +1 Natural Wool!" : $"{_displayName} kırpıldı: +1 Doğal Koyun Yünü!";
+                            NpcSpeechBubbleManager.Say(transform, _displayName, bubble, 3.0f, NpcBubbleMood.Friendly, 1.35f);
+                            mode.RaiseStatusMessage(status);
+                        },
+                        startStatus: startMsg,
+                        onProgress: p =>
+                        {
+                            ApplySheepWoolTint(p);
+                        });
+                }
             }
             else
             {
-                // Feeding / petting makes the animal happy and cuts remaining cooldown in half!
-                _produceTimer = Mathf.Max(2f, _produceTimer * 0.45f);
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(0.98f, 0.45f, 0.58f), count: 8, spread: 0.4f);
-                string happy = _kind == FarmAnimalKind.Chicken
-                    ? (IsEn ? "Cluck! Loves the feed!" : "Gıdak! Yemi çok sevdi!")
-                    : (_kind == FarmAnimalKind.Cow
-                        ? (IsEn ? "Moo! Happy & fed!" : "Möö! Yemini yedi, çok mutlu!")
-                        : (IsEn ? "Baa! Wool growing faster!" : "Mee! Yünü hızla uzuyor!"));
-                NpcSpeechBubbleManager.Say(transform, _displayName, happy, 2.6f, NpcBubbleMood.Friendly, _kind == FarmAnimalKind.Cow ? 2.0f : 1.35f);
-                mode.RaiseStatusMessage(IsEn
-                    ? $"Fed & petted {_displayName}! Ready soon."
-                    : $"{_displayName} beslendi ve sevildi! Çok yakında hazır.");
+                // Feed & Pet: animal faces gently toward Deniz, eats scattered golden grain, and enjoys affectionate petting!
+                Vector3 toP = mode.ActiveWorldPosition - transform.position;
+                toP.y = 0f;
+                if (toP.sqrMagnitude > 0.04f)
+                {
+                    transform.rotation = Quaternion.LookRotation(toP.normalized, Vector3.up);
+                }
+                string startMsg = IsEn ? $"Feeding & petting {_displayName}..." : $"{_displayName} besleniyor ve seviliyor...";
+
+                PlayerActionAnimator.Play(
+                    mode,
+                    transform,
+                    PlayerActionKind.FeedAndPetAnimal,
+                    onClimax: () =>
+                    {
+                        _produceTimer = Mathf.Max(2f, _produceTimer * 0.45f);
+                        PlayAnimalSound();
+                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(0.98f, 0.45f, 0.58f), count: 10, spread: 0.45f);
+                        string happy = _kind == FarmAnimalKind.Chicken
+                            ? (IsEn ? "Cluck! Loves the feed!" : "Gıdak! Yemi çok sevdi!")
+                            : (_kind == FarmAnimalKind.Cow
+                                ? (IsEn ? "Moo! Happy & fed!" : "Möö! Yemini yedi, çok mutlu!")
+                                : (IsEn ? "Baa! Wool growing faster!" : "Mee! Yünü hızla uzuyor!"));
+                        NpcSpeechBubbleManager.Say(transform, _displayName, happy, 2.6f, NpcBubbleMood.Friendly, _kind == FarmAnimalKind.Cow ? 2.0f : 1.35f);
+                        mode.RaiseStatusMessage(IsEn
+                            ? $"Fed & petted {_displayName}! Ready soon."
+                            : $"{_displayName} beslendi ve sevildi! Çok yakında hazır.");
+                    },
+                    startStatus: startMsg,
+                    onProgress: p =>
+                    {
+                        if (p >= 0.45f)
+                        {
+                            _feedEatingTimer = 3.2f;
+                        }
+                    });
             }
         }
 
@@ -519,6 +616,7 @@ namespace OurWorld.World
 
             if (_kind == FarmAnimalKind.Sheep)
             {
+                ApplySheepWoolTint(_productReady ? 0f : 1f);
                 for (int i = 0; i < _woolPuffs.Count; i++)
                 {
                     if (_woolPuffs[i] != null) _woolPuffs[i].SetActive(_productReady);

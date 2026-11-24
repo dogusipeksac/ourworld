@@ -120,7 +120,9 @@ namespace OurWorld.Player
                 InputHub.Instance.OnInteractPressed += HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed += HandleExitVehiclePressed;
                 InputHub.Instance.OnAttackPressed += HandleSportAction;
+                InputHub.Instance.OnAttackReleased += HandleSportActionReleased;
                 InputHub.Instance.OnJumpPressed += HandleSportSecondaryAction;
+                InputHub.Instance.OnJumpReleased += HandleSportSecondaryActionReleased;
             }
 
             if (SaveManager.Instance != null)
@@ -143,7 +145,9 @@ namespace OurWorld.Player
                 InputHub.Instance.OnInteractPressed -= HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed -= HandleExitVehiclePressed;
                 InputHub.Instance.OnAttackPressed -= HandleSportAction;
+                InputHub.Instance.OnAttackReleased -= HandleSportActionReleased;
                 InputHub.Instance.OnJumpPressed -= HandleSportSecondaryAction;
+                InputHub.Instance.OnJumpReleased -= HandleSportSecondaryActionReleased;
             }
 
             if (SaveManager.Instance != null)
@@ -1122,9 +1126,43 @@ namespace OurWorld.Player
                 return;
             }
 
+            if (_currentTennisCourt != null)
+            {
+                _currentTennisCourt.TriggerSecondaryAction();
+                return;
+            }
+
             if (_currentArenaSport != null)
             {
                 _currentArenaSport.TriggerSecondaryAction();
+            }
+        }
+
+        private void HandleSportActionReleased(float holdSeconds)
+        {
+            if (IsModalLocked) return;
+            if (_currentTennisCourt != null)
+            {
+                _currentTennisCourt.TriggerPrimaryRelease(holdSeconds);
+                return;
+            }
+            if (_currentArenaSport != null)
+            {
+                _currentArenaSport.TriggerPrimaryRelease(holdSeconds);
+            }
+        }
+
+        private void HandleSportSecondaryActionReleased(float holdSeconds)
+        {
+            if (IsModalLocked) return;
+            if (_currentTennisCourt != null)
+            {
+                _currentTennisCourt.TriggerSecondaryRelease(holdSeconds);
+                return;
+            }
+            if (_currentArenaSport != null)
+            {
+                _currentArenaSport.TriggerSecondaryRelease(holdSeconds);
             }
         }
 

@@ -23,6 +23,15 @@ namespace OurWorld.Core
         private AudioClip _carHornClip;
         private AudioClip _prayerChimeClip;
         private AudioClip _doorLatchClip;
+        private AudioClip _milkSquirtClip;
+        private AudioClip _shearSnipClip;
+        private AudioClip _eggPickupClip;
+        private AudioClip _whistleClip;
+        private AudioClip _crowdCheerClip;
+        private AudioClip _goalpostClangClip;
+        private AudioClip _volleyBlockClip;
+        private AudioClip _slideWhooshClip;
+        private Coroutine _hitstopRoutine;
         private Material _burstMat;
         private float _lastHornTime = -99f;
 
@@ -63,6 +72,14 @@ namespace OurWorld.Core
             _carHornClip = BuildCarHornClip(sr);
             _prayerChimeClip = BuildPrayerChimeClip(sr);
             _doorLatchClip = BuildDoorLatchClip(sr);
+            _milkSquirtClip = BuildMilkSquirtClip(sr);
+            _shearSnipClip = BuildShearSnipClip(sr);
+            _eggPickupClip = BuildEggPickupClip(sr);
+            _whistleClip = BuildRefereeWhistleClip(sr);
+            _crowdCheerClip = BuildCrowdCheerClip(sr);
+            _goalpostClangClip = BuildGoalpostClangClip(sr);
+            _volleyBlockClip = BuildVolleyBlockClip(sr);
+            _slideWhooshClip = BuildSlideWhooshClip(sr);
 
             Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
             if (urpLit == null) urpLit = Shader.Find("Sprites/Default");
@@ -83,6 +100,15 @@ namespace OurWorld.Core
             if (_carHornClip != null) Destroy(_carHornClip);
             if (_prayerChimeClip != null) Destroy(_prayerChimeClip);
             if (_doorLatchClip != null) Destroy(_doorLatchClip);
+            if (_milkSquirtClip != null) Destroy(_milkSquirtClip);
+            if (_shearSnipClip != null) Destroy(_shearSnipClip);
+            if (_eggPickupClip != null) Destroy(_eggPickupClip);
+            if (_whistleClip != null) Destroy(_whistleClip);
+            if (_crowdCheerClip != null) Destroy(_crowdCheerClip);
+            if (_goalpostClangClip != null) Destroy(_goalpostClangClip);
+            if (_volleyBlockClip != null) Destroy(_volleyBlockClip);
+            if (_slideWhooshClip != null) Destroy(_slideWhooshClip);
+            if (_hitstopRoutine != null) Time.timeScale = 1f;
             if (_burstMat != null) Destroy(_burstMat);
             if (Instance == this) Instance = null;
         }
@@ -137,6 +163,82 @@ namespace OurWorld.Core
         {
             GameFeelAudio inst = EnsureInstance();
             inst.PlayOneShotPitched(inst._doorLatchClip, 0.26f, 0.92f, 1.08f);
+        }
+
+        public static void PlayMilkSquirt(float fill01 = 0.5f)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            // Pail resonance pitch gently rises as the milk bucket fills up!
+            float p = Mathf.Lerp(0.88f, 1.24f, Mathf.Clamp01(fill01));
+            inst.PlayOneShotPitched(inst._milkSquirtClip, 0.34f, p * 0.96f, p * 1.04f);
+        }
+
+        public static void PlayShearSnip()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._shearSnipClip, 0.30f, 0.90f, 1.14f);
+        }
+
+        public static void PlayEggPickup()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._eggPickupClip, 0.28f, 0.94f, 1.08f);
+        }
+
+        public static void PlayRefereeWhistle(bool doubleBlast = false)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._whistleClip, 0.28f, 0.98f, 1.03f);
+            if (doubleBlast && inst.isActiveAndEnabled)
+            {
+                inst.StartCoroutine(inst.DelayedWhistleRoutine(0.24f));
+            }
+        }
+
+        public static void PlayCrowdCheer(bool bigCheer = true)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._crowdCheerClip, bigCheer ? 0.34f : 0.22f, bigCheer ? 0.96f : 1.04f, bigCheer ? 1.05f : 1.12f);
+        }
+
+        public static void PlayGoalpostClang()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._goalpostClangClip, 0.42f, 0.95f, 1.05f);
+        }
+
+        public static void PlayVolleyBlockThud()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._volleyBlockClip, 0.44f, 0.93f, 1.07f);
+        }
+
+        public static void PlaySlideWhoosh()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._slideWhooshClip, 0.34f, 0.92f, 1.08f);
+        }
+
+        public static void TriggerHitstop(float unscaledSeconds = 0.042f)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            if (!inst.isActiveAndEnabled) return;
+            if (inst._hitstopRoutine != null) inst.StopCoroutine(inst._hitstopRoutine);
+            inst._hitstopRoutine = inst.StartCoroutine(inst.HitstopRoutine(Mathf.Clamp(unscaledSeconds, 0.015f, 0.075f)));
+        }
+
+        private IEnumerator DelayedWhistleRoutine(float delay)
+        {
+            yield return new WaitForSecondsRealtime(delay);
+            PlayOneShotPitched(_whistleClip, 0.26f, 1.02f, 1.07f);
+        }
+
+        private IEnumerator HitstopRoutine(float duration)
+        {
+            Time.timeScale = 0.08f;
+            yield return new WaitForSecondsRealtime(duration);
+            Time.timeScale = 1f;
+            _hitstopRoutine = null;
         }
 
         public static void SpawnBurst(Vector3 worldPos, Color color, int count = 10, float spread = 0.55f)
@@ -388,6 +490,207 @@ namespace OurWorld.Core
             }
             ApplyFade(data, sr, 3f);
             AudioClip clip = AudioClip.Create("SFX_DoorLatch", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildMilkSquirtClip(int sr)
+        {
+            // Crisp liquid stream into metal pail: bandpass liquid hiss + soft tin resonance
+            int len = Mathf.RoundToInt(sr * 0.19f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(6142);
+            float lp = 0f;
+            float hp = 0f;
+            double ph = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.22f * (white - lp);
+                hp += 0.06f * (lp - hp);
+                float jet = (lp - hp) * 1.45f;
+
+                float tinFreq = Mathf.Lerp(560f, 410f, t);
+                ph += (2.0 * Math.PI * tinFreq) / sr;
+                float tin = (float)Math.Sin(ph) * 0.22f * Mathf.Exp(-t * 7f);
+
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.18f) * Mathf.PI * 0.5f) *
+                            Mathf.Pow(1f - t, 0.85f);
+                data[i] = Mathf.Clamp((jet * 0.65f + tin) * env * 0.62f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 4f);
+            AudioClip clip = AudioClip.Create("SFX_MilkSquirt", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildShearSnipClip(int sr)
+        {
+            // Authentic metallic double-blade sheep-shears "snip-snip" slide + crisp blade click
+            int len = Mathf.RoundToInt(sr * 0.12f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(8391);
+            float prev = 0f;
+            double p1 = 0.0, p2 = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                float high = white - prev * 0.72f;
+                prev = white;
+
+                p1 += (2.0 * Math.PI * Mathf.Lerp(2650f, 3400f, t)) / sr;
+                p2 += (2.0 * Math.PI * 4280.0) / sr;
+                float metal = (float)(Math.Sin(p1) * 0.28 + Math.Sin(p2) * 0.16);
+
+                // Quick blade scrape followed by crisp tip-snap around t=0.65
+                float scrapeEnv = Mathf.Exp(-t * 10f);
+                float snapEnv = Mathf.Exp(-Mathf.Abs(t - 0.62f) * 42f);
+                float s = (high * 0.55f * scrapeEnv + metal * (0.45f * scrapeEnv + 0.85f * snapEnv));
+                data[i] = Mathf.Clamp(s * 0.58f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 3f);
+            AudioClip clip = AudioClip.Create("SFX_ShearSnip", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildEggPickupClip(int sr)
+        {
+            // Warm gentle organic pop/nestle when lifting an egg or placing it into straw basket
+            int len = Mathf.RoundToInt(sr * 0.13f);
+            float[] data = new float[len];
+            double ph = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float freq = Mathf.Lerp(320f, 640f, Mathf.SmoothStep(0f, 1f, t));
+                ph += (2.0 * Math.PI * freq) / sr;
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.16f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 14f);
+                data[i] = (float)Math.Sin(ph) * env * 0.48f;
+            }
+            ApplyFade(data, sr, 3f);
+            AudioClip clip = AudioClip.Create("SFX_EggPickup", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildRefereeWhistleClip(int sr)
+        {
+            // Authentic sports pea-whistle with dual harmonic resonance & 36 Hz pea trill
+            int len = Mathf.RoundToInt(sr * 0.28f);
+            float[] data = new float[len];
+            double p1 = 0.0, p2 = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float trill = 0.72f + 0.28f * Mathf.Sin(t * 2f * Mathf.PI * 10.5f);
+                float f1 = 2740f + 95f * Mathf.Sin(t * 2f * Mathf.PI * 10.5f);
+                float f2 = f1 * 1.062f;
+                p1 += (2.0 * Math.PI * f1) / sr;
+                p2 += (2.0 * Math.PI * f2) / sr;
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.12f) * Mathf.PI * 0.5f) *
+                            Mathf.Clamp01((1f - t) / 0.18f);
+                data[i] = Mathf.Clamp(((float)Math.Sin(p1) * 0.52f + (float)Math.Sin(p2) * 0.26f) * trill * env * 0.56f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 4f);
+            AudioClip clip = AudioClip.Create("SFX_RefereeWhistle", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildCrowdCheerClip(int sr)
+        {
+            // Warm cheering neighborhood stadium swell + rhythmic clap shimmer
+            int len = Mathf.RoundToInt(sr * 1.15f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(9421);
+            float lp1 = 0f, lp2 = 0f, hp = 0f;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp1 += 0.18f * (white - lp1);
+                lp2 += 0.06f * (lp1 - lp2);
+                hp += 0.015f * (lp2 - hp);
+                float voiceBand = (lp2 - hp) * 2.4f;
+                float claps = (lp1 - lp2) * (0.45f + 0.55f * Mathf.Abs(Mathf.Sin(t * 26f)));
+                float swell = Mathf.Sin(Mathf.Clamp01(t / 0.22f) * Mathf.PI * 0.5f) * Mathf.Pow(1f - t, 0.9f);
+                data[i] = Mathf.Clamp((voiceBand * 0.65f + claps * 0.35f) * swell * 0.62f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 8f);
+            AudioClip clip = AudioClip.Create("SFX_CrowdCheer", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildGoalpostClangClip(int sr)
+        {
+            // Ringing metallic steel goalpost "DANG!" impact with inharmonic overtones
+            int len = Mathf.RoundToInt(sr * 0.42f);
+            float[] data = new float[len];
+            double p1 = 0.0, p2 = 0.0, p3 = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                p1 += (2.0 * Math.PI * 525.0) / sr;
+                p2 += (2.0 * Math.PI * 1190.0) / sr;
+                p3 += (2.0 * Math.PI * 1945.0) / sr;
+                float s = (float)(Math.Sin(p1) * 0.55 * Math.Exp(-t * 6.5) +
+                                  Math.Sin(p2) * 0.38 * Math.Exp(-t * 9.5) +
+                                  Math.Sin(p3) * 0.24 * Math.Exp(-t * 14.0));
+                data[i] = Mathf.Clamp(s * 0.78f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_GoalpostClang", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildVolleyBlockClip(int sr)
+        {
+            // Punchy two-hand roof block thud + tight palm slap
+            int len = Mathf.RoundToInt(sr * 0.16f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(3347);
+            float lp = 0f;
+            double ph = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float freq = Mathf.Lerp(185f, 58f, t);
+                ph += (2.0 * Math.PI * freq) / sr;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.35f * (white - lp);
+                float body = (float)Math.Sin(ph) * Mathf.Exp(-t * 12f) * 0.78f;
+                float slap = lp * Mathf.Exp(-t * 22f) * 0.55f;
+                data[i] = Mathf.Clamp((body + slap) * 0.85f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_VolleyBlock", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildSlideWhooshClip(int sr)
+        {
+            // Gritty turf / beach sand sliding whoosh for tackles and volleyball dive saves
+            int len = Mathf.RoundToInt(sr * 0.34f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(7192);
+            float lp = 0f, hp = 0f;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += Mathf.Lerp(0.32f, 0.10f, t) * (white - lp);
+                hp += 0.04f * (lp - hp);
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.15f) * Mathf.PI * 0.5f) * Mathf.Pow(1f - t, 1.2f);
+                data[i] = Mathf.Clamp((lp - hp) * env * 1.15f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 4f);
+            AudioClip clip = AudioClip.Create("SFX_SlideWhoosh", len, 1, sr, false);
             clip.SetData(data, 0);
             return clip;
         }

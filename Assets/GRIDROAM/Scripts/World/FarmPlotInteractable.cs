@@ -196,9 +196,9 @@ namespace OurWorld.World
 
         public void Interact(PlayerModeController mode)
         {
-            if (mode == null) return;
+            if (mode == null || PlayerActionAnimator.IsBusyOn(mode)) return;
 
-            // 1. Empty plot -> Plant selected seed!
+            // 1. Empty plot -> Plant selected seed (sprouts right when Deniz finishes patting the soil!)
             if (_crop == FarmCropType.None)
             {
                 FarmCropSpec spec = FarmEconomyManager.SelectedCropSpec;
@@ -210,88 +210,116 @@ namespace OurWorld.World
                     return;
                 }
 
-                if (SaveManager.Instance != null)
-                {
-                    SaveManager.Instance.TrySpend(spec.SeedCost);
-                }
+                PlayerActionAnimator.Play(
+                    mode,
+                    transform,
+                    PlayerActionKind.FarmPlantAndDig,
+                    onClimax: () =>
+                    {
+                        if (SaveManager.Instance != null)
+                        {
+                            SaveManager.Instance.TrySpend(spec.SeedCost);
+                        }
 
-                _crop = spec.Type;
-                _growthProgress = 0.04f;
-                bool autoWater = (FarmEconomyManager.Data != null && FarmEconomyManager.Data.hasAutoSprinkler) ||
-                                 (NeighborhoodWeatherSystem.Instance != null &&
-                                  NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower);
-                _isWatered = autoWater;
+                        _crop = spec.Type;
+                        _growthProgress = 0.04f;
+                        bool autoWater = (FarmEconomyManager.Data != null && FarmEconomyManager.Data.hasAutoSprinkler) ||
+                                         (NeighborhoodWeatherSystem.Instance != null &&
+                                          NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower);
+                        _isWatered = autoWater;
 
-                SaveToEntry(persistDisk: true);
-                RefreshSoilAndVisuals(force: true);
-                RefreshPrompt();
+                        SaveToEntry(persistDisk: true);
+                        RefreshSoilAndVisuals(force: true);
+                        RefreshPrompt();
 
-                PlayerActionAnimator.Play(mode, transform, PlayerActionKind.FarmPlantAndDig);
-                GameFeelAudio.PlayUiClick();
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.35f, new Color(0.42f, 0.78f, 0.28f), count: 8, spread: 0.45f);
-                mode.RaiseStatusMessage(IsEn
-                    ? $"Planted {spec.NameEn} (-{spec.SeedCost} ₺)! {(autoWater ? "Auto-watered!" : "Tap again to water it.")}"
-                    : $"{spec.NameTr} tohumu ekildi (-{spec.SeedCost} ₺)! {(autoWater ? "Otomatik sulandı!" : "Şimdi sulayarak hızla büyüt.")}");
+                        GameFeelAudio.PlayEggPickup();
+                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.35f, new Color(0.42f, 0.78f, 0.28f), count: 8, spread: 0.45f);
+                        mode.RaiseStatusMessage(IsEn
+                            ? $"Planted {spec.NameEn} (-{spec.SeedCost} ₺)! {(autoWater ? "Auto-watered!" : "Tap again to water it.")}"
+                            : $"{spec.NameTr} tohumu ekildi (-{spec.SeedCost} ₺)! {(autoWater ? "Otomatik sulandı!" : "Şimdi sulayarak hızla büyüt.")}");
+                    },
+                    startStatus: IsEn ? $"Planting {spec.NameEn}..." : $"{spec.NameTr} tohumu ekiliyor...");
                 return;
             }
 
-            // 2. Ripe crop -> Harvest!
+            // 2. Ripe crop -> Harvest physically into wicker basket on climax!
             if (IsRipe)
             {
                 FarmCropType harvested = _crop;
                 FarmCropSpec spec = FarmEconomyManager.GetCropSpec(harvested);
-                int yieldCount = Random.value < 0.25f ? 2 : 1; // Occasional bountiful double harvest!
-
-                _crop = FarmCropType.None;
-                _growthProgress = 0f;
-                _isWatered = false;
-
-                SaveToEntry(persistDisk: false);
-                FarmEconomyManager.AddCropHarvest(harvested, yieldCount);
-                RefreshSoilAndVisuals(force: true);
-                RefreshPrompt();
-
-                PlayerActionAnimator.Play(mode, transform, PlayerActionKind.FarmHarvest);
-                GameFeelAudio.PlayCoinChime();
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.65f, spec.FruitColor, count: 14, spread: 0.55f);
-
                 string cropName = IsEn ? spec.NameEn : spec.NameTr;
-                mode.RaiseStatusMessage(IsEn
-                    ? $"Harvested +{yieldCount} fresh {cropName}! Sell at Farm Market or Selman Market."
-                    : $"+{yieldCount} taze {cropName} hasat edildi! Köy Tezgâhı veya Selman Bakkal'da satabilirsin.");
+
+                PlayerActionAnimator.Play(
+                    mode,
+                    transform,
+                    PlayerActionKind.FarmHarvest,
+                    onClimax: () =>
+                    {
+                        int yieldCount = Random.value < 0.25f ? 2 : 1;
+                        _crop = FarmCropType.None;
+                        _growthProgress = 0f;
+                        _isWatered = false;
+
+                        SaveToEntry(persistDisk: false);
+                        FarmEconomyManager.AddCropHarvest(harvested, yieldCount);
+                        RefreshSoilAndVisuals(force: true);
+                        RefreshPrompt();
+
+                        GameFeelAudio.PlayCoinChime();
+                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.65f, spec.FruitColor, count: 14, spread: 0.55f);
+                        mode.RaiseStatusMessage(IsEn
+                            ? $"Harvested +{yieldCount} fresh {cropName}! Sell at Farm Market or Selman Market."
+                            : $"+{yieldCount} taze {cropName} hasat edildi! Köy Tezgâhı veya Selman Bakkal'da satabilirsin.");
+                    },
+                    startStatus: IsEn ? $"Harvesting {cropName}..." : $"{cropName} hasat ediliyor...");
                 return;
             }
 
-            // 3. Growing & dry -> Water!
+            // 3. Growing & dry -> Water with 3D watering can (soil darkens right as water pours!)
             if (!_isWatered)
             {
-                _isWatered = true;
-                _growthProgress = Mathf.Min(1f, _growthProgress + 0.08f);
-                SaveToEntry(persistDisk: true);
-                RefreshSoilAndVisuals(force: false);
-                RefreshPrompt();
+                string cropName = FarmEconomyManager.GetCropName(_crop);
+                PlayerActionAnimator.Play(
+                    mode,
+                    transform,
+                    PlayerActionKind.FarmWatering,
+                    onClimax: () =>
+                    {
+                        _isWatered = true;
+                        _growthProgress = Mathf.Min(1f, _growthProgress + 0.08f);
+                        SaveToEntry(persistDisk: true);
+                        RefreshSoilAndVisuals(force: false);
+                        RefreshPrompt();
 
-                PlayerActionAnimator.Play(mode, transform, PlayerActionKind.FarmWatering);
-                GameFeelAudio.PlayUiClick();
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.55f, new Color(0.32f, 0.78f, 0.98f), count: 12, spread: 0.50f);
-                mode.RaiseStatusMessage(IsEn
-                    ? $"Watered {FarmEconomyManager.GetCropName(_crop)}! Growing fast now."
-                    : $"{FarmEconomyManager.GetCropName(_crop)} sulandı! Şimdi hızla büyüyor.");
+                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.55f, new Color(0.32f, 0.78f, 0.98f), count: 12, spread: 0.50f);
+                        mode.RaiseStatusMessage(IsEn
+                            ? $"Watered {cropName}! Growing fast now."
+                            : $"{cropName} sulandı! Şimdi hızla büyüyor.");
+                    },
+                    startStatus: IsEn ? $"Watering {cropName}..." : $"{cropName} sulanıyor...");
                 return;
             }
 
-            // 4. Growing & watered -> Gentle tend (+10% instant growth boost so mobile play feels responsive!)
-            _growthProgress = Mathf.Min(1f, _growthProgress + 0.14f);
-            SaveToEntry(persistDisk: false);
-            RefreshSoilAndVisuals(force: false);
-            RefreshPrompt();
+            // 4. Growing & watered -> Gentle tend (+14% growth boost on climax!)
+            string tendName = FarmEconomyManager.GetCropName(_crop);
+            PlayerActionAnimator.Play(
+                mode,
+                transform,
+                PlayerActionKind.FarmPlantAndDig,
+                onClimax: () =>
+                {
+                    _growthProgress = Mathf.Min(1f, _growthProgress + 0.14f);
+                    SaveToEntry(persistDisk: false);
+                    RefreshSoilAndVisuals(force: false);
+                    RefreshPrompt();
 
-            PlayerActionAnimator.Play(mode, transform, PlayerActionKind.InspectReach);
-            GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.45f, new Color(0.55f, 0.88f, 0.36f), count: 6, spread: 0.35f);
-            int pct = Mathf.RoundToInt(_growthProgress * 100f);
-            mode.RaiseStatusMessage(IsEn
-                ? $"Tended {FarmEconomyManager.GetCropName(_crop)} ({pct}% grown)."
-                : $"{FarmEconomyManager.GetCropName(_crop)} bakımı yapıldı (%{pct}).");
+                    GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.45f, new Color(0.55f, 0.88f, 0.36f), count: 6, spread: 0.35f);
+                    int pct = Mathf.RoundToInt(_growthProgress * 100f);
+                    mode.RaiseStatusMessage(IsEn
+                        ? $"Tended {tendName} ({pct}% grown)."
+                        : $"{tendName} bakımı yapıldı (%{pct}).");
+                },
+                startStatus: IsEn ? $"Tending {tendName}..." : $"{tendName} bakımı yapılıyor...");
         }
 
         private int ComputeVisualStage()

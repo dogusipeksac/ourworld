@@ -13,7 +13,15 @@ namespace OurWorld.Player
         BasketballPass = 4,
         VolleyballBump = 5,
         VolleyballSpike = 6,
-        VictoryJump = 7
+        VictoryJump = 7,
+        SoccerSlideTackle = 8,
+        SoccerFeint = 9,
+        GoalkeeperDive = 10,
+        VolleyballBlock = 11,
+        VolleyballDiveSave = 12,
+        VolleyballTip = 13,
+        SwimDiveStart = 14,
+        SwimFlipTurn = 15
     }
 
     /// <summary>
@@ -93,6 +101,7 @@ namespace OurWorld.Player
         private SportAnimKind _sportAnimKind = SportAnimKind.None;
         private float _sportAnimTimer = -1f;
         private float _sportAnimDuration = 0.55f;
+        private float _sportAnimSide = 1f;
 
         private float _phase;
         private int _lastStepCount;
@@ -123,6 +132,7 @@ namespace OurWorld.Player
         private float _vaultTimer = -1f;
         private Vector3? _vaultSupport;
         private bool _isSwimming;
+        private bool _swimBreaststroke;
         private float _swimSpeed;
         private float _swimPhase;
         private int _prayerStage;
@@ -463,7 +473,7 @@ namespace OurWorld.Player
             _waveTimer = -1f;
         }
 
-        public void PlaySportAnim(SportAnimKind kind, float duration = 0.55f)
+        public void PlaySportAnim(SportAnimKind kind, float duration = 0.55f, float sideSign = 1f)
         {
             if (kind == SportAnimKind.None)
             {
@@ -472,8 +482,9 @@ namespace OurWorld.Player
                 return;
             }
             _sportAnimKind = kind;
-            _sportAnimDuration = Mathf.Max(0.28f, duration);
+            _sportAnimDuration = Mathf.Max(0.24f, duration);
             _sportAnimTimer = 0f;
+            _sportAnimSide = sideSign < 0f ? -1f : 1f;
             _waveTimer = -1f;
         }
 
@@ -507,10 +518,11 @@ namespace OurWorld.Player
             OnLanded?.Invoke();
         }
 
-        public void SetSwimming(bool swimming, float swimSpeed)
+        public void SetSwimming(bool swimming, float swimSpeed, bool breaststroke = false)
         {
             _isSwimming = swimming;
             _swimSpeed = Mathf.Max(0f, swimSpeed);
+            _swimBreaststroke = breaststroke;
         }
 
         /// <summary>
@@ -1242,33 +1254,63 @@ namespace OurWorld.Player
                     targetRAnkleRot = new Vector3(56f, 0f, 0f);
                 }
             }
-            // --- Swimming override (front-crawl freestyle when moving, treading water when idle) ---
+            // --- Swimming override (Freestyle front-crawl or Breaststroke Kurbağalama!) ---
             else if (_isSwimming)
             {
                 float swimBlend = Mathf.Clamp01(_swimSpeed / 1.8f);
-                _swimPhase += dt * Mathf.Lerp(2.8f, 6.4f, swimBlend);
-                float strokeL = Mathf.Sin(_swimPhase);
-                float strokeR = Mathf.Sin(_swimPhase + Mathf.PI);
+                _swimPhase += dt * Mathf.Lerp(2.8f, _swimBreaststroke ? 4.8f : 6.4f, swimBlend);
 
-                targetHipsPos = new Vector3(0f, Mathf.Lerp(0.56f, 0.72f, swimBlend) + Mathf.Sin(_swimPhase * 0.5f) * 0.04f, 0f);
-                targetHipsRot = new Vector3(Mathf.Lerp(18f, 74f, swimBlend), 0f, strokeL * 14f * swimBlend);
-                targetSpineRot = new Vector3(Mathf.Lerp(-8f, -18f, swimBlend), -strokeL * 18f * swimBlend, 0f);
-                targetNeckRot = new Vector3(Mathf.Lerp(-8f, -38f, swimBlend), 0f, 0f);
-                targetHeadRot = new Vector3(Mathf.Lerp(-6f, -20f, swimBlend), 0f, 0f);
+                if (_swimBreaststroke)
+                {
+                    float pull = Mathf.Sin(_swimPhase);
+                    float sweep = Mathf.Cos(_swimPhase);
+                    targetHipsPos = new Vector3(0f, Mathf.Lerp(0.56f, 0.70f, swimBlend) + pull * 0.06f, 0f);
+                    targetHipsRot = new Vector3(Mathf.Lerp(18f, 68f, swimBlend) - pull * 8f, 0f, 0f);
+                    targetSpineRot = new Vector3(Mathf.Lerp(-8f, -14f - pull * 10f, swimBlend), 0f, 0f);
+                    targetNeckRot = new Vector3(Mathf.Lerp(-8f, -34f, swimBlend), 0f, 0f);
+                    targetHeadRot = new Vector3(Mathf.Lerp(-6f, -18f, swimBlend), 0f, 0f);
 
-                targetLShoulderRot = new Vector3(Mathf.Lerp(-55f, -155f + strokeL * 78f, swimBlend), 0f, Mathf.Lerp(-36f + strokeL * 24f, -22f, swimBlend));
-                targetRShoulderRot = new Vector3(Mathf.Lerp(-55f, -155f + strokeR * 78f, swimBlend), 0f, Mathf.Lerp(36f - strokeR * 24f, 22f, swimBlend));
-                targetLElbowRot = new Vector3(Mathf.Lerp(-48f, -28f - Mathf.Max(0f, strokeL) * 45f, swimBlend), 0f, 0f);
-                targetRElbowRot = new Vector3(Mathf.Lerp(-48f, -28f - Mathf.Max(0f, strokeR) * 45f, swimBlend), 0f, 0f);
+                    float armPitch = Mathf.Lerp(-55f, -142f + pull * 42f, swimBlend);
+                    float armSpread = Mathf.Lerp(26f, 18f + Mathf.Max(0f, sweep) * 58f, swimBlend);
+                    targetLShoulderRot = new Vector3(armPitch, 0f, -armSpread);
+                    targetRShoulderRot = new Vector3(armPitch, 0f, armSpread);
+                    targetLElbowRot = new Vector3(Mathf.Lerp(-44f, -22f - Mathf.Max(0f, -pull) * 48f, swimBlend), 0f, 0f);
+                    targetRElbowRot = new Vector3(Mathf.Lerp(-44f, -22f - Mathf.Max(0f, -pull) * 48f, swimBlend), 0f, 0f);
 
-                float kickL = Mathf.Sin(_swimPhase * 2.2f);
-                float kickR = Mathf.Sin(_swimPhase * 2.2f + Mathf.PI);
-                targetLHipRot = new Vector3(Mathf.Lerp(-16f, 10f + kickL * 22f, swimBlend), 0f, -5f);
-                targetRHipRot = new Vector3(Mathf.Lerp(-16f, 10f + kickR * 22f, swimBlend), 0f, 5f);
-                targetLKneeRot = new Vector3(Mathf.Lerp(36f, 18f + Mathf.Max(0f, -kickL) * 26f, swimBlend), 0f, 0f);
-                targetRKneeRot = new Vector3(Mathf.Lerp(36f, 18f + Mathf.Max(0f, -kickR) * 26f, swimBlend), 0f, 0f);
-                targetLAnkleRot = new Vector3(28f, 0f, 0f);
-                targetRAnkleRot = new Vector3(28f, 0f, 0f);
+                    // Frog kick synchronized with glide!
+                    float frog = Mathf.Max(0f, -pull);
+                    targetLHipRot = new Vector3(Mathf.Lerp(-14f, -28f * frog + 12f, swimBlend), -18f * frog, -10f - 18f * frog);
+                    targetRHipRot = new Vector3(Mathf.Lerp(-14f, -28f * frog + 12f, swimBlend), 18f * frog, 10f + 18f * frog);
+                    targetLKneeRot = new Vector3(Mathf.Lerp(32f, 16f + frog * 74f, swimBlend), 0f, 0f);
+                    targetRKneeRot = new Vector3(Mathf.Lerp(32f, 16f + frog * 74f, swimBlend), 0f, 0f);
+                    targetLAnkleRot = new Vector3(24f, 0f, 0f);
+                    targetRAnkleRot = new Vector3(24f, 0f, 0f);
+                }
+                else
+                {
+                    float strokeL = Mathf.Sin(_swimPhase);
+                    float strokeR = Mathf.Sin(_swimPhase + Mathf.PI);
+
+                    targetHipsPos = new Vector3(0f, Mathf.Lerp(0.56f, 0.72f, swimBlend) + Mathf.Sin(_swimPhase * 0.5f) * 0.04f, 0f);
+                    targetHipsRot = new Vector3(Mathf.Lerp(18f, 74f, swimBlend), 0f, strokeL * 14f * swimBlend);
+                    targetSpineRot = new Vector3(Mathf.Lerp(-8f, -18f, swimBlend), -strokeL * 18f * swimBlend, 0f);
+                    targetNeckRot = new Vector3(Mathf.Lerp(-8f, -38f, swimBlend), 0f, 0f);
+                    targetHeadRot = new Vector3(Mathf.Lerp(-6f, -20f, swimBlend), 0f, 0f);
+
+                    targetLShoulderRot = new Vector3(Mathf.Lerp(-55f, -155f + strokeL * 78f, swimBlend), 0f, Mathf.Lerp(-36f + strokeL * 24f, -22f, swimBlend));
+                    targetRShoulderRot = new Vector3(Mathf.Lerp(-55f, -155f + strokeR * 78f, swimBlend), 0f, Mathf.Lerp(36f - strokeR * 24f, 22f, swimBlend));
+                    targetLElbowRot = new Vector3(Mathf.Lerp(-48f, -28f - Mathf.Max(0f, strokeL) * 45f, swimBlend), 0f, 0f);
+                    targetRElbowRot = new Vector3(Mathf.Lerp(-48f, -28f - Mathf.Max(0f, strokeR) * 45f, swimBlend), 0f, 0f);
+
+                    float kickL = Mathf.Sin(_swimPhase * 2.2f);
+                    float kickR = Mathf.Sin(_swimPhase * 2.2f + Mathf.PI);
+                    targetLHipRot = new Vector3(Mathf.Lerp(-16f, 10f + kickL * 22f, swimBlend), 0f, -5f);
+                    targetRHipRot = new Vector3(Mathf.Lerp(-16f, 10f + kickR * 22f, swimBlend), 0f, 5f);
+                    targetLKneeRot = new Vector3(Mathf.Lerp(36f, 18f + Mathf.Max(0f, -kickL) * 26f, swimBlend), 0f, 0f);
+                    targetRKneeRot = new Vector3(Mathf.Lerp(36f, 18f + Mathf.Max(0f, -kickR) * 26f, swimBlend), 0f, 0f);
+                    targetLAnkleRot = new Vector3(28f, 0f, 0f);
+                    targetRAnkleRot = new Vector3(28f, 0f, 0f);
+                }
             }
             // --- Parkour Vault hurdle animation (0.42 s) ---
             else if (_vaultTimer >= 0f)
@@ -1547,6 +1589,133 @@ namespace OurWorld.Player
                         targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-26f, 0f, 0f), hop);
                         break;
                     }
+                    case SportAnimKind.SoccerSlideTackle:
+                    {
+                        // Low turf-skimming slide tackle: hips drop low, lead leg spears straight forward, rear knee tucks!
+                        float slide = Mathf.Sin(Mathf.Clamp01(sn / 0.85f) * Mathf.PI);
+                        targetHipsPos.y -= 0.54f * slide;
+                        targetHipsRot.x = Mathf.Lerp(targetHipsRot.x, -42f, slide);
+                        targetHipsRot.z = Mathf.Lerp(targetHipsRot.z, -24f * _sportAnimSide, slide);
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 18f, slide);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-72f, 0f, 8f), slide);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(8f, 0f, 0f), slide);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-28f, -20f, -18f), slide);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(92f, 0f, 0f), slide);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(24f, 0f, -54f), slide);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-36f, 0f, 44f), slide);
+                        break;
+                    }
+                    case SportAnimKind.SoccerFeint:
+                    {
+                        // Crisp step-over body feint: quick shoulder drop to one side then explosive push opposite!
+                        float sway = Mathf.Sin(sn * TwoPi) * _sportAnimSide;
+                        targetHipsPos.y -= 0.14f * env;
+                        targetHipsPos.x += sway * 0.16f;
+                        targetSpineRot.z += -24f * sway;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 18f, env);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-30f, 0f, -38f), env);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-30f, 0f, 38f), env);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(36f, 0f, 0f), env);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(36f, 0f, 0f), env);
+                        break;
+                    }
+                    case SportAnimKind.GoalkeeperDive:
+                    {
+                        // Full horizontal diving stretch toward shot corner (sideSign = +1 right, -1 left)
+                        float dive = Mathf.Sin(sn * Mathf.PI);
+                        float s = _sportAnimSide;
+                        targetHipsPos.y += (0.20f * Mathf.Sin(Mathf.Clamp01(sn * 1.4f) * Mathf.PI) - 0.34f * Mathf.Clamp01(sn * 1.15f)) * dive;
+                        targetHipsPos.x += s * 0.52f * dive;
+                        targetHipsRot.z = Mathf.Lerp(targetHipsRot.z, -82f * s, dive);
+                        targetSpineRot.z = Mathf.Lerp(targetSpineRot.z, -10f * s, dive);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-164f, 0f, -14f), dive);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-164f, 0f, 14f), dive);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-8f, 0f, 0f), dive);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-8f, 0f, 0f), dive);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(14f, 0f, -12f), dive);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(14f, 0f, 12f), dive);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(24f, 0f, 0f), dive);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(24f, 0f, 0f), dive);
+                        break;
+                    }
+                    case SportAnimKind.VolleyballBlock:
+                    {
+                        // Vertical 0.72 m roof-block leap with both hands forming a solid net wall overhead!
+                        float air = Mathf.Sin(sn * Mathf.PI);
+                        targetHipsPos.y += air * 0.72f;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 8f, air);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-172f, 8f, -6f), air);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-172f, -8f, 6f), air);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-4f, 0f, 0f), air);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-4f, 0f, 0f), air);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(26f, 0f, 0f), air);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(26f, 0f, 0f), air);
+                        break;
+                    }
+                    case SportAnimKind.VolleyballDiveSave:
+                    {
+                        // Athletic forward sand pancake dive: body stretches horizontally near ground, arms extended forward!
+                        float dive = Mathf.Sin(sn * Mathf.PI);
+                        targetHipsPos.y -= 0.56f * dive;
+                        targetHipsPos.z += 0.34f * dive;
+                        targetHipsRot.x = Mathf.Lerp(targetHipsRot.x, 74f, dive);
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -18f, dive);
+                        targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -38f, dive);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-164f, 14f, -8f), dive);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-164f, -14f, 8f), dive);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-6f, 0f, 0f), dive);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-6f, 0f, 0f), dive);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(36f, 0f, 0f), dive);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(44f, 0f, 0f), dive);
+                        break;
+                    }
+                    case SportAnimKind.VolleyballTip:
+                    {
+                        // Nimble jump + delicate fingertip dink/plase push right over the opponent's block!
+                        float air = Mathf.Sin(sn * Mathf.PI);
+                        targetHipsPos.y += air * 0.44f;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -6f, air);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-148f, -10f, 14f), air);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-22f, 0f, 0f), air);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-76f, 0f, -24f), air);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(34f, 0f, 0f), air);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(40f, 0f, 0f), air);
+                        break;
+                    }
+                    case SportAnimKind.SwimDiveStart:
+                    {
+                        // Olympic streamlined arrow dive off block or springboard: arms locked overhead, crisp entry angle!
+                        float arc = Mathf.Sin(sn * Mathf.PI);
+                        targetHipsRot.x = Mathf.Lerp(targetHipsRot.x, Mathf.Lerp(28f, 108f, sn), env);
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 12f, env);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-176f, 0f, -6f), env);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-176f, 0f, 6f), env);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, Vector3.zero, env);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, Vector3.zero, env);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(12f * arc, 0f, -4f), env);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(12f * arc, 0f, 4f), env);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(6f, 0f, 0f), env);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(6f, 0f, 0f), env);
+                        targetLAnkleRot = new Vector3(42f, 0f, 0f);
+                        targetRAnkleRot = new Vector3(42f, 0f, 0f);
+                        break;
+                    }
+                    case SportAnimKind.SwimFlipTurn:
+                    {
+                        // Tucked 360-degree Olympic flip turn / mid-air diving somersault!
+                        float tuck = Mathf.Sin(sn * Mathf.PI);
+                        targetHipsRot.x = sn * 360f;
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 42f, tuck);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-92f, 0f, -8f), tuck);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-92f, 0f, 8f), tuck);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(115f, 0f, 0f), tuck);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(115f, 0f, 0f), tuck);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-68f, 0f, -24f), tuck);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-68f, 0f, 24f), tuck);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-86f, 0f, 0f), tuck);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-86f, 0f, 0f), tuck);
+                        break;
+                    }
                 }
             }
 
@@ -1657,8 +1826,16 @@ namespace OurWorld.Player
             bool sportAirOrKick = _sportAnimTimer >= 0f &&
                                   (_sportAnimKind == SportAnimKind.SoccerKick ||
                                    _sportAnimKind == SportAnimKind.SoccerSteal ||
+                                   _sportAnimKind == SportAnimKind.SoccerSlideTackle ||
+                                   _sportAnimKind == SportAnimKind.SoccerFeint ||
+                                   _sportAnimKind == SportAnimKind.GoalkeeperDive ||
                                    _sportAnimKind == SportAnimKind.BasketballJumpShot ||
                                    _sportAnimKind == SportAnimKind.VolleyballSpike ||
+                                   _sportAnimKind == SportAnimKind.VolleyballBlock ||
+                                   _sportAnimKind == SportAnimKind.VolleyballDiveSave ||
+                                   _sportAnimKind == SportAnimKind.VolleyballTip ||
+                                   _sportAnimKind == SportAnimKind.SwimDiveStart ||
+                                   _sportAnimKind == SportAnimKind.SwimFlipTurn ||
                                    _sportAnimKind == SportAnimKind.VictoryJump);
             bool tennisJumpServe = tennisStance && _tennisServing && swingTime >= -0.22f && swingTime <= 0.22f;
 
@@ -1763,7 +1940,7 @@ namespace OurWorld.Player
                 float reachable = 1f - Mathf.InverseLerp(0.51f, 0.74f, Vector3.Distance(rShoulder.position, palm));
                 AimHand(rShoulder, rElbow, palm, transform.right, plant * reachable);
             }
-            if (_isSwimming)
+            if (_isSwimming && !_swimBreaststroke)
             {
                 float strokeBlend = Mathf.SmoothStep(0f, 1f, _swimSpeed / 1.70f);
                 AimHand(lShoulder, lElbow, SwimHand(-1f, _swimPhase), -transform.right, strokeBlend);

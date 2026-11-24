@@ -108,6 +108,18 @@ namespace OurWorld.UI
         private CanvasGroup _hudRootGroup;
         private Text _tennisScoreText;
         private int _tennisHudRevision = -1;
+        private GameObject _sportMeterRoot;
+        private GameObject _sportPrimaryTrackObj;
+        private RectTransform _sportPrimaryFillRect;
+        private Image _sportPrimaryFillImg;
+        private RectTransform _sportSweetSpotRect;
+        private Text _sportPrimaryLabel;
+        private GameObject _sportStaminaTrackObj;
+        private RectTransform _sportStaminaFillRect;
+        private Image _sportStaminaFillImg;
+        private GameObject _sportCalloutObj;
+        private Image _sportCalloutBg;
+        private Text _sportCalloutText;
         private Text _attackBtnLabel;
         private Text _jumpBtnLabel;
         private GameObject _jumpBtnObject;
@@ -732,6 +744,12 @@ namespace OurWorld.UI
                 }
             }
 
+            if (player != null && _tennisScoreText == null && player.FootController != null && player.FootController.IsSwimming)
+            {
+                SetTennisScoreVisible(true);
+                SetTennisScoreVisible(false);
+            }
+
             if (player != null && _tennisScoreText != null)
             {
                 if (player.CurrentTennisCourt != null)
@@ -740,11 +758,16 @@ namespace OurWorld.UI
                     if (_tennisHudRevision != court.HudRevision)
                     {
                         _tennisScoreText.text = court.HudText();
-                        _tennisScoreText.color = court.AcceptsHit ? AccentTealColor : OffWhiteColor;
+                        _tennisScoreText.color = court.AcceptsHit
+                            ? new Color(0.54f, 0.98f, 0.90f, 1f)
+                            : new Color(0.95f, 0.97f, 1.0f, 1f);
                         CacheSportActionButtons();
                         if (_attackBtnLabel != null) _attackBtnLabel.text = court.PrimaryButtonLabel();
+                        if (_jumpBtnObject != null) _jumpBtnObject.SetActive(court.HasSecondaryAction);
+                        if (_jumpBtnLabel != null && court.HasSecondaryAction) _jumpBtnLabel.text = court.SecondaryButtonLabel();
                         _tennisHudRevision = court.HudRevision;
                     }
+                    UpdateSportMeterVisuals(court.GetHudMeterState());
                 }
                 else if (player.CurrentArenaSport != null)
                 {
@@ -752,13 +775,34 @@ namespace OurWorld.UI
                     if (_tennisHudRevision != arena.HudRevision)
                     {
                         _tennisScoreText.text = arena.HudText();
-                        _tennisScoreText.color = arena.AcceptsPrimaryAction ? AccentTealColor : OffWhiteColor;
+                        _tennisScoreText.color = arena.AcceptsPrimaryAction
+                            ? new Color(0.54f, 0.98f, 0.90f, 1f)
+                            : new Color(0.95f, 0.97f, 1.0f, 1f);
                         CacheSportActionButtons();
                         if (_attackBtnLabel != null) _attackBtnLabel.text = arena.PrimaryButtonLabel();
                         if (_jumpBtnObject != null) _jumpBtnObject.SetActive(arena.HasSecondaryAction);
                         if (_jumpBtnLabel != null && arena.HasSecondaryAction) _jumpBtnLabel.text = arena.SecondaryButtonLabel();
                         _tennisHudRevision = arena.HudRevision;
                     }
+                    UpdateSportMeterVisuals(arena.GetHudMeterState());
+                }
+                else if (player.FootController != null && player.FootController.IsSwimming)
+                {
+                    bool lowOxy = player.FootController.SwimOxygen01 < 0.30f;
+                    var swimState = new SportHudMeterState
+                    {
+                        ShowPrimaryBar = player.FootController.IsUnderwater || player.FootController.SwimOxygen01 < 0.99f,
+                        PrimaryFill01 = player.FootController.SwimOxygen01,
+                        PrimaryColor = lowOxy ? DangerRedColor : new Color(0.24f, 0.88f, 0.98f),
+                        PrimaryLabel = lowOxy ? "NEFES AZALIYOR · YÜZEYE ÇIK!" : "OKSİJEN (Dalış: Atla Basılı Tut · Stil: Vur)",
+                        ShowSweetSpot = false,
+                        ShowStaminaBar = false
+                    };
+                    UpdateSportMeterVisuals(swimState);
+                }
+                else if (_sportMeterRoot != null && _sportMeterRoot.activeSelf)
+                {
+                    _sportMeterRoot.SetActive(false);
                 }
             }
 
@@ -968,7 +1012,8 @@ namespace OurWorld.UI
             CacheSportActionButtons();
             if (_jumpBtnObject != null)
             {
-                bool showJump = !tennis && (!arenaSport || (PlayerModeController.Instance?.CurrentArenaSport?.HasSecondaryAction ?? false));
+                bool showJump = (tennis && (PlayerModeController.Instance?.CurrentTennisCourt?.HasSecondaryAction ?? false))
+                    || (!tennis && (!arenaSport || (PlayerModeController.Instance?.CurrentArenaSport?.HasSecondaryAction ?? false)));
                 _jumpBtnObject.SetActive(showJump);
             }
 
@@ -1005,15 +1050,18 @@ namespace OurWorld.UI
         {
             if (visible && _tennisScoreText == null && interactButtonLabel != null && interactButton != null)
             {
+                Transform uiParent = interactButton.transform.parent;
+                Font uiFont = interactButtonLabel.font;
+
                 GameObject panel = new GameObject("TennisScore", typeof(RectTransform), typeof(Image));
                 RectTransform frame = (RectTransform)panel.transform;
-                frame.SetParent(interactButton.transform.parent, false);
+                frame.SetParent(uiParent, false);
                 frame.anchorMin = frame.anchorMax = new Vector2(0.5f, 1f);
                 frame.pivot = new Vector2(0.5f, 1f);
-                frame.anchoredPosition = new Vector2(0f, -16f);
-                frame.sizeDelta = new Vector2(560f, 88f);
+                frame.anchoredPosition = new Vector2(0f, -14f);
+                frame.sizeDelta = new Vector2(660f, 92f);
                 Image background = panel.GetComponent<Image>();
-                background.color = new Color(0.06f, 0.11f, 0.15f, 0.90f);
+                background.color = new Color(0.06f, 0.11f, 0.16f, 0.92f);
                 background.raycastTarget = false;
 
                 GameObject label = new GameObject("Score and instructions", typeof(RectTransform), typeof(Text));
@@ -1024,17 +1072,208 @@ namespace OurWorld.UI
                 textRect.offsetMin = new Vector2(16f, 6f);
                 textRect.offsetMax = new Vector2(-16f, -6f);
                 _tennisScoreText = label.GetComponent<Text>();
-                _tennisScoreText.font = interactButtonLabel.font;
-                _tennisScoreText.fontSize = 23;
+                _tennisScoreText.font = uiFont;
+                _tennisScoreText.fontSize = 21;
                 _tennisScoreText.fontStyle = FontStyle.Bold;
                 _tennisScoreText.alignment = TextAnchor.MiddleCenter;
+                _tennisScoreText.color = new Color(0.95f, 0.97f, 1.0f, 1f);
                 _tennisScoreText.raycastTarget = false;
+                Outline scoreOut = label.AddComponent<Outline>();
+                scoreOut.effectColor = new Color(0.02f, 0.04f, 0.07f, 0.85f);
+                scoreOut.effectDistance = new Vector2(1.1f, -1.1f);
+
+                // Dynamic Sports Meter Strip (Power / Timing Sweet-Spot + Stamina + Highlight Callout Badge)
+                _sportMeterRoot = new GameObject("SportDynamicMeterRoot", typeof(RectTransform));
+                RectTransform mRoot = (RectTransform)_sportMeterRoot.transform;
+                mRoot.SetParent(uiParent, false);
+                mRoot.anchorMin = mRoot.anchorMax = new Vector2(0.5f, 1f);
+                mRoot.pivot = new Vector2(0.5f, 1f);
+                mRoot.anchoredPosition = new Vector2(0f, -112f);
+                mRoot.sizeDelta = new Vector2(460f, 84f);
+
+                // 1. Primary Power / Timing Bar Track
+                _sportPrimaryTrackObj = new GameObject("PrimaryMeterTrack", typeof(RectTransform), typeof(Image));
+                RectTransform pTrack = (RectTransform)_sportPrimaryTrackObj.transform;
+                pTrack.SetParent(mRoot, false);
+                pTrack.anchorMin = new Vector2(0f, 1f);
+                pTrack.anchorMax = new Vector2(1f, 1f);
+                pTrack.pivot = new Vector2(0.5f, 1f);
+                pTrack.anchoredPosition = Vector2.zero;
+                pTrack.sizeDelta = new Vector2(0f, 24f);
+                Image pTrackImg = _sportPrimaryTrackObj.GetComponent<Image>();
+                pTrackImg.color = new Color(0.05f, 0.08f, 0.12f, 0.88f);
+                pTrackImg.raycastTarget = false;
+
+                // Sweet-Spot Golden Zone highlight inside track
+                GameObject sweetGo = new GameObject("SweetSpotZone", typeof(RectTransform), typeof(Image));
+                _sportSweetSpotRect = (RectTransform)sweetGo.transform;
+                _sportSweetSpotRect.SetParent(pTrack, false);
+                _sportSweetSpotRect.anchorMin = new Vector2(0.55f, 0f);
+                _sportSweetSpotRect.anchorMax = new Vector2(0.85f, 1f);
+                _sportSweetSpotRect.offsetMin = Vector2.zero;
+                _sportSweetSpotRect.offsetMax = Vector2.zero;
+                Image sweetImg = sweetGo.GetComponent<Image>();
+                sweetImg.color = new Color(1.0f, 0.86f, 0.22f, 0.34f);
+                sweetImg.raycastTarget = false;
+
+                // Primary Fill Bar
+                GameObject pFillGo = new GameObject("PrimaryMeterFill", typeof(RectTransform), typeof(Image));
+                _sportPrimaryFillRect = (RectTransform)pFillGo.transform;
+                _sportPrimaryFillRect.SetParent(pTrack, false);
+                _sportPrimaryFillRect.anchorMin = Vector2.zero;
+                _sportPrimaryFillRect.anchorMax = new Vector2(0f, 1f);
+                _sportPrimaryFillRect.offsetMin = new Vector2(2f, 2f);
+                _sportPrimaryFillRect.offsetMax = new Vector2(-2f, -2f);
+                _sportPrimaryFillImg = pFillGo.GetComponent<Image>();
+                _sportPrimaryFillImg.color = AccentTealColor;
+                _sportPrimaryFillImg.raycastTarget = false;
+
+                // Primary Label centered over bar
+                GameObject pLblGo = new GameObject("PrimaryMeterLabel", typeof(RectTransform), typeof(Text));
+                RectTransform pLblRt = (RectTransform)pLblGo.transform;
+                pLblRt.SetParent(pTrack, false);
+                pLblRt.anchorMin = Vector2.zero;
+                pLblRt.anchorMax = Vector2.one;
+                pLblRt.offsetMin = Vector2.zero;
+                pLblRt.offsetMax = Vector2.zero;
+                _sportPrimaryLabel = pLblGo.GetComponent<Text>();
+                _sportPrimaryLabel.font = uiFont;
+                _sportPrimaryLabel.fontSize = 15;
+                _sportPrimaryLabel.fontStyle = FontStyle.Bold;
+                _sportPrimaryLabel.alignment = TextAnchor.MiddleCenter;
+                _sportPrimaryLabel.color = Color.white;
+                _sportPrimaryLabel.raycastTarget = false;
+                Outline pLblOut = pLblGo.AddComponent<Outline>();
+                pLblOut.effectColor = new Color(0.03f, 0.05f, 0.09f, 0.96f);
+                pLblOut.effectDistance = new Vector2(1.5f, -1.5f);
+                Shadow pLblShd = pLblGo.AddComponent<Shadow>();
+                pLblShd.effectColor = new Color(0f, 0f, 0f, 0.85f);
+                pLblShd.effectDistance = new Vector2(0f, -1.4f);
+
+                // 2. Slim Stamina Bar right underneath
+                _sportStaminaTrackObj = new GameObject("StaminaTrack", typeof(RectTransform), typeof(Image));
+                RectTransform sTrack = (RectTransform)_sportStaminaTrackObj.transform;
+                sTrack.SetParent(mRoot, false);
+                sTrack.anchorMin = new Vector2(0.12f, 1f);
+                sTrack.anchorMax = new Vector2(0.88f, 1f);
+                sTrack.pivot = new Vector2(0.5f, 1f);
+                sTrack.anchoredPosition = new Vector2(0f, -29f);
+                sTrack.sizeDelta = new Vector2(0f, 8f);
+                Image sTrackImg = _sportStaminaTrackObj.GetComponent<Image>();
+                sTrackImg.color = new Color(0.05f, 0.08f, 0.12f, 0.76f);
+                sTrackImg.raycastTarget = false;
+
+                GameObject sFillGo = new GameObject("StaminaFill", typeof(RectTransform), typeof(Image));
+                _sportStaminaFillRect = (RectTransform)sFillGo.transform;
+                _sportStaminaFillRect.SetParent(sTrack, false);
+                _sportStaminaFillRect.anchorMin = Vector2.zero;
+                _sportStaminaFillRect.anchorMax = new Vector2(1f, 1f);
+                _sportStaminaFillRect.offsetMin = new Vector2(1f, 1f);
+                _sportStaminaFillRect.offsetMax = new Vector2(-1f, -1f);
+                _sportStaminaFillImg = sFillGo.GetComponent<Image>();
+                _sportStaminaFillImg.color = new Color(0.24f, 0.90f, 0.68f, 0.95f);
+                _sportStaminaFillImg.raycastTarget = false;
+
+                // 3. Crisp Callout Badge Pill ("⚡ 90'A FALSOLU FÜZE!", "🧱 DUVAR BLOK SAYISI!")
+                _sportCalloutObj = new GameObject("SportCalloutBadge", typeof(RectTransform), typeof(Image));
+                RectTransform cRt = (RectTransform)_sportCalloutObj.transform;
+                cRt.SetParent(mRoot, false);
+                cRt.anchorMin = new Vector2(0.5f, 1f);
+                cRt.anchorMax = new Vector2(0.5f, 1f);
+                cRt.pivot = new Vector2(0.5f, 1f);
+                cRt.anchoredPosition = new Vector2(0f, -43f);
+                cRt.sizeDelta = new Vector2(440f, 34f);
+                _sportCalloutBg = _sportCalloutObj.GetComponent<Image>();
+                _sportCalloutBg.color = new Color(0.06f, 0.11f, 0.16f, 0.92f);
+                _sportCalloutBg.raycastTarget = false;
+
+                GameObject cTxtGo = new GameObject("CalloutText", typeof(RectTransform), typeof(Text));
+                RectTransform cTxtRt = (RectTransform)cTxtGo.transform;
+                cTxtRt.SetParent(cRt, false);
+                cTxtRt.anchorMin = Vector2.zero;
+                cTxtRt.anchorMax = Vector2.one;
+                cTxtRt.offsetMin = new Vector2(10f, 2f);
+                cTxtRt.offsetMax = new Vector2(-10f, -2f);
+                _sportCalloutText = cTxtGo.GetComponent<Text>();
+                _sportCalloutText.font = uiFont;
+                _sportCalloutText.fontSize = 18;
+                _sportCalloutText.fontStyle = FontStyle.Bold;
+                _sportCalloutText.alignment = TextAnchor.MiddleCenter;
+                _sportCalloutText.color = Color.white;
+                _sportCalloutText.raycastTarget = false;
+                Outline cTxtOut = cTxtGo.AddComponent<Outline>();
+                cTxtOut.effectColor = new Color(0.02f, 0.04f, 0.08f, 0.92f);
+                cTxtOut.effectDistance = new Vector2(1.2f, -1.2f);
+
+                _sportMeterRoot.SetActive(false);
             }
 
             if (_tennisScoreText != null)
             {
                 _tennisScoreText.transform.parent.gameObject.SetActive(visible);
                 _tennisHudRevision = -1;
+            }
+            if (_sportMeterRoot != null && !visible)
+            {
+                _sportMeterRoot.SetActive(false);
+            }
+        }
+
+        private void UpdateSportMeterVisuals(SportHudMeterState state)
+        {
+            if (_sportMeterRoot == null) return;
+            bool hasCallout = !string.IsNullOrEmpty(state.CalloutBadge);
+            bool anyVisible = state.ShowPrimaryBar || state.ShowStaminaBar || hasCallout;
+            if (_sportMeterRoot.activeSelf != anyVisible) _sportMeterRoot.SetActive(anyVisible);
+            if (!anyVisible) return;
+
+            if (_sportPrimaryTrackObj != null)
+            {
+                if (_sportPrimaryTrackObj.activeSelf != state.ShowPrimaryBar)
+                    _sportPrimaryTrackObj.SetActive(state.ShowPrimaryBar);
+                if (state.ShowPrimaryBar)
+                {
+                    float fill = Mathf.Clamp01(state.PrimaryFill01);
+                    if (_sportPrimaryFillRect != null) _sportPrimaryFillRect.anchorMax = new Vector2(fill, 1f);
+                    if (_sportPrimaryFillImg != null) _sportPrimaryFillImg.color = state.PrimaryColor;
+                    if (_sportPrimaryLabel != null) _sportPrimaryLabel.text = state.PrimaryLabel ?? string.Empty;
+                    if (_sportSweetSpotRect != null)
+                    {
+                        _sportSweetSpotRect.gameObject.SetActive(state.ShowSweetSpot);
+                        if (state.ShowSweetSpot)
+                        {
+                            _sportSweetSpotRect.anchorMin = new Vector2(Mathf.Clamp01(state.SweetSpotMin01), 0f);
+                            _sportSweetSpotRect.anchorMax = new Vector2(Mathf.Clamp01(state.SweetSpotMax01), 1f);
+                        }
+                    }
+                }
+            }
+
+            if (_sportStaminaTrackObj != null)
+            {
+                if (_sportStaminaTrackObj.activeSelf != state.ShowStaminaBar)
+                    _sportStaminaTrackObj.SetActive(state.ShowStaminaBar);
+                if (state.ShowStaminaBar)
+                {
+                    float sFill = Mathf.Clamp01(state.StaminaFill01);
+                    if (_sportStaminaFillRect != null) _sportStaminaFillRect.anchorMax = new Vector2(sFill, 1f);
+                    if (_sportStaminaFillImg != null)
+                    {
+                        _sportStaminaFillImg.color = sFill < 0.25f
+                            ? new Color(0.96f, 0.45f, 0.22f, 0.95f)
+                            : new Color(0.24f, 0.92f, 0.68f, 0.95f);
+                    }
+                }
+            }
+
+            if (_sportCalloutObj != null)
+            {
+                if (_sportCalloutObj.activeSelf != hasCallout) _sportCalloutObj.SetActive(hasCallout);
+                if (hasCallout && _sportCalloutText != null)
+                {
+                    _sportCalloutText.text = state.CalloutBadge;
+                    _sportCalloutText.color = state.CalloutColor;
+                }
             }
         }
 

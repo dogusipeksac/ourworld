@@ -25,6 +25,7 @@ namespace OurWorld.World
         {
             interiorLights = lights;
             indoorCameraMaxDistance = indoorMaxDistance;
+            CalibrateInteriorLights();
             SetLightsEnabled(false);
         }
 
@@ -35,7 +36,28 @@ namespace OurWorld.World
             {
                 _zoneBox.isTrigger = true;
             }
+            CalibrateInteriorLights();
             SetLightsEnabled(false);
+        }
+
+        private void CalibrateInteriorLights()
+        {
+            if (interiorLights == null) return;
+            for (int i = 0; i < interiorLights.Length; i++)
+            {
+                Light l = interiorLights[i];
+                if (l == null || l.type != LightType.Point) continue;
+                // Calibrate legacy gamma-era indoor point lights (~2.65) for crisp URP Linear room illumination
+                if (l.intensity < 12f)
+                {
+                    l.intensity = Mathf.Clamp(l.intensity * 6.8f, 16f, 24f);
+                }
+                if (l.range < 11f)
+                {
+                    l.range = 11f;
+                }
+                l.shadows = LightShadows.None;
+            }
         }
 
         private void Start()

@@ -54,7 +54,7 @@ namespace OurWorld.UI
         private static readonly Color SegInactive = new Color(0.13f, 0.18f, 0.26f, 0.95f);
 
         private const string PrefMasterVolumeKey = "ow_master_volume";
-        private const int DefaultTotalStoryMissions = 20;
+        private const int DefaultTotalStoryMissions = 26;
 
         private struct ScenicVista
         {
@@ -322,6 +322,19 @@ namespace OurWorld.UI
                 ExitYaw = 180f,
                 PreviewCamPos = new Vector3(52.0f, 5.8f, -33.5f),
                 PreviewLookAt = new Vector3(59.0f, 1.8f, -44.0f)
+            },
+            new SportQuickOption
+            {
+                BadgeTr = "50m  ·  +95 ₺",
+                BadgeEn = "50m  ·  +95 ₺",
+                NameTr = "Yüzme Yarışı & Dalış",
+                NameEn = "50m Swim Race",
+                TagTr = "3 Kulvar · Kulaç Ritmi · Takla\nTramplen Dalışı",
+                TagEn = "3 Lanes · Stroke Rhythm · Flip Turn\nSpringboard Dive",
+                ExitPos = new Vector3(16.0f, 1.45f, -34.0f),
+                ExitYaw = 180f,
+                PreviewCamPos = new Vector3(16.0f, 7.6f, -26.0f),
+                PreviewLookAt = new Vector3(16.0f, 1.2f, -40.0f)
             }
         };
 
@@ -1157,6 +1170,12 @@ namespace OurWorld.UI
                 {
                     LiveVolleyballMatch volley = FindAnyObjectByType<LiveVolleyballMatch>();
                     if (volley != null) mode.StartArenaSport(volley, sport.ExitPos, exitRot);
+                    break;
+                }
+                case 4:
+                {
+                    LiveSwimRace swimRace = SwimWorldInstaller.ActiveSwimRace ?? FindAnyObjectByType<LiveSwimRace>();
+                    if (swimRace != null) mode.StartArenaSport(swimRace, sport.ExitPos, exitRot);
                     break;
                 }
             }

@@ -1,39 +1,52 @@
 using OurWorld.Input;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace OurWorld.UI
 {
     /// <summary>
-    /// Binds the On-Foot touch "Vur" (Punch) button directly to InputHub.TriggerTouchAttack().
+    /// Binds the On-Foot / Sports primary action touch button ("Vur" / "Şut" / "Smaç")
+    /// to InputHub with full multi-touch press-and-hold support (instant tap + hold-to-charge release).
     /// </summary>
     [RequireComponent(typeof(Button))]
-    public class TouchAttackButtonBinder : MonoBehaviour
+    public class TouchAttackButtonBinder : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
-        private Button _button;
+        private int _activePointerId = int.MinValue;
 
-        private void Awake()
+        public void OnPointerDown(PointerEventData eventData)
         {
-            _button = GetComponent<Button>();
-            if (_button != null)
-            {
-                _button.onClick.AddListener(HandleClick);
-            }
-        }
-
-        private void OnDestroy()
-        {
-            if (_button != null)
-            {
-                _button.onClick.RemoveListener(HandleClick);
-            }
-        }
-
-        private void HandleClick()
-        {
+            if (_activePointerId != int.MinValue) return;
+            _activePointerId = eventData.pointerId;
             if (InputHub.Instance != null)
             {
-                InputHub.Instance.TriggerTouchAttack();
+                InputHub.Instance.SetTouchAttackHeld(true);
+            }
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData.pointerId != _activePointerId) return;
+            Release();
+        }
+
+        private void OnDisable()
+        {
+            Release();
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (!hasFocus) Release();
+        }
+
+        private void Release()
+        {
+            if (_activePointerId == int.MinValue) return;
+            _activePointerId = int.MinValue;
+            if (InputHub.Instance != null)
+            {
+                InputHub.Instance.SetTouchAttackHeld(false);
             }
         }
     }

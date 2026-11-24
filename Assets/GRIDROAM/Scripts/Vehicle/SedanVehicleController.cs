@@ -347,8 +347,11 @@ namespace OurWorld.Vehicle
             {
                 _headlightBeam.color = data.carHeadlightMode == 1
                     ? new Color(0.76f, 0.92f, 1.0f)
-                    : (data.carHeadlightMode == 2 ? new Color(1.0f, 0.86f, 0.36f) : new Color(1.0f, 0.94f, 0.80f));
-                _headlightBeam.intensity = data.carHeadlightMode > 0 ? 118f : 96f;
+                    : (data.carHeadlightMode == 2 ? new Color(1.0f, 0.86f, 0.36f) : new Color(1.0f, 0.95f, 0.82f));
+                _headlightBeam.intensity = data.carHeadlightMode > 0 ? 155f : 128f;
+                _headlightBeam.range = Mathf.Max(_headlightBeam.range, 68f);
+                _headlightBeam.spotAngle = Mathf.Max(_headlightBeam.spotAngle, 84f);
+                _headlightBeam.innerSpotAngle = Mathf.Max(_headlightBeam.innerSpotAngle, 48f);
             }
 
             // 4. Blender GT Spoiler & Overland Roof Rack mounts!
@@ -576,10 +579,10 @@ namespace OurWorld.Vehicle
                 // Calibrate car headlight beam for crisp URP Linear night street visibility
                 _headlightBeam.type = LightType.Spot;
                 _headlightBeam.color = new Color(1.0f, 0.95f, 0.82f);
-                _headlightBeam.range = Mathf.Max(_headlightBeam.range, 54f);
-                _headlightBeam.spotAngle = Mathf.Max(_headlightBeam.spotAngle, 74f);
-                _headlightBeam.innerSpotAngle = Mathf.Max(_headlightBeam.innerSpotAngle, 40f);
-                _headlightBeam.intensity = Mathf.Max(_headlightBeam.intensity, 48f);
+                _headlightBeam.range = Mathf.Max(_headlightBeam.range, 68f);
+                _headlightBeam.spotAngle = Mathf.Max(_headlightBeam.spotAngle, 84f);
+                _headlightBeam.innerSpotAngle = Mathf.Max(_headlightBeam.innerSpotAngle, 48f);
+                _headlightBeam.intensity = Mathf.Max(_headlightBeam.intensity, 128f);
                 _headlightBeam.shadows = LightShadows.None;
             }
 

@@ -61,6 +61,10 @@ namespace OurWorld.Player
         private Coroutine _vaultRoutine;
         private Coroutine _hitstopRoutine;
         private bool _isSwimming;
+        private bool _isUnderwater;
+        private bool _swimBreaststroke;
+        private float _swimOxygen01 = 1f;
+        private float _bubbleTimer;
         private float _waterSurfaceY;
         private Vector3 _moveDirection = Vector3.forward;
         private bool _movementEnabled = true;
@@ -69,6 +73,8 @@ namespace OurWorld.Player
         public ProceduralHumanoid Humanoid => humanoid;
         public float CurrentSpeed => _currentSpeed;
         public bool IsSwimming => _isSwimming;
+        public bool IsUnderwater => _isUnderwater;
+        public float SwimOxygen01 => _swimOxygen01;
 
         public void ConfigureVisuals(Transform root, Animator animator = null, ProceduralHumanoid proceduralHumanoid = null)
         {
@@ -831,21 +837,51 @@ namespace OurWorld.Player
             else if (!shouldSwim && _isSwimming)
             {
                 _isSwimming = false;
+                _isUnderwater = false;
+                _swimOxygen01 = 1f;
                 if (humanoid != null)
                 {
-                    humanoid.SetSwimming(false, 0f);
+                    humanoid.SetSwimming(false, 0f, false);
                 }
             }
 
             if (_isSwimming)
             {
                 _waterSurfaceY = surfaceY;
-                float swimTargetSpeed = (sprint ? 4.2f : 2.65f) * inputMag;
-                _currentSpeed = Mathf.MoveTowards(_currentSpeed, swimTargetSpeed, 6.5f * dt);
+                // Secondary/Attack tap toggles Breaststroke vs Freestyle; holding Jump dives underwater!
+                bool diveHeld = InputHub.Instance != null && InputHub.Instance.JumpHeld && _swimOxygen01 > 0.08f;
+                if (InputHub.Instance != null && InputHub.Instance.AttackHeld && InputHub.Instance.AttackHoldSeconds < 0.04f)
+                {
+                    _swimBreaststroke = !_swimBreaststroke;
+                    PlayerModeController.Instance?.RaiseStatusMessage(_swimBreaststroke
+                        ? "Yüzme Stili: Kurbağalama (Düşük yorgunluk)"
+                        : "Yüzme Stili: Serbest Stil (Yüksek hız)");
+                }
 
-                // Buoyancy smoothly holds swimmer near water surface (horizontal when stroking, upright when treading)
-                float desiredBodyY = Mathf.Lerp(surfaceY - 1.12f, surfaceY - 0.88f, Mathf.Clamp01(_currentSpeed / 2.2f));
-                desiredBodyY = Mathf.Max(floorY + 0.08f, desiredBodyY);
+                _isUnderwater = diveHeld && (surfaceY - floorY) >= 1.15f;
+                if (_isUnderwater)
+                {
+                    _swimOxygen01 = Mathf.Max(0f, _swimOxygen01 - dt * 0.11f); // ~9 seconds underwater breath
+                    _bubbleTimer -= dt;
+                    if (_bubbleTimer <= 0f)
+                    {
+                        _bubbleTimer = 0.28f;
+                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.95f, new Color(0.76f, 0.96f, 1.0f), count: 3, spread: 0.18f);
+                    }
+                }
+                else
+                {
+                    _swimOxygen01 = Mathf.Min(1f, _swimOxygen01 + dt * 0.38f);
+                }
+
+                float baseSwim = _swimBreaststroke ? 2.55f : 2.95f;
+                float sprintSwim = _swimBreaststroke ? 3.75f : 4.45f;
+                float swimTargetSpeed = (sprint ? sprintSwim : baseSwim) * inputMag;
+                _currentSpeed = Mathf.MoveTowards(_currentSpeed, swimTargetSpeed, 6.8f * dt);
+
+                // Buoyancy holds near surface OR glides underwater when diving!
+                float surfaceBodyY = Mathf.Lerp(surfaceY - 1.12f, surfaceY - 0.88f, Mathf.Clamp01(_currentSpeed / 2.2f));
+                float desiredBodyY = _isUnderwater ? Mathf.Max(floorY + 0.12f, surfaceY - 1.55f) : Mathf.Max(floorY + 0.08f, surfaceBodyY);
                 float heightErr = desiredBodyY - transform.position.y;
                 _verticalVelocity = Mathf.Lerp(_verticalVelocity, Mathf.Clamp(heightErr * 6.5f, -3.5f, 3.8f), 1f - Mathf.Exp(-8f * dt));
 
@@ -855,7 +891,7 @@ namespace OurWorld.Player
                 if (humanoid != null)
                 {
                     humanoid.SetLookAtPoint(false, Vector3.zero);
-                    humanoid.SetSwimming(true, _currentSpeed);
+                    humanoid.SetSwimming(true, _currentSpeed, _swimBreaststroke);
                 }
                 return;
             }

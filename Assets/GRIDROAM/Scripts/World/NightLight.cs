@@ -74,20 +74,20 @@ namespace OurWorld.World
             if (_calibrated) return;
             _calibrated = true;
 
-            if (targetLight != null && targetLight.type == LightType.Point && targetLight.range >= 14f)
+            if (targetLight != null && targetLight.type == LightType.Point && targetLight.range >= 12f)
             {
                 bool isInterior = GetComponentInParent<InteriorZone>() != null;
                 if (!isInterior)
                 {
                     IsManagedOutdoorLight = true;
                     // Calibrate legacy gamma-era outdoor point intensities (2.4..3.8) into crisp URP Linear street pools
-                    if (targetLight.intensity < 12f)
+                    if (targetLight.intensity < 18f)
                     {
-                        targetLight.intensity = Mathf.Clamp(targetLight.intensity * 8.2f, 22f, 34f);
+                        targetLight.intensity = Mathf.Clamp(targetLight.intensity * 12.5f, 34f, 50f);
                     }
-                    if (targetLight.range < 28f)
+                    if (targetLight.range < 36f)
                     {
-                        targetLight.range = 28f;
+                        targetLight.range = 36f;
                     }
                     targetLight.shadows = LightShadows.None;
                 }

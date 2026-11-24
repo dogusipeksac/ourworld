@@ -1,39 +1,52 @@
 using OurWorld.Input;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace OurWorld.UI
 {
     /// <summary>
-    /// Binds the On-Foot touch "Atla" (Jump / Parkour Vault / Exit Pool) button to InputHub.TriggerTouchJump().
+    /// Binds the On-Foot / Sports secondary action touch button ("Atla" / "Pas" / "Plase" / "Blok")
+    /// to InputHub with full multi-touch press-and-hold support (instant tap + hold-to-charge release).
     /// </summary>
     [RequireComponent(typeof(Button))]
-    public class TouchJumpButtonBinder : MonoBehaviour
+    public class TouchJumpButtonBinder : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
-        private Button _button;
+        private int _activePointerId = int.MinValue;
 
-        private void Awake()
+        public void OnPointerDown(PointerEventData eventData)
         {
-            _button = GetComponent<Button>();
-            if (_button != null)
-            {
-                _button.onClick.AddListener(HandleClick);
-            }
-        }
-
-        private void OnDestroy()
-        {
-            if (_button != null)
-            {
-                _button.onClick.RemoveListener(HandleClick);
-            }
-        }
-
-        private void HandleClick()
-        {
+            if (_activePointerId != int.MinValue) return;
+            _activePointerId = eventData.pointerId;
             if (InputHub.Instance != null)
             {
-                InputHub.Instance.TriggerTouchJump();
+                InputHub.Instance.SetTouchJumpHeld(true);
+            }
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData.pointerId != _activePointerId) return;
+            Release();
+        }
+
+        private void OnDisable()
+        {
+            Release();
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (!hasFocus) Release();
+        }
+
+        private void Release()
+        {
+            if (_activePointerId == int.MinValue) return;
+            _activePointerId = int.MinValue;
+            if (InputHub.Instance != null)
+            {
+                InputHub.Instance.SetTouchJumpHeld(false);
             }
         }
     }

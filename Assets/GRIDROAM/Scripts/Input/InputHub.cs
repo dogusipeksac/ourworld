@@ -43,9 +43,19 @@ namespace OurWorld.Input
         private bool _touchPhoneQueued;
         private bool _touchAttackQueued;
         private bool _touchJumpQueued;
+        private bool _touchAttackHeld;
+        private bool _touchJumpHeld;
+        private bool _prevAttackHeld;
+        private bool _prevJumpHeld;
+        private float _attackHoldSeconds;
+        private float _jumpHoldSeconds;
 
         public Vector2 MoveInput { get; private set; }
         public bool SprintHeld { get; private set; }
+        public bool AttackHeld { get; private set; }
+        public float AttackHoldSeconds => _attackHoldSeconds;
+        public bool JumpHeld { get; private set; }
+        public float JumpHoldSeconds => _jumpHoldSeconds;
         public Vector2 LookDelta { get; private set; }
         public float DriveSteer { get; private set; }
         public float DriveThrottle { get; private set; }
@@ -55,7 +65,9 @@ namespace OurWorld.Input
 
         public event Action OnInteractPressed;
         public event Action OnAttackPressed;
+        public event Action<float> OnAttackReleased;
         public event Action OnJumpPressed;
+        public event Action<float> OnJumpReleased;
         public event Action OnExitVehiclePressed;
         public event Action OnContinueDialoguePressed;
         public event Action OnRetryPressed;
@@ -103,6 +115,14 @@ namespace OurWorld.Input
             {
                 MoveInput = Vector2.zero;
                 SprintHeld = false;
+                AttackHeld = false;
+                JumpHeld = false;
+                _prevAttackHeld = false;
+                _prevJumpHeld = false;
+                _attackHoldSeconds = 0f;
+                _jumpHoldSeconds = 0f;
+                _touchAttackHeld = false;
+                _touchJumpHeld = false;
                 LookDelta = Vector2.zero;
                 DriveSteer = 0f;
                 DriveThrottle = 0f;
@@ -196,9 +216,42 @@ namespace OurWorld.Input
             bool togglePhone = _touchPhoneQueued || (kb != null && kb.mKey.wasPressedThisFrame);
 
             bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-            bool lmbAttack = mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverUi;
-            bool attack = _touchAttackQueued || (kb != null && kb.vKey.wasPressedThisFrame) || lmbAttack;
-            bool jump = _touchJumpQueued || (kb != null && kb.spaceKey.wasPressedThisFrame);
+            bool lmbAttackDown = mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverUi;
+            bool lmbAttackHeld = mouse != null && mouse.leftButton.isPressed && (!pointerOverUi || _prevAttackHeld);
+            bool kbAttackHeld = kb != null && kb.vKey.isPressed;
+            bool kbJumpHeld = kb != null && kb.spaceKey.isPressed;
+
+            bool attackHeldNow = _touchAttackHeld || kbAttackHeld || lmbAttackHeld;
+            bool jumpHeldNow = _touchJumpHeld || kbJumpHeld;
+
+            bool attackPressed = _touchAttackQueued || (kb != null && kb.vKey.wasPressedThisFrame) || lmbAttackDown || (attackHeldNow && !_prevAttackHeld);
+            bool jumpPressed = _touchJumpQueued || (kb != null && kb.spaceKey.wasPressedThisFrame) || (jumpHeldNow && !_prevJumpHeld);
+
+            bool attackReleased = !attackHeldNow && _prevAttackHeld;
+            bool jumpReleased = !jumpHeldNow && _prevJumpHeld;
+            float releasedAttackDuration = _attackHoldSeconds;
+            float releasedJumpDuration = _jumpHoldSeconds;
+
+            AttackHeld = attackHeldNow;
+            JumpHeld = jumpHeldNow;
+            if (attackHeldNow)
+            {
+                _attackHoldSeconds = _prevAttackHeld ? (_attackHoldSeconds + Time.unscaledDeltaTime) : 0f;
+            }
+            else
+            {
+                _attackHoldSeconds = 0f;
+            }
+            if (jumpHeldNow)
+            {
+                _jumpHoldSeconds = _prevJumpHeld ? (_jumpHoldSeconds + Time.unscaledDeltaTime) : 0f;
+            }
+            else
+            {
+                _jumpHoldSeconds = 0f;
+            }
+            _prevAttackHeld = attackHeldNow;
+            _prevJumpHeld = jumpHeldNow;
 
             _touchInteractQueued = false;
             _touchExitVehicleQueued = false;
@@ -222,14 +275,24 @@ namespace OurWorld.Input
                 OnInteractPressed?.Invoke();
             }
 
-            if (attack)
+            if (attackPressed)
             {
                 OnAttackPressed?.Invoke();
             }
 
-            if (jump)
+            if (attackReleased)
+            {
+                OnAttackReleased?.Invoke(releasedAttackDuration);
+            }
+
+            if (jumpPressed)
             {
                 OnJumpPressed?.Invoke();
+            }
+
+            if (jumpReleased)
+            {
+                OnJumpReleased?.Invoke(releasedJumpDuration);
             }
 
             if (exitVehicle)
@@ -267,6 +330,8 @@ namespace OurWorld.Input
             _touchMove = Vector2.zero;
             _touchLookAccumulator = Vector2.zero;
             _touchSprint = false;
+            _touchAttackHeld = false;
+            _touchJumpHeld = false;
             ClearDrivingTouchInputs();
         }
 
@@ -279,6 +344,8 @@ namespace OurWorld.Input
         public void SetTouchBrake(bool pressed) => _touchBrake = pressed ? 1f : 0f;
         public void SetTouchHandbrake(bool pressed) => _touchHandbrake = pressed;
         public void SetTouchSprint(bool pressed) => _touchSprint = pressed;
+        public void SetTouchAttackHeld(bool pressed) => _touchAttackHeld = pressed;
+        public void SetTouchJumpHeld(bool pressed) => _touchJumpHeld = pressed;
         public void TriggerTouchInteract() => _touchInteractQueued = true;
         public void TriggerTouchAttack() => _touchAttackQueued = true;
         public void TriggerTouchJump() => _touchJumpQueued = true;

@@ -1,592 +1,2641 @@
 {
   "languageCode": "tr",
   "entries": [
-    { "key": "ui.mode.onfoot", "value": "Yaya" },
-    { "key": "ui.mode.driving", "value": "Sürüş" },
-    { "key": "ui.btn.interact", "value": "Etkileş" },
-    { "key": "ui.btn.talk", "value": "Konuş" },
-    { "key": "ui.btn.enter_car", "value": "Arabaya Bin" },
-    { "key": "ui.btn.exit_car", "value": "İn" },
-    { "key": "ui.btn.inspect", "value": "İncele" },
-    { "key": "ui.btn.pickup", "value": "Al" },
-    { "key": "ui.btn.gas", "value": "GAZ" },
-    { "key": "ui.btn.brake", "value": "FREN" },
-    { "key": "ui.btn.handbrake", "value": "El Freni" },
-    { "key": "ui.btn.sprint", "value": "Koş" },
-    { "key": "ui.btn.phone", "value": "Rehber (M)" },
-    { "key": "ui.btn.steer_left", "value": "◀" },
-    { "key": "ui.btn.steer_right", "value": "▶" },
-    { "key": "ui.btn.continue", "value": "Devam" },
-    { "key": "ui.btn.retry", "value": "Tekrar Dene" },
-    { "key": "ui.btn.reset_save", "value": "Sıfırla" },
-    { "key": "ui.btn.close", "value": "Kapat" },
-    { "key": "ui.btn.cancel", "value": "İptal" },
-    { "key": "ui.btn.cancel_job", "value": "Aktif İşi İptal Et" },
-    { "key": "ui.btn.door", "value": "Kapı" },
-    { "key": "ui.btn.sit", "value": "Otur" },
-    { "key": "ui.btn.stand", "value": "Kalk" },
-    { "key": "ui.btn.paint", "value": "Evi Boya" },
-    { "key": "ui.btn.drive", "value": "Sür" },
-    { "key": "ui.btn.job_board", "value": "İşe Başla" },
-    { "key": "ui.btn.shop", "value": "Satın Al" },
-    { "key": "ui.btn.vendor", "value": "Alışveriş" },
-    { "key": "ui.btn.chat", "value": "Sohbet" },
-    { "key": "ui.btn.punch", "value": "Vur" },
-    { "key": "ui.btn.jump", "value": "Atla" },
-    { "key": "ui.btn.use_tv", "value": "TV Aç / Kanal" },
-    { "key": "ui.btn.use_tea", "value": "Çay İç (+22)" },
-    { "key": "ui.btn.use_fridge", "value": "Buzdolabı (+28)" },
-    { "key": "ui.btn.use_wardrobe", "value": "Kıyafet Değiştir" },
-    { "key": "ui.btn.use_pc", "value": "Bilgisayarı Kullan" },
-    { "key": "ui.btn.use_washer", "value": "Çamaşır Makinesi" },
-    { "key": "ui.btn.use_sink", "value": "El Yüz Yıka (+15)" },
-    { "key": "ui.btn.pray", "value": "Namaz Kıl" },
-    { "key": "ui.btn.abdest", "value": "Abdest Al (+15)" },
-    { "key": "ui.btn.pet_cat", "value": "Kediyi Sev (+12)" },
-    { "key": "ui.btn.kick_ball", "value": "Şut Çek" },
-    { "key": "ui.btn.ride_motorcycle", "value": "Motora bin" },
-    { "key": "ui.btn.exit_motorcycle", "value": "Motordan in" },
-    { "key": "vehicle.motorcycle.slow_down", "value": "İnmek için önce yavaşla." },
-    { "key": "vehicle.motorcycle.controls", "value": "W/S Gaz/Fren · A/D Yön · E/F İn" },
-    { "key": "ui.btn.ride_bike", "value": "Bisiklete bin" },
-    { "key": "ui.btn.exit_bike", "value": "Bisikletten in" },
-    { "key": "ui.btn.play_tennis", "value": "Tenis Oyna" },
-    { "key": "ui.btn.leave_tennis", "value": "Korttan Çık" },
-    { "key": "ui.btn.play_football", "value": "Halı Saha Futbol Oyna" },
-    { "key": "ui.btn.play_basketball", "value": "Basketbol Oyna" },
-    { "key": "ui.btn.play_volleyball", "value": "Voleybol Oyna" },
-    { "key": "ui.btn.leave_sport", "value": "Maçtan Çık" },
-    { "key": "sports.btn.serve", "value": "Servis" },
-    { "key": "sports.btn.hit_now", "value": "VUR!" },
-    { "key": "sports.btn.rematch", "value": "Tekrar" },
-    { "key": "sports.btn.shoot", "value": "Şut!" },
-    { "key": "sports.btn.pass", "value": "Pas Ver" },
-    { "key": "sports.btn.call_pass", "value": "Pas İste" },
-    { "key": "sports.btn.steal", "value": "Top Kap" },
-    { "key": "sports.btn.shoot_2pt", "value": "Şut At" },
-    { "key": "sports.btn.shoot_3pt", "value": "3'lük!" },
-    { "key": "sports.btn.bump", "value": "Manşet" },
-    { "key": "sports.btn.spike", "value": "Smaç!" },
-    { "key": "sports.bicycle.slow_down", "value": "İnmek için önce fren yap." },
-    { "key": "sports.bicycle.no_space", "value": "İnmek için açık bir yere geç." },
-    { "key": "sports.bicycle.controls", "value": "W/S Pedal/Fren · A/D Yön · E/F İn" },
-    { "key": "sports.tennis.controls", "value": "V / Vur · A/D veya Joystick Yön Ver · E/F Çık" },
-    { "key": "sports.tennis.you", "value": "Sen" },
-    { "key": "sports.tennis.opponent", "value": "Rakip" },
-    { "key": "sports.tennis.serve", "value": "Servis için Vur · İlk 3 puan kazanır" },
-    { "key": "sports.tennis.swing", "value": "Vuruş yapılıyor" },
-    { "key": "sports.tennis.now", "value": "YEŞİL HALKA! ŞİMDİ VUR · Yön ver" },
-    { "key": "sports.tennis.buffered", "value": "Vuruş hazır! Top gelince vurulacak" },
-    { "key": "sports.tennis.perfect", "value": "MÜKEMMEL VURUŞ!" },
-    { "key": "sports.tennis.wait", "value": "Halka küçülünce Vur'a dokun" },
-    { "key": "sports.tennis.rally", "value": "Rakip topa koşuyor!" },
-    { "key": "sports.tennis.point_won", "value": "Harika! Puan senin!" },
-    { "key": "sports.tennis.point_lost", "value": "Puan rakibin" },
-    { "key": "sports.tennis.won", "value": "Maçı kazandın!" },
-    { "key": "sports.tennis.lost", "value": "Maçı rakip kazandı" },
-    { "key": "sports.tennis.won_rematch", "value": "MAÇI KAZANDIN (+75 ₺)! Tekrar için Vur" },
-    { "key": "sports.tennis.lost_rematch", "value": "Maç bitti · Rövanş için Tekrar'a dokun" },
-    { "key": "sports.tennis.win_toast", "value": "Tenis Maçı Kazanıldı! (+75 ₺)" },
-    { "key": "sports.football.controls", "value": "WASD Koş · Sol Tık Şut/Top Kap · Space Pas · E/F Çık" },
-    { "key": "sports.football.title", "value": "Halı Saha 3v3" },
-    { "key": "sports.football.team_you", "value": "Kırmızı (Sen)" },
-    { "key": "sports.football.team_rival", "value": "Mavi" },
-    { "key": "sports.football.has_ball", "value": "Top sende! Şut çek veya Pas ver" },
-    { "key": "sports.football.mate_ball", "value": "Takım arkadaşında · Pas İste'ye dokun" },
-    { "key": "sports.football.defend", "value": "Rakibe yaklaş ve Top Kap'a dokun!" },
-    { "key": "sports.football.chase", "value": "Boştaki topu kap!" },
-    { "key": "sports.football.passed_to_you", "value": "Pas sana geliyor!" },
-    { "key": "sports.football.nice_pass", "value": "Güzel pas!" },
-    { "key": "sports.football.stole", "value": "Topu kaptın! Kaleye yüklen!" },
-    { "key": "sports.football.goal_you", "value": "GOOOOL! (+35 ₺)" },
-    { "key": "sports.football.goal_rival", "value": "Mavi takım gol attı" },
-    { "key": "sports.football.won", "value": "HALI SAHA ŞAMPİYONU (+90 ₺)! Tekrar oyna" },
-    { "key": "sports.football.lost", "value": "Maç bitti · Rövanş için Tekrar'a dokun" },
-    { "key": "sports.football.win_toast", "value": "Halı Saha Zaferi! (+90 ₺)" },
-    { "key": "sports.basketball.controls", "value": "WASD Hareket · Sol Tık Şut/Top Kap · Space Pas · E/F Çık" },
-    { "key": "sports.basketball.title", "value": "Basketbol 2v2" },
-    { "key": "sports.basketball.team_you", "value": "Sarı (Sen)" },
-    { "key": "sports.basketball.team_rival", "value": "Lacivert" },
-    { "key": "sports.basketball.zone_2pt", "value": "2'lik Bölge · Şut At veya Pas Ver" },
-    { "key": "sports.basketball.zone_3pt", "value": "3'LÜK BÖLGE (+3) · Şut At!" },
-    { "key": "sports.basketball.mate_ball", "value": "Arkadaşında · Pas İste'ye dokun" },
-    { "key": "sports.basketball.defend", "value": "Rakibe yaklaş ve Top Kap!" },
-    { "key": "sports.basketball.stole", "value": "Müthiş top çalma! Hücuma çık!" },
-    { "key": "sports.basketball.scored_2pt", "value": "BASKET! +2 Sayı (+15 ₺)" },
-    { "key": "sports.basketball.scored_3pt", "value": "MUHTEŞEM ÜÇLÜK! +3 Sayı (+25 ₺)" },
-    { "key": "sports.basketball.rival_scored", "value": "Rakip sayı buldu · Sıra sende!" },
-    { "key": "sports.basketball.missed", "value": "Çemberden döndü!" },
-    { "key": "sports.basketball.won", "value": "SOKAK BASKETBOLU ZAFERİ (+90 ₺)! Tekrar" },
-    { "key": "sports.basketball.lost", "value": "Maç bitti · Rövanş için Tekrar'a dokun" },
-    { "key": "sports.basketball.win_toast", "value": "Basketbol Maçı Kazanıldı! (+90 ₺)" },
-    { "key": "sports.volleyball.controls", "value": "WASD Hareket · Sol Tık Manşet/Smaç · Space Direkt Smaç · E/F Çık" },
-    { "key": "sports.volleyball.title", "value": "Voleybol 2v2" },
-    { "key": "sports.volleyball.team_you", "value": "Turkuaz (Sen)" },
-    { "key": "sports.volleyball.team_rival", "value": "Bordo" },
-    { "key": "sports.volleyball.serve", "value": "Servis için Vur · İlk 5 puan kazanır" },
-    { "key": "sports.volleyball.wait", "value": "Halkaya yaklaş, yeşilde vur!" },
-    { "key": "sports.volleyball.now_bump", "value": "YEŞİL HALKA! Manşet vur!" },
-    { "key": "sports.volleyball.now_spike", "value": "YÜKSEK PAS! ŞİMDİ SMAÇ VUR!" },
-    { "key": "sports.volleyball.bumping", "value": "Manşet hazır!" },
-    { "key": "sports.volleyball.spiking", "value": "Smaç geliyor!" },
-    { "key": "sports.volleyball.mate_setting", "value": "Arkadaşın sana yüksek pas kaldırıyor!" },
-    { "key": "sports.volleyball.rally", "value": "Rakip karşılıyor!" },
-    { "key": "sports.volleyball.point_you", "value": "Harika sayı! Puan senin!" },
-    { "key": "sports.volleyball.point_rival", "value": "Sayı rakibin" },
-    { "key": "sports.volleyball.won", "value": "VOLEYBOL ZAFERİ (+85 ₺)! Tekrar oyna" },
-    { "key": "sports.volleyball.lost", "value": "Maç bitti · Rövanş için Tekrar'a dokun" },
-    { "key": "sports.volleyball.win_toast", "value": "Voleybol Maçı Kazanıldı! (+85 ₺)" },
-    { "key": "ui.btn.carry_prop", "value": "Al / Taşı" },
-    { "key": "ui.btn.use_atm", "value": "ATM Kullan" },
-    { "key": "ui.btn.sleep", "value": "Uyu (8 Saat)" },
-    { "key": "ui.phone.lang_prefix", "value": "Dil" },
-    { "key": "job.taxi.dest.seyyidkutup", "value": "Seyyid Kutup Cd. Kavşağı" },
-    { "key": "job.taxi.dest.bakkal58", "value": "No:58 Selman Bakkal" },
-    { "key": "job.taxi.dest.ototamir", "value": "No:73 Oto Tamir" },
-    { "key": "job.taxi.dest.nutuk", "value": "Nutuk Sokağı Girişi" },
-    { "key": "job.taxi.dest.camii", "value": "Hz. Osman Camii" },
-    { "key": "job.taxi.dest.fuel", "value": "Akaryakıt İstasyonu" },
-    { "key": "ui.btn.refuel", "value": "Yakıt Al" },
-    { "key": "ui.btn.vending", "value": "İçecek Al (5 ₺)" },
-    { "key": "ui.btn.gfx_low", "value": "Kalite: Düşük" },
-    { "key": "ui.btn.gfx_med", "value": "Kalite: Orta" },
-    { "key": "ui.paint.title", "value": "Evi Boya" },
-    { "key": "ui.paint.job_hint", "value": "Sipariş Rengi: {0} (+60 ₺)" },
-    { "key": "paint.color.0", "value": "Beyaz" },
-    { "key": "paint.color.1", "value": "Krem" },
-    { "key": "paint.color.2", "value": "Kiremit" },
-    { "key": "paint.color.3", "value": "Gök Mavisi" },
-    { "key": "paint.color.4", "value": "Adaçayı Yeşili" },
-    { "key": "paint.color.5", "value": "Açık Sarı" },
-    { "key": "paint.color.6", "value": "Lila" },
-    { "key": "paint.color.7", "value": "Antrasit" },
-    { "key": "ui.hud.freeroam_title", "value": "Sultanbeyli · Selman Sokağı" },
-    { "key": "ui.hud.freeroam_objective", "value": "Avrupa ve Anadolu Yakası'nı keşfet, Boğaziçi Köprüsü'nden geç, Kız Kulesi'ne yüz!" },
-    { "key": "ui.hud.keys_locked", "value": "Kilitli — Tamirhanedeki usta Marco'dan anahtarı al." },
-    { "key": "ui.hud.mission_complete", "value": "Görev Tamamlandı" },
-    { "key": "ui.hud.mission_failed", "value": "Görev Başarısız" },
-    { "key": "ui.hud.speed_unit", "value": "km/s" },
-    { "key": "ui.hud.distance_unit", "value": "m" },
-    { "key": "ui.hud.perf_saved", "value": "Performans raporu kaydedildi (ourworld_perf_log.txt)" },
-    { "key": "ui.hud.tail_too_close", "value": "Çok yakınsın — geri çekil!" },
-    { "key": "ui.hud.tail_too_far", "value": "Hedefi kaybediyorsun — yetiş!" },
-    { "key": "ui.hud.tail_good", "value": "Güvenli takip mesafesi" },
-    { "key": "ui.fail.timeout", "value": "Teslimat tamamlanmadan süre doldu." },
-    { "key": "ui.fail.lost_target", "value": "Takip edilen aracı gözden kaybettin." },
-    { "key": "ui.fail.spotted", "value": "Fazla yaklaştın ve sürücüyü şüphelendirdin." },
-    { "key": "ui.hint.controls_foot", "value": "WASD · Shift Koş · Space Atla · Sol Tık Vur/Şut/Fırlat · E Etkileş · G Işınlan · T Saat · M Harita" },
-    { "key": "ui.hint.controls_drive", "value": "W/S Sür · Space Drift · Shift Nitro · R Radyo · H Korna · L Far · T Saat · F/E İn" },
-    { "key": "ui.needs.tired_badge", "value": "Yorgun" },
-    { "key": "ui.needs.tired_toast", "value": "Yorgunsun — Kahve iç veya bir yatakta dinlen." },
-    { "key": "ui.needs.slept", "value": "8 saat uyudun — Dinç hissediyorsun!" },
-    { "key": "ui.vending.bought", "value": "Soğuk içecek aldın! (+8 Enerji)" },
-    { "key": "ui.mailbox.inspect", "value": "Çınarlı Kasabası Postası — Kutuda birkaç mektup ve kartpostal var." },
-    { "key": "ui.fuel.stop_first", "value": "Yakıt almak için pompanın yanında tamamen dur." },
-    { "key": "ui.fuel.already_full", "value": "Depo zaten dolu." },
-    { "key": "ui.fuel.no_money", "value": "Yakıt için yeterli paran yok! (%1 = 2 ₺)" },
-    { "key": "ui.fuel.filling", "value": "Yakıt dolduruluyor..." },
-    { "key": "ui.fuel.done", "value": "Depo dolduruldu! (-{0} ₺)" },
-    { "key": "ui.fuel.empty", "value": "Yakıt bitti! Kuzeydoğu akaryakıt istasyonuna uğra." },
-    { "key": "ui.shop.cafe_title", "value": "Çınar Kafe" },
-    { "key": "ui.shop.market_title", "value": "Kasaba Market" },
-    { "key": "ui.shop.pizza_title", "value": "Çınarlı Pizza" },
-    { "key": "ui.shop.status_line", "value": "Bakiye: ₺ {0}   ·   Enerji: %{1}" },
-    { "key": "ui.shop.item_coffee", "value": "Taze Kahve · 15 ₺ (+25 Enerji)" },
-    { "key": "ui.shop.item_sandwich", "value": "Kaşarlı Sandviç · 22 ₺ (+35 Enerji)" },
-    { "key": "ui.shop.item_meal", "value": "Sıcak Yemek · 30 ₺ (+50 Enerji)" },
-    { "key": "ui.shop.no_money", "value": "Yetersiz bakiye!" },
-    { "key": "ui.shop.bought", "value": "Afiyet olsun! +{0} Enerji" },
-    { "key": "job.pizza.name", "value": "Pizza Teslimatı" },
-    { "key": "job.taxi.name", "value": "Taksi" },
-    { "key": "job.cleanup.name", "value": "Sokak Temizliği" },
-    { "key": "job.paint.name", "value": "Ev Boyama İşi" },
-    { "key": "job.pizza.loc", "value": "Ana Cadde · PİZZA" },
-    { "key": "job.taxi.loc", "value": "Kasaba Meydanı Durağı" },
-    { "key": "job.cleanup.loc", "value": "Saat Kulesi Önü" },
-    { "key": "job.paint.loc", "value": "Konut Mahallesi Girişi" },
-    { "key": "job.pizza.desc", "value": "Ana Cadde PİZZA · Araçla evlere sıcak teslimat (40 ₺ + süre bonusu)" },
-    { "key": "job.taxi.desc", "value": "Meydan Taksi Durağı · Yolcuyu al ve hedefe bırak (mesafe + temiz sürüş)" },
-    { "key": "job.cleanup.desc", "value": "Saat Kulesi Önü · Yaya olarak 10 çöp topla (parça başı 5 ₺)" },
-    { "key": "job.paint.desc", "value": "Konut Mahallesi Girişi · İstenen evi seçilen renge boya (60 ₺)" },
-    { "key": "job.blocked_by_mission", "value": "Önce aktif süreli hikaye görevini tamamla." },
-    { "key": "job.cleanup.need_onfoot", "value": "Sokak temizliği yaya yapılır — önce araçtan in." },
-    { "key": "job.cancelled", "value": "İş iptal edildi." },
-    { "key": "job.pizza.started", "value": "Pizza Teslimatı başladı! Herhangi bir araçla adrese götür." },
-    { "key": "job.pizza.delivered", "value": "Pizza teslim edildi! +{0} ₺ ({1}/{2})" },
-    { "key": "job.pizza.all_done", "value": "5/5 Pizza vardiyası tamamlandı! +{0} ₺" },
-    { "key": "job.pizza.failed", "value": "Süre doldu! Pizza teslimatı başarısız." },
-    { "key": "job.taxi.started", "value": "Taksi çağrısı alındı! Bekleyen yolcuya sür." },
-    { "key": "job.taxi.collision", "value": "Sert çarpışma! Yolcu sarsıldı (-%10 ücret)" },
-    { "key": "job.taxi.picked_up", "value": "Yolcu bindi! Hedef: {0}" },
-    { "key": "job.taxi.done_bonus", "value": "Yolcu indirildi! Temiz sürüş bonusu ile +{0} ₺" },
-    { "key": "job.taxi.done", "value": "Yolcu indirildi! +{0} ₺" },
-    { "key": "job.taxi.dest.square", "value": "Kasaba Meydanı" },
-    { "key": "job.taxi.dest.harbor", "value": "Kuzey Kargo Deposu" },
-    { "key": "job.taxi.dest.garage", "value": "Tamirhane" },
-    { "key": "job.taxi.dest.park", "value": "Çınarlı Parkı" },
-    { "key": "job.taxi.dest.north", "value": "Kuzey Çarşı" },
-    { "key": "job.cleanup.started", "value": "Sokak Temizliği başladı! Meydan ve caddedeki 10 çöpü topla." },
-    { "key": "job.cleanup.done", "value": "Sokaklar tertemiz! 10/10 çöp toplandı." },
-    { "key": "job.cleanup.timeout", "value": "Süre doldu! Sokak temizliği sona erdi." },
-    { "key": "job.paint.started", "value": "Ev Boyama İşi: {0} evini {1} rengine boya." },
-    { "key": "job.paint.done", "value": "Harika işçilik! Ev istenen renge boyandı (+60 ₺)" },
-    { "key": "job.paint.wrong_color", "value": "Ev sahibi {0} rengini istemişti! Tekrar boyayabilirsin." },
-    { "key": "job.hud.pizza_drive", "value": "İŞ: Pizza ({0}/{1}) — {2} kapısında dur" },
-    { "key": "job.hud.pizza_enter_car", "value": "İŞ: Pizza ({0}/{1}) — Bir arabaya bin ({2})" },
-    { "key": "job.hud.taxi_pickup", "value": "İŞ: Taksi — El sallayan yolcunun yanında dur" },
-    { "key": "job.hud.taxi_enter_car", "value": "İŞ: Taksi — Bir arabaya bin ve yolcuyu al" },
-    { "key": "job.hud.taxi_dropoff", "value": "İŞ: Taksi — Yolcuyu {0} noktasına bırak" },
-    { "key": "job.hud.cleanup", "value": "İŞ: Sokak Temizliği — Çöpleri topla ({0}/{1})" },
-    { "key": "job.hud.paint", "value": "İŞ: Ev Boyama — {0} evini {1} rengine boya" },
-    { "key": "ui.phone.title", "value": "Kasaba Rehberi" },
-    { "key": "ui.phone.tab_map", "value": "Harita" },
-    { "key": "ui.phone.tab_jobs", "value": "İşler" },
-    { "key": "ui.phone.tab_stats", "value": "İstatistik" },
-    { "key": "ui.phone.clear_wp", "value": "İşareti Kaldır" },
-    { "key": "ui.phone.map_hint", "value": "Haritaya dokunarak özel hedef işaretleyebilirsin." },
-    { "key": "ui.phone.legend", "value": "▲ Konumun\n● Sürülebilir Araçlar\n★ Ek İş Başlangıç Noktaları\n⛽ Akaryakıt İstasyonu\n◎ Aktif Hedef / Rota" },
-    { "key": "ui.phone.pin_job", "value": "Konum İşaretle" },
-    { "key": "ui.phone.waypoint_set_named", "value": "Hedef işaretlendi: {0}" },
-    { "key": "ui.stats.money", "value": "Bakiye" },
-    { "key": "ui.stats.energy", "value": "Enerji" },
-    { "key": "ui.stats.deliveries", "value": "Teslim Edilen Pizza" },
-    { "key": "ui.stats.taxis", "value": "Taksi Yolculuğu" },
-    { "key": "ui.stats.painted", "value": "Boyanan Ev" },
-    { "key": "ui.stats.litter", "value": "Toplanan Çöp" },
-    { "key": "ui.stats.playtime", "value": "Oynama Süresi" },
-    { "key": "npc.mechanic.name", "value": "Usta Kemal (No:73 Oto Tamir)" },
-    { "key": "npc.harbor_receiver.name", "value": "Elif Abla (Mahalle Dayanışma)" },
-    { "key": "npc.player.name", "value": "Deniz'in Notları" },
-    { "key": "m01.title", "value": "Mahalleye Dönüş" },
-    { "key": "m01.summary", "value": "No:73 Oto Tamir'e yürü, Usta Kemal'den dedenin sedanının anahtarını al ve arabaya bin." },
-    { "key": "m01.step1.objective", "value": "No:73 Oto Tamir'e yürü ve Usta Kemal ile konuş." },
-    { "key": "m01.step2.objective", "value": "Tamirhanenin önündeki sedana bin." },
-    { "key": "m01.dlg.1", "value": "Hoş geldin Deniz! Yıllar sonra dedenin evine döndüğüne çok sevindim — sedanı bakımdan çıkardım, deposu dolu." },
-    { "key": "m01.dlg.2", "value": "Al anahtarları. Elif Abla az önce aradı; Kaya Holding denen bir şirket mahalledeki eski tapuların peşine düşmüş." },
-    { "key": "m01.dlg.3", "value": "Arabaya geç ve şu yedek parça kasasını Elif Abla'ya yetiştir, sana önemli bir şey anlatacak." },
-    { "key": "m02.title", "value": "İlk Emanet" },
-    { "key": "m02.summary", "value": "Kasa ve belgeleri süre dolmadan Elif Abla'ya teslim et." },
-    { "key": "m02.step1.objective", "value": "Süre dolmadan Elif Abla'nın teslimat noktasına sür." },
-    { "key": "m02.step2.objective", "value": "Araçtan in ve Elif Abla ile konuş." },
-    { "key": "m02.dlg.1", "value": "Tam vaktinde yetiştin Deniz, sağ olasın. Kasayı şöyle bırakalım." },
-    { "key": "m02.dlg.2", "value": "Gitmeden dinle: Hamidiye esnafının eski tapu suretlerini taşıyan koyu renkli bir kurye aracı bugün kayıplara karıştı." },
-    { "key": "m02.dlg.3", "value": "En son Selman Sokağı civarında park hâlinde görülmüş. Yaya olarak bir etrafa bakabilir misin?" },
-    { "key": "m03.title", "value": "Kayıp Sedanın İzinde" },
-    { "key": "m03.summary", "value": "Tarif edilen koyu renkli aracı mahallede yaya olarak bul ve torpidodaki notu oku." },
-    { "key": "m03.step1.objective", "value": "Batı sokaklarına git ve kayıp koyu renkli aracı bul." },
-    { "key": "m03.step2.objective", "value": "Araçtan inip kayıp sedanı yaya olarak incele." },
-    { "key": "m03.dlg.1", "value": "Plaka tutuyor — Elif Abla'nın bahsettiği araç bu. Şoför kapısı aralık bırakılmış." },
-    { "key": "m03.dlg.2", "value": "Torpidoda Kaya Holding antetli bir not var: 'Kurye çıkıştan kalkıp tapu zarfını batı sokaktaki buluşma noktasına bırakacak.'" },
-    { "key": "m03.dlg.3", "value": "Çıkış noktasına hemen yetişirsem kurye aracını uzaktan takip edip o zarfı alabilirim." },
-    { "key": "m04.title", "value": "Akşam Takibi" },
-    { "key": "m04.summary", "value": "Kaya Holding kuryesini gözden kaybetmeden takip et ve bırakılan mühürlü zarfı al." },
-    { "key": "m04.step1.objective", "value": "Çıkış gözetleme noktasına sür." },
-    { "key": "m04.step2.objective", "value": "Kurye aracını fark ettirmeden takip et (12m – 75m)." },
-    { "key": "m04.step3.objective", "value": "Kuryenin batı sokakta bıraktığı mühürlü zarfı yaya olarak al." },
-    { "key": "m04.dlg.1", "value": "Mühürlü zarf elimde! İçinde No:73 Oto Tamir'in kira sözleşmesi ve Selman Sokağı'nın eski imar kayıtları var." },
-    { "key": "m04.dlg.2", "value": "Usta Kemal belgeleri tamirhanede bekliyor; Elif Abla ise mahalle meclisine sunmak için istiyor. Karar benim." },
-    { "key": "m05.title", "value": "İlk Karar" },
-    { "key": "m05.summary", "value": "Selman Sokağı'na dön ve tapu zarfını Usta Kemal'e veya Elif Abla'ya teslim et." },
-    { "key": "m05.step1.objective", "value": "Selman Sokağı merkezine dön." },
-    { "key": "m05.step2.objective", "value": "Zarfı tamirhanedeki Usta Kemal'e VEYA Elif Abla'ya teslim et." },
-    { "key": "m05.marco.dlg.1", "value": "Biliyordum Kaya Holding'in esnafı sıkıştırmak için bu kayıtları sakladığını! Doğru kapıya getirdin evlat." },
-    { "key": "m05.marco.dlg.2", "value": "Bu belgelerle kimse No:73'ü kapatamaz. Al bakalım, emeğinin karşılığı (+300 ₺)." },
-    { "key": "m05.marco.dlg.3", "value": "Sedan artık tamamen senin Deniz. Şimdi mahalledeki komşularla tanışma vakti!" },
-    { "key": "m05.elena.dlg.1", "value": "Zarfı doğrudan mahalle meclisine getireceğini biliyordum! Bütün imar oyunlarının kanıtı bu dosyadaymış." },
-    { "key": "m05.elena.dlg.2", "value": "Esnaf dayanışma fonundan hakkını hemen ayırdık (+300 ₺). Selman Sokağı'na nefes aldırdın." },
-    { "key": "m05.elena.dlg.3", "value": "Artık Hamidiye'nin bir parçasısın Deniz — komşularımızın senden küçük ricaları olacak!" },
-    { "key": "npc.ayse.name", "value": "Ayşe Teyze" },
-    { "key": "npc.efe.name", "value": "Küçük Efe" },
-    { "key": "npc.pharmacist.name", "value": "Eczacı Selin" },
-    { "key": "npc.muhtar.name", "value": "Muhtar Remzi Bey" },
-    { "key": "npc.ayse.idle", "value": "Hayırlı günler evladım, Selman Sokağı'nda herkes birbirini tanır." },
-    { "key": "npc.efe.idle", "value": "Abi top oynayalım mı? Gürsu Sokağı'ndaki sahada maç var!" },
-    { "key": "npc.pharmacist.idle", "value": "Nöbetçi eczane bu hafta bizde. Geçmiş olsun dileklerimle." },
-    { "key": "npc.muhtar.idle", "value": "Mahallemizin her derdine koşarız, kapımız herkese açık." },
-    { "key": "ui.btn.pickup_cat", "value": "Kediyi Al" },
-    { "key": "m06.title", "value": "Bakkal Siparişi" },
-    { "key": "m06.summary", "value": "Ayşe Teyze'nin alışverişini Hüseyin Abi'nin bakkalından getir." },
-    { "key": "m06.step1.objective", "value": "Güney kaldırımındaki Ayşe Teyze ile konuş." },
-    { "key": "m06.step2.objective", "value": "Selman Bakkal'ın önündeki alışveriş poşetini al." },
-    { "key": "m06.step3.objective", "value": "Poşeti soğumadan Ayşe Teyze'ye teslim et." },
-    { "key": "m06.dlg.a1", "value": "Evladım dizlerim tutmuyor, bakkala kadar yürüyemedim." },
-    { "key": "m06.dlg.a2", "value": "Hüseyin Abi siparişimi hazırladı, kapının önünde. Getirir misin?" },
-    { "key": "m06.dlg.b1", "value": "Ekmek, süt, bir paket çay… Ayşe Teyze'nin siparişi tamam." },
-    { "key": "m06.dlg.c1", "value": "Allah razı olsun yavrum! Çayımı demleyip seni bekleyeceğim." },
-    { "key": "m06.dlg.c2", "value": "Al şu harçlığı da, sakın geri çevirme (+300 ₺)." },
-    { "key": "m07.title", "value": "Kayıp Kedi Pamuk" },
-    { "key": "m07.summary", "value": "Küçük Efe'nin beyaz kedisi Pamuk'u mahallede bul." },
-    { "key": "m07.step1.objective", "value": "Ağlayan Küçük Efe ile konuş." },
-    { "key": "m07.step2.objective", "value": "Gürsu Sokağı'ndaki futbol sahasına bak." },
-    { "key": "m07.step3.objective", "value": "Sahada yerde duran tasmayı incele." },
-    { "key": "m07.step4.objective", "value": "Hz. Osman Camii avlusunda Pamuk'u bul ve kucağına al." },
-    { "key": "m07.step5.objective", "value": "Pamuk'u Küçük Efe'ye geri götür." },
-    { "key": "m07.dlg.a1", "value": "Pamuk kayboldu! Sabah top oynarken peşimizden geliyordu…" },
-    { "key": "m07.dlg.a2", "value": "Futbol sahasına bakabilir misin? Ben çok korkuyorum." },
-    { "key": "m07.dlg.b1", "value": "Pamuk'un mavi tasması! Üzerinde balık kılçığı var…" },
-    { "key": "m07.dlg.b2", "value": "Cami avlusunda kedilere mama veriliyor. Oraya gitmiş olmalı." },
-    { "key": "m07.dlg.c1", "value": "İşte burada! Pamuk mırlayarak kollarıma atladı." },
-    { "key": "m07.dlg.d1", "value": "PAMUK! Teşekkürler abi, sen bir kahramansın!" },
-    { "key": "m07.dlg.d2", "value": "Annem bu parayı sana vermemi söyledi (+350 ₺)." },
-    { "key": "m08.title", "value": "Acil Eczane" },
-    { "key": "m08.summary", "value": "Ayşe Teyze'nin eşinin ilacını zamanında eczaneden getir." },
-    { "key": "m08.step1.objective", "value": "Telaşlı Ayşe Teyze ile konuş." },
-    { "key": "m08.step2.objective", "value": "Hemen arabana bin." },
-    { "key": "m08.step3.objective", "value": "Süre bitmeden doğudaki nöbetçi eczaneye arabayla ulaş." },
-    { "key": "m08.step4.objective", "value": "Eczacı Selin'den ilacı al." },
-    { "key": "m08.step5.objective", "value": "İlacı hızla Ayşe Teyze'ye yetiştir." },
-    { "key": "m08.dlg.a1", "value": "Evladım, Hasan Amca'nın tansiyon ilacı bitmiş, başı dönüyor!" },
-    { "key": "m08.dlg.a2", "value": "Nöbetçi eczane sokağın doğu ucunda. Arabanla gidersen yetişirsin!" },
-    { "key": "m08.dlg.b1", "value": "Hasan Bey'in reçetesi hazır. Günde bir tane, tok karnına." },
-    { "key": "m08.dlg.b2", "value": "Acele et, geç kalmasın. Geçmiş olsun!" },
-    { "key": "m08.dlg.c1", "value": "Yetiştin! Hasan Amca ilacını içti, rengi yerine geldi." },
-    { "key": "m08.dlg.c2", "value": "Sen bu mahallenin meleğisin evladım (+400 ₺)." },
-    { "key": "m09.title", "value": "Ustanın Parçası" },
-    { "key": "m09.summary", "value": "Usta Kemal'in benzinlikte unutulan yedek parçasını No:73 Oto Tamir'e getir." },
-    { "key": "m09.step1.objective", "value": "Tamirhanedeki Usta Kemal ile konuş." },
-    { "key": "m09.step2.objective", "value": "Arabayla batıdaki benzin istasyonuna git." },
-    { "key": "m09.step3.objective", "value": "Araçtan in ve yedek parça kutusunu al." },
-    { "key": "m09.step4.objective", "value": "Müşteri beklemeden parçayı arabayla tamirhaneye getir." },
-    { "key": "m09.step5.objective", "value": "Parçayı Usta Kemal'e teslim et." },
-    { "key": "m09.dlg.a1", "value": "Kargocu parçayı yanlışlıkla benzinliğe bırakmış, müşteri de kapıda!" },
-    { "key": "m09.dlg.a2", "value": "Arabayla git, kutuyu al ve hemen dön. Sana güveniyorum." },
-    { "key": "m09.dlg.b1", "value": "Triger seti — kutunun üstünde 'Oto Tamir No:73' yazıyor." },
-    { "key": "m09.dlg.c1", "value": "Tam zamanında! Müşterinin arabası öğlene hazır olur." },
-    { "key": "m09.dlg.c2", "value": "Bu da emeğinin karşılığı (+450 ₺). Arabana da bir göz attım." },
-    { "key": "m10.title", "value": "Mahalle Şenliği" },
-    { "key": "m10.summary", "value": "Elif Abla ile mahalle şenliğini hazırla ve Muhtar Remzi Bey'e haber ver." },
-    { "key": "m10.step1.objective", "value": "No:66 önündeki Elif Abla ile konuş." },
-    { "key": "m10.step2.objective", "value": "Çay Ocağı önündeki çay kolisini al." },
-    { "key": "m10.step3.objective", "value": "Bakkalın yanındaki simit tepsisini al." },
-    { "key": "m10.step4.objective", "value": "Şenlik alanına (Gürsu Sk. futbol sahası) git." },
-    { "key": "m10.step5.objective", "value": "Muhtar Remzi Bey'e şenliğin hazır olduğunu söyle." },
-    { "key": "m10.dlg.a1", "value": "Bu akşam mahalle şenliği var ve çay ile simit hâlâ gelmedi!" },
-    { "key": "m10.dlg.a2", "value": "Çay Ocağı'ndan çayı, bakkalın yanından simitleri alıp sahaya götürür müsün?" },
-    { "key": "m10.dlg.b1", "value": "Kocaman bir koli Rize çayı. Bu gece semaverler boş kalmayacak." },
-    { "key": "m10.dlg.c1", "value": "Sıcacık susamlı simitler… Mis gibi kokuyor." },
-    { "key": "m10.dlg.d1", "value": "Maşallah! Çay da simit de tamam, şenlik başlayabilir." },
-    { "key": "m10.dlg.d2", "value": "Bütün Selman Sokağı senden bahsediyor. Bu ödül hepimizden (+1000 ₺)." },
-    { "key": "m10.dlg.d3", "value": "Ama işimiz bitmedi Deniz! Kaya Holding Fatih Bulvarı'ndaki Saat Kulesi'nde imar başvurusu açmış. Avukat Tarık seni orada bekliyor!" },
-    { "key": "npc.tarik.name", "value": "Avukat Tarık (Mahalle Gönüllüsü)" },
-    { "key": "npc.tarik.idle", "value": "Hamidiye'nin sokaklarını korumak için hukuki her adımı atıyoruz Deniz." },
-    { "key": "m11.title", "value": "Saat Kulesi'ndeki Dosya" },
-    { "key": "m11.summary", "value": "Fatih Bulvarı · Saat Kulesi Meydanı'na git, Avukat Tarık ile buluş ve imar dosyasını incele." },
-    { "key": "m11.step1.objective", "value": "Fatih Bulvarı · Saat Kulesi Meydanı'na git." },
-    { "key": "m11.step2.objective", "value": "Saat Kulesi yanındaki Avukat Tarık ile konuş." },
-    { "key": "m11.step3.objective", "value": "Meydandaki imar ilan panosu dosyasını incele." },
-    { "key": "m11.step4.objective", "value": "Dosyayı Avukat Tarık'a götür." },
-    { "key": "m11.dlg.a1", "value": "Sonunda geldin Deniz! Kaya Holding, Selman Sokağı ile Zübeyde Hanım arasındaki eski bahçeli evler için ticari yıkım başvurusu vermiş." },
-    { "key": "m11.dlg.a2", "value": "İlan kopyası hemen Saat Kulesi'nin yanındaki masada. Bir göz atıp bana getirir misin?" },
-    { "key": "m11.dlg.b1", "value": "İmar itirazı için Hamidiye'nin farklı caddelerinden esnaf ve okul temsilcilerinin imzası gerekiyor!" },
-    { "key": "m11.dlg.c1", "value": "Harika! Şimdi Eyyubi, Aziziye ve Petrol Yolu caddelerindeki komşulardan imzaları toplarsak bu planı tamamen durdururuz (+550 ₺)." },
-    { "key": "m12.title", "value": "Sekiz Caddenin İmzası" },
-    { "key": "m12.summary", "value": "Eyyubi, Aziziye ve Petrol Yolu caddelerini dolaşıp Hamidiye Dayanışma İmzalarını topla." },
-    { "key": "m12.step1.objective", "value": "53 Eyyubi Mahalle Büfesi önünden Eyyubi imza klasörünü al." },
-    { "key": "m12.step2.objective", "value": "Aziziye Cd. İTO İlkokulu önünden veli imza dosyasını al." },
-    { "key": "m12.step3.objective", "value": "Petrol Yolu Cd. Büfesi önünden esnaf imzalarını al." },
-    { "key": "m12.step4.objective", "value": "Toplanan imzaları Fatih Bulvarı'ndaki Avukat Tarık'a teslim et." },
-    { "key": "m12.dlg.a1", "value": "Eyyubi Caddesi esnafı tek yürek! Murat Abi bütün sokağın imzasını toplamış." },
-    { "key": "m12.dlg.b1", "value": "İTO İlkokulu velileri ve Merve Öğretmen'in imzaları da tamam! Çocukların oyun sokakları güvende." },
-    { "key": "m12.dlg.c1", "value": "Petrol Yolu Caddesi esnafının son imzası da atıldı — klasör dolup taşıyor!" },
-    { "key": "m12.dlg.d1", "value": "İnanılmazsın Deniz! Sekiz caddeden yüzlerce imza topladın. Yarın sabah dilekçeyi veriyorum (+650 ₺)." },
-    { "key": "m12.dlg.d2", "value": "Gitmeden önce bir ricam var: Cankurtaran Can, havuzda çocuklar için yaz kutlaması hazırlıyor, ona bir el atar mısın?" },
-    { "key": "m13.title", "value": "Yaz Sürprizi · Havuz Günü" },
-    { "key": "m13.summary", "value": "Selman Bakkal'dan soğuk ikram kasasını al, Hamidiye Açık Yüzme Havuzu'na götür ve suya gir!" },
-    { "key": "m13.step1.objective", "value": "Selman Bakkal No:58 önündeki soğuk ikram kasasını al." },
-    { "key": "m13.step2.objective", "value": "Hamidiye Açık Yüzme Havuzu güvertesine çık (Selman Sk. güneyi)." },
-    { "key": "m13.step3.objective", "value": "Kasayı havuz başındaki ikram masasına bırak ve serinle!" },
-    { "key": "m13.step4.objective", "value": "Fatih Bulvarı'ndaki büyük final için Avukat Tarık'a dön." },
-    { "key": "m13.dlg.a1", "value": "Buz gibi karpuz, soğuk su ve dondurma dolu kasa hazır! Hüseyin Abi mahallenin çocuklarına benden dedi." },
-    { "key": "m13.dlg.b1", "value": "İkramlar havuz başında yerini aldı! İstediğin zaman merdivenden inip havuzda yüzebilirsin. Şimdi büyük final vakti!" },
-    { "key": "m13.dlg.c1", "value": "Mahalle neşe doldu Deniz! Muhtar Remzi Bey de Saat Kulesi Meydanı'nda bizi bekliyor — son imzayı atalım (+700 ₺)." },
-    { "key": "m14.title", "value": "Hamidiye'nin Zaferi" },
-    { "key": "m14.summary", "value": "Hamidiye Mahalle Sözleşmesi'ni Saat Kulesi Meydanı'nda Muhtar Remzi Bey'e teslim et ve mahalleyi kurtar!" },
-    { "key": "m14.step1.objective", "value": "Saat Kulesi yanındaki onaylı Hamidiye Koruma Sözleşmesi'ni al." },
-    { "key": "m14.step2.objective", "value": "Meydandaki Muhtar Remzi Bey ile konuş ve zaferi ilan et." },
-    { "key": "m14.dlg.a1", "value": "Resmî mühürlü Hamidiye Mahalle Koruma Kararı! Kaya Holding'in yıkım talebi kalıcı olarak reddedildi!" },
-    { "key": "m14.dlg.b1", "value": "BAŞARDIK DENİZ! Selman Sokağı, Hz. Osman Camii, havuzumuz, kortumuz ve tüm Hamidiye artık koruma altında!" },
-    { "key": "m14.dlg.b2", "value": "Deden bugünleri görse seninle gurur duyardı. Tüm mahallenin teşekkür ödülü (+2000 ₺) ve 'Hamidiye Kahramanı' unvanı senin!" },
-    { "key": "m14.dlg.b3", "value": "Bekle Deniz — Ayşe Teyze az önce haber yolladı! Dedenin 1988'de mahalle için sakladığı kayıp bir sandığın ipucunu bulmuş. Selman Sokağı'nda seni bekliyor!" },
-    { "key": "ui.hud.mission_prefix", "value": "Görev" },
-    { "key": "sports.mission.stage_done", "value": "Turnuva etabı kazanıldı! Sıradaki hedef güncellendi." },
-    { "key": "sports.mission.retry_hint", "value": "Bu etabı geçmek için Tekrar'a dokun ve maçı kazan!" },
-    { "key": "npc.kerem.name", "value": "Antrenör Kerem (Spor Kompleksi)" },
-    { "key": "npc.kerem.idle", "value": "Tenis, Halı Saha, Basketbol, Voleybol — Hamidiye'de spor hiç durmaz!" },
-    { "key": "npc.hasan.name", "value": "Elektrik Ustası Hasan (AYEDAŞ)" },
-    { "key": "npc.hasan.idle", "value": "Mürşit Caddesi trafosu güvende, sokak ışıkları sabaha kadar pırıl pırıl." },
-    { "key": "npc.defne.name", "value": "Gazeteci Defne (Hamidiye Postası)" },
-    { "key": "npc.defne.idle", "value": "Mahallemizin her hikâyesini ve gerçeğini tüm İstanbul'a duyuruyoruz." },
-    { "key": "m15.title", "value": "Dedemin Kayıp Sandığı" },
-    { "key": "m15.summary", "value": "Ayşe Teyze'nin üç bilmecesini çöz, 1988 tarihli şifre plakalarını topla ve dedenin gizli zaman kapsülünü aç." },
-    { "key": "m15.step1.objective", "value": "Selman Sokağı'ndaki Ayşe Teyze ile konuş ve ilk bilmeceyi dinle." },
-    { "key": "m15.step2.objective", "value": "1. Bilmece: Hz. Osman Camii avlusundaki pirinç şifre plakasını bul." },
-    { "key": "m15.step3.objective", "value": "2. Bilmece: Hamidiye Çay Bahçesi & Parkı'ndaki 2. plakayı bul." },
-    { "key": "m15.step4.objective", "value": "3. Bilmece: Zübeyde Hanım çamlı mavi evler önündeki 3. plakayı bul." },
-    { "key": "m15.step5.objective", "value": "No:48 Benim Evim bahçesindeki Dedemin Pirinç Sandığı'nı aç!" },
-    { "key": "m15.step6.objective", "value": "Sandıktan çıkan 1988 Turnuva Kupasını Saat Kulesi'ndeki Muhtar Remzi Bey'e götür." },
-    { "key": "m15.dlg.a1", "value": "Deniz yavrum, eski sandığımı karıştırırken dedenin 1988'de bıraktığı bir mektup buldum! Bahçendeki zaman kapsülünü 3 pirinç plaka açıyormuş." },
-    { "key": "m15.dlg.a2", "value": "İlk bilmece şöyle diyor: 'Suyun şırıltısı ve avlunun huzuru...' — Hz. Osman Camii avlusundan başla!" },
-    { "key": "m15.dlg.b1", "value": "1. Pirinç Plaka bulundu! Arkasında 2. bilmece kazılı: 'Çay kokusu, tavla sesleri ve parkın serin gölgesi...' — Hamidiye Çay Bahçesi!" },
-    { "key": "m15.dlg.c1", "value": "2. Pirinç Plaka elimde! Son ipucu: 'Mavi balkonların altında, çamların rüzgârında...' — Zübeyde Hanım Caddesi'ne!" },
-    { "key": "m15.dlg.d1", "value": "3. ve son şifre plakası da tamam! Gün batarken No:48 Selman Sokağı'ndaki bahçeme dönüp dedemin sandığını açma vakti." },
-    { "key": "m15.dlg.e1", "value": "Sandık açıldı! İçinden 1988 tarihli soluk bir mahalle fotoğrafı, +900 ₺ hatıra fonu ve parlak pirinç bir kupa çıktı..." },
-    { "key": "m15.dlg.e2", "value": "Üzerinde 'Büyük Hamidiye Spor Kupası' yazıyor! Bunu hemen Saat Kulesi'ndeki Muhtar Remzi Bey'e göstermeliyim." },
-    { "key": "m15.dlg.f1", "value": "Gözlerime inanamıyorum Deniz! Dedenin 1988'de başlattığı efsanevi Mahalle Spor Kupası bu! Yıllardır kayıp sanıyorduk (+900 ₺)." },
-    { "key": "m15.dlg.f2", "value": "Antrenör Kerem sahalarda seni bekliyor — kupayı yeniden canlandırmak için tüm sahalarda yarışmaya hazır mısın?" },
-    { "key": "m16.title", "value": "Büyük Hamidiye Spor Kupası" },
-    { "key": "m16.summary", "value": "Tenis, Halı Saha Futbolu ve Sokak Basketbolunda zafere ulaş, yüzme havuzunda serinle ve kupayı kaldır!" },
-    { "key": "m16.step1.objective", "value": "Spor Kompleksindeki Antrenör Kerem ile konuş ve turnuvayı başlat." },
-    { "key": "m16.step2.objective", "value": "1. Etap: Gürsu Sokağı Tenis Kortu'nda 1 Tenis maçı kazan! (Menü → Spor ile de girebilirsin)" },
-    { "key": "m16.step3.objective", "value": "2. Etap: Hamidiye Halı Saha'da 3v3 Futbol maçı kazan!" },
-    { "key": "m16.step4.objective", "value": "3. Etap: Hamidiye Basketbol Sahası'nda 2v2 Basketbol maçı kazan!" },
-    { "key": "m16.step5.objective", "value": "Şampiyonluk serinliği: Hamidiye Açık Yüzme Havuzu'na atla ve yüz!" },
-    { "key": "m16.step6.objective", "value": "Kupayı kaldırmak için Antrenör Kerem'in yanına dön." },
-    { "key": "m16.dlg.a1", "value": "Hoş geldin şampiyon adayı! Dedenin 1988 kupası için bütün Hamidiye sahalara akın etti." },
-    { "key": "m16.dlg.a2", "value": "Sırayla Tenis, 3v3 Halı Saha Futbolu ve 2v2 Basketbol maçlarını kazan, ardından havuza atlayıp serinle — kupa senin olsun!" },
-    { "key": "m16.dlg.b1", "value": "İNANILMAZ PERFORMANS DENİZ! Kortta, halı sahada, potada ve havuzda adını Hamidiye tarihine yazdırdın (+1200 ₺)!" },
-    { "key": "m16.dlg.b2", "value": "Bir dakika... Mürşit Caddesi'nden siren ve kesinti haberi geldi! Elektrik Ustası Hasan trafo başında acil yardım istiyor!" },
-    { "key": "m17.title", "value": "Gece Yarısı Elektrik Kesintisi" },
-    { "key": "m17.summary", "value": "Gece 22:00'de arızalanan Mürşit Cd. trafosunu kurtarmak için sigorta, jeneratör yakıtı ve röle panosunu zamanında yetiştir." },
-    { "key": "m17.step1.objective", "value": "Mürşit Caddesi trafosundaki Elektrik Ustası Hasan ile konuş." },
-    { "key": "m17.step2.objective", "value": "Süre bitmeden No:73 Oto Tamir önünden Yüksek Gerilim Sigorta Kutusu'nu al." },
-    { "key": "m17.step3.objective", "value": "Süre bitmeden Petrol Yolu'ndan Jeneratör Yakıt Bidonu'nu al." },
-    { "key": "m17.step4.objective", "value": "Süre bitmeden Atatürk Caddesi'ndeki Yedek Röle Panosu şalterini kaldır." },
-    { "key": "m17.step5.objective", "value": "Tüm malzemeleri süre dolmadan Mürşit Caddesi trafosuna yetiştir!" },
-    { "key": "m17.step6.objective", "value": "Sabah ışıklarıyla Usta Hasan ile konuş ve emeğinin karşılığını al." },
-    { "key": "m17.dlg.a1", "value": "Yetiştiğine şükür Deniz! Saat 22:00 oldu ve ana trafo aşırı yükten attı — bütün mahalle karanlıkta kalmak üzere!" },
-    { "key": "m17.dlg.a2", "value": "No:73'ten sigorta kutusunu, Petrol Yolu'ndan jeneratör yakıtını kap, Atatürk Cd. rölesini aç ve hemen buraya dön!" },
-    { "key": "m17.dlg.b1", "value": "Yüksek gerilim sigortaları sağlam! Şimdi hızla Petrol Yolu'ndan jeneratör yakıtını almalıyım." },
-    { "key": "m17.dlg.c1", "value": "Jeneratör bidonu bagajda! Sırada Atatürk Caddesi'ndeki yedek röle panosunu devreye almak var." },
-    { "key": "m17.dlg.d1", "value": "Röle şalteri kalktı, hat gerilimi normale döndü! Hemen Mürşit Caddesi'ndeki Usta Hasan'a yetişeyim!" },
-    { "key": "m17.dlg.e1", "value": "Bütün gece çalıştık ama tek bir ev bile elektriksiz kalmadı Deniz! Güneş de doğdu, mahalle sana minnettar (+1100 ₺)." },
-    { "key": "m17.dlg.e2", "value": "Usta Kemal seni No:73'te arıyordu — dedenin sedanı için 'Sekiz Cadde Büyük Rallisi' hazırlamış!" },
-    { "key": "m18.title", "value": "Sekiz Cadde Büyük Rallisi" },
-    { "key": "m18.summary", "value": "Dedenin sedanıyla gün batımında Fatih Bulvarı, Eyyubi, Zübeyde Hanım ve Abdülkadir Udeh'i aşan zamana karşı şehir rallisini tamamla!" },
-    { "key": "m18.step1.objective", "value": "No:73 Oto Tamir'deki Usta Kemal ile konuş ve ralli brifingini al." },
-    { "key": "m18.step2.objective", "value": "Hemen sedana bin ve başlangıç çizgisine hazırlan." },
-    { "key": "m18.step3.objective", "value": "1. Kapı: Süre bitmeden Fatih Bulvarı Saat Kulesi'nden geç!" },
-    { "key": "m18.step4.objective", "value": "2. Kapı: Hızla batıya dön, Eyyubi Caddesi kapısından geç!" },
-    { "key": "m18.step5.objective", "value": "3. Kapı: Güneye in, Zübeyde Hanım Çamlı Düzlüğünden geç!" },
-    { "key": "m18.step6.objective", "value": "4. Kapı: Abdülkadir Udeh & Hz. Osman Camii virajından geç!" },
-    { "key": "m18.step7.objective", "value": "FİNİŞ: Selman Sokağı No:73 Tamirhane önündeki bitiş çizgisini geç!" },
-    { "key": "m18.dlg.a1", "value": "Motoru senin için yeniden ayarladım Deniz! Bugün Hamidiye'nin 8 caddesini turlayan efsanevi Gün Batımı Rallisi var." },
-    { "key": "m18.dlg.a2", "value": "Saat Kulesi, Eyyubi, Zübeyde Hanım, Abdülkadir Udeh ve tekrar Selman Sokağı! Gazı köklemeye hazır mısın?" },
-    { "key": "m18.dlg.b1", "value": "REKOR SÜRE DENİZ! Dedenin sedanı caddelerde rüzgâr gibi aktı, bütün esnaf alkışlıyor (+1400 ₺)!" },
-    { "key": "m18.dlg.b2", "value": "Dur bir saniye... Gazeteci Defne, Fatih Bulvarı'ndan acil mesaj bıraktı. Kaya Holding bu gece gizli bir tezgâh kuruyormuş!" },
-    { "key": "m19.title", "value": "Kaya Holding'in Son Hamlesi" },
-    { "key": "m19.summary", "value": "Gece 21:00'de Gazeteci Defne'nin ihbarını takip et, 3 caddedeki gizli kanıt çantalarını topla ve son komployu boz!" },
-    { "key": "m19.step1.objective", "value": "Fatih Bulvarı'ndaki Gazeteci Defne ile buluş ve gece ihbarını al." },
-    { "key": "m19.step2.objective", "value": "Petrol Yolu Ticaret Şeridi'ndeki gizli belge çantasını ele geçir." },
-    { "key": "m19.step3.objective", "value": "Atatürk Caddesi Çam Koridoru'ndaki şifreli USB ve sözleşme dosyasını al." },
-    { "key": "m19.step4.objective", "value": "Aziziye İlkokulu önündeki sahte imar tutanağı zarfını topla." },
-    { "key": "m19.step5.objective", "value": "Süre bitmeden tüm kanıtları Saat Kulesi'ndeki Avukat Tarık'a ulaştır!" },
-    { "key": "m19.dlg.a1", "value": "İyi ki geldin Deniz! Kaya Holding koruma kararını delmek için bu gece üç farklı caddeye sahte tutanak ve rüşvet zarfları bırakmış." },
-    { "key": "m19.dlg.a2", "value": "Petrol Yolu, Atatürk Caddesi ve Aziziye İlkokulu önündeki kanıt çantalarını topla, Tarık'a ulaştır — ben manşeti hazırlıyorum!" },
-    { "key": "m19.dlg.b1", "value": "İlk kanıt çantası elimde! Sahte ekspertiz raporları... Şimdi hızla Atatürk Caddesi çam koridoruna!" },
-    { "key": "m19.dlg.c1", "value": "Şifreli USB ve gizli talimat yazışmaları tamam! Son nokta Aziziye Caddesi İlkokul önü." },
-    { "key": "m19.dlg.d1", "value": "Üçüncü dosya da bizde — okulu bile ticari parsele katmaya çalışmışlar! Hemen Saat Kulesi'ndeki Avukat Tarık'a yetişmeliyim!" },
-    { "key": "m19.dlg.e1", "value": "Muhteşem iş Deniz! Bu kanıtlarla savcılık soruşturması anında açıldı ve Kaya Holding tazminat ödemeye mahkûm edildi (+1600 ₺)!" },
-    { "key": "m19.dlg.e2", "value": "Son dakika haberi yayında! Yarın sabah Saat Kulesi Meydanı'nda büyük mahalle meclisi toplanıyor — karar günü!" },
-    { "key": "m20.title", "value": "Bizim Dünyamız · Büyük Miras" },
-    { "key": "m20.summary", "value": "Şenlik voleybol maçını kazan, kutlama pastasını al, dedenin plaketini gör ve Hamidiye'nin geleceği için son kararı ver!" },
-    { "key": "m20.step1.objective", "value": "Saat Kulesi Meydanı'ndaki Muhtar Remzi Bey ile konuş." },
-    { "key": "m20.step2.objective", "value": "Şenlik Gösteri Maçı: Plaj Voleybolu sahasında 2v2 Voleybol maçı kazan!" },
-    { "key": "m20.step3.objective", "value": "Selman Bakkal önünden mahalle kutlama pastasını al." },
-    { "key": "m20.step4.objective", "value": "No:48 Benim Evim girişindeki Dedemin Hatıra Plaketini incele." },
-    { "key": "m20.step5.objective", "value": "BÜYÜK KARAR: Fonu Avukat Tarık'a (Spor Akademisi) VEYA Elif Abla'ya (Kültür Parkı) teslim et!" },
-    { "key": "m20.dlg.a1", "value": "Günaydın Deniz! Kaya Holding'ten kazanılan büyük mahalle fonu bugün sahibini buluyor — ve son sözü tüm Hamidiye sana bıraktı!" },
-    { "key": "m20.dlg.a2", "value": "Önce şenlik voleybol maçında sahaya çık, bakkaldan kutlama pastasını al, evindeki hatıra plaketini gör ve büyük kararını ver!" },
-    { "key": "m20.dlg.b1", "value": "Hüseyin Abi 'Bizim Dünyamız · Hamidiye' yazılı dev bir pasta hazırlamış! Şimdi No:48'deki dedemin plaketine uğrayayım." },
-    { "key": "m20.dlg.c1", "value": "Pirinç plakette yazıyor: 'Bir mahalleyi beton değil, komşuların yüreği ayakta tutar. — 1988'" },
-    { "key": "m20.dlg.c2", "value": "Artık son karar vakti: Saat Kulesi'ndeki Avukat Tarık'la Gençlik Spor Akademisi mi, yoksa Elif Abla'yla Kültür Evi & Çam Parkı mı?" },
-    { "key": "m20.academy.1", "value": "Harika bir vizyon Deniz! 'Hamidiye Gençlik & Spor Akademisi' bugün resmen kuruldu — tenis, futbol, basketbol ve voleybol tüm çocuklara ücretsiz!" },
-    { "key": "m20.academy.2", "value": "20 görev boyunca Hamidiye'nin her sokağına hayat verdin. Büyük onur ödülü (+3000 ₺) ve 'Bizim Dünyamız Efsanesi' unvanı senin!" },
-    { "key": "m20.academy.3", "value": "Burası sadece bir mahalle değil — burası artık gerçekten Bizim Dünyamız. İstediğin zaman spor yap, sür, yüz ve keşfet!" },
-    { "key": "m20.park.1", "value": "Ne güzel bir yürek Deniz! 'Selman Sokağı Kültür Evi & Çam Parkı' bugün açılıyor — esnafımız, çocuklarımız ve komşularımız için sonsuz bir yuva!" },
-    { "key": "m20.park.2", "value": "20 görev boyunca Hamidiye'nin her sokağına hayat verdin. Büyük onur ödülü (+3000 ₺) ve 'Bizim Dünyamız Efsanesi' unvanı senin!" },
-    { "key": "m20.park.3", "value": "Burası sadece bir mahalle değil — burası artık gerçekten Bizim Dünyamız. İstediğin zaman spor yap, sür, yüz ve keşfet!" },
-    { "key": "ui.tab.feedback", "value": "Öneri" },
-    { "key": "feedback.title", "value": "Oyunu birlikte geliştirelim" },
-    { "key": "feedback.info", "value": "Oyunda ne olsun istersin? Fikrini yaz, her güncellemede en çok istenenleri ekliyoruz." },
-    { "key": "feedback.placeholder", "value": "Örn: Bir otobüs durağı ve şoförlük işi olsun…" },
-    { "key": "feedback.cat.idea", "value": "Fikir" },
-    { "key": "feedback.cat.bug", "value": "Hata" },
-    { "key": "feedback.cat.other", "value": "Diğer" },
-    { "key": "feedback.send", "value": "Gönder" },
-    { "key": "feedback.sending", "value": "Gönderiliyor…" },
-    { "key": "feedback.sent", "value": "Teşekkürler! Önerin bize ulaştı." },
-    { "key": "feedback.queued", "value": "İnternet yok — önerin kaydedildi, bağlanınca gönderilecek." },
-    { "key": "feedback.empty", "value": "Lütfen en az 5 karakterlik bir öneri yaz." },
-    { "key": "feedback.too_soon", "value": "Biraz bekle, az önce öneri gönderdin." },
-    { "key": "feedback.error", "value": "Gönderilemedi, daha sonra tekrar denenecek." },
-    { "key": "feedback.privacy", "value": "Takma adın, mesajın ve oyun sürümün anonim olarak Firestore'a kaydedilir." },
-    { "key": "feedback.name_placeholder", "value": "Adın / Takma ad (isteğe bağlı)" },
-    { "key": "feedback.feed_title", "value": "Canlı Oyuncu Mesajları" },
-    { "key": "feedback.refresh", "value": "Yenile" },
-    { "key": "update.maintenance_eyebrow", "value": "BAKIM ÇALIŞMASI" },
-    { "key": "update.force_eyebrow", "value": "ZORUNLU GÜNCELLEME" },
-    { "key": "update.soft_eyebrow", "value": "YENİ SÜRÜM" },
-    { "key": "update.retry", "value": "TEKRAR DENE" },
-    { "key": "whatsnew.btn", "value": "Yenilikler" },
-    { "key": "whatsnew.skip", "value": "ATLA  ✕" },
-    { "key": "whatsnew.next", "value": "SONRAKİ  →" },
-    { "key": "whatsnew.play", "value": "OYUNA BAŞLA!" },
-    { "key": "whatsnew.suggest", "value": "SEN DE FİKİR YAZ" },
-    { "key": "whatsnew.swipe_hint", "value": "←  Kaydırarak diğer özellikleri gör  →" },
-    { "key": "ui.btn.attack", "value": "Vur" },
-    { "key": "ui.menu.hud_btn", "value": "Menü" },
-    { "key": "ui.menu.eyebrow", "value": "İSTANBUL  ·  SULTANBEYLİ  ·  HAMİDİYE" },
-    { "key": "ui.menu.title", "value": "BİZİM DÜNYAMIZ" },
-    { "key": "ui.menu.subtitle", "value": "Yaşayan Açık Dünya · Mahalle Yaşamı" },
-    { "key": "ui.menu.pause_badge", "value": "DURAKLATILDI" },
-    { "key": "ui.menu.play_new", "value": "MAHALLEYE GİR" },
-    { "key": "ui.menu.play_continue", "value": "DEVAM ET" },
-    { "key": "ui.menu.play_resume", "value": "OYUNA DÖN" },
-    { "key": "ui.menu.play_new_sub", "value": "Selman Sokağı No:48 · Yeni Hayat" },
-    { "key": "ui.menu.nav_districts", "value": "Bölge Seç & Başla" },
-    { "key": "ui.menu.nav_fast_travel", "value": "Bölgeye Işınlan" },
-    { "key": "ui.menu.nav_settings", "value": "Ayarlar & Dünya" },
-    { "key": "ui.menu.nav_whatsnew", "value": "Yenilikler & Topluluk" },
-    { "key": "ui.menu.nav_guide", "value": "Mahalle Rehberi & Harita" },
-    { "key": "ui.menu.districts_title", "value": "BAŞLANGIÇ BÖLGESİ" },
-    { "key": "ui.menu.districts_hint", "value": "Bir mahalleye dokun, canlı kameradan incele ve oradan başla." },
-    { "key": "ui.menu.start_here", "value": "BURADA BAŞLA" },
-    { "key": "ui.menu.travel_here", "value": "BURAYA IŞINLAN" },
-    { "key": "ui.menu.discovered", "value": "KEŞFEDİLDİ" },
-    { "key": "ui.menu.unexplored", "value": "KEŞFET" },
-    { "key": "ui.menu.settings_title", "value": "AYARLAR & ATMOSFER" },
-    { "key": "ui.menu.set_graphics", "value": "Grafik Kalitesi" },
-    { "key": "ui.menu.set_gfx_low", "value": "Düşük" },
-    { "key": "ui.menu.set_gfx_med", "value": "Orta" },
-    { "key": "ui.menu.set_language", "value": "Dil" },
-    { "key": "ui.menu.set_audio", "value": "Ses Seviyesi" },
-    { "key": "ui.menu.set_sens", "value": "Kamera Hassasiyeti" },
-    { "key": "ui.menu.set_sens_low", "value": "Yavaş" },
-    { "key": "ui.menu.set_sens_mid", "value": "Normal" },
-    { "key": "ui.menu.set_sens_high", "value": "Hızlı" },
-    { "key": "ui.menu.set_time", "value": "Günün Saati (Canlı Önizleme)" },
-    { "key": "ui.menu.time_morning", "value": "Sabah" },
-    { "key": "ui.menu.time_noon", "value": "Öğle" },
-    { "key": "ui.menu.time_sunset", "value": "Akşam" },
-    { "key": "ui.menu.time_night", "value": "Gece" },
-    { "key": "ui.menu.set_fps", "value": "FPS Göstergesi" },
-    { "key": "ui.menu.on", "value": "Açık" },
-    { "key": "ui.menu.off", "value": "Kapalı" },
-    { "key": "ui.menu.reset_btn", "value": "Yeni Oyun (Kaydı Sıfırla)" },
-    { "key": "ui.menu.reset_confirm", "value": "EMİN MİSİN? SIFIRLA" },
-    { "key": "ui.menu.reset_cancel", "value": "Vazgeç" },
-    { "key": "ui.menu.profile_header", "value": "MAHALLE PROFİLİN" },
-    { "key": "ui.menu.stat_cash", "value": "NAKİT" },
-    { "key": "ui.menu.stat_missions", "value": "GÖREV" },
-    { "key": "ui.menu.stat_landmarks", "value": "KEŞİF" },
-    { "key": "ui.menu.stat_memories", "value": "HATIRA" },
-    { "key": "ui.menu.weather_clear", "value": "Açık & Güneşli" },
-    { "key": "ui.menu.weather_breezy", "value": "Serin & Esintili" },
-    { "key": "ui.menu.weather_rain", "value": "Yaz Yağmuru" },
-    { "key": "ui.menu.nav_sports", "value": "Spor & Mini Oyunlar" },
-    { "key": "ui.menu.sports_title", "value": "SPOR & MİNİ OYUNLAR" },
-    { "key": "ui.menu.sports_hint", "value": "İstediğin zaman bir spor seç, canlı sahayı gör ve hemen maça başla!" },
-    { "key": "ui.menu.play_sport_now", "value": "MAÇA BAŞLA" },
-    { "key": "ui.menu.vista_player", "value": "Bulunduğun Konum" }
+    {
+      "key": "ui.mode.onfoot",
+      "value": "Yaya"
+    },
+    {
+      "key": "ui.mode.driving",
+      "value": "Sürüş"
+    },
+    {
+      "key": "ui.btn.interact",
+      "value": "Etkileş"
+    },
+    {
+      "key": "ui.btn.talk",
+      "value": "Konuş"
+    },
+    {
+      "key": "ui.btn.enter_car",
+      "value": "Arabaya Bin"
+    },
+    {
+      "key": "ui.btn.exit_car",
+      "value": "İn"
+    },
+    {
+      "key": "ui.btn.inspect",
+      "value": "İncele"
+    },
+    {
+      "key": "ui.btn.pickup",
+      "value": "Al"
+    },
+    {
+      "key": "ui.btn.gas",
+      "value": "GAZ"
+    },
+    {
+      "key": "ui.btn.brake",
+      "value": "FREN"
+    },
+    {
+      "key": "ui.btn.handbrake",
+      "value": "El Freni"
+    },
+    {
+      "key": "ui.btn.sprint",
+      "value": "Koş"
+    },
+    {
+      "key": "ui.btn.phone",
+      "value": "Rehber (M)"
+    },
+    {
+      "key": "ui.btn.steer_left",
+      "value": "◀"
+    },
+    {
+      "key": "ui.btn.steer_right",
+      "value": "▶"
+    },
+    {
+      "key": "ui.btn.continue",
+      "value": "Devam"
+    },
+    {
+      "key": "ui.btn.retry",
+      "value": "Tekrar Dene"
+    },
+    {
+      "key": "ui.btn.reset_save",
+      "value": "Sıfırla"
+    },
+    {
+      "key": "ui.btn.close",
+      "value": "Kapat"
+    },
+    {
+      "key": "ui.btn.cancel",
+      "value": "İptal"
+    },
+    {
+      "key": "ui.btn.cancel_job",
+      "value": "Aktif İşi İptal Et"
+    },
+    {
+      "key": "ui.btn.door",
+      "value": "Kapı"
+    },
+    {
+      "key": "ui.btn.sit",
+      "value": "Otur"
+    },
+    {
+      "key": "ui.btn.stand",
+      "value": "Kalk"
+    },
+    {
+      "key": "ui.btn.paint",
+      "value": "Evi Boya"
+    },
+    {
+      "key": "ui.btn.drive",
+      "value": "Sür"
+    },
+    {
+      "key": "ui.btn.job_board",
+      "value": "İşe Başla"
+    },
+    {
+      "key": "ui.btn.shop",
+      "value": "Satın Al"
+    },
+    {
+      "key": "ui.btn.vendor",
+      "value": "Alışveriş"
+    },
+    {
+      "key": "ui.btn.chat",
+      "value": "Sohbet"
+    },
+    {
+      "key": "ui.btn.punch",
+      "value": "Vur"
+    },
+    {
+      "key": "ui.btn.jump",
+      "value": "Atla"
+    },
+    {
+      "key": "ui.btn.use_tv",
+      "value": "TV Aç / Kanal"
+    },
+    {
+      "key": "ui.btn.use_tea",
+      "value": "Çay İç (+22)"
+    },
+    {
+      "key": "ui.btn.use_fridge",
+      "value": "Buzdolabı (+28)"
+    },
+    {
+      "key": "ui.btn.use_wardrobe",
+      "value": "Kıyafet Değiştir"
+    },
+    {
+      "key": "ui.btn.use_pc",
+      "value": "Bilgisayarı Kullan"
+    },
+    {
+      "key": "ui.btn.use_washer",
+      "value": "Çamaşır Makinesi"
+    },
+    {
+      "key": "ui.btn.use_sink",
+      "value": "El Yüz Yıka (+15)"
+    },
+    {
+      "key": "ui.btn.pray",
+      "value": "Namaz Kıl"
+    },
+    {
+      "key": "ui.btn.abdest",
+      "value": "Abdest Al (+15)"
+    },
+    {
+      "key": "ui.btn.pet_cat",
+      "value": "Kediyi Sev (+12)"
+    },
+    {
+      "key": "ui.btn.kick_ball",
+      "value": "Şut Çek"
+    },
+    {
+      "key": "ui.btn.ride_motorcycle",
+      "value": "Motora bin"
+    },
+    {
+      "key": "ui.btn.exit_motorcycle",
+      "value": "Motordan in"
+    },
+    {
+      "key": "vehicle.motorcycle.slow_down",
+      "value": "İnmek için önce yavaşla."
+    },
+    {
+      "key": "vehicle.motorcycle.controls",
+      "value": "W/S Gaz/Fren · A/D Yön · E/F İn"
+    },
+    {
+      "key": "ui.btn.ride_bike",
+      "value": "Bisiklete bin"
+    },
+    {
+      "key": "ui.btn.exit_bike",
+      "value": "Bisikletten in"
+    },
+    {
+      "key": "ui.btn.play_tennis",
+      "value": "Tenis Oyna"
+    },
+    {
+      "key": "ui.btn.leave_tennis",
+      "value": "Korttan Çık"
+    },
+    {
+      "key": "ui.btn.play_football",
+      "value": "Halı Saha Futbol Oyna"
+    },
+    {
+      "key": "ui.btn.play_basketball",
+      "value": "Basketbol Oyna"
+    },
+    {
+      "key": "ui.btn.play_volleyball",
+      "value": "Voleybol Oyna"
+    },
+    {
+      "key": "ui.btn.leave_sport",
+      "value": "Maçtan Çık"
+    },
+    {
+      "key": "sports.btn.serve",
+      "value": "Servis"
+    },
+    {
+      "key": "sports.btn.hit_now",
+      "value": "VUR!"
+    },
+    {
+      "key": "sports.btn.rematch",
+      "value": "Tekrar"
+    },
+    {
+      "key": "sports.btn.shoot",
+      "value": "Şut!"
+    },
+    {
+      "key": "sports.btn.pass",
+      "value": "Pas Ver"
+    },
+    {
+      "key": "sports.btn.call_pass",
+      "value": "Pas İste"
+    },
+    {
+      "key": "sports.btn.steal",
+      "value": "Top Kap"
+    },
+    {
+      "key": "sports.btn.shoot_2pt",
+      "value": "Şut At"
+    },
+    {
+      "key": "sports.btn.shoot_3pt",
+      "value": "3'lük!"
+    },
+    {
+      "key": "sports.btn.bump",
+      "value": "Manşet"
+    },
+    {
+      "key": "sports.btn.spike",
+      "value": "Smaç!"
+    },
+    {
+      "key": "sports.bicycle.slow_down",
+      "value": "İnmek için önce fren yap."
+    },
+    {
+      "key": "sports.bicycle.no_space",
+      "value": "İnmek için açık bir yere geç."
+    },
+    {
+      "key": "sports.bicycle.controls",
+      "value": "W/S Pedal/Fren · A/D Yön · E/F İn"
+    },
+    {
+      "key": "sports.tennis.controls",
+      "value": "V / Vur · A/D veya Joystick Yön Ver · E/F Çık"
+    },
+    {
+      "key": "sports.tennis.you",
+      "value": "Sen"
+    },
+    {
+      "key": "sports.tennis.opponent",
+      "value": "Rakip"
+    },
+    {
+      "key": "sports.tennis.serve",
+      "value": "Servis için Vur · İlk 3 puan kazanır"
+    },
+    {
+      "key": "sports.tennis.swing",
+      "value": "Vuruş yapılıyor"
+    },
+    {
+      "key": "sports.tennis.now",
+      "value": "YEŞİL HALKA! ŞİMDİ VUR · Yön ver"
+    },
+    {
+      "key": "sports.tennis.buffered",
+      "value": "Vuruş hazır! Top gelince vurulacak"
+    },
+    {
+      "key": "sports.tennis.perfect",
+      "value": "MÜKEMMEL VURUŞ!"
+    },
+    {
+      "key": "sports.tennis.wait",
+      "value": "Halka küçülünce Vur'a dokun"
+    },
+    {
+      "key": "sports.tennis.rally",
+      "value": "Rakip topa koşuyor!"
+    },
+    {
+      "key": "sports.tennis.point_won",
+      "value": "Harika! Puan senin!"
+    },
+    {
+      "key": "sports.tennis.point_lost",
+      "value": "Puan rakibin"
+    },
+    {
+      "key": "sports.tennis.won",
+      "value": "Maçı kazandın!"
+    },
+    {
+      "key": "sports.tennis.lost",
+      "value": "Maçı rakip kazandı"
+    },
+    {
+      "key": "sports.tennis.won_rematch",
+      "value": "MAÇI KAZANDIN (+75 ₺)! Tekrar için Vur"
+    },
+    {
+      "key": "sports.tennis.lost_rematch",
+      "value": "Maç bitti · Rövanş için Tekrar'a dokun"
+    },
+    {
+      "key": "sports.tennis.win_toast",
+      "value": "Tenis Maçı Kazanıldı! (+75 ₺)"
+    },
+    {
+      "key": "sports.football.controls",
+      "value": "WASD Koş · Sol Tık Şut/Top Kap · Space Pas · E/F Çık"
+    },
+    {
+      "key": "sports.football.title",
+      "value": "Halı Saha 3v3"
+    },
+    {
+      "key": "sports.football.team_you",
+      "value": "Kırmızı (Sen)"
+    },
+    {
+      "key": "sports.football.team_rival",
+      "value": "Mavi"
+    },
+    {
+      "key": "sports.football.has_ball",
+      "value": "Top sende! Şut çek veya Pas ver"
+    },
+    {
+      "key": "sports.football.mate_ball",
+      "value": "Takım arkadaşında · Pas İste'ye dokun"
+    },
+    {
+      "key": "sports.football.defend",
+      "value": "Rakibe yaklaş ve Top Kap'a dokun!"
+    },
+    {
+      "key": "sports.football.chase",
+      "value": "Boştaki topu kap!"
+    },
+    {
+      "key": "sports.football.passed_to_you",
+      "value": "Pas sana geliyor!"
+    },
+    {
+      "key": "sports.football.nice_pass",
+      "value": "Güzel pas!"
+    },
+    {
+      "key": "sports.football.stole",
+      "value": "Topu kaptın! Kaleye yüklen!"
+    },
+    {
+      "key": "sports.football.goal_you",
+      "value": "GOOOOL! (+35 ₺)"
+    },
+    {
+      "key": "sports.football.goal_rival",
+      "value": "Mavi takım gol attı"
+    },
+    {
+      "key": "sports.football.won",
+      "value": "HALI SAHA ŞAMPİYONU (+90 ₺)! Tekrar oyna"
+    },
+    {
+      "key": "sports.football.lost",
+      "value": "Maç bitti · Rövanş için Tekrar'a dokun"
+    },
+    {
+      "key": "sports.football.win_toast",
+      "value": "Halı Saha Zaferi! (+90 ₺)"
+    },
+    {
+      "key": "sports.basketball.controls",
+      "value": "WASD Hareket · Sol Tık Şut/Top Kap · Space Pas · E/F Çık"
+    },
+    {
+      "key": "sports.basketball.title",
+      "value": "Basketbol 2v2"
+    },
+    {
+      "key": "sports.basketball.team_you",
+      "value": "Sarı (Sen)"
+    },
+    {
+      "key": "sports.basketball.team_rival",
+      "value": "Lacivert"
+    },
+    {
+      "key": "sports.basketball.zone_2pt",
+      "value": "2'lik Bölge · Şut At veya Pas Ver"
+    },
+    {
+      "key": "sports.basketball.zone_3pt",
+      "value": "3'LÜK BÖLGE (+3) · Şut At!"
+    },
+    {
+      "key": "sports.basketball.mate_ball",
+      "value": "Arkadaşında · Pas İste'ye dokun"
+    },
+    {
+      "key": "sports.basketball.defend",
+      "value": "Rakibe yaklaş ve Top Kap!"
+    },
+    {
+      "key": "sports.basketball.stole",
+      "value": "Müthiş top çalma! Hücuma çık!"
+    },
+    {
+      "key": "sports.basketball.scored_2pt",
+      "value": "BASKET! +2 Sayı (+15 ₺)"
+    },
+    {
+      "key": "sports.basketball.scored_3pt",
+      "value": "MUHTEŞEM ÜÇLÜK! +3 Sayı (+25 ₺)"
+    },
+    {
+      "key": "sports.basketball.rival_scored",
+      "value": "Rakip sayı buldu · Sıra sende!"
+    },
+    {
+      "key": "sports.basketball.missed",
+      "value": "Çemberden döndü!"
+    },
+    {
+      "key": "sports.basketball.won",
+      "value": "SOKAK BASKETBOLU ZAFERİ (+90 ₺)! Tekrar"
+    },
+    {
+      "key": "sports.basketball.lost",
+      "value": "Maç bitti · Rövanş için Tekrar'a dokun"
+    },
+    {
+      "key": "sports.basketball.win_toast",
+      "value": "Basketbol Maçı Kazanıldı! (+90 ₺)"
+    },
+    {
+      "key": "sports.volleyball.controls",
+      "value": "WASD Hareket · Sol Tık Manşet/Smaç · Space Direkt Smaç · E/F Çık"
+    },
+    {
+      "key": "sports.volleyball.title",
+      "value": "Voleybol 2v2"
+    },
+    {
+      "key": "sports.volleyball.team_you",
+      "value": "Turkuaz (Sen)"
+    },
+    {
+      "key": "sports.volleyball.team_rival",
+      "value": "Bordo"
+    },
+    {
+      "key": "sports.volleyball.serve",
+      "value": "Servis için Vur · İlk 5 puan kazanır"
+    },
+    {
+      "key": "sports.volleyball.wait",
+      "value": "Halkaya yaklaş, yeşilde vur!"
+    },
+    {
+      "key": "sports.volleyball.now_bump",
+      "value": "YEŞİL HALKA! Manşet vur!"
+    },
+    {
+      "key": "sports.volleyball.now_spike",
+      "value": "YÜKSEK PAS! ŞİMDİ SMAÇ VUR!"
+    },
+    {
+      "key": "sports.volleyball.bumping",
+      "value": "Manşet hazır!"
+    },
+    {
+      "key": "sports.volleyball.spiking",
+      "value": "Smaç geliyor!"
+    },
+    {
+      "key": "sports.volleyball.mate_setting",
+      "value": "Arkadaşın sana yüksek pas kaldırıyor!"
+    },
+    {
+      "key": "sports.volleyball.rally",
+      "value": "Rakip karşılıyor!"
+    },
+    {
+      "key": "sports.volleyball.point_you",
+      "value": "Harika sayı! Puan senin!"
+    },
+    {
+      "key": "sports.volleyball.point_rival",
+      "value": "Sayı rakibin"
+    },
+    {
+      "key": "sports.volleyball.won",
+      "value": "VOLEYBOL ZAFERİ (+85 ₺)! Tekrar oyna"
+    },
+    {
+      "key": "sports.volleyball.lost",
+      "value": "Maç bitti · Rövanş için Tekrar'a dokun"
+    },
+    {
+      "key": "sports.volleyball.win_toast",
+      "value": "Voleybol Maçı Kazanıldı! (+85 ₺)"
+    },
+    {
+      "key": "ui.btn.carry_prop",
+      "value": "Al / Taşı"
+    },
+    {
+      "key": "ui.btn.use_atm",
+      "value": "ATM Kullan"
+    },
+    {
+      "key": "ui.btn.sleep",
+      "value": "Uyu (8 Saat)"
+    },
+    {
+      "key": "ui.phone.lang_prefix",
+      "value": "Dil"
+    },
+    {
+      "key": "job.taxi.dest.seyyidkutup",
+      "value": "Seyyid Kutup Cd. Kavşağı"
+    },
+    {
+      "key": "job.taxi.dest.bakkal58",
+      "value": "No:58 Selman Bakkal"
+    },
+    {
+      "key": "job.taxi.dest.ototamir",
+      "value": "No:73 Oto Tamir"
+    },
+    {
+      "key": "job.taxi.dest.nutuk",
+      "value": "Nutuk Sokağı Girişi"
+    },
+    {
+      "key": "job.taxi.dest.camii",
+      "value": "Hz. Osman Camii"
+    },
+    {
+      "key": "job.taxi.dest.fuel",
+      "value": "Akaryakıt İstasyonu"
+    },
+    {
+      "key": "ui.btn.refuel",
+      "value": "Yakıt Al"
+    },
+    {
+      "key": "ui.btn.vending",
+      "value": "İçecek Al (5 ₺)"
+    },
+    {
+      "key": "ui.btn.gfx_low",
+      "value": "Kalite: Düşük"
+    },
+    {
+      "key": "ui.btn.gfx_med",
+      "value": "Kalite: Orta"
+    },
+    {
+      "key": "ui.paint.title",
+      "value": "Evi Boya"
+    },
+    {
+      "key": "ui.paint.job_hint",
+      "value": "Sipariş Rengi: {0} (+60 ₺)"
+    },
+    {
+      "key": "paint.color.0",
+      "value": "Beyaz"
+    },
+    {
+      "key": "paint.color.1",
+      "value": "Krem"
+    },
+    {
+      "key": "paint.color.2",
+      "value": "Kiremit"
+    },
+    {
+      "key": "paint.color.3",
+      "value": "Gök Mavisi"
+    },
+    {
+      "key": "paint.color.4",
+      "value": "Adaçayı Yeşili"
+    },
+    {
+      "key": "paint.color.5",
+      "value": "Açık Sarı"
+    },
+    {
+      "key": "paint.color.6",
+      "value": "Lila"
+    },
+    {
+      "key": "paint.color.7",
+      "value": "Antrasit"
+    },
+    {
+      "key": "ui.hud.freeroam_title",
+      "value": "Sultanbeyli · Selman Sokağı"
+    },
+    {
+      "key": "ui.hud.freeroam_objective",
+      "value": "Avrupa ve Anadolu Yakası'nı keşfet, Boğaziçi Köprüsü'nden geç, Kız Kulesi'ne yüz!"
+    },
+    {
+      "key": "ui.hud.keys_locked",
+      "value": "Kilitli — Tamirhanedeki usta Marco'dan anahtarı al."
+    },
+    {
+      "key": "ui.hud.mission_complete",
+      "value": "Görev Tamamlandı"
+    },
+    {
+      "key": "ui.hud.mission_failed",
+      "value": "Görev Başarısız"
+    },
+    {
+      "key": "ui.hud.speed_unit",
+      "value": "km/s"
+    },
+    {
+      "key": "ui.hud.distance_unit",
+      "value": "m"
+    },
+    {
+      "key": "ui.hud.perf_saved",
+      "value": "Performans raporu kaydedildi (ourworld_perf_log.txt)"
+    },
+    {
+      "key": "ui.hud.tail_too_close",
+      "value": "Çok yakınsın — geri çekil!"
+    },
+    {
+      "key": "ui.hud.tail_too_far",
+      "value": "Hedefi kaybediyorsun — yetiş!"
+    },
+    {
+      "key": "ui.hud.tail_good",
+      "value": "Güvenli takip mesafesi"
+    },
+    {
+      "key": "ui.fail.timeout",
+      "value": "Teslimat tamamlanmadan süre doldu."
+    },
+    {
+      "key": "ui.fail.lost_target",
+      "value": "Takip edilen aracı gözden kaybettin."
+    },
+    {
+      "key": "ui.fail.spotted",
+      "value": "Fazla yaklaştın ve sürücüyü şüphelendirdin."
+    },
+    {
+      "key": "ui.hint.controls_foot",
+      "value": "WASD · Shift Koş · Space Atla · Sol Tık Vur/Şut/Fırlat · E Etkileş · G Işınlan · T Saat · M Harita"
+    },
+    {
+      "key": "ui.hint.controls_drive",
+      "value": "W/S Sür · Space Drift · Shift Nitro · R Radyo · H Korna · L Far · T Saat · F/E İn"
+    },
+    {
+      "key": "ui.needs.tired_badge",
+      "value": "Yorgun"
+    },
+    {
+      "key": "ui.needs.tired_toast",
+      "value": "Yorgunsun — Kahve iç veya bir yatakta dinlen."
+    },
+    {
+      "key": "ui.needs.slept",
+      "value": "8 saat uyudun — Dinç hissediyorsun!"
+    },
+    {
+      "key": "ui.vending.bought",
+      "value": "Soğuk içecek aldın! (+8 Enerji)"
+    },
+    {
+      "key": "ui.mailbox.inspect",
+      "value": "Çınarlı Kasabası Postası — Kutuda birkaç mektup ve kartpostal var."
+    },
+    {
+      "key": "ui.fuel.stop_first",
+      "value": "Yakıt almak için pompanın yanında tamamen dur."
+    },
+    {
+      "key": "ui.fuel.already_full",
+      "value": "Depo zaten dolu."
+    },
+    {
+      "key": "ui.fuel.no_money",
+      "value": "Yakıt için yeterli paran yok! (%1 = 2 ₺)"
+    },
+    {
+      "key": "ui.fuel.filling",
+      "value": "Yakıt dolduruluyor..."
+    },
+    {
+      "key": "ui.fuel.done",
+      "value": "Depo dolduruldu! (-{0} ₺)"
+    },
+    {
+      "key": "ui.fuel.empty",
+      "value": "Yakıt bitti! Kuzeydoğu akaryakıt istasyonuna uğra."
+    },
+    {
+      "key": "ui.shop.cafe_title",
+      "value": "Çınar Kafe"
+    },
+    {
+      "key": "ui.shop.market_title",
+      "value": "Kasaba Market"
+    },
+    {
+      "key": "ui.shop.pizza_title",
+      "value": "Çınarlı Pizza"
+    },
+    {
+      "key": "ui.shop.status_line",
+      "value": "Bakiye: ₺ {0}   ·   Enerji: %{1}"
+    },
+    {
+      "key": "ui.shop.item_coffee",
+      "value": "Taze Kahve · 15 ₺ (+25 Enerji)"
+    },
+    {
+      "key": "ui.shop.item_sandwich",
+      "value": "Kaşarlı Sandviç · 22 ₺ (+35 Enerji)"
+    },
+    {
+      "key": "ui.shop.item_meal",
+      "value": "Sıcak Yemek · 30 ₺ (+50 Enerji)"
+    },
+    {
+      "key": "ui.shop.no_money",
+      "value": "Yetersiz bakiye!"
+    },
+    {
+      "key": "ui.shop.bought",
+      "value": "Afiyet olsun! +{0} Enerji"
+    },
+    {
+      "key": "job.pizza.name",
+      "value": "Pizza Teslimatı"
+    },
+    {
+      "key": "job.taxi.name",
+      "value": "Taksi"
+    },
+    {
+      "key": "job.cleanup.name",
+      "value": "Sokak Temizliği"
+    },
+    {
+      "key": "job.paint.name",
+      "value": "Ev Boyama İşi"
+    },
+    {
+      "key": "job.pizza.loc",
+      "value": "Ana Cadde · PİZZA"
+    },
+    {
+      "key": "job.taxi.loc",
+      "value": "Kasaba Meydanı Durağı"
+    },
+    {
+      "key": "job.cleanup.loc",
+      "value": "Saat Kulesi Önü"
+    },
+    {
+      "key": "job.paint.loc",
+      "value": "Konut Mahallesi Girişi"
+    },
+    {
+      "key": "job.pizza.desc",
+      "value": "Ana Cadde PİZZA · Araçla evlere sıcak teslimat (40 ₺ + süre bonusu)"
+    },
+    {
+      "key": "job.taxi.desc",
+      "value": "Meydan Taksi Durağı · Yolcuyu al ve hedefe bırak (mesafe + temiz sürüş)"
+    },
+    {
+      "key": "job.cleanup.desc",
+      "value": "Saat Kulesi Önü · Yaya olarak 10 çöp topla (parça başı 5 ₺)"
+    },
+    {
+      "key": "job.paint.desc",
+      "value": "Konut Mahallesi Girişi · İstenen evi seçilen renge boya (60 ₺)"
+    },
+    {
+      "key": "job.blocked_by_mission",
+      "value": "Önce aktif süreli hikaye görevini tamamla."
+    },
+    {
+      "key": "job.cleanup.need_onfoot",
+      "value": "Sokak temizliği yaya yapılır — önce araçtan in."
+    },
+    {
+      "key": "job.cancelled",
+      "value": "İş iptal edildi."
+    },
+    {
+      "key": "job.pizza.started",
+      "value": "Pizza Teslimatı başladı! Herhangi bir araçla adrese götür."
+    },
+    {
+      "key": "job.pizza.delivered",
+      "value": "Pizza teslim edildi! +{0} ₺ ({1}/{2})"
+    },
+    {
+      "key": "job.pizza.all_done",
+      "value": "5/5 Pizza vardiyası tamamlandı! +{0} ₺"
+    },
+    {
+      "key": "job.pizza.failed",
+      "value": "Süre doldu! Pizza teslimatı başarısız."
+    },
+    {
+      "key": "job.taxi.started",
+      "value": "Taksi çağrısı alındı! Bekleyen yolcuya sür."
+    },
+    {
+      "key": "job.taxi.collision",
+      "value": "Sert çarpışma! Yolcu sarsıldı (-%10 ücret)"
+    },
+    {
+      "key": "job.taxi.picked_up",
+      "value": "Yolcu bindi! Hedef: {0}"
+    },
+    {
+      "key": "job.taxi.done_bonus",
+      "value": "Yolcu indirildi! Temiz sürüş bonusu ile +{0} ₺"
+    },
+    {
+      "key": "job.taxi.done",
+      "value": "Yolcu indirildi! +{0} ₺"
+    },
+    {
+      "key": "job.taxi.dest.square",
+      "value": "Kasaba Meydanı"
+    },
+    {
+      "key": "job.taxi.dest.harbor",
+      "value": "Kuzey Kargo Deposu"
+    },
+    {
+      "key": "job.taxi.dest.garage",
+      "value": "Tamirhane"
+    },
+    {
+      "key": "job.taxi.dest.park",
+      "value": "Çınarlı Parkı"
+    },
+    {
+      "key": "job.taxi.dest.north",
+      "value": "Kuzey Çarşı"
+    },
+    {
+      "key": "job.cleanup.started",
+      "value": "Sokak Temizliği başladı! Meydan ve caddedeki 10 çöpü topla."
+    },
+    {
+      "key": "job.cleanup.done",
+      "value": "Sokaklar tertemiz! 10/10 çöp toplandı."
+    },
+    {
+      "key": "job.cleanup.timeout",
+      "value": "Süre doldu! Sokak temizliği sona erdi."
+    },
+    {
+      "key": "job.paint.started",
+      "value": "Ev Boyama İşi: {0} evini {1} rengine boya."
+    },
+    {
+      "key": "job.paint.done",
+      "value": "Harika işçilik! Ev istenen renge boyandı (+60 ₺)"
+    },
+    {
+      "key": "job.paint.wrong_color",
+      "value": "Ev sahibi {0} rengini istemişti! Tekrar boyayabilirsin."
+    },
+    {
+      "key": "job.hud.pizza_drive",
+      "value": "İŞ: Pizza ({0}/{1}) — {2} kapısında dur"
+    },
+    {
+      "key": "job.hud.pizza_enter_car",
+      "value": "İŞ: Pizza ({0}/{1}) — Bir arabaya bin ({2})"
+    },
+    {
+      "key": "job.hud.taxi_pickup",
+      "value": "İŞ: Taksi — El sallayan yolcunun yanında dur"
+    },
+    {
+      "key": "job.hud.taxi_enter_car",
+      "value": "İŞ: Taksi — Bir arabaya bin ve yolcuyu al"
+    },
+    {
+      "key": "job.hud.taxi_dropoff",
+      "value": "İŞ: Taksi — Yolcuyu {0} noktasına bırak"
+    },
+    {
+      "key": "job.hud.cleanup",
+      "value": "İŞ: Sokak Temizliği — Çöpleri topla ({0}/{1})"
+    },
+    {
+      "key": "job.hud.paint",
+      "value": "İŞ: Ev Boyama — {0} evini {1} rengine boya"
+    },
+    {
+      "key": "ui.phone.title",
+      "value": "Kasaba Rehberi"
+    },
+    {
+      "key": "ui.phone.tab_map",
+      "value": "Harita"
+    },
+    {
+      "key": "ui.phone.tab_jobs",
+      "value": "İşler"
+    },
+    {
+      "key": "ui.phone.tab_stats",
+      "value": "İstatistik"
+    },
+    {
+      "key": "ui.phone.clear_wp",
+      "value": "İşareti Kaldır"
+    },
+    {
+      "key": "ui.phone.map_hint",
+      "value": "Haritaya dokunarak özel hedef işaretleyebilirsin."
+    },
+    {
+      "key": "ui.phone.legend",
+      "value": "▲ Konumun\n● Sürülebilir Araçlar\n★ Ek İş Başlangıç Noktaları\n⛽ Akaryakıt İstasyonu\n◎ Aktif Hedef / Rota"
+    },
+    {
+      "key": "ui.phone.pin_job",
+      "value": "Konum İşaretle"
+    },
+    {
+      "key": "ui.phone.waypoint_set_named",
+      "value": "Hedef işaretlendi: {0}"
+    },
+    {
+      "key": "ui.stats.money",
+      "value": "Bakiye"
+    },
+    {
+      "key": "ui.stats.energy",
+      "value": "Enerji"
+    },
+    {
+      "key": "ui.stats.deliveries",
+      "value": "Teslim Edilen Pizza"
+    },
+    {
+      "key": "ui.stats.taxis",
+      "value": "Taksi Yolculuğu"
+    },
+    {
+      "key": "ui.stats.painted",
+      "value": "Boyanan Ev"
+    },
+    {
+      "key": "ui.stats.litter",
+      "value": "Toplanan Çöp"
+    },
+    {
+      "key": "ui.stats.playtime",
+      "value": "Oynama Süresi"
+    },
+    {
+      "key": "npc.mechanic.name",
+      "value": "Usta Kemal (No:73 Oto Tamir)"
+    },
+    {
+      "key": "npc.harbor_receiver.name",
+      "value": "Elif Abla (Mahalle Dayanışma)"
+    },
+    {
+      "key": "npc.player.name",
+      "value": "Deniz"
+    },
+    {
+      "key": "m01.title",
+      "value": "Mahalleye Dönüş"
+    },
+    {
+      "key": "m01.summary",
+      "value": "No:73 Oto Tamir'e yürü, Usta Kemal'den dedenin sedanının anahtarını al ve arabaya bin."
+    },
+    {
+      "key": "m01.step1.objective",
+      "value": "No:73 Oto Tamir'e yürü ve Usta Kemal ile konuş."
+    },
+    {
+      "key": "m01.step2.objective",
+      "value": "Tamirhanenin önündeki sedana bin."
+    },
+    {
+      "key": "m01.dlg.1",
+      "value": "Hoş geldin Deniz! Yıllar sonra dedenin evine döndüğüne çok sevindim — sedanı bakımdan çıkardım, deposu dolu."
+    },
+    {
+      "key": "m01.dlg.2",
+      "value": "Al anahtarları. Elif Abla az önce aradı; Kaya Holding denen bir şirket mahalledeki eski tapuların peşine düşmüş."
+    },
+    {
+      "key": "m01.dlg.3",
+      "value": "Arabaya geç ve şu yedek parça kasasını Elif Abla'ya yetiştir, sana önemli bir şey anlatacak."
+    },
+    {
+      "key": "m02.title",
+      "value": "İlk Emanet"
+    },
+    {
+      "key": "m02.summary",
+      "value": "Kasa ve belgeleri süre dolmadan Elif Abla'ya teslim et."
+    },
+    {
+      "key": "m02.step1.objective",
+      "value": "Süre dolmadan Elif Abla'nın teslimat noktasına sür."
+    },
+    {
+      "key": "m02.step2.objective",
+      "value": "Araçtan in ve Elif Abla ile konuş."
+    },
+    {
+      "key": "m02.dlg.1",
+      "value": "Tam vaktinde yetiştin Deniz, sağ olasın. Kasayı şöyle bırakalım."
+    },
+    {
+      "key": "m02.dlg.2",
+      "value": "Gitmeden dinle: Hamidiye esnafının eski tapu suretlerini taşıyan koyu renkli bir kurye aracı bugün kayıplara karıştı."
+    },
+    {
+      "key": "m02.dlg.3",
+      "value": "En son Selman Sokağı civarında park hâlinde görülmüş. Yaya olarak bir etrafa bakabilir misin?"
+    },
+    {
+      "key": "m03.title",
+      "value": "Kayıp Sedanın İzinde"
+    },
+    {
+      "key": "m03.summary",
+      "value": "Tarif edilen koyu renkli aracı mahallede yaya olarak bul ve torpidodaki notu oku."
+    },
+    {
+      "key": "m03.step1.objective",
+      "value": "Batı sokaklarına git ve kayıp koyu renkli aracı bul."
+    },
+    {
+      "key": "m03.step2.objective",
+      "value": "Araçtan inip kayıp sedanı yaya olarak incele."
+    },
+    {
+      "key": "m03.dlg.1",
+      "value": "Plaka tutuyor — Elif Abla'nın bahsettiği araç bu. Şoför kapısı aralık bırakılmış."
+    },
+    {
+      "key": "m03.dlg.2",
+      "value": "Torpidoda Kaya Holding antetli bir not var: 'Kurye çıkıştan kalkıp tapu zarfını batı sokaktaki buluşma noktasına bırakacak.'"
+    },
+    {
+      "key": "m03.dlg.3",
+      "value": "Çıkış noktasına hemen yetişirsem kurye aracını uzaktan takip edip o zarfı alabilirim."
+    },
+    {
+      "key": "m04.title",
+      "value": "Akşam Takibi"
+    },
+    {
+      "key": "m04.summary",
+      "value": "Kaya Holding kuryesini gözden kaybetmeden takip et ve bırakılan mühürlü zarfı al."
+    },
+    {
+      "key": "m04.step1.objective",
+      "value": "Çıkış gözetleme noktasına sür."
+    },
+    {
+      "key": "m04.step2.objective",
+      "value": "Kurye aracını fark ettirmeden takip et (12m – 75m)."
+    },
+    {
+      "key": "m04.step3.objective",
+      "value": "Kuryenin batı sokakta bıraktığı mühürlü zarfı yaya olarak al."
+    },
+    {
+      "key": "m04.dlg.1",
+      "value": "Mühürlü zarf elimde! İçinde No:73 Oto Tamir'in kira sözleşmesi ve Selman Sokağı'nın eski imar kayıtları var."
+    },
+    {
+      "key": "m04.dlg.2",
+      "value": "Usta Kemal belgeleri tamirhanede bekliyor; Elif Abla ise mahalle meclisine sunmak için istiyor. Karar benim."
+    },
+    {
+      "key": "m05.title",
+      "value": "İlk Karar"
+    },
+    {
+      "key": "m05.summary",
+      "value": "Selman Sokağı'na dön ve tapu zarfını Usta Kemal'e veya Elif Abla'ya teslim et."
+    },
+    {
+      "key": "m05.step1.objective",
+      "value": "Selman Sokağı merkezine dön."
+    },
+    {
+      "key": "m05.step2.objective",
+      "value": "Zarfı tamirhanedeki Usta Kemal'e VEYA Elif Abla'ya teslim et."
+    },
+    {
+      "key": "m05.marco.dlg.1",
+      "value": "Biliyordum Kaya Holding'in esnafı sıkıştırmak için bu kayıtları sakladığını! Doğru kapıya getirdin evlat."
+    },
+    {
+      "key": "m05.marco.dlg.2",
+      "value": "Bu belgelerle kimse No:73'ü kapatamaz. Al bakalım, emeğinin karşılığı (+300 ₺)."
+    },
+    {
+      "key": "m05.marco.dlg.3",
+      "value": "Sedan artık tamamen senin Deniz. Şimdi mahalledeki komşularla tanışma vakti!"
+    },
+    {
+      "key": "m05.elena.dlg.1",
+      "value": "Zarfı doğrudan mahalle meclisine getireceğini biliyordum! Bütün imar oyunlarının kanıtı bu dosyadaymış."
+    },
+    {
+      "key": "m05.elena.dlg.2",
+      "value": "Esnaf dayanışma fonundan hakkını hemen ayırdık (+300 ₺). Selman Sokağı'na nefes aldırdın."
+    },
+    {
+      "key": "m05.elena.dlg.3",
+      "value": "Artık Hamidiye'nin bir parçasısın Deniz — komşularımızın senden küçük ricaları olacak!"
+    },
+    {
+      "key": "npc.ayse.name",
+      "value": "Ayşe Teyze"
+    },
+    {
+      "key": "npc.efe.name",
+      "value": "Küçük Efe"
+    },
+    {
+      "key": "npc.pharmacist.name",
+      "value": "Eczacı Selin"
+    },
+    {
+      "key": "npc.muhtar.name",
+      "value": "Muhtar Remzi Bey"
+    },
+    {
+      "key": "npc.ayse.idle",
+      "value": "Hayırlı günler evladım, Selman Sokağı'nda herkes birbirini tanır."
+    },
+    {
+      "key": "npc.efe.idle",
+      "value": "Abi top oynayalım mı? Gürsu Sokağı'ndaki sahada maç var!"
+    },
+    {
+      "key": "npc.pharmacist.idle",
+      "value": "Nöbetçi eczane bu hafta bizde. Geçmiş olsun dileklerimle."
+    },
+    {
+      "key": "npc.muhtar.idle",
+      "value": "Mahallemizin her derdine koşarız, kapımız herkese açık."
+    },
+    {
+      "key": "ui.btn.pickup_cat",
+      "value": "Kediyi Al"
+    },
+    {
+      "key": "m06.title",
+      "value": "Bakkal Siparişi"
+    },
+    {
+      "key": "m06.summary",
+      "value": "Ayşe Teyze'nin alışverişini Hüseyin Abi'nin bakkalından getir."
+    },
+    {
+      "key": "m06.step1.objective",
+      "value": "Güney kaldırımındaki Ayşe Teyze ile konuş."
+    },
+    {
+      "key": "m06.step2.objective",
+      "value": "Selman Bakkal'ın önündeki alışveriş poşetini al."
+    },
+    {
+      "key": "m06.step3.objective",
+      "value": "Poşeti soğumadan Ayşe Teyze'ye teslim et."
+    },
+    {
+      "key": "m06.dlg.a1",
+      "value": "Evladım dizlerim tutmuyor, bakkala kadar yürüyemedim."
+    },
+    {
+      "key": "m06.dlg.a2",
+      "value": "Hüseyin Abi siparişimi hazırladı, kapının önünde. Getirir misin?"
+    },
+    {
+      "key": "m06.dlg.b1",
+      "value": "Ekmek, süt, bir paket çay… Ayşe Teyze'nin siparişi tamam."
+    },
+    {
+      "key": "m06.dlg.c1",
+      "value": "Allah razı olsun yavrum! Çayımı demleyip seni bekleyeceğim."
+    },
+    {
+      "key": "m06.dlg.c2",
+      "value": "Al şu harçlığı da, sakın geri çevirme (+300 ₺)."
+    },
+    {
+      "key": "m07.title",
+      "value": "Kayıp Kedi Pamuk"
+    },
+    {
+      "key": "m07.summary",
+      "value": "Küçük Efe'nin beyaz kedisi Pamuk'u mahallede bul."
+    },
+    {
+      "key": "m07.step1.objective",
+      "value": "Ağlayan Küçük Efe ile konuş."
+    },
+    {
+      "key": "m07.step2.objective",
+      "value": "Gürsu Sokağı'ndaki futbol sahasına bak."
+    },
+    {
+      "key": "m07.step3.objective",
+      "value": "Sahada yerde duran tasmayı incele."
+    },
+    {
+      "key": "m07.step4.objective",
+      "value": "Hz. Osman Camii avlusunda Pamuk'u bul ve kucağına al."
+    },
+    {
+      "key": "m07.step5.objective",
+      "value": "Pamuk'u Küçük Efe'ye geri götür."
+    },
+    {
+      "key": "m07.dlg.a1",
+      "value": "Pamuk kayboldu! Sabah top oynarken peşimizden geliyordu…"
+    },
+    {
+      "key": "m07.dlg.a2",
+      "value": "Futbol sahasına bakabilir misin? Ben çok korkuyorum."
+    },
+    {
+      "key": "m07.dlg.b1",
+      "value": "Pamuk'un mavi tasması! Üzerinde balık kılçığı var…"
+    },
+    {
+      "key": "m07.dlg.b2",
+      "value": "Cami avlusunda kedilere mama veriliyor. Oraya gitmiş olmalı."
+    },
+    {
+      "key": "m07.dlg.c1",
+      "value": "İşte burada! Pamuk mırlayarak kollarıma atladı."
+    },
+    {
+      "key": "m07.dlg.d1",
+      "value": "PAMUK! Teşekkürler abi, sen bir kahramansın!"
+    },
+    {
+      "key": "m07.dlg.d2",
+      "value": "Annem bu parayı sana vermemi söyledi (+350 ₺)."
+    },
+    {
+      "key": "m08.title",
+      "value": "Acil Eczane"
+    },
+    {
+      "key": "m08.summary",
+      "value": "Ayşe Teyze'nin eşinin ilacını zamanında eczaneden getir."
+    },
+    {
+      "key": "m08.step1.objective",
+      "value": "Telaşlı Ayşe Teyze ile konuş."
+    },
+    {
+      "key": "m08.step2.objective",
+      "value": "Hemen arabana bin."
+    },
+    {
+      "key": "m08.step3.objective",
+      "value": "Süre bitmeden doğudaki nöbetçi eczaneye arabayla ulaş."
+    },
+    {
+      "key": "m08.step4.objective",
+      "value": "Eczacı Selin'den ilacı al."
+    },
+    {
+      "key": "m08.step5.objective",
+      "value": "İlacı hızla Ayşe Teyze'ye yetiştir."
+    },
+    {
+      "key": "m08.dlg.a1",
+      "value": "Evladım, Hasan Amca'nın tansiyon ilacı bitmiş, başı dönüyor!"
+    },
+    {
+      "key": "m08.dlg.a2",
+      "value": "Nöbetçi eczane sokağın doğu ucunda. Arabanla gidersen yetişirsin!"
+    },
+    {
+      "key": "m08.dlg.b1",
+      "value": "Hasan Bey'in reçetesi hazır. Günde bir tane, tok karnına."
+    },
+    {
+      "key": "m08.dlg.b2",
+      "value": "Acele et, geç kalmasın. Geçmiş olsun!"
+    },
+    {
+      "key": "m08.dlg.c1",
+      "value": "Yetiştin! Hasan Amca ilacını içti, rengi yerine geldi."
+    },
+    {
+      "key": "m08.dlg.c2",
+      "value": "Sen bu mahallenin meleğisin evladım (+400 ₺)."
+    },
+    {
+      "key": "m09.title",
+      "value": "Ustanın Parçası"
+    },
+    {
+      "key": "m09.summary",
+      "value": "Usta Kemal'in benzinlikte unutulan yedek parçasını No:73 Oto Tamir'e getir."
+    },
+    {
+      "key": "m09.step1.objective",
+      "value": "Tamirhanedeki Usta Kemal ile konuş."
+    },
+    {
+      "key": "m09.step2.objective",
+      "value": "Arabayla batıdaki benzin istasyonuna git."
+    },
+    {
+      "key": "m09.step3.objective",
+      "value": "Araçtan in ve yedek parça kutusunu al."
+    },
+    {
+      "key": "m09.step4.objective",
+      "value": "Müşteri beklemeden parçayı arabayla tamirhaneye getir."
+    },
+    {
+      "key": "m09.step5.objective",
+      "value": "Parçayı Usta Kemal'e teslim et."
+    },
+    {
+      "key": "m09.dlg.a1",
+      "value": "Kargocu parçayı yanlışlıkla benzinliğe bırakmış, müşteri de kapıda!"
+    },
+    {
+      "key": "m09.dlg.a2",
+      "value": "Arabayla git, kutuyu al ve hemen dön. Sana güveniyorum."
+    },
+    {
+      "key": "m09.dlg.b1",
+      "value": "Triger seti — kutunun üstünde 'Oto Tamir No:73' yazıyor."
+    },
+    {
+      "key": "m09.dlg.c1",
+      "value": "Tam zamanında! Müşterinin arabası öğlene hazır olur."
+    },
+    {
+      "key": "m09.dlg.c2",
+      "value": "Bu da emeğinin karşılığı (+450 ₺). Arabana da bir göz attım."
+    },
+    {
+      "key": "m10.title",
+      "value": "Mahalle Şenliği"
+    },
+    {
+      "key": "m10.summary",
+      "value": "Elif Abla ile mahalle şenliğini hazırla ve Muhtar Remzi Bey'e haber ver."
+    },
+    {
+      "key": "m10.step1.objective",
+      "value": "No:66 önündeki Elif Abla ile konuş."
+    },
+    {
+      "key": "m10.step2.objective",
+      "value": "Çay Ocağı önündeki çay kolisini al."
+    },
+    {
+      "key": "m10.step3.objective",
+      "value": "Bakkalın yanındaki simit tepsisini al."
+    },
+    {
+      "key": "m10.step4.objective",
+      "value": "Şenlik alanına (Gürsu Sk. futbol sahası) git."
+    },
+    {
+      "key": "m10.step5.objective",
+      "value": "Muhtar Remzi Bey'e şenliğin hazır olduğunu söyle."
+    },
+    {
+      "key": "m10.dlg.a1",
+      "value": "Bu akşam mahalle şenliği var ve çay ile simit hâlâ gelmedi!"
+    },
+    {
+      "key": "m10.dlg.a2",
+      "value": "Çay Ocağı'ndan çayı, bakkalın yanından simitleri alıp sahaya götürür müsün?"
+    },
+    {
+      "key": "m10.dlg.b1",
+      "value": "Kocaman bir koli Rize çayı. Bu gece semaverler boş kalmayacak."
+    },
+    {
+      "key": "m10.dlg.c1",
+      "value": "Sıcacık susamlı simitler… Mis gibi kokuyor."
+    },
+    {
+      "key": "m10.dlg.d1",
+      "value": "Maşallah! Çay da simit de tamam, şenlik başlayabilir."
+    },
+    {
+      "key": "m10.dlg.d2",
+      "value": "Bütün Selman Sokağı senden bahsediyor. Bu ödül hepimizden (+1000 ₺)."
+    },
+    {
+      "key": "m10.dlg.d3",
+      "value": "Ama işimiz bitmedi Deniz! Kaya Holding Fatih Bulvarı'ndaki Saat Kulesi'nde imar başvurusu açmış. Avukat Tarık seni orada bekliyor!"
+    },
+    {
+      "key": "npc.tarik.name",
+      "value": "Avukat Tarık (Mahalle Gönüllüsü)"
+    },
+    {
+      "key": "npc.tarik.idle",
+      "value": "Hamidiye'nin sokaklarını korumak için hukuki her adımı atıyoruz Deniz."
+    },
+    {
+      "key": "m11.title",
+      "value": "Saat Kulesi'ndeki Dosya"
+    },
+    {
+      "key": "m11.summary",
+      "value": "Fatih Bulvarı · Saat Kulesi Meydanı'na git, Avukat Tarık ile buluş ve imar dosyasını incele."
+    },
+    {
+      "key": "m11.step1.objective",
+      "value": "Fatih Bulvarı · Saat Kulesi Meydanı'na git."
+    },
+    {
+      "key": "m11.step2.objective",
+      "value": "Saat Kulesi yanındaki Avukat Tarık ile konuş."
+    },
+    {
+      "key": "m11.step3.objective",
+      "value": "Meydandaki imar ilan panosu dosyasını incele."
+    },
+    {
+      "key": "m11.step4.objective",
+      "value": "Dosyayı Avukat Tarık'a götür."
+    },
+    {
+      "key": "m11.dlg.a1",
+      "value": "Sonunda geldin Deniz! Kaya Holding, Selman Sokağı ile Zübeyde Hanım arasındaki eski bahçeli evler için ticari yıkım başvurusu vermiş."
+    },
+    {
+      "key": "m11.dlg.a2",
+      "value": "İlan kopyası hemen Saat Kulesi'nin yanındaki masada. Bir göz atıp bana getirir misin?"
+    },
+    {
+      "key": "m11.dlg.b1",
+      "value": "İmar itirazı için Hamidiye'nin farklı caddelerinden esnaf ve okul temsilcilerinin imzası gerekiyor!"
+    },
+    {
+      "key": "m11.dlg.c1",
+      "value": "Harika! Şimdi Eyyubi, Aziziye ve Petrol Yolu caddelerindeki komşulardan imzaları toplarsak bu planı tamamen durdururuz (+550 ₺)."
+    },
+    {
+      "key": "m12.title",
+      "value": "Sekiz Caddenin İmzası"
+    },
+    {
+      "key": "m12.summary",
+      "value": "Eyyubi, Aziziye ve Petrol Yolu caddelerini dolaşıp Hamidiye Dayanışma İmzalarını topla."
+    },
+    {
+      "key": "m12.step1.objective",
+      "value": "53 Eyyubi Mahalle Büfesi önünden Eyyubi imza klasörünü al."
+    },
+    {
+      "key": "m12.step2.objective",
+      "value": "Aziziye Cd. İTO İlkokulu önünden veli imza dosyasını al."
+    },
+    {
+      "key": "m12.step3.objective",
+      "value": "Petrol Yolu Cd. Büfesi önünden esnaf imzalarını al."
+    },
+    {
+      "key": "m12.step4.objective",
+      "value": "Toplanan imzaları Fatih Bulvarı'ndaki Avukat Tarık'a teslim et."
+    },
+    {
+      "key": "m12.dlg.a1",
+      "value": "Eyyubi Caddesi esnafı tek yürek! Murat Abi bütün sokağın imzasını toplamış."
+    },
+    {
+      "key": "m12.dlg.b1",
+      "value": "İTO İlkokulu velileri ve Merve Öğretmen'in imzaları da tamam! Çocukların oyun sokakları güvende."
+    },
+    {
+      "key": "m12.dlg.c1",
+      "value": "Petrol Yolu Caddesi esnafının son imzası da atıldı — klasör dolup taşıyor!"
+    },
+    {
+      "key": "m12.dlg.d1",
+      "value": "İnanılmazsın Deniz! Sekiz caddeden yüzlerce imza topladın. Yarın sabah dilekçeyi veriyorum (+650 ₺)."
+    },
+    {
+      "key": "m12.dlg.d2",
+      "value": "Gitmeden önce bir ricam var: Cankurtaran Can, havuzda çocuklar için yaz kutlaması hazırlıyor, ona bir el atar mısın?"
+    },
+    {
+      "key": "m13.title",
+      "value": "Yaz Sürprizi · Havuz Günü"
+    },
+    {
+      "key": "m13.summary",
+      "value": "Selman Bakkal'dan soğuk ikram kasasını al, Hamidiye Açık Yüzme Havuzu'na götür ve suya gir!"
+    },
+    {
+      "key": "m13.step1.objective",
+      "value": "Selman Bakkal No:58 önündeki soğuk ikram kasasını al."
+    },
+    {
+      "key": "m13.step2.objective",
+      "value": "Hamidiye Açık Yüzme Havuzu güvertesine çık (Selman Sk. güneyi)."
+    },
+    {
+      "key": "m13.step3.objective",
+      "value": "Kasayı havuz başındaki ikram masasına bırak ve serinle!"
+    },
+    {
+      "key": "m13.step4.objective",
+      "value": "Fatih Bulvarı'ndaki büyük final için Avukat Tarık'a dön."
+    },
+    {
+      "key": "m13.dlg.a1",
+      "value": "Buz gibi karpuz, soğuk su ve dondurma dolu kasa hazır! Hüseyin Abi mahallenin çocuklarına benden dedi."
+    },
+    {
+      "key": "m13.dlg.b1",
+      "value": "İkramlar havuz başında yerini aldı! İstediğin zaman merdivenden inip havuzda yüzebilirsin. Şimdi büyük final vakti!"
+    },
+    {
+      "key": "m13.dlg.c1",
+      "value": "Mahalle neşe doldu Deniz! Muhtar Remzi Bey de Saat Kulesi Meydanı'nda bizi bekliyor — son imzayı atalım (+700 ₺)."
+    },
+    {
+      "key": "m14.title",
+      "value": "Hamidiye'nin Zaferi"
+    },
+    {
+      "key": "m14.summary",
+      "value": "Hamidiye Mahalle Sözleşmesi'ni Saat Kulesi Meydanı'nda Muhtar Remzi Bey'e teslim et ve mahalleyi kurtar!"
+    },
+    {
+      "key": "m14.step1.objective",
+      "value": "Saat Kulesi yanındaki onaylı Hamidiye Koruma Sözleşmesi'ni al."
+    },
+    {
+      "key": "m14.step2.objective",
+      "value": "Meydandaki Muhtar Remzi Bey ile konuş ve zaferi ilan et."
+    },
+    {
+      "key": "m14.dlg.a1",
+      "value": "Resmî mühürlü Hamidiye Mahalle Koruma Kararı! Kaya Holding'in yıkım talebi kalıcı olarak reddedildi!"
+    },
+    {
+      "key": "m14.dlg.b1",
+      "value": "BAŞARDIK DENİZ! Selman Sokağı, Hz. Osman Camii, havuzumuz, kortumuz ve tüm Hamidiye artık koruma altında!"
+    },
+    {
+      "key": "m14.dlg.b2",
+      "value": "Deden bugünleri görse seninle gurur duyardı. Tüm mahallenin teşekkür ödülü (+2000 ₺) ve 'Hamidiye Kahramanı' unvanı senin!"
+    },
+    {
+      "key": "m14.dlg.b3",
+      "value": "Bekle Deniz — Ayşe Teyze az önce haber yolladı! Dedenin 1988'de mahalle için sakladığı kayıp bir sandığın ipucunu bulmuş. Selman Sokağı'nda seni bekliyor!"
+    },
+    {
+      "key": "ui.hud.mission_prefix",
+      "value": "Görev"
+    },
+    {
+      "key": "sports.mission.stage_done",
+      "value": "Turnuva etabı kazanıldı! Sıradaki hedef güncellendi."
+    },
+    {
+      "key": "sports.mission.retry_hint",
+      "value": "Bu etabı geçmek için Tekrar'a dokun ve maçı kazan!"
+    },
+    {
+      "key": "npc.kerem.name",
+      "value": "Antrenör Kerem (Spor Kompleksi)"
+    },
+    {
+      "key": "npc.kerem.idle",
+      "value": "Tenis, Halı Saha, Basketbol, Voleybol — Hamidiye'de spor hiç durmaz!"
+    },
+    {
+      "key": "npc.hasan.name",
+      "value": "Elektrik Ustası Hasan (AYEDAŞ)"
+    },
+    {
+      "key": "npc.hasan.idle",
+      "value": "Mürşit Caddesi trafosu güvende, sokak ışıkları sabaha kadar pırıl pırıl."
+    },
+    {
+      "key": "npc.defne.name",
+      "value": "Gazeteci Defne (Hamidiye Postası)"
+    },
+    {
+      "key": "npc.defne.idle",
+      "value": "Mahallemizin her hikâyesini ve gerçeğini tüm İstanbul'a duyuruyoruz."
+    },
+    {
+      "key": "m15.title",
+      "value": "Dedemin Kayıp Sandığı"
+    },
+    {
+      "key": "m15.summary",
+      "value": "Ayşe Teyze'nin üç bilmecesini çöz, 1988 tarihli şifre plakalarını topla ve dedenin gizli zaman kapsülünü aç."
+    },
+    {
+      "key": "m15.step1.objective",
+      "value": "Selman Sokağı'ndaki Ayşe Teyze ile konuş ve ilk bilmeceyi dinle."
+    },
+    {
+      "key": "m15.step2.objective",
+      "value": "1. Bilmece: Hz. Osman Camii avlusundaki pirinç şifre plakasını bul."
+    },
+    {
+      "key": "m15.step3.objective",
+      "value": "2. Bilmece: Hamidiye Çay Bahçesi & Parkı'ndaki 2. plakayı bul."
+    },
+    {
+      "key": "m15.step4.objective",
+      "value": "3. Bilmece: Zübeyde Hanım çamlı mavi evler önündeki 3. plakayı bul."
+    },
+    {
+      "key": "m15.step5.objective",
+      "value": "No:48 Benim Evim bahçesindeki Dedemin Pirinç Sandığı'nı aç!"
+    },
+    {
+      "key": "m15.step6.objective",
+      "value": "Sandıktan çıkan 1988 Turnuva Kupasını Saat Kulesi'ndeki Muhtar Remzi Bey'e götür."
+    },
+    {
+      "key": "m15.dlg.a1",
+      "value": "Deniz yavrum, eski sandığımı karıştırırken dedenin 1988'de bıraktığı bir mektup buldum! Bahçendeki zaman kapsülünü 3 pirinç plaka açıyormuş."
+    },
+    {
+      "key": "m15.dlg.a2",
+      "value": "İlk bilmece şöyle diyor: 'Suyun şırıltısı ve avlunun huzuru...' — Hz. Osman Camii avlusundan başla!"
+    },
+    {
+      "key": "m15.dlg.b1",
+      "value": "1. Pirinç Plaka bulundu! Arkasında 2. bilmece kazılı: 'Çay kokusu, tavla sesleri ve parkın serin gölgesi...' — Hamidiye Çay Bahçesi!"
+    },
+    {
+      "key": "m15.dlg.c1",
+      "value": "2. Pirinç Plaka elimde! Son ipucu: 'Mavi balkonların altında, çamların rüzgârında...' — Zübeyde Hanım Caddesi'ne!"
+    },
+    {
+      "key": "m15.dlg.d1",
+      "value": "3. ve son şifre plakası da tamam! Gün batarken No:48 Selman Sokağı'ndaki bahçeme dönüp dedemin sandığını açma vakti."
+    },
+    {
+      "key": "m15.dlg.e1",
+      "value": "Sandık açıldı! İçinden 1988 tarihli soluk bir mahalle fotoğrafı, +900 ₺ hatıra fonu ve parlak pirinç bir kupa çıktı..."
+    },
+    {
+      "key": "m15.dlg.e2",
+      "value": "Üzerinde 'Büyük Hamidiye Spor Kupası' yazıyor! Bunu hemen Saat Kulesi'ndeki Muhtar Remzi Bey'e göstermeliyim."
+    },
+    {
+      "key": "m15.dlg.f1",
+      "value": "Gözlerime inanamıyorum Deniz! Dedenin 1988'de başlattığı efsanevi Mahalle Spor Kupası bu! Yıllardır kayıp sanıyorduk (+900 ₺)."
+    },
+    {
+      "key": "m15.dlg.f2",
+      "value": "Antrenör Kerem sahalarda seni bekliyor — kupayı yeniden canlandırmak için tüm sahalarda yarışmaya hazır mısın?"
+    },
+    {
+      "key": "m16.title",
+      "value": "Büyük Hamidiye Spor Kupası"
+    },
+    {
+      "key": "m16.summary",
+      "value": "Tenis, Halı Saha Futbolu ve Sokak Basketbolunda zafere ulaş, yüzme havuzunda serinle ve kupayı kaldır!"
+    },
+    {
+      "key": "m16.step1.objective",
+      "value": "Spor Kompleksindeki Antrenör Kerem ile konuş ve turnuvayı başlat."
+    },
+    {
+      "key": "m16.step2.objective",
+      "value": "1. Etap: Gürsu Sokağı Tenis Kortu'nda 1 Tenis maçı kazan! (Menü → Spor ile de girebilirsin)"
+    },
+    {
+      "key": "m16.step3.objective",
+      "value": "2. Etap: Hamidiye Halı Saha'da 3v3 Futbol maçı kazan!"
+    },
+    {
+      "key": "m16.step4.objective",
+      "value": "3. Etap: Hamidiye Basketbol Sahası'nda 2v2 Basketbol maçı kazan!"
+    },
+    {
+      "key": "m16.step5.objective",
+      "value": "Şampiyonluk serinliği: Hamidiye Açık Yüzme Havuzu'na atla ve yüz!"
+    },
+    {
+      "key": "m16.step6.objective",
+      "value": "Kupayı kaldırmak için Antrenör Kerem'in yanına dön."
+    },
+    {
+      "key": "m16.dlg.a1",
+      "value": "Hoş geldin şampiyon adayı! Dedenin 1988 kupası için bütün Hamidiye sahalara akın etti."
+    },
+    {
+      "key": "m16.dlg.a2",
+      "value": "Sırayla Tenis, 3v3 Halı Saha Futbolu ve 2v2 Basketbol maçlarını kazan, ardından havuza atlayıp serinle — kupa senin olsun!"
+    },
+    {
+      "key": "m16.dlg.b1",
+      "value": "İNANILMAZ PERFORMANS DENİZ! Kortta, halı sahada, potada ve havuzda adını Hamidiye tarihine yazdırdın (+1200 ₺)!"
+    },
+    {
+      "key": "m16.dlg.b2",
+      "value": "Bir dakika... Mürşit Caddesi'nden siren ve kesinti haberi geldi! Elektrik Ustası Hasan trafo başında acil yardım istiyor!"
+    },
+    {
+      "key": "m17.title",
+      "value": "Gece Yarısı Elektrik Kesintisi"
+    },
+    {
+      "key": "m17.summary",
+      "value": "Gece 22:00'de arızalanan Mürşit Cd. trafosunu kurtarmak için sigorta, jeneratör yakıtı ve röle panosunu zamanında yetiştir."
+    },
+    {
+      "key": "m17.step1.objective",
+      "value": "Mürşit Caddesi trafosundaki Elektrik Ustası Hasan ile konuş."
+    },
+    {
+      "key": "m17.step2.objective",
+      "value": "Süre bitmeden No:73 Oto Tamir önünden Yüksek Gerilim Sigorta Kutusu'nu al."
+    },
+    {
+      "key": "m17.step3.objective",
+      "value": "Süre bitmeden Petrol Yolu'ndan Jeneratör Yakıt Bidonu'nu al."
+    },
+    {
+      "key": "m17.step4.objective",
+      "value": "Süre bitmeden Atatürk Caddesi'ndeki Yedek Röle Panosu şalterini kaldır."
+    },
+    {
+      "key": "m17.step5.objective",
+      "value": "Tüm malzemeleri süre dolmadan Mürşit Caddesi trafosuna yetiştir!"
+    },
+    {
+      "key": "m17.step6.objective",
+      "value": "Sabah ışıklarıyla Usta Hasan ile konuş ve emeğinin karşılığını al."
+    },
+    {
+      "key": "m17.dlg.a1",
+      "value": "Yetiştiğine şükür Deniz! Saat 22:00 oldu ve ana trafo aşırı yükten attı — bütün mahalle karanlıkta kalmak üzere!"
+    },
+    {
+      "key": "m17.dlg.a2",
+      "value": "No:73'ten sigorta kutusunu, Petrol Yolu'ndan jeneratör yakıtını kap, Atatürk Cd. rölesini aç ve hemen buraya dön!"
+    },
+    {
+      "key": "m17.dlg.b1",
+      "value": "Yüksek gerilim sigortaları sağlam! Şimdi hızla Petrol Yolu'ndan jeneratör yakıtını almalıyım."
+    },
+    {
+      "key": "m17.dlg.c1",
+      "value": "Jeneratör bidonu bagajda! Sırada Atatürk Caddesi'ndeki yedek röle panosunu devreye almak var."
+    },
+    {
+      "key": "m17.dlg.d1",
+      "value": "Röle şalteri kalktı, hat gerilimi normale döndü! Hemen Mürşit Caddesi'ndeki Usta Hasan'a yetişeyim!"
+    },
+    {
+      "key": "m17.dlg.e1",
+      "value": "Bütün gece çalıştık ama tek bir ev bile elektriksiz kalmadı Deniz! Güneş de doğdu, mahalle sana minnettar (+1100 ₺)."
+    },
+    {
+      "key": "m17.dlg.e2",
+      "value": "Usta Kemal seni No:73'te arıyordu — dedenin sedanı için 'Sekiz Cadde Büyük Rallisi' hazırlamış!"
+    },
+    {
+      "key": "m18.title",
+      "value": "Sekiz Cadde Büyük Rallisi"
+    },
+    {
+      "key": "m18.summary",
+      "value": "Dedenin sedanıyla gün batımında Fatih Bulvarı, Eyyubi, Zübeyde Hanım ve Abdülkadir Udeh'i aşan zamana karşı şehir rallisini tamamla!"
+    },
+    {
+      "key": "m18.step1.objective",
+      "value": "No:73 Oto Tamir'deki Usta Kemal ile konuş ve ralli brifingini al."
+    },
+    {
+      "key": "m18.step2.objective",
+      "value": "Hemen sedana bin ve başlangıç çizgisine hazırlan."
+    },
+    {
+      "key": "m18.step3.objective",
+      "value": "1. Kapı: Süre bitmeden Fatih Bulvarı Saat Kulesi'nden geç!"
+    },
+    {
+      "key": "m18.step4.objective",
+      "value": "2. Kapı: Hızla batıya dön, Eyyubi Caddesi kapısından geç!"
+    },
+    {
+      "key": "m18.step5.objective",
+      "value": "3. Kapı: Güneye in, Zübeyde Hanım Çamlı Düzlüğünden geç!"
+    },
+    {
+      "key": "m18.step6.objective",
+      "value": "4. Kapı: Abdülkadir Udeh & Hz. Osman Camii virajından geç!"
+    },
+    {
+      "key": "m18.step7.objective",
+      "value": "FİNİŞ: Selman Sokağı No:73 Tamirhane önündeki bitiş çizgisini geç!"
+    },
+    {
+      "key": "m18.dlg.a1",
+      "value": "Motoru senin için yeniden ayarladım Deniz! Bugün Hamidiye'nin 8 caddesini turlayan efsanevi Gün Batımı Rallisi var."
+    },
+    {
+      "key": "m18.dlg.a2",
+      "value": "Saat Kulesi, Eyyubi, Zübeyde Hanım, Abdülkadir Udeh ve tekrar Selman Sokağı! Gazı köklemeye hazır mısın?"
+    },
+    {
+      "key": "m18.dlg.b1",
+      "value": "REKOR SÜRE DENİZ! Dedenin sedanı caddelerde rüzgâr gibi aktı, bütün esnaf alkışlıyor (+1400 ₺)!"
+    },
+    {
+      "key": "m18.dlg.b2",
+      "value": "Dur bir saniye... Gazeteci Defne, Fatih Bulvarı'ndan acil mesaj bıraktı. Kaya Holding bu gece gizli bir tezgâh kuruyormuş!"
+    },
+    {
+      "key": "m19.title",
+      "value": "Kaya Holding'in Son Hamlesi"
+    },
+    {
+      "key": "m19.summary",
+      "value": "Gece 21:00'de Gazeteci Defne'nin ihbarını takip et, 3 caddedeki gizli kanıt çantalarını topla ve son komployu boz!"
+    },
+    {
+      "key": "m19.step1.objective",
+      "value": "Fatih Bulvarı'ndaki Gazeteci Defne ile buluş ve gece ihbarını al."
+    },
+    {
+      "key": "m19.step2.objective",
+      "value": "Petrol Yolu Ticaret Şeridi'ndeki gizli belge çantasını ele geçir."
+    },
+    {
+      "key": "m19.step3.objective",
+      "value": "Atatürk Caddesi Çam Koridoru'ndaki şifreli USB ve sözleşme dosyasını al."
+    },
+    {
+      "key": "m19.step4.objective",
+      "value": "Aziziye İlkokulu önündeki sahte imar tutanağı zarfını topla."
+    },
+    {
+      "key": "m19.step5.objective",
+      "value": "Süre bitmeden tüm kanıtları Saat Kulesi'ndeki Avukat Tarık'a ulaştır!"
+    },
+    {
+      "key": "m19.dlg.a1",
+      "value": "İyi ki geldin Deniz! Kaya Holding koruma kararını delmek için bu gece üç farklı caddeye sahte tutanak ve rüşvet zarfları bırakmış."
+    },
+    {
+      "key": "m19.dlg.a2",
+      "value": "Petrol Yolu, Atatürk Caddesi ve Aziziye İlkokulu önündeki kanıt çantalarını topla, Tarık'a ulaştır — ben manşeti hazırlıyorum!"
+    },
+    {
+      "key": "m19.dlg.b1",
+      "value": "İlk kanıt çantası elimde! Sahte ekspertiz raporları... Şimdi hızla Atatürk Caddesi çam koridoruna!"
+    },
+    {
+      "key": "m19.dlg.c1",
+      "value": "Şifreli USB ve gizli talimat yazışmaları tamam! Son nokta Aziziye Caddesi İlkokul önü."
+    },
+    {
+      "key": "m19.dlg.d1",
+      "value": "Üçüncü dosya da bizde — okulu bile ticari parsele katmaya çalışmışlar! Hemen Saat Kulesi'ndeki Avukat Tarık'a yetişmeliyim!"
+    },
+    {
+      "key": "m19.dlg.e1",
+      "value": "Muhteşem iş Deniz! Bu kanıtlarla savcılık soruşturması anında açıldı ve Kaya Holding tazminat ödemeye mahkûm edildi (+1600 ₺)!"
+    },
+    {
+      "key": "m19.dlg.e2",
+      "value": "Son dakika haberi yayında! Yarın sabah Saat Kulesi Meydanı'nda büyük mahalle meclisi toplanıyor — karar günü!"
+    },
+    {
+      "key": "m20.title",
+      "value": "Bizim Dünyamız · Büyük Miras"
+    },
+    {
+      "key": "m20.summary",
+      "value": "Şenlik voleybol maçını kazan, kutlama pastasını al, dedenin plaketini gör ve Hamidiye'nin geleceği için son kararı ver!"
+    },
+    {
+      "key": "m20.step1.objective",
+      "value": "Saat Kulesi Meydanı'ndaki Muhtar Remzi Bey ile konuş."
+    },
+    {
+      "key": "m20.step2.objective",
+      "value": "Şenlik Gösteri Maçı: Plaj Voleybolu sahasında 2v2 Voleybol maçı kazan!"
+    },
+    {
+      "key": "m20.step3.objective",
+      "value": "Selman Bakkal önünden mahalle kutlama pastasını al."
+    },
+    {
+      "key": "m20.step4.objective",
+      "value": "No:48 Benim Evim girişindeki Dedemin Hatıra Plaketini incele."
+    },
+    {
+      "key": "m20.step5.objective",
+      "value": "BÜYÜK KARAR: Fonu Avukat Tarık'a (Spor Akademisi) VEYA Elif Abla'ya (Kültür Parkı) teslim et!"
+    },
+    {
+      "key": "m20.dlg.a1",
+      "value": "Günaydın Deniz! Kaya Holding'ten kazanılan büyük mahalle fonu bugün sahibini buluyor — ve son sözü tüm Hamidiye sana bıraktı!"
+    },
+    {
+      "key": "m20.dlg.a2",
+      "value": "Önce şenlik voleybol maçında sahaya çık, bakkaldan kutlama pastasını al, evindeki hatıra plaketini gör ve büyük kararını ver!"
+    },
+    {
+      "key": "m20.dlg.b1",
+      "value": "Hüseyin Abi 'Bizim Dünyamız · Hamidiye' yazılı dev bir pasta hazırlamış! Şimdi No:48'deki dedemin plaketine uğrayayım."
+    },
+    {
+      "key": "m20.dlg.c1",
+      "value": "Pirinç plakette yazıyor: 'Bir mahalleyi beton değil, komşuların yüreği ayakta tutar. — 1988'"
+    },
+    {
+      "key": "m20.dlg.c2",
+      "value": "Artık son karar vakti: Saat Kulesi'ndeki Avukat Tarık'la Gençlik Spor Akademisi mi, yoksa Elif Abla'yla Kültür Evi & Çam Parkı mı?"
+    },
+    {
+      "key": "m20.academy.1",
+      "value": "Harika bir vizyon Deniz! 'Hamidiye Gençlik & Spor Akademisi' bugün resmen kuruldu — tenis, futbol, basketbol ve voleybol tüm çocuklara ücretsiz!"
+    },
+    {
+      "key": "m20.academy.2",
+      "value": "20 görev boyunca Hamidiye'nin her sokağına hayat verdin. Büyük onur ödülü (+3000 ₺) ve 'Bizim Dünyamız Efsanesi' unvanı senin!"
+    },
+    {
+      "key": "m20.academy.3",
+      "value": "Burası sadece bir mahalle değil — burası artık gerçekten Bizim Dünyamız. İstediğin zaman spor yap, sür, yüz ve keşfet!"
+    },
+    {
+      "key": "m20.park.1",
+      "value": "Ne güzel bir yürek Deniz! 'Selman Sokağı Kültür Evi & Çam Parkı' bugün açılıyor — esnafımız, çocuklarımız ve komşularımız için sonsuz bir yuva!"
+    },
+    {
+      "key": "m20.park.2",
+      "value": "20 görev boyunca Hamidiye'nin her sokağına hayat verdin. Büyük onur ödülü (+3000 ₺) ve 'Bizim Dünyamız Efsanesi' unvanı senin!"
+    },
+    {
+      "key": "m20.park.3",
+      "value": "Burası sadece bir mahalle değil — burası artık gerçekten Bizim Dünyamız. İstediğin zaman spor yap, sür, yüz ve keşfet!"
+    },
+    {
+      "key": "ui.tab.feedback",
+      "value": "Öneri"
+    },
+    {
+      "key": "feedback.title",
+      "value": "Oyunu birlikte geliştirelim"
+    },
+    {
+      "key": "feedback.info",
+      "value": "Oyunda ne olsun istersin? Fikrini yaz, her güncellemede en çok istenenleri ekliyoruz."
+    },
+    {
+      "key": "feedback.placeholder",
+      "value": "Örn: Bir otobüs durağı ve şoförlük işi olsun…"
+    },
+    {
+      "key": "feedback.cat.idea",
+      "value": "Fikir"
+    },
+    {
+      "key": "feedback.cat.bug",
+      "value": "Hata"
+    },
+    {
+      "key": "feedback.cat.other",
+      "value": "Diğer"
+    },
+    {
+      "key": "feedback.send",
+      "value": "Gönder"
+    },
+    {
+      "key": "feedback.sending",
+      "value": "Gönderiliyor…"
+    },
+    {
+      "key": "feedback.sent",
+      "value": "Teşekkürler! Önerin bize ulaştı."
+    },
+    {
+      "key": "feedback.queued",
+      "value": "İnternet yok — önerin kaydedildi, bağlanınca gönderilecek."
+    },
+    {
+      "key": "feedback.empty",
+      "value": "Lütfen en az 5 karakterlik bir öneri yaz."
+    },
+    {
+      "key": "feedback.too_soon",
+      "value": "Biraz bekle, az önce öneri gönderdin."
+    },
+    {
+      "key": "feedback.error",
+      "value": "Gönderilemedi, daha sonra tekrar denenecek."
+    },
+    {
+      "key": "feedback.privacy",
+      "value": "Takma adın, mesajın ve oyun sürümün anonim olarak Firestore'a kaydedilir."
+    },
+    {
+      "key": "feedback.name_placeholder",
+      "value": "Adın / Takma ad (isteğe bağlı)"
+    },
+    {
+      "key": "feedback.feed_title",
+      "value": "Canlı Oyuncu Mesajları"
+    },
+    {
+      "key": "feedback.refresh",
+      "value": "Yenile"
+    },
+    {
+      "key": "update.maintenance_eyebrow",
+      "value": "BAKIM ÇALIŞMASI"
+    },
+    {
+      "key": "update.force_eyebrow",
+      "value": "ZORUNLU GÜNCELLEME"
+    },
+    {
+      "key": "update.soft_eyebrow",
+      "value": "YENİ SÜRÜM"
+    },
+    {
+      "key": "update.retry",
+      "value": "TEKRAR DENE"
+    },
+    {
+      "key": "whatsnew.btn",
+      "value": "Yenilikler"
+    },
+    {
+      "key": "whatsnew.skip",
+      "value": "ATLA  ✕"
+    },
+    {
+      "key": "whatsnew.next",
+      "value": "SONRAKİ  →"
+    },
+    {
+      "key": "whatsnew.play",
+      "value": "OYUNA BAŞLA!"
+    },
+    {
+      "key": "whatsnew.suggest",
+      "value": "SEN DE FİKİR YAZ"
+    },
+    {
+      "key": "whatsnew.swipe_hint",
+      "value": "←  Kaydırarak diğer özellikleri gör  →"
+    },
+    {
+      "key": "ui.btn.attack",
+      "value": "Vur"
+    },
+    {
+      "key": "ui.menu.hud_btn",
+      "value": "Menü"
+    },
+    {
+      "key": "ui.menu.eyebrow",
+      "value": "İSTANBUL  ·  SULTANBEYLİ  ·  HAMİDİYE"
+    },
+    {
+      "key": "ui.menu.title",
+      "value": "BİZİM DÜNYAMIZ"
+    },
+    {
+      "key": "ui.menu.subtitle",
+      "value": "Yaşayan Açık Dünya · Mahalle Yaşamı"
+    },
+    {
+      "key": "ui.menu.pause_badge",
+      "value": "DURAKLATILDI"
+    },
+    {
+      "key": "ui.menu.play_new",
+      "value": "MAHALLEYE GİR"
+    },
+    {
+      "key": "ui.menu.play_continue",
+      "value": "DEVAM ET"
+    },
+    {
+      "key": "ui.menu.play_resume",
+      "value": "OYUNA DÖN"
+    },
+    {
+      "key": "ui.menu.play_new_sub",
+      "value": "Selman Sokağı No:48 · Yeni Hayat"
+    },
+    {
+      "key": "ui.menu.nav_districts",
+      "value": "Bölge Seç & Başla"
+    },
+    {
+      "key": "ui.menu.nav_fast_travel",
+      "value": "Bölgeye Işınlan"
+    },
+    {
+      "key": "ui.menu.nav_settings",
+      "value": "Ayarlar & Dünya"
+    },
+    {
+      "key": "ui.menu.nav_whatsnew",
+      "value": "Yenilikler & Topluluk"
+    },
+    {
+      "key": "ui.menu.nav_guide",
+      "value": "Mahalle Rehberi & Harita"
+    },
+    {
+      "key": "ui.menu.districts_title",
+      "value": "BAŞLANGIÇ BÖLGESİ"
+    },
+    {
+      "key": "ui.menu.districts_hint",
+      "value": "Bir mahalleye dokun, canlı kameradan incele ve oradan başla."
+    },
+    {
+      "key": "ui.menu.start_here",
+      "value": "BURADA BAŞLA"
+    },
+    {
+      "key": "ui.menu.travel_here",
+      "value": "BURAYA IŞINLAN"
+    },
+    {
+      "key": "ui.menu.discovered",
+      "value": "KEŞFEDİLDİ"
+    },
+    {
+      "key": "ui.menu.unexplored",
+      "value": "KEŞFET"
+    },
+    {
+      "key": "ui.menu.settings_title",
+      "value": "AYARLAR & ATMOSFER"
+    },
+    {
+      "key": "ui.menu.set_graphics",
+      "value": "Grafik Kalitesi"
+    },
+    {
+      "key": "ui.menu.set_gfx_low",
+      "value": "Düşük"
+    },
+    {
+      "key": "ui.menu.set_gfx_med",
+      "value": "Orta"
+    },
+    {
+      "key": "ui.menu.set_language",
+      "value": "Dil"
+    },
+    {
+      "key": "ui.menu.set_audio",
+      "value": "Ses Seviyesi"
+    },
+    {
+      "key": "ui.menu.set_sens",
+      "value": "Kamera Hassasiyeti"
+    },
+    {
+      "key": "ui.menu.set_sens_low",
+      "value": "Yavaş"
+    },
+    {
+      "key": "ui.menu.set_sens_mid",
+      "value": "Normal"
+    },
+    {
+      "key": "ui.menu.set_sens_high",
+      "value": "Hızlı"
+    },
+    {
+      "key": "ui.menu.set_time",
+      "value": "Günün Saati (Canlı Önizleme)"
+    },
+    {
+      "key": "ui.menu.time_morning",
+      "value": "Sabah"
+    },
+    {
+      "key": "ui.menu.time_noon",
+      "value": "Öğle"
+    },
+    {
+      "key": "ui.menu.time_sunset",
+      "value": "Akşam"
+    },
+    {
+      "key": "ui.menu.time_night",
+      "value": "Gece"
+    },
+    {
+      "key": "ui.menu.set_fps",
+      "value": "FPS Göstergesi"
+    },
+    {
+      "key": "ui.menu.on",
+      "value": "Açık"
+    },
+    {
+      "key": "ui.menu.off",
+      "value": "Kapalı"
+    },
+    {
+      "key": "ui.menu.reset_btn",
+      "value": "Yeni Oyun (Kaydı Sıfırla)"
+    },
+    {
+      "key": "ui.menu.reset_confirm",
+      "value": "EMİN MİSİN? SIFIRLA"
+    },
+    {
+      "key": "ui.menu.reset_cancel",
+      "value": "Vazgeç"
+    },
+    {
+      "key": "ui.menu.profile_header",
+      "value": "MAHALLE PROFİLİN"
+    },
+    {
+      "key": "ui.menu.stat_cash",
+      "value": "NAKİT"
+    },
+    {
+      "key": "ui.menu.stat_missions",
+      "value": "GÖREV"
+    },
+    {
+      "key": "ui.menu.stat_landmarks",
+      "value": "KEŞİF"
+    },
+    {
+      "key": "ui.menu.stat_memories",
+      "value": "HATIRA"
+    },
+    {
+      "key": "ui.menu.weather_clear",
+      "value": "Açık & Güneşli"
+    },
+    {
+      "key": "ui.menu.weather_breezy",
+      "value": "Serin & Esintili"
+    },
+    {
+      "key": "ui.menu.weather_rain",
+      "value": "Yaz Yağmuru"
+    },
+    {
+      "key": "ui.menu.nav_sports",
+      "value": "Spor & Mini Oyunlar"
+    },
+    {
+      "key": "ui.menu.sports_title",
+      "value": "SPOR & MİNİ OYUNLAR"
+    },
+    {
+      "key": "ui.menu.sports_hint",
+      "value": "İstediğin zaman bir spor seç, canlı sahayı gör ve hemen maça başla!"
+    },
+    {
+      "key": "ui.menu.play_sport_now",
+      "value": "MAÇA BAŞLA"
+    },
+    {
+      "key": "ui.menu.vista_player",
+      "value": "Bulunduğun Konum"
+    },
+    {
+      "key": "sports.swim.controls",
+      "value": "Yüzme Yarışı: Vur/Sol Tık: Çıkış · Kulaç Ritmi · Takla | Space: Stil Değiştir | E/F: Çık"
+    },
+    {
+      "key": "npc.simitci_ahmet.name",
+      "value": "Simitçi Ahmet Amca"
+    },
+    {
+      "key": "npc.cayci_riza.name",
+      "value": "Çaycı Rıza Usta"
+    },
+    {
+      "key": "npc.kaptan_tarik.name",
+      "value": "Kaptan Tarık"
+    },
+    {
+      "key": "npc.havuz_selin.name",
+      "value": "Yüzme Hakemi Selin"
+    },
+    {
+      "key": "npc.farmer_irfan.name",
+      "value": "Çiftçi İrfan Amca"
+    },
+    {
+      "key": "m21.title",
+      "value": "Sabahın İlk Simidi & 1984 Mektubu"
+    },
+    {
+      "key": "m21.summary",
+      "value": "Simitçi Ahmet Amca eski bir mahalle fotoğrafı ve gizemli bir mektup buldu."
+    },
+    {
+      "key": "m21.s1.obj",
+      "value": "Meydan simit tezgahında Simitçi Ahmet Amca ile konuş."
+    },
+    {
+      "key": "m21.s2.obj",
+      "value": "Çay Bahçesi'nde Çaycı Rıza Usta'ya 1984 mektubunu sor."
+    },
+    {
+      "key": "m21.s3.obj",
+      "value": "Sultanbeyli Göleti iskelesinde Kaptan Tarık ile buluş."
+    },
+    {
+      "key": "m21.d1.1",
+      "value": "Günaydın Deniz evladım! Sabah tepsiyi silerken altından 1984'ten kalma sararmış bir fotoğraf ve mektup çıktı."
+    },
+    {
+      "key": "m21.d1.2",
+      "value": "Mektupta 'Gölet kenarındaki çınarın altında buluşalım — Tarık' yazıyor. Çaycı Rıza Usta bu eski dostları kesin tanır!"
+    },
+    {
+      "key": "m21.d1.3",
+      "value": "Al şu sıcacık simitlerden iki tane, Rıza Usta'ya götür de bu güzel sırrı birlikte çözelim."
+    },
+    {
+      "key": "m21.d2.1",
+      "value": "Vay be Deniz! Bu fotoğraftaki genç, bizim eski kayıkçı Kaptan Tarık! Gençliğinde Hamidiye'nin hem en hızlı yüzücüsü hem en neşeli dostuydu."
+    },
+    {
+      "key": "m21.d2.2",
+      "value": "Yıllardır her sabah Sultanbeyli Göleti iskelesine oturup kuğuları izler. Mektubu ona götürürsen dünyalar onun olur!"
+    },
+    {
+      "key": "m21.d3.1",
+      "value": "İnanmıyorum... Kırk yıl önce yazdığım mektup hâlâ duruyor mu?! Ellerine sağlık evladım, bana gençliğimi geri getirdin."
+    },
+    {
+      "key": "m21.d3.2",
+      "value": "Mahalle yeniden canlanmış: spor sahaları, güvercinler, çay bahçesi... Bu yaz hep birlikte efsane bir Hamidiye Şöleni yapalım!"
+    },
+    {
+      "key": "m22.title",
+      "value": "Kortta Onur Maçı: Tenis Kupası"
+    },
+    {
+      "key": "m22.summary",
+      "value": "Gürsu Tenis Kortu'nda yeni topspin, kısa top ve lob taktikleriyle mahalle kupasını kazan."
+    },
+    {
+      "key": "m22.s1.obj",
+      "value": "Spor Kompleksi'nde Antrenör Kerem ile konuş."
+    },
+    {
+      "key": "m22.s2.obj",
+      "value": "Gürsu Tenis Kortu'nda gerçek 1v1 tenis maçını oyna!"
+    },
+    {
+      "key": "m22.s3.obj",
+      "value": "Maç sonrası Antrenör Kerem'in yanına dön."
+    },
+    {
+      "key": "m22.d1.1",
+      "value": "Deniz! Kaptan Tarık aradı, 1984'te yağmur yüzünden yarım kalan Hamidiye Tenis Kupası'nı bugün tamamlıyoruz!"
+    },
+    {
+      "key": "m22.d1.2",
+      "value": "Kortta servisini altın bölgede bırakırsan 185 km/s ACE atabilirsin. İkinci tuşla Kısa Top (Drop Shot) ve Lob yaparak rakibi şaşırt!"
+    },
+    {
+      "key": "m22.d2.1",
+      "value": "İşte gerçek mahalle tenisi! Tribünlerdeki herkes servislerini ve file voleni ayakta alkışladı!"
+    },
+    {
+      "key": "m22.d2.2",
+      "value": "Bu kupa artık Hamidiye Spor Kompleksi'nin baş köşesinde duracak. Tebrikler şampiyon!"
+    },
+    {
+      "key": "m23.title",
+      "value": "Sultanbeyli Göleti'nin Batık Yadigarı"
+    },
+    {
+      "key": "m23.summary",
+      "value": "Gölet sularına dalıp Kaptan Tarık'ın dede yadigarı gümüş cep saatini çıkar."
+    },
+    {
+      "key": "m23.s1.obj",
+      "value": "Sultanbeyli Göleti iskelesinde Kaptan Tarık ile konuş."
+    },
+    {
+      "key": "m23.s2.obj",
+      "value": "Gölete yüzüp parlayan Batık Yadigar Sandığı'nı çıkar!"
+    },
+    {
+      "key": "m23.s3.obj",
+      "value": "Gümüş cep saatini iskelede Kaptan Tarık'a teslim et."
+    },
+    {
+      "key": "m23.d1.1",
+      "value": "Evladım, benden saklama; o 1984 yazında kayık sallanınca dedemin gümüş cep saati şu kuğuların yüzdüğü koya düşmüştü."
+    },
+    {
+      "key": "m23.d1.2",
+      "value": "Su bugün cam gibi berrak. İskeleden gölete atlayıp parlayan sandığı çıkarabilirsen ömrümün en güzel hediyesi olur."
+    },
+    {
+      "key": "m23.d2.1",
+      "value": "Sandık hâlâ sapasağlam! İçinden işlemeli gümüş cep saati pırıl pırıl çıktı!"
+    },
+    {
+      "key": "m23.d3.1",
+      "value": "Aman Allah'ım... Dedemin saati! Bak kapağının içinde 1984'teki bütün mahalle gençlerinin gülümseyen fotoğrafı duruyor."
+    },
+    {
+      "key": "m23.d3.2",
+      "value": "Deniz, sen sadece hızlı bir sporcu değil, bu mahallenin kalbisin. Akşamki şölende bunu herkese göstereceğim!"
+    },
+    {
+      "key": "m24.title",
+      "value": "Altın Kulaç: Hamidiye Su Festivali"
+    },
+    {
+      "key": "m24.summary",
+      "value": "Hamidiye Havuzu'nda 3 kulvarlı 50m yüzme yarışı ve jüri puanlı tramplen dalışına katıl."
+    },
+    {
+      "key": "m24.s1.obj",
+      "value": "Hamidiye Yüzme Havuzu'nda Hakem Selin ile konuş."
+    },
+    {
+      "key": "m24.s2.obj",
+      "value": "3 kulvarlı 50m Yüzme Yarışı'nı tamamla!"
+    },
+    {
+      "key": "m24.s3.obj",
+      "value": "Tramplenden jüri önünde akrobatik dalış yap!"
+    },
+    {
+      "key": "m24.s4.obj",
+      "value": "Festival madalyanı almak için Hakem Selin'e dön."
+    },
+    {
+      "key": "m24.d1.1",
+      "value": "Hoş geldin Deniz! Hamidiye Su Festivali'ne hoş geldin. Tribünler tıklım tıklım dolu!"
+    },
+    {
+      "key": "m24.d1.2",
+      "value": "Önce 50m yarışında çıkış bloğundan altın zamanlamayla atla, kulaç ritmini yakala ve duvarlarda dönüş taklası at. Sonra tramplenden şov dalışını bekliyoruz!"
+    },
+    {
+      "key": "m24.d2.1",
+      "value": "Muhteşem bir su şöleniydi! Hem 50 metrede kulaçların hem tramplendeki taklaların jüriyi mest etti!"
+    },
+    {
+      "key": "m24.d2.2",
+      "value": "Altın Kulaç Madalyası senin Deniz! Artık Büyük Yaz Şöleni için son hazırlıklara geçebiliriz."
+    },
+    {
+      "key": "m25.title",
+      "value": "Aydos Çiftliği'nden Şölen Sofrası"
+    },
+    {
+      "key": "m25.summary",
+      "value": "Çiftlikten taze keçi peyniri ve meydandan sıcak simit toplayıp şölen sofrasını kur."
+    },
+    {
+      "key": "m25.s1.obj",
+      "value": "Aydos Çiftliği'nde Çiftçi İrfan Amca ile konuş."
+    },
+    {
+      "key": "m25.s2.obj",
+      "value": "Keçi ağılından Taze Köy Peyniri Sepeti'ni al."
+    },
+    {
+      "key": "m25.s3.obj",
+      "value": "Meydan'da Simitçi Ahmet Amca'dan Şölen Simit Tepsisi'ni al."
+    },
+    {
+      "key": "m25.s4.obj",
+      "value": "Tüm ikramları Çay Bahçesi'nde Çaycı Rıza Usta'ya teslim et."
+    },
+    {
+      "key": "m25.d1.1",
+      "value": "Hoş geldin Deniz! Keçilerimiz Akkız ve Kınalı bu sabah şölen için en taze sütü verdi, köy peynirini sepete dizdim!"
+    },
+    {
+      "key": "m25.d1.2",
+      "value": "Peynir sepetini al, meydandan Ahmet'in sıcak simitlerini de ekle, doğru Rıza Usta'nın semaverinin başına!"
+    },
+    {
+      "key": "m25.d2.1",
+      "value": "Taze keçi peyniri ve tereyağlı köy sepeti hazır!"
+    },
+    {
+      "key": "m25.d3.1",
+      "value": "Fırından yeni çıktı çıtır susamlı simitler! Şölen sofrasına benden armağan olsun!"
+    },
+    {
+      "key": "m25.d4.1",
+      "value": "Harikasın Deniz! Semaver fokurduyor, simitler dizildi, fenerler yakılmak üzere. Gün batımında Büyük Hamidiye Yaz Şöleni başlıyor!"
+    },
+    {
+      "key": "m26.title",
+      "value": "Büyük Hamidiye Yaz Şöleni"
+    },
+    {
+      "key": "m26.summary",
+      "value": "Gün batımı fenerleri altında tüm mahalleyle buluş ve Hamidiye'ye adanan konuşmanı yap!"
+    },
+    {
+      "key": "m26.s1.obj",
+      "value": "Gün batımında Çay Bahçesi Meydanı'na gel ve Kaptan Tarık ile konuş."
+    },
+    {
+      "key": "m26.d1.1",
+      "value": "Bak Deniz... Çınar ağaçlarının altında fenerler yandı, çocuklar gülüyor, kediler ayaklarımızda mırıldanıyor, herkes bir arada!"
+    },
+    {
+      "key": "m26.d1.2",
+      "value": "Usta Kemal, Antrenör Kerem, Ahmet Amca, Rıza Usta ve tüm Sultanbeyli seni dinlemek istiyor. Şölen konuşmanda mahalleye ne söylemek istersin?"
+    },
+    {
+      "key": "m26.c1.label",
+      "value": "Bu mahalle bizim evimiz, komşuluk her şeydir!"
+    },
+    {
+      "key": "m26.c1.f1",
+      "value": "Bravo Deniz! İşte İstanbul'un ruhu budur — paylaşılan bir bardak çay, selamlaşan komşular ve açık kapılar!"
+    },
+    {
+      "key": "m26.c1.f2",
+      "value": "Yaşasın Hamidiye Mahallesi! Şölenimiz kutlu olsun, bu güzel dünya hepimizin!"
+    },
+    {
+      "key": "m26.c2.label",
+      "value": "Sporla, dostlukla ve emeğimizle büyüyen bir mahalle!"
+    },
+    {
+      "key": "m26.c2.f1",
+      "value": "Helal olsun şampiyon! Halı sahadan tenis kortuna, yüzme havuzundan çiftliğe kadar hepimize ilham oldun!"
+    },
+    {
+      "key": "m26.c2.f2",
+      "value": "Geleceğin tüm gençleri senin kırdığın rekorları konuşacak! Yaşasın Bizim Dünyamız!"
+    },
+    {
+      "key": "m26.c3.label",
+      "value": "1984'ün güzel anılarını geleceğe taşıyoruz!"
+    },
+    {
+      "key": "m26.c3.f1",
+      "value": "Gözlerim doldu evladım... O gümüş cep saati artık her yaz şöleninde yeni dostluklara şahitlik edecek."
+    },
+    {
+      "key": "m26.c3.f2",
+      "value": "Geçmişten geleceğe uzanan bu sevgi bağı hiç kopmasın! İyi ki varsın Deniz!"
+    }
   ]
 }

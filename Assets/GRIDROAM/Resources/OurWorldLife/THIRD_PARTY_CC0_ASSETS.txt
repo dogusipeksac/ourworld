@@ -19,3 +19,20 @@ Our World — Commercial-Safe 3D Models & Skeletal Animations Manifest
    - OW_FarmTractor.fbx, OW_HydraulicCarLift.fbx, OW_GarageToolStation.fbx, OW_CarSpoilerSport.fbx,
      OW_CarRoofRack.fbx, OW_FishingRod.fbx, OW_CarWashGantry.fbx, OW_HomeLuxurySofaSet.fbx,
      OW_HomeMediaAndConsole.fbx, OW_HomeBackyardMangal.fbx, OW_HomeAquariumAndPlant.fbx <- Original Blender models
+
+3. CC0 1.0 Universal (Public Domain — commercial use permitted, no attribution required)
+   Source: Poly Haven (https://polyhaven.com — License: https://creativecommons.org/publicdomain/zero/1.0/)
+   Customized, decimated for mobile, grounded & URP-normalized in Blender 5.3.0:
+   - OW_ParkBench.fbx         <- Poly Haven painted_wooden_bench_1k.gltf (decimated mobile park bench)
+   - OW_IstanbulLantern.fbx   <- Poly Haven Lantern_01_1k.gltf (brass street/plaza lantern + warm glass core)
+   - Resources/OurWorldTheme/Textures/ph_* (1K Albedo + NormalGL PBR sets):
+     clay_plaster, cobblestone_02, asphalt_02, grass_ground, coast_sand_02, clay_roof_tiles_02, oak_wood_planks
+
+4. Additional Quaternius CC0 Customization & Original Blender 5.3.0 Rigged Wildlife + Istanbul Mahalle Theme Pack
+   - OW_StreetDog.fbx         <- Quaternius CC0 Husky.fbx repainted & rescaled in Blender 5.3.0 as Golden Istanbul Street Dog (6 skeletal clips)
+   - OW_StreetCat.fbx         <- Original sculpted fluffy Istanbul Street Cat + 8-bone Armature (Idle, Walk, Sit, Happy)
+   - OW_Pigeon.fbx            <- Original sculpted Istanbul Plaza Pigeon + 6-bone Armature (Peck, Walk, Fly)
+   - OW_LakeSwan.fbx          <- Original sculpted Sultanbeyli Lake Swan + 6-bone Armature (Swim, WingSpread)
+   - OW_FarmGoat.fbx          <- Original sculpted Horned Anatolian Farm Goat + 8-bone Armature (Idle, Walk, Eating, Happy)
+   - OW_SimitCart.fbx, OW_TeaGardenSet.fbx, OW_IstanbulFountain.fbx, OW_PlaneTree.fbx, OW_CypressTree.fbx,
+     OW_ShopAwning.fbx, OW_FlowerPlanter.fbx, OW_DivingBoard.fbx <- Original Blender 5.3.0 Istanbul Mahalle & Sports Props

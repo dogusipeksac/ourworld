@@ -124,5 +124,16 @@ namespace OurWorld.Core
         public bool decorBackyardMangal;
         public bool decorGardenLanterns;
         public bool decorFarmLounge;
+
+        // Sports Leagues & Personal Records (Football, Volleyball, Tennis, Swimming)
+        public int footballWins;
+        public int footballLeagueTier; // 0=Acemi, 1=Mahalle, 2=Şampiyonlar
+        public int volleyballWins;
+        public int volleyballLeagueTier;
+        public int tennisWins;
+        public int tennisLeagueTier;
+        public float bestTennisServeKmh;
+        public int swimWins;
+        public float bestSwim50mSeconds;
     }
 }

@@ -385,9 +385,10 @@ namespace OurWorld.World
                 SpawnFarmPlot(homeRoot, pid, homePlotCoords[i]);
             }
 
-            // Cute cherry-blossom tree + flowerbed framing Deniz's home garden
+            // Cute cherry-blossom tree + flowerbed + cozy warm garden lantern framing Deniz's home garden
             SpawnBlossomTree(homeRoot, new Vector3(-59.2f, 0f, 13.8f), 0.92f);
             SpawnFlowerBed(homeRoot, new Vector3(-51.4f, 0.02f, 6.8f), 0f);
+            SpawnFarmLantern(homeRoot, new Vector3(-52.4f, 0f, 12.8f));
         }
 
         // =====================================================================
@@ -463,11 +464,16 @@ namespace OurWorld.World
             BuildGazebo(_farmRoot, new Vector3(172f, 0f, -5.0f));
             BuildFarmTractorDecor(_farmRoot, new Vector3(179f, 0f, 3.8f), 210f);
 
-            // Warm farmyard lanterns for cozy glowing nights!
-            SpawnFarmLantern(_farmRoot, new Vector3(150f, 0f, 7.8f));
-            SpawnFarmLantern(_farmRoot, new Vector3(176f, 0f, 7.8f));
+            // Warm farmyard lanterns illuminating courtyard, crop plots, barn/cow pasture, chicken coop, sheep pen & windmill!
+            SpawnFarmLantern(_farmRoot, new Vector3(144f, 0f,  4.2f));
+            SpawnFarmLantern(_farmRoot, new Vector3(154f, 0f,  8.0f));
+            SpawnFarmLantern(_farmRoot, new Vector3(174f, 0f, 14.5f));
+            SpawnFarmLantern(_farmRoot, new Vector3(158f, 0f, -11.5f));
             SpawnFarmLantern(_farmRoot, new Vector3(183f, 0f, -8.5f));
-            SpawnFarmLantern(_farmRoot, new Vector3(204f, 0f, 4.5f));
+            SpawnFarmLantern(_farmRoot, new Vector3(198f, 0f, -15.5f));
+            SpawnFarmLantern(_farmRoot, new Vector3(190f, 0f, 11.5f));
+            SpawnFarmLantern(_farmRoot, new Vector3(206f, 0f, 20.5f));
+            SpawnFarmLantern(_farmRoot, new Vector3(204f, 0f,  4.5f));
 
             // Perimeter scenic pines & blossoms framing Aydos Farm Valley
             Vector3[] borderTrees =
@@ -990,9 +996,12 @@ namespace OurWorld.World
                 _ducks.Add((duck, duckSkel, new Vector3(-198f + (d - 1) * 7f, 0f, (d - 1) * 5f), 5.5f + d * 2.2f, 0.36f + d * 0.08f, d * 2.1f));
             }
 
-            // Lakeside Gazebos + Lush Aydos Pine & Cherry-Blossom Grove!
+            // Lakeside Gazebos + Warm Promenade Lanterns + Lush Aydos Pine & Cherry-Blossom Grove!
             BuildGazebo(lakeRoot, new Vector3(-168f, 0f,  15f));
             BuildGazebo(lakeRoot, new Vector3(-168f, 0f, -15f));
+            SpawnFarmLantern(lakeRoot, new Vector3(-164.5f, 0f,  11.8f));
+            SpawnFarmLantern(lakeRoot, new Vector3(-164.5f, 0f, -11.8f));
+            SpawnFarmLantern(lakeRoot, new Vector3(-164.5f, 0f,   3.4f));
             SpawnFlowerBed(lakeRoot, new Vector3(-166f, 0.03f,  8.5f), 90f);
             SpawnFlowerBed(lakeRoot, new Vector3(-166f, 0.03f, -8.5f), 90f);
 
@@ -1184,14 +1193,14 @@ namespace OurWorld.World
 
             Light pl = bulb.AddComponent<Light>();
             pl.type = LightType.Point;
-            pl.color = new Color(1.0f, 0.80f, 0.46f);
-            pl.range = 28f;
-            pl.intensity = 26f;
+            pl.color = new Color(1.0f, 0.82f, 0.48f);
+            pl.range = 36f;
+            pl.intensity = 44f;
             pl.shadows = LightShadows.None;
             pl.enabled = false;
 
             NightLight nl = bulb.AddComponent<NightLight>();
-            nl.Configure(pl, new[] { mr }, new Color(1.0f, 0.82f, 0.46f) * 3.8f);
+            nl.Configure(pl, new[] { mr }, new Color(1.0f, 0.84f, 0.50f) * 4.2f);
             if (NeighborhoodNightLighting.Instance != null)
             {
                 NeighborhoodNightLighting.Instance.RegisterDynamicOutdoorLight(nl);
