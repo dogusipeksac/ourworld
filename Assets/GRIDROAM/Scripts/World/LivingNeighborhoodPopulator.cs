@@ -210,7 +210,8 @@ namespace OurWorld.World
             Transform npcRoot = new GameObject("Living_Istanbul_NPCs").transform;
             npcRoot.SetParent(transform, false);
 
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
+            if (lit == null) return;
             Material[] shirtMats = new Material[ShirtPalette.Length];
             for (int i = 0; i < ShirtPalette.Length; i++)
             {

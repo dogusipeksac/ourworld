@@ -444,20 +444,24 @@ namespace OurWorld.Vehicle
 
         private void EnsureParticleMaterials()
         {
+            Shader fallback = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                ?? Shader.Find("Universal Render Pipeline/Unlit")
+                ?? Shader.Find("Sprites/Default")
+                ?? Shader.Find("Universal Render Pipeline/Lit");
+            if (fallback == null) return;
+
             if (_sharedSparkMat == null)
             {
-                Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-                if (sh == null) sh = Shader.Find("Universal Render Pipeline/Unlit");
-                _sharedSparkMat = new Material(sh);
+                _sharedSparkMat = new Material(fallback) { name = "MAT_VehicleDamageSpark" };
                 if (_sharedSparkMat.HasProperty("_BaseColor")) _sharedSparkMat.SetColor("_BaseColor", new Color(1.0f, 0.82f, 0.30f, 1f));
+                else _sharedSparkMat.color = new Color(1.0f, 0.82f, 0.30f, 1f);
             }
             if (_sharedSmokeMat == null)
             {
-                Shader sh = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-                if (sh == null) sh = Shader.Find("Universal Render Pipeline/Unlit");
-                _sharedSmokeMat = new Material(sh);
+                _sharedSmokeMat = new Material(fallback) { name = "MAT_VehicleDamageSmoke" };
                 if (_sharedSmokeMat.HasProperty("_Surface")) _sharedSmokeMat.SetFloat("_Surface", 1f);
                 if (_sharedSmokeMat.HasProperty("_BaseColor")) _sharedSmokeMat.SetColor("_BaseColor", new Color(0.65f, 0.65f, 0.68f, 0.55f));
+                else _sharedSmokeMat.color = new Color(0.65f, 0.65f, 0.68f, 0.55f);
                 _sharedSmokeMat.renderQueue = 3000;
             }
         }
