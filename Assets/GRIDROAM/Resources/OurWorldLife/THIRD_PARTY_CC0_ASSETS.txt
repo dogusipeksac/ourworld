@@ -1,0 +1,21 @@
+Our World — Commercial-Safe 3D Models & Skeletal Animations Manifest
+====================================================================
+
+1. CC0 1.0 Universal (Public Domain — commercial use permitted, no attribution required)
+   Source: Quaternius (https://quaternius.com — License: https://creativecommons.org/publicdomain/zero/1.0/)
+   Customized, scaled, material-normalized, and/or additionally animated inside live Blender 5.3.0 MCP:
+   - OW_Cow.fbx           <- Ultimate Animated Animal Pack (Cow.fbx) — 7 skeletal clips (Idle, Idle_2, Idle_Headlow, Walk, Eating, Gallop, Happy)
+   - OW_Sheep.fbx         <- Farm Animals Pack (Sheep.fbx) — 4 skeletal clips (Idle, Happy + Blender-MCP-authored Walk & Eating)
+   - OW_ShepherdDog.fbx   <- Ultimate Animated Animal Pack (Husky.fbx, repainted to Anatolian Kangal "Karabaş") — 6 skeletal clips (Idle, Idle_2, Walk, Gallop, Eating, Happy)
+   - OW_LakeFish.fbx      <- Animated Fish Pack (Fish1.fbx) — skeletal Swim clip
+   - OW_CustomerCar.fbx   <- Low-Poly Cars Pack (SportsCar.fbx) — customized URP metallic paint slots
+   - OW_Windmill.fbx      <- Farm Buildings Pack (TowerWindmill.fbx) — articulated BladesPivot
+   - OW_Crop_Corn.fbx     <- Ultimate Crops Pack (Corn_4.fbx)
+
+2. Original Models & Skeletal Animations Drawn, Rigged & Keyframe-Animated in Live Blender 5.3.0 MCP
+   - OW_Chicken.fbx       <- Original sculpted hen + 10-bone Armature + 4 skeletal clips (Idle, Walk, Eating, Happy)
+   - OW_PondDuck.fbx      <- Original sculpted mallard/white duck + 7-bone Armature + 2 skeletal clips (Swim, Dabble)
+   - OW_Crop_Sunflower.fbx, OW_Crop_Tomato.fbx, OW_Crop_Wheat.fbx <- Original sculpted 3D farm crops
+   - OW_FarmTractor.fbx, OW_HydraulicCarLift.fbx, OW_GarageToolStation.fbx, OW_CarSpoilerSport.fbx,
+     OW_CarRoofRack.fbx, OW_FishingRod.fbx, OW_CarWashGantry.fbx, OW_HomeLuxurySofaSet.fbx,
+     OW_HomeMediaAndConsole.fbx, OW_HomeBackyardMangal.fbx, OW_HomeAquariumAndPlant.fbx <- Original Blender models

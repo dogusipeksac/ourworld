@@ -132,6 +132,26 @@ namespace OurWorld.UI
                 Fov = 56f,
                 SwayRadius = 1.35f,
                 SwaySpeed = 0.15f
+            },
+            new ScenicVista
+            {
+                NameTr = "Aydos Yeşil Vadi · Çiftlik & Bostan",
+                NameEn = "Aydos Green Valley · Farm & Ranch",
+                BasePos = new Vector3(132.0f, 6.2f, -14.0f),
+                LookAt = new Vector3(182.0f, 2.5f, 4.0f),
+                Fov = 56f,
+                SwayRadius = 1.25f,
+                SwaySpeed = 0.15f
+            },
+            new ScenicVista
+            {
+                NameTr = "Sultanbeyli Göleti & Çam Korusu",
+                NameEn = "Sultanbeyli Lake & Pine Grove",
+                BasePos = new Vector3(-156.0f, 6.6f, -18.0f),
+                LookAt = new Vector3(-196.0f, 1.0f, 0.0f),
+                Fov = 56f,
+                SwayRadius = 1.25f,
+                SwaySpeed = 0.14f
             }
         };
 
@@ -178,8 +198,8 @@ namespace OurWorld.UI
                 LandmarkId = "lm_selman",
                 NameTr = "Selman Bakkal & Çarşı",
                 NameEn = "Selman Market & Shops",
-                TagTr = "Alışveriş · ATM · Tamirhane",
-                TagEn = "Shops · ATM · Auto Repair",
+                TagTr = "Bakkal · ATM · Oto Tamir & Modifiye",
+                TagEn = "Market · ATM · Auto Repair & Tuning",
                 SpawnPos = new Vector3(6.5f, 0.12f, 4.5f),
                 SpawnYaw = 0f,
                 PreviewCamPos = new Vector3(-3.0f, 3.6f, -3.2f),
@@ -208,6 +228,30 @@ namespace OurWorld.UI
                 SpawnYaw = 180f,
                 PreviewCamPos = new Vector3(5.5f, 5.6f, -26.0f),
                 PreviewLookAt = new Vector3(16.5f, 1.4f, -41.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_ciftlik",
+                NameTr = "Aydos Çiftliği & Bostan",
+                NameEn = "Aydos Farm & Ranch",
+                TagTr = "Tarım · Tavuk · İnek · Koyun",
+                TagEn = "Crops · Chickens · Cows · Sheep",
+                SpawnPos = new Vector3(136.0f, 0.12f, 0.0f),
+                SpawnYaw = 90f,
+                PreviewCamPos = new Vector3(132.0f, 6.2f, -14.0f),
+                PreviewLookAt = new Vector3(182.0f, 2.5f, 4.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_golet",
+                NameTr = "Sultanbeyli Göleti",
+                NameEn = "Sultanbeyli Lake & Grove",
+                TagTr = "Balıkçılık İskelesi · Oto Yıkama · Koru",
+                TagEn = "Fishing Pier · Car Wash · Pine Grove",
+                SpawnPos = new Vector3(-164.0f, 0.12f, 0.0f),
+                SpawnYaw = -90f,
+                PreviewCamPos = new Vector3(-156.0f, 6.6f, -18.0f),
+                PreviewLookAt = new Vector3(-196.0f, 1.0f, 0.0f)
             }
         };
 
@@ -1720,8 +1764,8 @@ namespace OurWorld.UI
             grt.offsetMax = new Vector2(-30f, -112f);
 
             GridLayoutGroup glg = gridGo.AddComponent<GridLayoutGroup>();
-            glg.cellSize = new Vector2(322f, 168f);
-            glg.spacing = new Vector2(20f, 18f);
+            glg.cellSize = new Vector2(322f, 128f);
+            glg.spacing = new Vector2(20f, 12f);
             glg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             glg.constraintCount = 2;
 
@@ -1742,16 +1786,16 @@ namespace OurWorld.UI
 
                 GameObject badgeGo = CreateRoundedPanel("StatusBadge", card.transform, _pillSprite,
                     new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                    new Vector2(18f, -16f), new Vector2(152f, 32f),
+                    new Vector2(16f, -12f), new Vector2(142f, 26f),
                     BadgeExploreBg, addBorder: false);
-                UnityEngine.UI.Text badgeLbl = CreateText("BadgeLabel", badgeGo.transform, "•  KEŞFET", 15, FontStyle.Bold, AccentGold, TextAnchor.MiddleCenter);
-                StretchFull(badgeLbl.rectTransform, 8f, 0f);
+                UnityEngine.UI.Text badgeLbl = CreateText("BadgeLabel", badgeGo.transform, "•  KEŞFET", 14, FontStyle.Bold, AccentGold, TextAnchor.MiddleCenter);
+                StretchFull(badgeLbl.rectTransform, 6f, 0f);
 
-                UnityEngine.UI.Text title = CreateText("Title", card.transform, Districts[i].NameTr, 22, FontStyle.Bold, TextPrimary, TextAnchor.MiddleLeft);
-                PlaceTopLeft(title.rectTransform, 18f, -60f, 286f, 34f);
+                UnityEngine.UI.Text title = CreateText("Title", card.transform, Districts[i].NameTr, 20, FontStyle.Bold, TextPrimary, TextAnchor.MiddleLeft);
+                PlaceTopLeft(title.rectTransform, 16f, -44f, 290f, 28f);
 
-                UnityEngine.UI.Text tag = CreateText("Tag", card.transform, Districts[i].TagTr, 16, FontStyle.Normal, TextSecondary, TextAnchor.UpperLeft);
-                PlaceTopLeft(tag.rectTransform, 18f, -98f, 286f, 46f);
+                UnityEngine.UI.Text tag = CreateText("Tag", card.transform, Districts[i].TagTr, 14, FontStyle.Normal, TextSecondary, TextAnchor.UpperLeft);
+                PlaceTopLeft(tag.rectTransform, 16f, -75f, 290f, 44f);
                 tag.horizontalOverflow = HorizontalWrapMode.Wrap;
 
                 _districtCardBgs.Add(bg);

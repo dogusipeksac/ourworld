@@ -143,47 +143,47 @@ vloc_map = {}
 (vlocs["data"] || []).each { |l| vloc_map[l.dig("attributes", "locale")] = l["id"] }
 
 desc_tr = <<~TEXT.strip
-  Bizim Dünyamız (Our World), oyuncuların fikirleriyle birlikte büyüyen, capcanlı bir 3D açık dünya yaşam, sürüş ve spor oyunudur!
+  Bizim Dünyamız (Our World), oyuncuların fikirleriyle birlikte büyüyen, capcanlı bir 3D açık dünya yaşam, çiftlik, oto tamir, sürüş ve spor oyunudur!
 
-  Hamidiye Mahallesi'nin samimi sokaklarından 8 ana caddeye uzanan özgür bir şehre adım at. Yaya olarak mahalleni gez, dilediğin araca binip sür, dilediğin an halı saha, tenis, basketbol ve voleybol maçlarına katıl, konuşan komşularla tanış ve günlük hayatın tadını çıkar.
+  Hamidiye Mahallesi'nin samimi sokaklarından Aydos Yeşil Vadi Çiftliği'ne ve Sultanbeyli Göleti'ne uzanan özgür dünyaya adım at. Yaya olarak mahalleni gez, tarlanı ekip biç, hayvanlarını besle, oto tamirhanende araçları lifte kaldırıp tamir et, gölette balık tut, evini dekore et ve 4 farklı sporda maça çık!
 
   ÖNE ÇIKAN ÖZELLİKLER:
-  • Yaşayan 3D Açık Dünya: Selman Sokağı, Fatih Bulvarı Saat Kulesi, Hz. Osman Camii, Çay Bahçesi, Açık Yüzme Havuzu ve 8 ana cadde.
-  • 5 Bölümlük 20 Hikâye Görevi + 4 Yan İş: Büyük Spor Kupası, Gece Yarısı Kesintisi, Sekiz Cadde Rallisi ve Büyük Final dâhil 20 görev; ayrıca Taksi, Pizza, Temizlik ve Ev Boyama işleriyle para kazan.
-  • 4 Oynanabilir Spor (İstediğin An Maç!): 1v1 Toprak Kort Tenis, 3v3 Halı Saha Futbolu, 2v2 Sokak Basketbolu ve 2v2 Voleybol maçlarına dilediğin zaman gir, ödül kazan.
-  • Akıllı & Konuşan Mahalle NPC'leri: Birbiriyle sohbet eden, korna ve yağmura tepki veren, sokak kedilerini seven ve saygınlığına göre seni selamlayan canlı komşular.
-  • Gerçekçi Fiziksel Etkileşimler: Menü açmadan bakkal raflarından alışveriş yap, çay iç, evinde dinlen, havuzda yüz ve camide ibadet et.
-  • Çoklu Araç & Işıklı Geceler: Araba, bisiklet ve motosiklet sür; driftle nitro doldur, Türkçe radyo aç, akşam 18:30'dan itibaren yanan sokak lambaları ve farlarla şehri keşfet.
+  • Geniş Yaşayan 3D Açık Dünya: Selman Sokağı, Fatih Bulvarı Saat Kulesi, Aydos Çiftliği & Bostanı, Sultanbeyli Göleti, Hz. Osman Camii, Çay Bahçesi, Açık Yüzme Havuzu ve 8 ana cadde.
+  • Tarım, Hayvancılık & Köy Pazarı: 16 bostan tarlasında ayçiçeği, domates, biber ve çilek yetiştir; inek sağ, koyun kırp, kümesten yumurta topla ve Köy Pazarı'nda sat.
+  • No:73 Oto Tamir, Modifiye & Oto Yıkama: Müşteri araçlarını hidrolik lifte kaldırıp lastik, motor ve kaporta tamiratı yap; kendi aracına metalik boya, jant, rüzgarlık, tavan bagajı ve performans yükseltmeleri tak.
+  • Gölet Balıkçılığı & Ev Dekorasyonu: Sultanbeyli Göleti iskelesinden 5 farklı balık türü yakala; No:48 evini koltuk takımı, akvaryum ve bahçe mangalıyla yenile.
+  • 5 Bölümlük 20 Hikâye Görevi + 4 Oynanabilir Spor: 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol ve 2v2 Voleybol maçlarına dilediğin an gir; Taksi, Pizza, Temizlik ve Ev Boyama yan işleriyle kazan.
+  • Akıllı Komşular & Işıklı Geceler: Konuşan komşular, gerçekçi iskeletli hayvan ve etkileşim animasyonları, araba/bisiklet/motosiklet sürüşü ve akşam 18:30'dan itibaren yanan sokak lambaları.
   • Birlikte Büyüyen Dünya: Oyun içi Öneri sekmesinden fikrini yaz, sıradaki güncellemeleri birlikte şekillendirelim!
 TEXT
 
 desc_en = <<~TEXT.strip
-  Our World is a vibrant, living 3D open-world life, driving & sports game built to grow together with its community!
+  Our World is a vibrant, living 3D open-world life, farming, auto-repair, driving & sports game built to grow together with its community!
 
-  Step into a lively handcrafted neighborhood spanning 8 bustling avenues — drive cars, bikes, and motorcycles, jump into playable tennis, football, basketball, and volleyball matches anytime, meet talking smart NPCs, and shape the city's story.
+  Explore a sprawling handcrafted neighborhood stretching from 8 bustling avenues to Aydos Green Valley Farm and Sultanbeyli Lake. Plant & harvest crops, raise cows, sheep, and chickens, repair & tune cars on a hydraulic garage lift, fish off the lakeside pier, decorate your home, and jump into 4 playable sports anytime!
 
   KEY FEATURES:
-  • Living 3D Open World: Explore 8 connected avenues, Clock Tower Plaza, local shops, parks, a swimmable pool, and enterable interiors.
-  • 5-Chapter Story (20 Missions) + 4 Side Jobs: Compete in the Sports Cup, restore a midnight blackout, race the 8-Avenue Rally, and choose the neighborhood's legacy — plus Taxi, Pizza, Cleanup, and House Painting jobs.
-  • 4 Playable Sports Anytime: Jump straight into 1v1 Clay Tennis, 3v3 Street Football, 2v2 Street Basketball, and 2v2 Volleyball with crisp controls and animations.
-  • Smart Talking Neighborhood NPCs: Citizens chat with neighbors via speech bubbles, react to car horns, rain, and fights, pet street cats, and remember how you treat them.
-  • Physical Zero-Menu Interactions: Pick products right off market shelves and pay at the counter, brew hot tea, swim freely, and rest in your own home.
-  • Multi-Vehicle Driving & Glowing Nights: Cruise with realistic handling, drift nitro, headlights, glowing streetlamps, lit apartment windows, and stadium floodlights after dusk.
-  • Shaped by Players: Share your ideas directly via the in-game Suggestions tab to help guide every update!
+  • Living 3D Open World: Roam 8 connected avenues, Aydos Farm Valley, Sultanbeyli Lake & Pine Grove, Clock Tower Plaza, swimmable pool, and enterable interiors.
+  • Farming, Livestock & Village Market: Grow sunflowers, tomatoes, peppers, and strawberries across 16 beds; milk cows, shear sheep, collect eggs, and sell fresh harvest at the village stand.
+  • No:73 Auto Garage, Tuning & Car Wash: Raise customer cars on a hydraulic lift for 3-step repairs, customize your own car with metallic paints, rims, spoilers, roof racks & performance upgrades, and visit the drive-through car wash.
+  • Lake Fishing & Home Decor: Cast off Sultanbeyli Lake Pier to catch 5 fish species, upgrade your home with luxury furniture & aquarium, and grill on your backyard mangal.
+  • 5-Chapter Story (20 Missions) + 4 Playable Sports: Jump anytime into 1v1 Clay Tennis, 3v3 Football, 2v2 Basketball, and 2v2 Volleyball, plus Taxi, Pizza, Cleanup & Painting jobs.
+  • Smart Talking NPCs & Realistic Animations: Expressive skeletal animal animations, two-hand IK interactions, multi-vehicle driving, and glowing streetlamps & headlights after dusk.
+  • Shaped by Players: Share your ideas via the in-game Suggestions tab to help guide every update!
 TEXT
 
 version_locs = {
   "tr" => {
-    promotionalText: "20 görev, 4 oynanabilir spor (Tenis, Futbol, Basketbol, Voleybol), akıllı komşular, araba sürüşü ve ışıklı İstanbul geceleri seni bekliyor!",
+    promotionalText: "Aydos Çiftliği, tarım, hayvancılık, oto tamir & modifiye, gölet balıkçılığı, 20 görev ve 4 oynanabilir spor şimdi tek açık dünyada!",
     description: desc_tr,
-    keywords: "araba,sürme,istanbul,simülasyon,tenis,futbol,basketbol,voleybol,taksi,görev,3d,şehir,drift,offline",
+    keywords: "araba,sürme,çiftlik,tamir,balık,simülasyon,tenis,futbol,basketbol,voleybol,3d,şehir,drift,offline",
     supportUrl: "https://dogusipeksac.com",
     marketingUrl: "https://dogusipeksac.com"
   },
   "en-US" => {
-    promotionalText: "20 story missions, 4 playable sports (Tennis, Football, Basketball, Volleyball), smart talking NPCs, multi-vehicle driving & glowing nights!",
+    promotionalText: "Farming, livestock, auto garage & tuning, lake fishing, home decor, 20 missions & 4 playable sports in one living 3D open world!",
     description: desc_en,
-    keywords: "sandbox,car,driving,life,sim,city,tennis,football,basketball,volleyball,taxi,missions,drift,offline",
+    keywords: "sandbox,farming,garage,fishing,car,driving,life,sim,tennis,football,basketball,volleyball,offline",
     supportUrl: "https://dogusipeksac.com",
     marketingUrl: "https://dogusipeksac.com"
   }

@@ -20,6 +20,13 @@ namespace OurWorld.World
 
         private static readonly StreetZone[] Zones =
         {
+            // New Expanded Nature & Farm Regions (highest priority)
+            new StreetZone { DisplayName = "Aydos Yeşil Vadi · Çiftlik & Bostan", MinX = 132f, MaxX = 244f, MinZ = -56f, MaxZ =  56f, Priority = 4 },
+            new StreetZone { DisplayName = "Aydos Çiftlik Yolu",                  MinX = 108f, MaxX = 136f, MinZ = -12f, MaxZ =  12f, Priority = 3 },
+            new StreetZone { DisplayName = "Evimin Bostanı (No:48)",              MinX = -60f, MaxX = -51f, MinZ =   6f, MaxZ =  15f, Priority = 4 },
+            new StreetZone { DisplayName = "Sultanbeyli Göleti & Aydos Korusu",   MinX =-244f, MaxX =-156f, MinZ = -62f, MaxZ =  62f, Priority = 4 },
+            new StreetZone { DisplayName = "Gölet Yürüyüş Yolu",                  MinX =-160f, MaxX =-108f, MinZ = -12f, MaxZ =  12f, Priority = 3 },
+
             // Landmarks & Hero Streets (higher priority)
             new StreetZone { DisplayName = "Hz. Osman Camii Avlusu",            MinX =  68f, MaxX =  95f, MinZ = -54f, MaxZ = -21f, Priority = 3 },
             new StreetZone { DisplayName = "Hamidiye Açık Yüzme Havuzu",        MinX =   4f, MaxX =  28f, MinZ = -50f, MaxZ = -29f, Priority = 3 },
@@ -40,6 +47,7 @@ namespace OurWorld.World
             new StreetZone { DisplayName = "Zübeyde Hanım Caddesi",              MinX = -175f, MaxX = 165f, MinZ = -156f, MaxZ = -136f, Priority = 1 },
             new StreetZone { DisplayName = "Eyyubi Caddesi",                     MinX = -158f, MaxX = -138f, MinZ = -156f, MaxZ = 156f, Priority = 1 },
             new StreetZone { DisplayName = "Seyyid Kutup Caddesi",               MinX =  -94f, MaxX =  -76f, MinZ = -156f, MaxZ = 156f, Priority = 1 },
+            new StreetZone { DisplayName = "Aydos Tazyikli Oto Yıkama",           MinX =  114f, MaxX =  134f, MinZ = -24f, MaxZ =  -4f, Priority = 7 },
             new StreetZone { DisplayName = "Abdülkadir Udeh Caddesi",            MinX =   90f, MaxX =  108f, MinZ = -156f, MaxZ = 156f, Priority = 1 }
         };
 

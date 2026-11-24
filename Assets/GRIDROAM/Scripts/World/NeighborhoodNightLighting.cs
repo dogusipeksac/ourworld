@@ -237,16 +237,32 @@ namespace OurWorld.World
             NightLight[] allLights = FindObjectsByType<NightLight>(FindObjectsInactive.Include);
             for (int i = 0; i < allLights.Length; i++)
             {
-                NightLight nl = allLights[i];
-                if (nl == null || !nl.IsManagedOutdoorLight || nl.TargetLight == null) continue;
+                RegisterDynamicOutdoorLight(allLights[i]);
+            }
+        }
 
-                _managedOutdoorLights.Add(nl);
+        public void RegisterDynamicOutdoorLight(NightLight nl)
+        {
+            if (nl == null || !nl.IsManagedOutdoorLight || nl.TargetLight == null) return;
+            if (_managedOutdoorLights.Contains(nl)) return;
 
+            _managedOutdoorLights.Add(nl);
+
+            if (_generatedRoot != null && _sphereMesh != null && _quadMesh != null)
+            {
                 Vector3 lampPos = nl.TargetLight.transform.position;
                 bool isCool = nl.TargetLight.color.b > 0.85f && nl.TargetLight.color.g > 0.85f;
                 if (lampPos.y >= 2.2f && lampPos.y <= 11.5f)
                 {
+                    int beforeCount = _nightOnlyVisuals.Count;
                     SpawnLampBulbAndPool(lampPos, isCool, poolDiameter: isCool ? 16f : 15f);
+                    if (_initialized && _isNightApplied)
+                    {
+                        for (int k = beforeCount; k < _nightOnlyVisuals.Count; k++)
+                        {
+                            if (_nightOnlyVisuals[k] != null) _nightOnlyVisuals[k].SetActive(true);
+                        }
+                    }
                 }
             }
         }

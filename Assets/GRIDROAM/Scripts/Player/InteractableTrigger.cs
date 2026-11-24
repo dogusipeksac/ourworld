@@ -29,7 +29,17 @@ namespace OurWorld.Player
         Tennis,
         Motorcycle,
         ShopItem,
-        SportsArena
+        SportsArena,
+        FarmPlot,
+        FarmAnimal,
+        FarmMarket,
+        FarmBoard,
+        GarageRepairBay,
+        GarageModBoard,
+        FishingPier,
+        CarWashStation,
+        HomeDecorBoard,
+        HomeMangal
     }
 
     /// <summary>

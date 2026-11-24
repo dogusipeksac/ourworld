@@ -384,9 +384,9 @@ namespace OurWorld.UI
         {
             HasCustomWaypoint = true;
             CustomWaypointPosition = new Vector3(
-                Mathf.Clamp(worldPos.x, -160f, 160f),
+                Mathf.Clamp(worldPos.x, -242f, 242f),
                 0.2f,
-                Mathf.Clamp(worldPos.z, -160f, 160f));
+                Mathf.Clamp(worldPos.z, -242f, 242f));
 
             if (!string.IsNullOrEmpty(label) && PlayerModeController.Instance != null)
             {

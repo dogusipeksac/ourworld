@@ -12,6 +12,15 @@ namespace OurWorld.Core
         public float b = 1f;
     }
 
+    [Serializable]
+    public class FarmPlotSaveEntry
+    {
+        public string plotId = string.Empty;
+        public int cropType;
+        public float growthProgress;
+        public bool isWatered;
+    }
+
     /// <summary>
     /// Serializable local save structure for mission progress, unlocked keys,
     /// economy, player needs, clock, fuel, stats, player/vehicle world state,
@@ -74,5 +83,46 @@ namespace OurWorld.Core
         public float savedVehiclePosZ = -32.5f;
         public float savedVehicleRotY = 0f;
         public float savedVehicleFuel = 0.8f;
+
+        // Phase 1: Gardening, Farming & Livestock (Home Bostan + Aydos Farm)
+        public List<FarmPlotSaveEntry> farmPlots = new List<FarmPlotSaveEntry>();
+        public int selectedSeedIndex = 0; // 0=Tomato, 1=Pepper, 2=Strawberry, 3=Sunflower
+        public int invTomatoes;
+        public int invPeppers;
+        public int invStrawberries;
+        public int invSunflowers;
+        public int invEggs;
+        public int invMilk;
+        public int invWool;
+        public int extraChickens;
+        public int extraSheep;
+        public int extraCows;
+        public bool hasAutoSprinkler;
+        public int totalCropsHarvested;
+        public int totalAnimalProductsCollected;
+
+        // Phase 2: No:73 Auto Repair Workshop & Car Modification
+        public int carPaintIndex = -1;
+        public int carRimIndex;
+        public int carHeadlightMode;
+        public bool carHasSpoiler;
+        public bool carHasRoofRack;
+        public bool carHasTurboUpgrade;
+        public bool carHasSportSuspension;
+        public bool carHasNitroUpgrade;
+        public int totalCarsRepaired;
+
+        // Phase 3: Sultanbeyli Lake Fishing, Car Wash & No:48 Home Decor
+        public int invFishCount;
+        public int invFishTotalValue;
+        public int totalFishCaught;
+        public string bestFishName = string.Empty;
+        public int totalCarWashes;
+        public bool decorLuxurySofa;
+        public bool decorMediaConsole;
+        public bool decorAquarium;
+        public bool decorBackyardMangal;
+        public bool decorGardenLanterns;
+        public bool decorFarmLounge;
     }
 }

@@ -18,7 +18,13 @@ namespace OurWorld.Player
         LoadWashingMachine = 6,
         RefuelCar = 7,
         InspectReach = 8,
-        WakeStretch = 9
+        WakeStretch = 9,
+        FarmPlantAndDig = 10,
+        FarmWatering = 11,
+        FarmHarvest = 12,
+        MilkCow = 13,
+        ShearSheep = 14,
+        GrillMangal = 15
     }
 
     /// <summary>
@@ -27,13 +33,15 @@ namespace OurWorld.Player
     /// aiming TV remote, changing outfits at wardrobe, loading washing machine, fueling car,
     /// inspecting objects, and morning stretch after waking up).
     /// </summary>
-    [DefaultExecutionOrder(200)]
+    [DefaultExecutionOrder(250)]
     public class PlayerActionAnimator : MonoBehaviour
     {
         private PlayerFootController _foot;
         private CharacterController _cc;
         private Coroutine _activeRoutine;
         private GameObject _heldProp;
+        private GameObject _groundProp;
+        private Quaternion _heldPropLocalRot = Quaternion.identity;
         private bool _holdingModalLock;
 
         public bool IsPlaying => _activeRoutine != null;
@@ -153,7 +161,7 @@ namespace OurWorld.Player
                 float dist = toTarget.magnitude;
                 float idealDist = GetIdealStandDistance(kind);
 
-                if (dist > idealDist + 0.30f && dist < 3.4f)
+                if (dist > idealDist + 0.55f && dist < 3.4f)
                 {
                     Vector3 approachDir = toTarget / Mathf.Max(0.001f, dist);
                     Vector3 standPos = new Vector3(target.position.x, _foot.transform.position.y, target.position.z) - approachDir * idealDist;
@@ -190,7 +198,7 @@ namespace OurWorld.Player
                 {
                     Quaternion faceRot = Quaternion.LookRotation(lookDelta.normalized, Vector3.up);
                     float turnT = 0f;
-                    while (turnT < 0.18f)
+                    while (turnT < 0.12f)
                     {
                         if (ShouldAbort(mode)) break;
                         turnT += Time.deltaTime;
@@ -241,6 +249,24 @@ namespace OurWorld.Player
                     break;
                 case PlayerActionKind.WakeStretch:
                     yield return RunWakeStretch(mode, hum, triggerClimax);
+                    break;
+                case PlayerActionKind.FarmPlantAndDig:
+                    yield return RunFarmPlantAndDig(mode, hum, target, triggerClimax);
+                    break;
+                case PlayerActionKind.FarmWatering:
+                    yield return RunFarmWatering(mode, hum, target, triggerClimax);
+                    break;
+                case PlayerActionKind.FarmHarvest:
+                    yield return RunFarmHarvest(mode, hum, target, triggerClimax);
+                    break;
+                case PlayerActionKind.MilkCow:
+                    yield return RunMilkCow(mode, hum, target, triggerClimax);
+                    break;
+                case PlayerActionKind.ShearSheep:
+                    yield return RunShearSheep(mode, hum, target, triggerClimax);
+                    break;
+                case PlayerActionKind.GrillMangal:
+                    yield return RunGrillMangal(mode, hum, target, triggerClimax);
                     break;
             }
 
@@ -781,6 +807,263 @@ namespace OurWorld.Player
             }
         }
 
+        private IEnumerator RunFarmPlantAndDig(PlayerModeController mode, ProceduralHumanoid hum, Transform target, Action triggerClimax)
+        {
+            const float total = 1.45f;
+            float t = 0f;
+            bool fired = false;
+
+            while (t < total)
+            {
+                if (ShouldAbort(mode)) yield break;
+                t += Time.deltaTime;
+                float norm = Mathf.Clamp01(t / total);
+                float env = EdgeBlend(norm, 0.18f, 0.80f);
+
+                Transform tr = _foot.transform;
+                Vector3 fwd = tr.forward;
+                Vector3 right = tr.right;
+                Vector3 bed = tr.position + fwd * 0.62f + Vector3.up * 0.42f;
+
+                float pat = Mathf.Sin(t * 11f);
+                Vector3 lHand = bed - right * 0.16f + Vector3.up * (0.08f + Mathf.Max(0f, pat) * 0.12f);
+                Vector3 rHand = bed + right * 0.16f + Vector3.up * (0.08f + Mathf.Max(0f, -pat) * 0.14f) + fwd * (Mathf.Sin(t * 5.5f) * 0.08f);
+
+                if (!fired && norm >= 0.52f)
+                {
+                    fired = true;
+                    GameFeelAudio.SpawnBurst(bed, new Color(0.46f, 0.30f, 0.16f), count: 10, spread: 0.36f);
+                    triggerClimax();
+                }
+
+                hum.SetDualHandAction(true, lHand, rHand, env, env, 40f * env, 26f * env, 0.36f * env);
+                yield return null;
+            }
+        }
+
+        private IEnumerator RunFarmWatering(PlayerModeController mode, ProceduralHumanoid hum, Transform target, Action triggerClimax)
+        {
+            const float total = 1.65f;
+            float t = 0f;
+            bool fired = false;
+            float splashTimer = 0.22f;
+
+            _heldProp = SpawnActionProp(hum.RightForearm, PlayerActionKind.FarmWatering);
+
+            while (t < total)
+            {
+                if (ShouldAbort(mode)) yield break;
+                float dt = Time.deltaTime;
+                t += dt;
+                float norm = Mathf.Clamp01(t / total);
+                float env = EdgeBlend(norm, 0.16f, 0.82f);
+
+                Transform tr = _foot.transform;
+                Vector3 fwd = tr.forward;
+                Vector3 right = tr.right;
+                float sweep = Mathf.Sin(norm * Mathf.PI * 2.5f);
+
+                Vector3 rHand = tr.position + fwd * 0.56f + right * (0.16f + sweep * 0.28f) + Vector3.up * (0.86f - 0.10f * env);
+                Vector3 lHand = tr.position + fwd * 0.26f - right * 0.24f + Vector3.up * 0.90f;
+
+                _heldPropLocalRot = Quaternion.Euler(38f * env, sweep * 16f, 0f);
+
+                splashTimer -= dt;
+                if (splashTimer <= 0f && norm > 0.18f && norm < 0.84f)
+                {
+                    splashTimer = 0.20f;
+                    GameFeelAudio.SpawnBurst(rHand + fwd * 0.24f - Vector3.up * 0.32f, new Color(0.32f, 0.82f, 1.0f), count: 7, spread: 0.28f);
+                }
+
+                if (!fired && norm >= 0.52f)
+                {
+                    fired = true;
+                    GameFeelAudio.PlayWaterSplash();
+                    triggerClimax();
+                }
+
+                hum.SetDualHandAction(true, lHand, rHand, env * 0.55f, env, 22f * env, 20f * env, 0.10f * env);
+                yield return null;
+            }
+        }
+
+        private IEnumerator RunFarmHarvest(PlayerModeController mode, ProceduralHumanoid hum, Transform target, Action triggerClimax)
+        {
+            const float total = 1.25f;
+            float t = 0f;
+            bool fired = false;
+
+            while (t < total)
+            {
+                if (ShouldAbort(mode)) yield break;
+                t += Time.deltaTime;
+                float norm = Mathf.Clamp01(t / total);
+                float env = EdgeBlend(norm, 0.18f, 0.82f);
+                float lift = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.45f) / 0.35f));
+
+                Transform tr = _foot.transform;
+                Vector3 fwd = tr.forward;
+                Vector3 right = tr.right;
+                Vector3 low = tr.position + fwd * 0.58f + Vector3.up * 0.48f;
+                Vector3 high = tr.position + fwd * 0.34f + Vector3.up * 1.12f;
+                Vector3 p = Vector3.Lerp(low, high, lift);
+
+                Vector3 lHand = p - right * 0.14f;
+                Vector3 rHand = p + right * 0.14f;
+
+                if (!fired && norm >= 0.50f)
+                {
+                    fired = true;
+                    triggerClimax();
+                }
+
+                float crouch = 0.34f * env * (1f - lift * 0.8f);
+                hum.SetDualHandAction(true, lHand, rHand, env, env, Mathf.Lerp(38f, 4f, lift) * env, Mathf.Lerp(24f, 6f, lift) * env, crouch);
+                yield return null;
+            }
+        }
+
+        private IEnumerator RunMilkCow(PlayerModeController mode, ProceduralHumanoid hum, Transform target, Action triggerClimax)
+        {
+            const float total = 1.70f;
+            float t = 0f;
+            bool fired = false;
+            float splashTimer = 0.24f;
+
+            // Place a gleaming stainless-steel milk pail on the grass right beneath Deniz's hands!
+            if (_foot != null)
+            {
+                Vector3 bucketPos = _foot.transform.position + _foot.transform.forward * 0.60f;
+                bucketPos.y = _foot.transform.position.y;
+                _groundProp = SpawnMilkBucket(bucketPos);
+            }
+
+            while (t < total)
+            {
+                if (ShouldAbort(mode)) yield break;
+                float dt = Time.deltaTime;
+                t += dt;
+                float norm = Mathf.Clamp01(t / total);
+                float env = EdgeBlend(norm, 0.18f, 0.82f);
+
+                Transform tr = _foot.transform;
+                Vector3 fwd = tr.forward;
+                Vector3 right = tr.right;
+                Vector3 center = tr.position + fwd * 0.56f + Vector3.up * 0.62f;
+
+                // Rhythmic alternating left-right downward milking strokes!
+                float stroke = Mathf.Sin(t * 13f);
+                Vector3 lHand = center - right * 0.12f + Vector3.up * (stroke * 0.10f);
+                Vector3 rHand = center + right * 0.12f - Vector3.up * (stroke * 0.10f);
+
+                splashTimer -= dt;
+                if (splashTimer <= 0f && norm > 0.20f && norm < 0.80f)
+                {
+                    splashTimer = 0.24f;
+                    GameFeelAudio.SpawnBurst(center - Vector3.up * 0.24f, new Color(0.96f, 0.98f, 1.0f), count: 7, spread: 0.22f);
+                }
+
+                if (!fired && norm >= 0.55f)
+                {
+                    fired = true;
+                    triggerClimax();
+                }
+
+                hum.SetDualHandAction(true, lHand, rHand, env, env, 30f * env, 18f * env, 0.38f * env);
+                yield return null;
+            }
+        }
+
+        private IEnumerator RunShearSheep(PlayerModeController mode, ProceduralHumanoid hum, Transform target, Action triggerClimax)
+        {
+            const float total = 1.55f;
+            float t = 0f;
+            bool fired = false;
+            float tuftTimer = 0.24f;
+
+            _heldProp = SpawnActionProp(hum.RightForearm, PlayerActionKind.ShearSheep);
+
+            while (t < total)
+            {
+                if (ShouldAbort(mode)) yield break;
+                float dt = Time.deltaTime;
+                t += dt;
+                float norm = Mathf.Clamp01(t / total);
+                float env = EdgeBlend(norm, 0.16f, 0.82f);
+
+                Transform tr = _foot.transform;
+                Vector3 fwd = tr.forward;
+                Vector3 right = tr.right;
+                Vector3 back = tr.position + fwd * 0.56f + Vector3.up * 0.72f;
+
+                float sweep = Mathf.Sin(t * 10f);
+                Vector3 lHand = back - right * 0.18f;
+                Vector3 rHand = back + right * (0.04f + sweep * 0.24f) + fwd * (Mathf.Cos(t * 10f) * 0.10f);
+                _heldPropLocalRot = Quaternion.Euler(20f * env, sweep * 18f, Mathf.Sin(t * 18f) * 10f);
+
+                tuftTimer -= dt;
+                if (tuftTimer <= 0f && norm > 0.18f && norm < 0.82f)
+                {
+                    tuftTimer = 0.22f;
+                    GameFeelAudio.SpawnBurst(rHand, new Color(0.97f, 0.95f, 0.89f), count: 6, spread: 0.28f);
+                }
+
+                if (!fired && norm >= 0.55f)
+                {
+                    fired = true;
+                    triggerClimax();
+                }
+
+                hum.SetDualHandAction(true, lHand, rHand, env * 0.85f, env, 34f * env, 22f * env, 0.26f * env);
+                yield return null;
+            }
+        }
+
+        private IEnumerator RunGrillMangal(PlayerModeController mode, ProceduralHumanoid hum, Transform target, Action triggerClimax)
+        {
+            const float total = 1.55f;
+            float t = 0f;
+            bool fired = false;
+            float sparkTimer = 0.22f;
+
+            _heldProp = SpawnActionProp(hum.RightForearm, PlayerActionKind.GrillMangal);
+
+            while (t < total)
+            {
+                if (ShouldAbort(mode)) yield break;
+                float dt = Time.deltaTime;
+                t += dt;
+                float norm = Mathf.Clamp01(t / total);
+                float env = EdgeBlend(norm, 0.16f, 0.82f);
+
+                Transform tr = _foot.transform;
+                Vector3 fwd = tr.forward;
+                Vector3 right = tr.right;
+                Vector3 grill = tr.position + fwd * 0.58f + Vector3.up * 0.98f;
+
+                float flip = Mathf.Sin(t * 8.5f);
+                Vector3 rHand = grill + right * (0.12f + flip * 0.16f) + Vector3.up * (Mathf.Abs(flip) * 0.10f);
+                Vector3 lHand = tr.position + fwd * 0.24f - right * 0.22f + Vector3.up * 0.96f;
+                _heldPropLocalRot = Quaternion.Euler(14f * env, flip * 16f, flip * 18f);
+
+                sparkTimer -= dt;
+                if (sparkTimer <= 0f && norm > 0.18f && norm < 0.82f)
+                {
+                    sparkTimer = 0.24f;
+                    GameFeelAudio.SpawnBurst(grill + Vector3.up * 0.08f, new Color(1.0f, 0.52f, 0.14f), count: 7, spread: 0.34f);
+                }
+
+                if (!fired && norm >= 0.52f)
+                {
+                    fired = true;
+                    triggerClimax();
+                }
+
+                hum.SetDualHandAction(true, lHand, rHand, env * 0.5f, env, 18f * env, 16f * env, 0.04f * env);
+                yield return null;
+            }
+        }
+
         private static float GetIdealStandDistance(PlayerActionKind kind)
         {
             switch (kind)
@@ -796,6 +1079,15 @@ namespace OurWorld.Player
                     return 0.82f;
                 case PlayerActionKind.UseTvRemote:
                     return 1.55f;
+                case PlayerActionKind.FarmPlantAndDig:
+                case PlayerActionKind.FarmWatering:
+                case PlayerActionKind.FarmHarvest:
+                    return 1.10f;
+                case PlayerActionKind.MilkCow:
+                case PlayerActionKind.ShearSheep:
+                    return 1.25f;
+                case PlayerActionKind.GrillMangal:
+                    return 1.05f;
                 default:
                     return 0.85f;
             }
@@ -827,6 +1119,12 @@ namespace OurWorld.Player
                 Destroy(_heldProp);
                 _heldProp = null;
             }
+            if (_groundProp != null)
+            {
+                Destroy(_groundProp);
+                _groundProp = null;
+            }
+            _heldPropLocalRot = Quaternion.identity;
 
             if (_holdingModalLock && PlayerModeController.Instance != null)
             {
@@ -840,7 +1138,21 @@ namespace OurWorld.Player
             if (_heldProp == null || _foot == null || _foot.Humanoid == null || _foot.Humanoid.RightForearm == null) return;
             Vector3 palmWorld = _foot.Humanoid.RightForearm.TransformPoint(new Vector3(0f, -0.305f, 0f));
             _heldProp.transform.position = palmWorld + _foot.transform.forward * 0.03f;
-            _heldProp.transform.rotation = _foot.transform.rotation;
+            _heldProp.transform.rotation = _foot.transform.rotation * _heldPropLocalRot;
+        }
+
+        private static GameObject SpawnMilkBucket(Vector3 groundPos)
+        {
+            GameObject root = new GameObject("TempMilkBucket");
+            root.transform.position = groundPos;
+            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material steel = MakeSimpleMat(urpLit, new Color(0.76f, 0.80f, 0.84f), 0.72f, 0.82f);
+            Material milk = MakeSimpleMat(urpLit, new Color(0.98f, 0.98f, 0.96f), 0.55f, 0.0f);
+            CreatePropPart("PailBody", PrimitiveType.Cylinder, root.transform,
+                new Vector3(0f, 0.17f, 0f), new Vector3(0.28f, 0.17f, 0.28f), steel);
+            CreatePropPart("MilkTop", PrimitiveType.Cylinder, root.transform,
+                new Vector3(0f, 0.31f, 0f), new Vector3(0.25f, 0.015f, 0.25f), milk);
+            return root;
         }
 
         private static GameObject SpawnActionProp(Transform rightForearm, PlayerActionKind kind)
@@ -874,6 +1186,41 @@ namespace OurWorld.Player
                     new Vector3(0f, 0.03f, 0.13f), new Vector3(0.026f, 0.10f, 0.026f),
                     MakeSimpleMat(urpLit, new Color(0.70f, 0.74f, 0.78f), 0.75f, 0.80f),
                     Quaternion.Euler(82f, 0f, 0f));
+            }
+            else if (kind == PlayerActionKind.FarmWatering)
+            {
+                Material canMat = MakeSimpleMat(urpLit, new Color(0.12f, 0.66f, 0.64f), 0.48f, 0.20f);
+                Material brassMat = MakeSimpleMat(urpLit, new Color(0.90f, 0.74f, 0.26f), 0.70f, 0.80f);
+                CreatePropPart("CanBody", PrimitiveType.Cylinder, root.transform,
+                    new Vector3(0f, -0.10f, 0.06f), new Vector3(0.20f, 0.13f, 0.20f), canMat);
+                CreatePropPart("CanSpout", PrimitiveType.Cylinder, root.transform,
+                    new Vector3(0f, -0.06f, 0.24f), new Vector3(0.035f, 0.14f, 0.035f), canMat,
+                    Quaternion.Euler(64f, 0f, 0f));
+                CreatePropPart("CanRose", PrimitiveType.Sphere, root.transform,
+                    new Vector3(0f, 0.01f, 0.36f), new Vector3(0.08f, 0.08f, 0.05f), brassMat);
+            }
+            else if (kind == PlayerActionKind.ShearSheep)
+            {
+                Material bladeMat = MakeSimpleMat(urpLit, new Color(0.84f, 0.86f, 0.90f), 0.82f, 0.88f);
+                Material gripMat = MakeSimpleMat(urpLit, new Color(0.84f, 0.18f, 0.16f), 0.35f, 0.05f);
+                CreatePropPart("ShearsGrip", PrimitiveType.Cube, root.transform,
+                    new Vector3(0f, 0f, 0.02f), new Vector3(0.05f, 0.03f, 0.12f), gripMat);
+                CreatePropPart("BladeL", PrimitiveType.Cube, root.transform,
+                    new Vector3(-0.02f, 0f, 0.15f), new Vector3(0.018f, 0.012f, 0.18f), bladeMat,
+                    Quaternion.Euler(0f, -8f, 0f));
+                CreatePropPart("BladeR", PrimitiveType.Cube, root.transform,
+                    new Vector3( 0.02f, 0f, 0.15f), new Vector3(0.018f, 0.012f, 0.18f), bladeMat,
+                    Quaternion.Euler(0f,  8f, 0f));
+            }
+            else if (kind == PlayerActionKind.GrillMangal)
+            {
+                Material steel = MakeSimpleMat(urpLit, new Color(0.82f, 0.84f, 0.88f), 0.85f, 0.90f);
+                CreatePropPart("TongsA", PrimitiveType.Cube, root.transform,
+                    new Vector3(-0.018f, 0f, 0.16f), new Vector3(0.012f, 0.014f, 0.32f), steel,
+                    Quaternion.Euler(0f, -4f, 0f));
+                CreatePropPart("TongsB", PrimitiveType.Cube, root.transform,
+                    new Vector3( 0.018f, 0f, 0.16f), new Vector3(0.012f, 0.014f, 0.32f), steel,
+                    Quaternion.Euler(0f,  4f, 0f));
             }
 
             return root;

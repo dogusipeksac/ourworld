@@ -213,7 +213,7 @@ namespace OurWorld.World
 
             if (humanoid != null)
             {
-                humanoid.PlayWave();
+                humanoid.SetTalking(true, 3.8f);
                 humanoid.SetLookAtPoint(true, playerWorldPos + Vector3.up * 1.55f);
             }
 
@@ -710,10 +710,12 @@ namespace OurWorld.World
                     {
                         other._brainState = CitizenBrainState.Patrol;
                     }
+                    if (other.humanoid != null) other.humanoid.SetTalking(false);
                 }
             }
             _chatTimer = 0f;
             _pendingChatReply = null;
+            if (humanoid != null) humanoid.SetTalking(false);
             if (_brainState == CitizenBrainState.ChattingWithNeighbor)
             {
                 _brainState = CitizenBrainState.Patrol;
@@ -762,8 +764,8 @@ namespace OurWorld.World
                 _brainState = CitizenBrainState.KnockedDown;
                 _airVelocity.y -= 21.0f * dt;
                 Vector3 nextAir = transform.position + _airVelocity * dt;
-                nextAir.x = Mathf.Clamp(nextAir.x, -165f, 165f);
-                nextAir.z = Mathf.Clamp(nextAir.z, -165f, 165f);
+                nextAir.x = Mathf.Clamp(nextAir.x, -245f, 245f);
+                nextAir.z = Mathf.Clamp(nextAir.z, -245f, 245f);
 
                 if (nextAir.y <= 0.02f)
                 {
@@ -1031,8 +1033,8 @@ namespace OurWorld.World
             }
 
             Vector3 nextPos = transform.position + finalMove;
-            nextPos.x = Mathf.Clamp(nextPos.x, -165f, 165f);
-            nextPos.z = Mathf.Clamp(nextPos.z, -165f, 165f);
+            nextPos.x = Mathf.Clamp(nextPos.x, -245f, 245f);
+            nextPos.z = Mathf.Clamp(nextPos.z, -245f, 245f);
             transform.position = nextPos;
         }
 
@@ -1226,7 +1228,7 @@ namespace OurWorld.World
             string lineA = isEn ? conv.aEn : conv.aTr;
             string lineB = isEn ? conv.bEn : conv.bTr;
 
-            if (humanoid != null) humanoid.PlayWave();
+            if (humanoid != null) humanoid.SetTalking(true, 3.0f);
             NpcSpeechBubbleManager.Say(transform, citizenName, lineA, 3.0f, NpcBubbleMood.Friendly);
 
             other._pendingChatReply = lineB;
@@ -1261,7 +1263,7 @@ namespace OurWorld.World
                 _chatReplyDelay -= dt;
                 if (_chatReplyDelay <= 0f)
                 {
-                    if (humanoid != null) humanoid.PlayWave();
+                    if (humanoid != null) humanoid.SetTalking(true, 3.2f);
                     NpcSpeechBubbleManager.Say(transform, citizenName, _pendingChatReply, 3.2f, NpcBubbleMood.Friendly);
                     _pendingChatReply = null;
                 }

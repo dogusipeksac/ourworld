@@ -103,9 +103,18 @@ namespace OurWorld.Player
         // v13 animation polish: acceleration lean, idle weight shifts, run crouch, fall flail
         private float _prevSpeedMs;
         private float _smoothedAccelLean;
+        private float _smoothedHeadTurnLead;
+        private float _stopSettleTimer = -1f;
+        private float _stopSettleStrength;
         private float _idleShift;
         private float _idleShiftTarget;
         private float _idleShiftCountdown = 7f;
+        private int _idleGestureKind; // 0 = none, 1 = hands-on-hips, 2 = neck/shoulder stretch, 3 = check wrist
+        private float _idleGestureTimer = -1f;
+        private float _idleGestureDuration = 2.8f;
+        private float _idleGestureCooldown = 8f;
+        private float _talkingTimer;
+        private float _talkingBlend;
         private float _waveTimer = -1f;
         private float _punchTimer = -1f;
         private int _combatMoveIndex;
@@ -422,6 +431,24 @@ namespace OurWorld.Player
         public void PlayWave()
         {
             _waveTimer = 0f;
+            _idleGestureTimer = -1f;
+        }
+
+        /// <summary>
+        /// Triggers natural conversational hand gestures, rhythmic head nods & attentive posture
+        /// while speaking to the player or another citizen!
+        /// </summary>
+        public void SetTalking(bool talking, float duration = 3.2f)
+        {
+            if (talking)
+            {
+                _talkingTimer = Mathf.Max(_talkingTimer, Mathf.Max(0.4f, duration));
+                _idleGestureTimer = -1f;
+            }
+            else
+            {
+                _talkingTimer = 0f;
+            }
         }
 
         public void PlayPunch()
@@ -774,14 +801,38 @@ namespace OurWorld.Player
                 return;
             }
 
-            // Track yaw change rate of root for turning lean into turns (+/- 8 deg)
+            // Track yaw change rate of root for turning lean (+/- 10 deg) AND natural head turn anticipation!
             float currentYaw = transform.eulerAngles.y;
             float yawDelta = Mathf.DeltaAngle(_prevYaw, currentYaw);
             _prevYaw = currentYaw;
             float yawRate = yawDelta / dt;
             float moveFactor = Mathf.Clamp01(_speedMs / WalkSpeedRef);
-            float targetTurnLean = Mathf.Clamp(-yawRate * 0.06f, -8f, 8f) * moveFactor;
-            _smoothedTurnLean = Mathf.Lerp(_smoothedTurnLean, targetTurnLean, 1f - Mathf.Exp(-8f * dt));
+            float targetTurnLean = Mathf.Clamp(-yawRate * 0.068f, -10f, 10f) * moveFactor;
+            _smoothedTurnLean = Mathf.Lerp(_smoothedTurnLean, targetTurnLean, 1f - Mathf.Exp(-8.5f * dt));
+            float targetHeadLead = Mathf.Clamp(yawRate * 0.14f, -22f, 22f) * Mathf.Clamp01(moveFactor + 0.35f);
+            _smoothedHeadTurnLead = Mathf.Lerp(_smoothedHeadTurnLead, targetHeadLead, 1f - Mathf.Exp(-9f * dt));
+
+            // Detect crisp braking / stopping settle impulse from brisk walk/run!
+            if (_grounded && _prevSpeedMs > 1.75f && _speedMs < 0.35f && _stopSettleTimer < 0f)
+            {
+                _stopSettleTimer = 0f;
+                _stopSettleStrength = Mathf.Clamp01((_prevSpeedMs - 1.2f) / 3.0f);
+            }
+            if (_stopSettleTimer >= 0f)
+            {
+                _stopSettleTimer += dt;
+                if (_stopSettleTimer >= 0.36f || _speedMs > 0.8f)
+                {
+                    _stopSettleTimer = -1f;
+                }
+            }
+
+            if (_talkingTimer > 0f)
+            {
+                _talkingTimer = Mathf.Max(0f, _talkingTimer - dt);
+            }
+            float desiredTalkBlend = (_talkingTimer > 0f && _speedMs < 0.45f && _grounded) ? 1f : 0f;
+            _talkingBlend = Mathf.Lerp(_talkingBlend, desiredTalkBlend, 1f - Mathf.Exp(-7.5f * dt));
 
             // Compute idle / walk / run blends
             float moveBlend = Mathf.Clamp01((_speedMs - 0.08f) / 1.2f);
@@ -846,19 +897,23 @@ namespace OurWorld.Player
             _smoothedLookYaw = Mathf.Lerp(_smoothedLookYaw, useLookIk ? desiredLookYaw : 0f, lookBlendRate);
             _smoothedLookPitch = Mathf.Lerp(_smoothedLookPitch, useLookIk ? desiredLookPitch : 0f, lookBlendRate);
 
-            // The opposite arm is forward at heel strike. The torso counter-rotates against the pelvis.
+            // Biomechanical arm pendulum with realistic elbow phase-lag & inward cross-body arc!
             float armCycle = Mathf.Cos(_phase - 0.19f);
-            float armAmp = Mathf.Lerp(17f, 39f, runBlend);
-            float elbowBaseBend = Mathf.Lerp(16f, 65f, runBlend);
+            float forearmLagL = Mathf.Cos(_phase - 0.62f);
+            float forearmLagR = -forearmLagL;
+            float armAmp = Mathf.Lerp(19f, 44f, runBlend);
+            float elbowBaseBend = Mathf.Lerp(18f, 70f, runBlend);
             float walkShoulderL = armCycle * armAmp;
             float walkShoulderR = -walkShoulderL;
-            float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -armCycle) * 15f);
-            float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, armCycle) * 15f);
-            float torsoForwardLean = Mathf.Lerp(3f, 10f, runBlend);
-            float walkBobY = -Mathf.Cos(_phase * 2f) * Mathf.Lerp(0.017f, 0.035f, runBlend);
-            float walkHipYaw = Mathf.Cos(_phase) * Mathf.Lerp(5f, 8f, runBlend);
-            float walkHipRoll = -Mathf.Sin(_phase) * Mathf.Lerp(2.5f, 3.5f, runBlend);
-            float walkHipSwayX = -Mathf.Sin(_phase) * Mathf.Lerp(0.017f, 0.012f, runBlend);
+            float walkShoulderYawL = Mathf.Lerp(6f, 14f, runBlend) * Mathf.Max(0f, -armCycle);
+            float walkShoulderYawR = -Mathf.Lerp(6f, 14f, runBlend) * Mathf.Max(0f, armCycle);
+            float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -forearmLagL) * Mathf.Lerp(18f, 28f, runBlend));
+            float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, -forearmLagR) * Mathf.Lerp(18f, 28f, runBlend));
+            float torsoForwardLean = Mathf.Lerp(3.5f, 12.5f, runBlend);
+            float walkBobY = -Mathf.Cos(_phase * 2f) * Mathf.Lerp(0.020f, 0.042f, runBlend);
+            float walkHipYaw = Mathf.Cos(_phase) * Mathf.Lerp(6.2f, 10.5f, runBlend);
+            float walkHipRoll = -Mathf.Sin(_phase) * Mathf.Lerp(3.4f, 4.6f, runBlend);
+            float walkHipSwayX = -Mathf.Sin(_phase) * Mathf.Lerp(0.020f, 0.015f, runBlend);
 
             // Blend Idle <-> Locomotion
             Vector3 targetHipsPos = new Vector3(
@@ -866,21 +921,21 @@ namespace OurWorld.Player
                 hipsBaseY - _gaitWeight * 0.064f + walkBobY * moveBlend,
                 0f);
 
-            float defaultHeadYaw = Mathf.Lerp(idleHeadYaw, 0f, moveBlend);
+            float defaultHeadYaw = Mathf.Lerp(idleHeadYaw, 0f, moveBlend) + _smoothedHeadTurnLead * 0.65f;
             float finalHeadYaw = useLookIk || Mathf.Abs(_smoothedLookYaw) > 0.5f
-                ? (_smoothedLookYaw * 0.75f)
+                ? (_smoothedLookYaw * 0.75f + _smoothedHeadTurnLead * 0.25f)
                 : defaultHeadYaw;
 
             Vector3 targetHipsRot = new Vector3(0f, walkHipYaw * moveBlend, walkHipRoll * moveBlend);
             Vector3 targetSpineRot = new Vector3(
                 Mathf.Lerp(idleChestPitch, torsoForwardLean, moveBlend),
-                -walkHipYaw * 1.15f * moveBlend,
-                _smoothedTurnLean - walkHipRoll * 0.65f * moveBlend);
+                -walkHipYaw * 1.20f * moveBlend,
+                _smoothedTurnLean - walkHipRoll * 0.72f * moveBlend);
             Vector3 targetNeckRot = new Vector3(
                 -targetSpineRot.x * 0.35f + _smoothedLookPitch * 0.25f,
-                _smoothedLookYaw * 0.25f,
+                _smoothedLookYaw * 0.25f + _smoothedHeadTurnLead * 0.35f,
                 -_smoothedTurnLean * 0.35f);
-            Vector3 targetHeadRot = new Vector3(_smoothedLookPitch * 0.75f, finalHeadYaw, 0f);
+            Vector3 targetHeadRot = new Vector3(_smoothedLookPitch * 0.75f, finalHeadYaw, -_smoothedTurnLean * 0.25f);
 
             Vector3 targetLHipRot = new Vector3(0f, 0f, -3.2f);
             Vector3 targetRHipRot = new Vector3(0f, 0f, 3.2f);
@@ -889,11 +944,120 @@ namespace OurWorld.Player
             Vector3 targetLAnkleRot = Vector3.zero;
             Vector3 targetRAnkleRot = Vector3.zero;
 
-            float idleArmBreath = breathWave * 1.4f;
-            Vector3 targetLShoulderRot = new Vector3(Mathf.Lerp(3.5f + idleArmBreath, walkShoulderL, moveBlend), 0f, Mathf.Lerp(-9.5f, -4.5f, moveBlend));
-            Vector3 targetRShoulderRot = new Vector3(Mathf.Lerp(3.5f + idleArmBreath, walkShoulderR, moveBlend), 0f, Mathf.Lerp(9.5f, 4.5f, moveBlend));
+            float idleArmBreath = breathWave * 1.6f;
+            Vector3 targetLShoulderRot = new Vector3(
+                Mathf.Lerp(3.5f + idleArmBreath, walkShoulderL, moveBlend),
+                walkShoulderYawL * moveBlend,
+                Mathf.Lerp(-9.5f, -5.2f + Mathf.Abs(armCycle) * 2.5f, moveBlend));
+            Vector3 targetRShoulderRot = new Vector3(
+                Mathf.Lerp(3.5f + idleArmBreath, walkShoulderR, moveBlend),
+                walkShoulderYawR * moveBlend,
+                Mathf.Lerp(9.5f, 5.2f - Mathf.Abs(armCycle) * 2.5f, moveBlend));
             Vector3 targetLElbowRot = new Vector3(Mathf.Lerp(-16f, walkElbowL, moveBlend), 0f, 0f);
             Vector3 targetRElbowRot = new Vector3(Mathf.Lerp(-16f, walkElbowR, moveBlend), 0f, 0f);
+
+            // Braking / stopping forward-dip & rebound settle!
+            if (_stopSettleTimer >= 0f && _grounded)
+            {
+                float sn = Mathf.Clamp01(_stopSettleTimer / 0.36f);
+                float settleWave = Mathf.Sin(sn * Mathf.PI) * (1f - sn * 0.45f) * _stopSettleStrength;
+                targetHipsPos.y -= 0.044f * settleWave;
+                targetSpineRot.x += 6.5f * settleWave;
+                targetLShoulderRot.x += 12f * settleWave;
+                targetRShoulderRot.x += 12f * settleWave;
+                targetLKneeRot.x += 12f * settleWave;
+                targetRKneeRot.x += 12f * settleWave;
+            }
+
+            // Natural Idle Micro-Fidgets (Hands-on-hips, Neck/Shoulder Stretch, Wrist Glance) when standing idle!
+            bool canFidget = moveBlend < 0.04f && _grounded && _talkingBlend < 0.1f && !_hasDualAction &&
+                             _prayerStage == 0 && !_isSwimming && !_isLyingDown && _waveTimer < 0f &&
+                             _sportAnimTimer < 0f && _tennisRacket == null;
+            if (canFidget)
+            {
+                if (_idleGestureTimer >= 0f)
+                {
+                    _idleGestureTimer += dt;
+                    if (_idleGestureTimer >= _idleGestureDuration)
+                    {
+                        _idleGestureTimer = -1f;
+                        _idleGestureKind = 0;
+                        _idleGestureCooldown = UnityEngine.Random.Range(7.5f, 14.5f);
+                    }
+                }
+                else
+                {
+                    _idleGestureCooldown -= dt;
+                    if (_idleGestureCooldown <= 0f)
+                    {
+                        _idleGestureKind = UnityEngine.Random.Range(1, 4);
+                        _idleGestureTimer = 0f;
+                        _idleGestureDuration = _idleGestureKind == 1 ? 3.6f : (_idleGestureKind == 2 ? 2.6f : 2.3f);
+                    }
+                }
+            }
+            else
+            {
+                _idleGestureTimer = -1f;
+                _idleGestureKind = 0;
+            }
+
+            if (_idleGestureTimer >= 0f && _idleGestureKind > 0)
+            {
+                float gn = Mathf.Clamp01(_idleGestureTimer / Mathf.Max(0.2f, _idleGestureDuration));
+                float env = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(gn / 0.22f)) *
+                            (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((gn - 0.76f) / 0.24f)));
+
+                if (_idleGestureKind == 1)
+                {
+                    // Relaxed hands-on-hips breather
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(12f, 14f, -34f), env);
+                    targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(12f, -14f, 34f), env);
+                    targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-86f, 0f, 24f), env);
+                    targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-86f, 0f, -24f), env);
+                    targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -4f + breathWave * 2.5f, env);
+                }
+                else if (_idleGestureKind == 2)
+                {
+                    // Subtle neck stretch & shoulder roll
+                    float tilt = Mathf.Sin(gn * Mathf.PI * 2f) * 16f;
+                    targetHeadRot.z += tilt * env;
+                    targetHeadRot.y += Mathf.Sin(gn * Mathf.PI) * 18f * env;
+                    targetLShoulderRot.z -= 5f * Mathf.Sin(gn * Mathf.PI) * env;
+                    targetRShoulderRot.z += 5f * Mathf.Sin(gn * Mathf.PI) * env;
+                }
+                else
+                {
+                    // Quick glance at wristwatch on left arm
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-44f, 28f, -12f), env);
+                    targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-96f, 0f, 0f), env);
+                    targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 22f, env);
+                    targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, -16f, env);
+                }
+            }
+
+            // Natural Conversational Hand Gestures & Expressive Head Nods when speaking!
+            if (_talkingBlend > 0.02f && !_hasDualAction && _waveTimer < 0f && _prayerStage == 0)
+            {
+                float t = _idleTime + _noiseSeed;
+                float gR = Mathf.Sin(t * 3.8f);
+                float gL = Mathf.Sin(t * 2.9f + 1.4f);
+                float emphasize = Mathf.Clamp01(Mathf.Sin(t * 1.9f) * 0.5f + 0.5f);
+
+                Vector3 talkRSh = new Vector3(-34f - gR * 18f * emphasize, -12f + gR * 10f, 16f + Mathf.Abs(gR) * 12f);
+                Vector3 talkRElb = new Vector3(-68f + gR * 22f, 0f, 0f);
+                Vector3 talkLSh = new Vector3(-28f - gL * 14f, 10f - gL * 8f, -14f - Mathf.Abs(gL) * 10f);
+                Vector3 talkLElb = new Vector3(-64f + gL * 18f, 0f, 0f);
+
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, talkRSh, _talkingBlend);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, talkRElb, _talkingBlend);
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, talkLSh, _talkingBlend * 0.85f);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, talkLElb, _talkingBlend * 0.85f);
+                targetSpineRot.x += (4f + Mathf.Sin(t * 2.1f) * 2.5f) * _talkingBlend;
+                targetSpineRot.y += Mathf.Sin(t * 1.6f) * 6f * _talkingBlend;
+                targetHeadRot.x += Mathf.Sin(t * 4.4f) * 7f * _talkingBlend;
+                targetHeadRot.z += Mathf.Sin(t * 2.3f) * 5f * _talkingBlend;
+            }
 
             // --- v13 polish: lean into acceleration, settle back when stopping ---
             float accel = (_speedMs - _prevSpeedMs) / dt;
@@ -1688,15 +1852,18 @@ namespace OurWorld.Player
             {
                 float load = phase / stance;
                 offset = Mathf.Lerp(halfStep, -halfStep, load);
-                pitch = -9f * (1f - Mathf.SmoothStep(0f, 1f, load / 0.22f)) +
-                    16f * Mathf.SmoothStep(0f, 1f, (load - 0.74f) / 0.26f);
+                // Crisp biomechanical heel-strike (-15 deg) -> flat midstance (0 deg) -> springy toe push-off (+25 deg)!
+                pitch = -15f * (1f - Mathf.SmoothStep(0f, 1f, load / 0.20f)) +
+                    Mathf.Lerp(21f, 28f, runBlend) * Mathf.SmoothStep(0f, 1f, (load - 0.68f) / 0.32f);
             }
             else
             {
                 float swing = (phase - stance) / (1f - stance);
                 offset = Mathf.SmoothStep(-halfStep, halfStep, swing);
-                lift = Mathf.Sin(swing * Mathf.PI) * (tennisStance ? 0.085f : Mathf.Lerp(0.11f, 0.20f, runBlend));
-                pitch = Mathf.Lerp(16f, -9f, swing);
+                // Slightly asymmetric knee-drive lift peaks earlier in swing for energetic human stride!
+                float liftArc = Mathf.Sin(Mathf.Pow(swing, 0.85f) * Mathf.PI);
+                lift = liftArc * (tennisStance ? 0.095f : Mathf.Lerp(0.125f, 0.24f, runBlend));
+                pitch = Mathf.Lerp(Mathf.Lerp(21f, 28f, runBlend), -15f, Mathf.SmoothStep(0f, 1f, swing));
             }
 
             float width = tennisStance ? 0.22f : Mathf.Lerp(0.13f, 0.102f, _gaitWeight);

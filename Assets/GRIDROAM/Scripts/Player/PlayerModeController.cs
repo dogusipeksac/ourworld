@@ -337,8 +337,8 @@ namespace OurWorld.Player
                 SedanVehicleController targetCar = FindVehicleBySaveId(data.savedVehicleId);
                 if (targetCar != null && (targetCar != playerSedan || HasVehicleKeys))
                 {
-                    bool carPosValid = data.savedVehiclePosX >= -196f && data.savedVehiclePosX <= 180f &&
-                                       data.savedVehiclePosZ >= -166f && data.savedVehiclePosZ <= 170f &&
+                    bool carPosValid = data.savedVehiclePosX >= -248f && data.savedVehiclePosX <= 248f &&
+                                       data.savedVehiclePosZ >= -248f && data.savedVehiclePosZ <= 248f &&
                                        data.savedVehiclePosY >= -0.5f && data.savedVehiclePosY <= 12f;
                     Vector3 vPos = carPosValid
                         ? new Vector3(data.savedVehiclePosX, Mathf.Max(0.24f, data.savedVehiclePosY), data.savedVehiclePosZ)
@@ -353,8 +353,8 @@ namespace OurWorld.Player
 
             if (footController != null)
             {
-                bool footPosValid = data.playerPosX >= -196f && data.playerPosX <= 180f &&
-                                    data.playerPosZ >= -166f && data.playerPosZ <= 170f &&
+                bool footPosValid = data.playerPosX >= -248f && data.playerPosX <= 248f &&
+                                    data.playerPosZ >= -248f && data.playerPosZ <= 248f &&
                                     data.playerPosY >= -0.5f && data.playerPosY <= 12f;
                 Vector3 fPos = footPosValid
                     ? new Vector3(data.playerPosX, Mathf.Max(0.10f, data.playerPosY), data.playerPosZ)
@@ -385,15 +385,18 @@ namespace OurWorld.Player
 
         private static readonly (string label, Vector3 pos, float yaw)[] FastTravelSpots =
         {
-            ("No:48 Selman Sokağı · Benim Evim", new Vector3(-62.0f, 0.12f,   4.5f),   0f),
-            ("Hamidiye Halı Saha · Futbol",      new Vector3(-14.0f, 0.12f, -29.0f), 180f),
-            ("Hamidiye Basketbol & Voleybol",    new Vector3( 49.0f, 0.12f, -31.0f), 180f),
-            ("No:58 Selman Bakkal & ATM",        new Vector3(  6.5f, 0.12f,   4.5f),   0f),
-            ("Hz. Osman Camii Avlusu",           new Vector3( 82.0f, 0.12f, -24.0f), 180f),
-            ("Fatih Bulvarı · Saat Kulesi",      new Vector3(  0.0f, 0.18f, 134.0f),   0f),
-            ("Petrol Yolu Caddesi",              new Vector3(-18.0f, 0.12f, -78.0f),  90f),
-            ("Aziziye Cd. · İlkokul",            new Vector3(-16.0f, 0.12f,-114.0f), 180f),
-            ("No:73 Oto Tamir",                  new Vector3( 24.0f, 0.12f,   4.2f),   0f)
+            ("No:48 Selman Sokağı · Benim Evim",    new Vector3( -62.0f, 0.12f,    4.5f),   0f),
+            ("Aydos Yeşil Vadi · Çiftlik & Bostan", new Vector3( 136.0f, 0.12f,    0.0f),  90f),
+            ("Sultanbeyli Göleti & Balıkçılık",     new Vector3(-164.0f, 0.12f,    0.0f), -90f),
+            ("Aydos Tazyikli Oto Yıkama",           new Vector3( 124.0f, 0.12f,   -4.5f), 180f),
+            ("No:73 Oto Tamir & Modifiye",          new Vector3(  32.0f, 0.12f,    4.2f),   0f),
+            ("Hamidiye Halı Saha · Futbol",         new Vector3( -14.0f, 0.12f,  -29.0f), 180f),
+            ("Hamidiye Basketbol & Voleybol",       new Vector3(  49.0f, 0.12f,  -31.0f), 180f),
+            ("No:58 Selman Bakkal & ATM",           new Vector3(   6.5f, 0.12f,    4.5f),   0f),
+            ("Hz. Osman Camii Avlusu",              new Vector3(  82.0f, 0.12f,  -24.0f), 180f),
+            ("Fatih Bulvarı · Saat Kulesi",         new Vector3(   0.0f, 0.18f,  134.0f),   0f),
+            ("Petrol Yolu Caddesi",                 new Vector3( -18.0f, 0.12f,  -78.0f),  90f),
+            ("Aziziye Cd. · İlkokul",               new Vector3( -16.0f, 0.12f, -114.0f), 180f)
         };
 
         private void Update()
@@ -471,7 +474,10 @@ namespace OurWorld.Player
                 foreach (InteractableTrigger trigger in _cachedInteractables)
                 {
                     if (trigger == null || !trigger.isActiveAndEnabled) continue;
-                    if (trigger.Kind != InteractableKind.FuelPump && trigger.Kind != InteractableKind.JobBoard)
+                    if (trigger.Kind != InteractableKind.FuelPump &&
+                        trigger.Kind != InteractableKind.JobBoard &&
+                        trigger.Kind != InteractableKind.CarWashStation &&
+                        trigger.Kind != InteractableKind.GarageModBoard)
                     {
                         continue;
                     }
@@ -534,7 +540,17 @@ namespace OurWorld.Player
                                     trigger.Kind != InteractableKind.TownVehicle &&
                                     trigger.Kind != InteractableKind.PaintableHouse &&
                                     trigger.Kind != InteractableKind.Tennis &&
-                                    trigger.Kind != InteractableKind.SportsArena;
+                                    trigger.Kind != InteractableKind.SportsArena &&
+                                    trigger.Kind != InteractableKind.FarmPlot &&
+                                    trigger.Kind != InteractableKind.FarmAnimal &&
+                                    trigger.Kind != InteractableKind.FarmMarket &&
+                                    trigger.Kind != InteractableKind.FarmBoard &&
+                                    trigger.Kind != InteractableKind.GarageRepairBay &&
+                                    trigger.Kind != InteractableKind.GarageModBoard &&
+                                    trigger.Kind != InteractableKind.FishingPier &&
+                                    trigger.Kind != InteractableKind.CarWashStation &&
+                                    trigger.Kind != InteractableKind.HomeDecorBoard &&
+                                    trigger.Kind != InteractableKind.HomeMangal;
                     if (checkLos && distSq > 0.45f)
                     {
                         float probeUp = trigger.Kind == InteractableKind.ShopItem ? 0.12f : 0.85f;
@@ -656,6 +672,23 @@ namespace OurWorld.Player
                     return;
                 }
 
+                if (_nearestInteractable.Kind == InteractableKind.CarWashStation)
+                {
+                    _interactConsumedFrame = Time.frameCount;
+                    if (CarWashStationController.Instance != null)
+                    {
+                        CarWashStationController.Instance.StartWash(this);
+                    }
+                    return;
+                }
+
+                if (_nearestInteractable.Kind == InteractableKind.GarageModBoard)
+                {
+                    _interactConsumedFrame = Time.frameCount;
+                    AutoGaragePanelController.EnsureInstance().Open(initialTab: 1);
+                    return;
+                }
+
                 return;
             }
 
@@ -771,10 +804,14 @@ namespace OurWorld.Player
                             cart.Checkout(this, _nearestInteractable.transform);
                         }
                     }
+                    else if (FarmEconomyManager.GetTotalProduceCount() > 0)
+                    {
+                        FarmEconomyManager.SellAllProduce(_nearestInteractable.transform.position);
+                    }
                     else
                     {
                         GameFeelAudio.PlayUiClick();
-                        RaiseStatusMessage("Raflardan, dolaptan veya tezgahtan almak istediğin ürüne yaklaşıp E ile eline al, sonra kasaya getir!");
+                        RaiseStatusMessage("Raflardan almak istediğin ürüne yaklaşıp eline al, ya da çiftlik/bostan mahsullerini getirip kasada sat!");
                     }
                     return;
                 }
@@ -872,6 +909,90 @@ namespace OurWorld.Player
                     if (atm != null)
                     {
                         atm.Use(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.FarmPlot:
+                {
+                    FarmPlotInteractable plot = _nearestInteractable.GetComponentInParent<FarmPlotInteractable>();
+                    if (plot != null)
+                    {
+                        plot.Interact(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.FarmAnimal:
+                {
+                    FarmAnimalController animal = _nearestInteractable.GetComponentInParent<FarmAnimalController>();
+                    if (animal != null)
+                    {
+                        animal.Interact(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.FarmMarket:
+                {
+                    if (FarmEconomyManager.GetTotalProduceCount() > 0)
+                    {
+                        FarmEconomyManager.SellAllProduce(_nearestInteractable.transform.position);
+                    }
+                    else
+                    {
+                        FarmPanelController.EnsureInstance().Open();
+                    }
+                    return;
+                }
+
+                case InteractableKind.FarmBoard:
+                {
+                    FarmPanelController.EnsureInstance().Open();
+                    return;
+                }
+
+                case InteractableKind.GarageRepairBay:
+                {
+                    AutoGaragePanelController.EnsureInstance().Open(initialTab: 0);
+                    return;
+                }
+
+                case InteractableKind.GarageModBoard:
+                {
+                    AutoGaragePanelController.EnsureInstance().Open(initialTab: 1);
+                    return;
+                }
+
+                case InteractableKind.FishingPier:
+                {
+                    if (LakeFishingController.Instance != null)
+                    {
+                        LakeFishingController.Instance.BeginFishing(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.CarWashStation:
+                {
+                    if (CarWashStationController.Instance != null)
+                    {
+                        CarWashStationController.Instance.StartWash(this);
+                    }
+                    return;
+                }
+
+                case InteractableKind.HomeDecorBoard:
+                {
+                    HomeDecorPanelController.EnsureInstance().Open();
+                    return;
+                }
+
+                case InteractableKind.HomeMangal:
+                {
+                    if (HomeDecorManager.Instance != null)
+                    {
+                        HomeDecorManager.Instance.InteractWithBackyardMangal(this);
                     }
                     return;
                 }

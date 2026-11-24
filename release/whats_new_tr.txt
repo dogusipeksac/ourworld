@@ -1,7 +1,6 @@
-Bizim Dünyamız (Our World) v1.0.0 · Build 2 (Büyük Oynanış Güncellemesi)
-• Canlı Açık Dünya Ana Menüsü: Bölge seçerek başlama, hızlı spor maçları ve ayarlar
-• Yenilenen Mobil Kontroller: Dengeli yürüyüş hızı ve büyütülmüş ergonomik joystick / sürüş pedalları
-• 4 Oynanabilir Spor (İstediğin An Maç): Geliştirilen 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol ve 2v2 Voleybol + tam vücut spor animasyonları
-• 5 Bölümlük 20 Hikâye Görevi: Spor Kupası, Gece Yarısı Kesintisi, 8 Cadde Rallisi ve Büyük Final
-• Akıllı Mahalle NPC'leri: Baş üstü konuşma baloncukları, komşu sohbetleri, korna/yağmur/tanık tepkileri
-• Akşam & Gece Aydınlatması: 18:30'dan itibaren yanan sokak lambaları, apartman ışıkları, saha projektörleri ve araç farları
+Bizim Dünyamız (Our World) v1.0.0 · Build 3 (Açık Dünya Yaşamı & İskeletli Animasyonlar)
+• Genişletilen Harita & Aydos Yeşil Vadi: 980×980 m açık dünya, 360° Aydos tepeleri, Aydos Çiftliği ve Sultanbeyli Göleti
+• Tarım & Hayvancılık: 16 bostan tarlasında ayçiçeği, domates, biber ve çilek yetiştirme; inek sağma, koyun kırpma, tavuklardan yumurta toplama ve Köy Pazarı satışı
+• No:73 Oto Tamir & Modifiye + Oto Yıkama: Hidrolik lifte çıkan müşteri araçlarını 3 aşamada tamir et; kendi aracına metalik boya, jant, rüzgarlık, tavan bagajı ve performans yükseltmeleri tak
+• Sultanbeyli Göleti Balıkçılık & Ev Dekorasyonu: İskeleden 5 balık türü avla, evin No:48'i lüks koltuk, akvaryum ve bahçe mangalıyla yenile
+• Yeni 3D Modeller & Gerçekçi İskelet Animasyonları: Blender MCP + CC0 iskeletli inek, koyun, tavuk, Kangal Karabaş, gölet ördekleri, balık, spor sedan ve 8 kanatlı yel değirmeni; 2-kemik IK sulama, süt sağımı, olta çekme ve doğal konuşma jestleri

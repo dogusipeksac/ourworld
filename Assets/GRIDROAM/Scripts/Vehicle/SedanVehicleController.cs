@@ -123,6 +123,32 @@ namespace OurWorld.Vehicle
         private Quaternion _steeringWheelBaseRot = Quaternion.identity;
         private bool _steeringWheelCached;
 
+        // Phase 2 Tuning & Car Wash state
+        private float _tuningTurboMult = 1.0f;
+        private float _tuningBrakeMult = 1.0f;
+        private GameObject _spoilerObj;
+        private GameObject _roofRackObj;
+
+        public static readonly Color[] TuningPaintColors =
+        {
+            new Color(0.11f, 0.56f, 0.58f), // 0: İstanbul Turkuazı
+            new Color(0.76f, 0.14f, 0.14f), // 1: Ateş Kırmızısı
+            new Color(0.10f, 0.11f, 0.14f), // 2: Gece Siyahı
+            new Color(0.94f, 0.94f, 0.92f), // 3: İnci Beyazı
+            new Color(0.14f, 0.44f, 0.24f), // 4: Aydos Yeşili
+            new Color(0.92f, 0.72f, 0.14f), // 5: Altın Sarısı
+            new Color(0.42f, 0.18f, 0.62f), // 6: Metalik Mor
+            new Color(0.16f, 0.42f, 0.82f)  // 7: Boğaz Mavisi
+        };
+
+        public static readonly Color[] TuningRimColors =
+        {
+            new Color(0.84f, 0.86f, 0.88f), // 0: Klasik Gümüş
+            new Color(0.14f, 0.14f, 0.16f), // 1: Spor Mat Siyah
+            new Color(0.92f, 0.72f, 0.22f), // 2: Altın Alaşım
+            new Color(0.14f, 0.76f, 0.72f)  // 3: Turkuaz Krom
+        };
+
         public bool IsPlayerDriving => _isPlayerDriving;
         public float SpeedKmh => _rb != null ? _rb.linearVelocity.magnitude * 3.6f : 0f;
         public float ForwardSpeedMs => _rb != null ? Vector3.Dot(_rb.linearVelocity, transform.forward) : 0f;
@@ -237,6 +263,173 @@ namespace OurWorld.Vehicle
                 DayNightCycle.Instance.OnNightStateChanged += HandleNightStateChanged;
             }
             UpdateHeadlightState();
+
+            if (SaveManager.Instance != null && SaveManager.Instance.Data != null &&
+                PlayerModeController.Instance != null && PlayerModeController.Instance.PlayerSedan == this)
+            {
+                ApplyTuningFromSave(SaveManager.Instance.Data);
+            }
+        }
+
+        public void ApplyTuningFromSave(SaveData data)
+        {
+            if (data == null) return;
+
+            _tuningTurboMult = data.carHasTurboUpgrade ? 1.24f : 1.0f;
+            _tuningBrakeMult = data.carHasSportSuspension ? 1.28f : 1.0f;
+            if (data.carHasSportSuspension)
+            {
+                baseRearSidewaysStiffness = 2.15f;
+            }
+            if (data.carHasNitroUpgrade)
+            {
+                _nitroCharge = Mathf.Max(_nitroCharge, 1.0f);
+            }
+
+            // 1. Live Metallic Body Paint
+            if (bodyVisualRoot != null && data.carPaintIndex >= 0 && data.carPaintIndex < TuningPaintColors.Length)
+            {
+                Color paint = TuningPaintColors[data.carPaintIndex];
+                Renderer[] renderers = bodyVisualRoot.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    Renderer r = renderers[i];
+                    if (r == null) continue;
+                    string n = r.gameObject.name;
+                    if (n.IndexOf("Headlight", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Taillight", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Reverse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Glass", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Window", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Wheel", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Spoiler", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("RoofRack", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        n.IndexOf("Driver", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        continue;
+                    }
+
+                    Material[] mats = r.materials;
+                    bool changed = false;
+                    for (int m = 0; m < mats.Length; m++)
+                    {
+                        Material mat = mats[m];
+                        if (mat == null) continue;
+                        string mn = mat.name;
+                        if (mn.IndexOf("Paint", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            mn.IndexOf("Body", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            mn.IndexOf("Car", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            mn.IndexOf("Sedan", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", paint);
+                            if (mat.HasProperty("_Color")) mat.SetColor("_Color", paint);
+                            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.78f);
+                            changed = true;
+                        }
+                    }
+                    if (changed) r.materials = mats;
+                }
+            }
+
+            // 2. Custom Alloy Rims on all 4 wheels
+            if (data.carRimIndex >= 0 && data.carRimIndex < TuningRimColors.Length)
+            {
+                Color rimCol = TuningRimColors[data.carRimIndex];
+                for (int i = 0; i < axleInfos.Count; i++)
+                {
+                    TintWheelRim(axleInfos[i].leftWheelVisual, rimCol);
+                    TintWheelRim(axleInfos[i].rightWheelVisual, rimCol);
+                }
+            }
+
+            // 3. Headlight Kit (0=Warm, 1=Ice Xenon, 2=Golden Rally)
+            if (_headlightBeam != null)
+            {
+                _headlightBeam.color = data.carHeadlightMode == 1
+                    ? new Color(0.76f, 0.92f, 1.0f)
+                    : (data.carHeadlightMode == 2 ? new Color(1.0f, 0.86f, 0.36f) : new Color(1.0f, 0.94f, 0.80f));
+                _headlightBeam.intensity = data.carHeadlightMode > 0 ? 118f : 96f;
+            }
+
+            // 4. Blender GT Spoiler & Overland Roof Rack mounts!
+            Transform attachRoot = bodyVisualRoot != null ? bodyVisualRoot : transform;
+            if (data.carHasSpoiler)
+            {
+                if (_spoilerObj == null)
+                {
+                    _spoilerObj = OurWorldModelLibrary.InstantiateModel(
+                        "OW_CarSpoilerSport", attachRoot, new Vector3(0f, 0.96f, -1.96f), Quaternion.identity, Vector3.one * 0.92f);
+                }
+                if (_spoilerObj != null) _spoilerObj.SetActive(true);
+            }
+            else if (_spoilerObj != null)
+            {
+                _spoilerObj.SetActive(false);
+            }
+
+            if (data.carHasRoofRack)
+            {
+                if (_roofRackObj == null)
+                {
+                    _roofRackObj = OurWorldModelLibrary.InstantiateModel(
+                        "OW_CarRoofRack", attachRoot, new Vector3(0f, 1.44f, -0.18f), Quaternion.identity, Vector3.one * 0.95f);
+                }
+                if (_roofRackObj != null) _roofRackObj.SetActive(true);
+            }
+            else if (_roofRackObj != null)
+            {
+                _roofRackObj.SetActive(false);
+            }
+        }
+
+        public void SparklePolishClean()
+        {
+            if (_damageSystem != null)
+            {
+                _damageSystem.RepairFull();
+            }
+            if (bodyVisualRoot != null)
+            {
+                Renderer[] renderers = bodyVisualRoot.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    Renderer r = renderers[i];
+                    if (r == null || r.sharedMaterial == null) continue;
+                    if (r.sharedMaterial.name.IndexOf("Paint", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        r.sharedMaterial.name.IndexOf("Body", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        Material m = r.material;
+                        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.86f);
+                    }
+                }
+            }
+        }
+
+        private static void TintWheelRim(Transform wheelVisual, Color rimCol)
+        {
+            if (wheelVisual == null) return;
+            Renderer[] rends = wheelVisual.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < rends.Length; i++)
+            {
+                Renderer r = rends[i];
+                if (r == null) continue;
+                Material[] mats = r.materials;
+                bool changed = false;
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    Material mat = mats[m];
+                    if (mat == null) continue;
+                    string mn = mat.name;
+                    if (mn.IndexOf("Tire", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        mn.IndexOf("Rubber", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                    if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", rimCol);
+                    if (mat.HasProperty("_Color")) mat.SetColor("_Color", rimCol);
+                    if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", 0.72f);
+                    if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.76f);
+                    changed = true;
+                }
+                if (changed) r.materials = mats;
+            }
         }
 
         private void OnDestroy()
@@ -606,9 +799,9 @@ namespace OurWorld.Vehicle
             if (transform.position.y < -3.5f)
             {
                 Vector3 safePos = new Vector3(
-                    Mathf.Clamp(transform.position.x, -160f, 160f),
+                    Mathf.Clamp(transform.position.x, -242f, 242f),
                     0.35f,
-                    Mathf.Clamp(transform.position.z, -160f, 160f));
+                    Mathf.Clamp(transform.position.z, -242f, 242f));
                 TeleportAndReset(safePos, Quaternion.Euler(0f, transform.eulerAngles.y, 0f));
                 return;
             }
@@ -837,7 +1030,7 @@ namespace OurWorld.Vehicle
             float damageTorqueMult = _damageSystem != null ? _damageSystem.EngineTorqueMultiplier : 1f;
             if (!parked && hasFuel && damageTorqueMult > 0.01f && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
             {
-                float engineTorque = EvaluateEngineTorque(EngineRpm) * damageTorqueMult;
+                float engineTorque = EvaluateEngineTorque(EngineRpm) * damageTorqueMult * _tuningTurboMult;
                 if (SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasTurboKit)
                 {
                     engineTorque *= 1.28f;
@@ -910,7 +1103,7 @@ namespace OurWorld.Vehicle
                 else if (serviceBrake > 0.01f)
                 {
                     float biasMultiplier = isFront ? (frontBrakeBias * 2f) : ((1f - frontBrakeBias) * 2f);
-                    baseWheelBrake = maxBrakeTorque * serviceBrake * biasMultiplier;
+                    baseWheelBrake = maxBrakeTorque * _tuningBrakeMult * serviceBrake * biasMultiplier;
                     applyAbs = true;
                 }
                 else if (axle.motor && engineBrakeTorque > 0f)

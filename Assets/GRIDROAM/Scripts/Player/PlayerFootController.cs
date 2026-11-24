@@ -758,9 +758,9 @@ namespace OurWorld.Player
             if (transform.position.y < -3.5f)
             {
                 Vector3 safePos = new Vector3(
-                    Mathf.Clamp(transform.position.x, -160f, 160f),
+                    Mathf.Clamp(transform.position.x, -242f, 242f),
                     0.25f,
-                    Mathf.Clamp(transform.position.z, -160f, 160f));
+                    Mathf.Clamp(transform.position.z, -242f, 242f));
                 TeleportTo(safePos, transform.rotation);
                 return;
             }
