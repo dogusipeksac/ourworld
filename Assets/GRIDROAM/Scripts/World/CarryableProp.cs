@@ -12,6 +12,9 @@ namespace OurWorld.World
 
         private const float ReachDuration = 0.36f;
         private const float LiftDuration = 0.34f;
+        private const float PutDownDuration = 0.38f;
+        private const float ThrowWindupDuration = 0.14f;
+        private const float ThrowReleaseTime = 0.22f;
         private static CarryableProp _currentlyHeld;
 
         private Rigidbody _rb;
@@ -24,6 +27,7 @@ namespace OurWorld.World
         private Vector3 _shapeExtents;
         private float _gripRadius;
         private bool _roundGrip;
+        private float _carryHeaviness = 0.72f;
         private Vector3 _spawnPos;
         private Quaternion _spawnRot;
         private Vector3 _liftStart;
@@ -31,15 +35,47 @@ namespace OurWorld.World
         private float _pickupDeadline;
         private float _reachStarted = -1f;
         private bool _attached;
+        private bool _puttingDown;
+        private float _putDownStarted = -1f;
+        private Vector3 _putDownStartPos;
+        private Quaternion _putDownStartRot;
+        private Vector3 _putDownTargetPos;
+        private Quaternion _putDownTargetRot;
+        private bool _throwing;
+        private float _throwStarted = -1f;
+        private Vector3 _throwDirection = Vector3.forward;
+        private Vector3 _throwStartLocalPos;
+        private Quaternion _throwStartLocalRot;
 
         public static bool IsHoldingProp => _currentlyHeld != null && _currentlyHeld._attached;
         public static CarryableProp CurrentlyHeld => _currentlyHeld;
         public string PropLabel => propLabel;
+        internal float CarryHeaviness => _carryHeaviness;
+        internal bool IsAttached => _attached;
+        internal bool IsThrowing => _throwing;
+
+        internal float ThrowProgress
+        {
+            get
+            {
+                if (!_throwing || _throwStarted < 0f) return 0f;
+                return Mathf.Clamp01((Time.time - _throwStarted) / ThrowReleaseTime);
+            }
+        }
 
         internal float PickupCrouch
         {
             get
             {
+                if (_puttingDown && _putDownStarted >= 0f)
+                {
+                    return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Time.time - _putDownStarted) / PutDownDuration));
+                }
+                if (_throwing && _throwStarted >= 0f)
+                {
+                    float t = Mathf.Clamp01((Time.time - _throwStarted) / ThrowReleaseTime);
+                    return Mathf.Sin(t * Mathf.PI) * 0.16f;
+                }
                 float elapsed = Time.time - _reachStarted;
                 return Mathf.SmoothStep(0f, 1f, elapsed / ReachDuration) *
                     (1f - Mathf.SmoothStep(0f, 1f, (elapsed - ReachDuration) / LiftDuration));
@@ -50,6 +86,7 @@ namespace OurWorld.World
         {
             propLabel = label;
             throwSpeed = throwVelocity;
+            ComputeHeaviness();
         }
 
         private void Awake()
@@ -65,6 +102,29 @@ namespace OurWorld.World
             Transform cone = transform.Find("ConeBody");
             _gripRadius = cone != null ? cone.localScale.x * 0.5f : _shapeExtents.x;
             _roundGrip = cone != null || transform.Find("Damacana_Mesh") != null;
+            ComputeHeaviness();
+        }
+
+        private void ComputeHeaviness()
+        {
+            bool isCone = transform.Find("ConeBody") != null;
+            bool isDamacana = transform.Find("Damacana_Mesh") != null;
+            string lbl = propLabel != null ? propLabel.ToLowerInvariant() : string.Empty;
+            if (isDamacana || lbl.Contains("damacana") || lbl.Contains("bidon") || lbl.Contains("su"))
+            {
+                _carryHeaviness = 0.96f;
+            }
+            else if (isCone || lbl.Contains("koni") || lbl.Contains("duba"))
+            {
+                _carryHeaviness = 0.35f;
+            }
+            else
+            {
+                float massHint = _rb != null ? Mathf.InverseLerp(1.5f, 14f, _rb.mass) : 0.5f;
+                float vol = _shapeExtents.x * _shapeExtents.y * _shapeExtents.z * 8f;
+                float volHint = Mathf.InverseLerp(0.015f, 0.12f, vol);
+                _carryHeaviness = Mathf.Clamp(Mathf.Lerp(0.42f, 0.92f, Mathf.Max(massHint, volHint)), 0.35f, 0.96f);
+            }
         }
 
         private void Start()
@@ -76,7 +136,8 @@ namespace OurWorld.World
         public static bool TryThrowHeldProp(Vector3 forwardDir)
         {
             if (!IsHoldingProp) return false;
-            _currentlyHeld.Throw(forwardDir);
+            if (_currentlyHeld._throwing || _currentlyHeld._puttingDown) return true;
+            _currentlyHeld.BeginThrow(forwardDir);
             return true;
         }
 
@@ -92,9 +153,19 @@ namespace OurWorld.World
 
             if (_currentlyHeld == this)
             {
-                bool wasHeld = _attached;
-                Drop(foot.transform.forward * 1.4f);
-                if (wasHeld) mode.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                if (_throwing) return;
+                if (_puttingDown)
+                {
+                    Drop(Vector3.zero);
+                    mode.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    return;
+                }
+                if (_attached)
+                {
+                    BeginPutDown(foot);
+                    return;
+                }
+                Drop(Vector3.zero);
                 return;
             }
 
@@ -106,12 +177,71 @@ namespace OurWorld.World
             _pickupDeadline = Time.time + 1.9f;
         }
 
+        private void BeginPutDown(PlayerFootController foot)
+        {
+            _puttingDown = true;
+            _putDownStarted = Time.time;
+            _putDownStartPos = transform.position;
+            _putDownStartRot = transform.rotation;
+
+            Transform footTr = foot.transform;
+            Vector3 fwd = footTr.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude < 0.001f) fwd = Vector3.forward;
+            fwd.Normalize();
+
+            float placeDist = (_holderCollider != null ? _holderCollider.radius : 0.32f) + _shapeExtents.z + 0.16f;
+            Vector3 spot = footTr.position + fwd * placeDist;
+            float groundY = footTr.position.y;
+            if (Physics.Raycast(spot + Vector3.up * 0.65f, Vector3.down, out RaycastHit hit, 1.5f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                hit.collider.transform.root != footTr.root && hit.collider.transform.root != transform.root)
+            {
+                groundY = hit.point.y;
+            }
+
+            float bottomOffset = (_shapeCenter.y - _shapeExtents.y) * transform.lossyScale.y;
+            _putDownTargetRot = Quaternion.LookRotation(fwd, Vector3.up);
+            _putDownTargetPos = new Vector3(spot.x, groundY - bottomOffset + 0.01f, spot.z);
+        }
+
+        private void BeginThrow(Vector3 forwardDir)
+        {
+            Vector3 dir = Vector3.ProjectOnPlane(forwardDir, Vector3.up);
+            if (dir.sqrMagnitude < 0.01f) dir = _holder != null ? _holder.transform.forward : Vector3.forward;
+            _throwDirection = dir.normalized;
+            _throwing = true;
+            _throwStarted = Time.time;
+            if (_holder != null && _holder.Humanoid != null)
+            {
+                Transform rigRoot = _holder.Humanoid.transform;
+                _throwStartLocalPos = rigRoot.InverseTransformPoint(transform.position);
+                _throwStartLocalRot = Quaternion.Inverse(rigRoot.rotation) * transform.rotation;
+            }
+        }
+
         internal bool TryGetPickupMotion(PlayerFootController player, bool canContinue, Vector3 requestedDirection,
             out Vector3 direction, out float speed)
         {
             direction = Vector3.zero;
             speed = 0f;
-            if (_holder != player || _attached) return false;
+            if (_holder != player) return false;
+
+            if (_puttingDown)
+            {
+                Vector3 toPlace = Vector3.ProjectOnPlane(_putDownTargetPos - player.transform.position, Vector3.up);
+                direction = toPlace.sqrMagnitude > 0.001f ? toPlace.normalized : player.transform.forward;
+                if (!canContinue || requestedDirection.sqrMagnitude > 0.45f)
+                {
+                    PlayerModeController m = _mode;
+                    Drop(Vector3.zero);
+                    if (m != null) m.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    return false;
+                }
+                return true;
+            }
+
+            if (_attached) return false;
 
             Vector3 toProp = Vector3.ProjectOnPlane(transform.TransformPoint(_shapeCenter) - player.transform.position, Vector3.up);
             direction = toProp.normalized;
@@ -150,6 +280,65 @@ namespace OurWorld.World
         {
             Transform rigRoot = rig.transform;
             float elapsed = Time.time - _reachStarted;
+
+            if (_puttingDown)
+            {
+                float putElapsed = Time.time - _putDownStarted;
+                float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(putElapsed / PutDownDuration));
+                Vector3 pos = Vector3.Lerp(_putDownStartPos, _putDownTargetPos, u);
+                // Subtle downward arc so prop clears thighs while squatting down
+                pos += rigRoot.forward * (Mathf.Sin(u * Mathf.PI) * 0.05f);
+                Quaternion rot = Quaternion.Slerp(_putDownStartRot, _putDownTargetRot, u);
+                transform.SetPositionAndRotation(pos, rot);
+
+                ComputePalmTargets(rigRoot, out left, out right);
+                if (putElapsed >= PutDownDuration)
+                {
+                    PlayerModeController m = _mode;
+                    rig.BeginCarryReleaseFade(left, right, 1f);
+                    Drop(Vector3.zero);
+                    if (m != null) m.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    return 0f;
+                }
+                return 1f;
+            }
+
+            if (_throwing)
+            {
+                float throwElapsed = Time.time - _throwStarted;
+                if (throwElapsed < ThrowWindupDuration)
+                {
+                    float w = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(throwElapsed / ThrowWindupDuration));
+                    Vector3 windLocal = _throwStartLocalPos + new Vector3(0f, 0.11f, -0.13f);
+                    Quaternion windRot = _throwStartLocalRot * Quaternion.Euler(-16f, 0f, 0f);
+                    transform.SetPositionAndRotation(
+                        rigRoot.TransformPoint(Vector3.Lerp(_throwStartLocalPos, windLocal, w)),
+                        rigRoot.rotation * Quaternion.Slerp(_throwStartLocalRot, windRot, w));
+                }
+                else
+                {
+                    float h = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((throwElapsed - ThrowWindupDuration) / (ThrowReleaseTime - ThrowWindupDuration)));
+                    Vector3 windLocal = _throwStartLocalPos + new Vector3(0f, 0.11f, -0.13f);
+                    Vector3 releaseLocal = _throwStartLocalPos + new Vector3(0f, 0.24f, 0.30f);
+                    Quaternion windRot = _throwStartLocalRot * Quaternion.Euler(-16f, 0f, 0f);
+                    Quaternion releaseRot = _throwStartLocalRot * Quaternion.Euler(22f, 0f, 0f);
+                    transform.SetPositionAndRotation(
+                        rigRoot.TransformPoint(Vector3.Lerp(windLocal, releaseLocal, h)),
+                        rigRoot.rotation * Quaternion.Slerp(windRot, releaseRot, h));
+                }
+
+                ComputePalmTargets(rigRoot, out left, out right);
+                if (throwElapsed >= ThrowReleaseTime)
+                {
+                    float heaviness = _carryHeaviness;
+                    Vector3 dir = _throwDirection;
+                    rig.PlayCarryThrowFollowThrough(heaviness, left, right);
+                    Throw(dir);
+                    return 0f;
+                }
+                return 1f;
+            }
+
             if (elapsed >= ReachDuration)
             {
                 if (!_attached)
@@ -163,30 +352,39 @@ namespace OurWorld.World
                 }
 
                 float lift = Mathf.SmoothStep(0f, 1f, (elapsed - ReachDuration) / LiftDuration);
-                Quaternion rotation = rigRoot.rotation * Quaternion.Euler(-7f, 0f, 0f);
+                float tiltBack = Mathf.Lerp(-4f, -10f, _carryHeaviness);
+                Quaternion rotation = rigRoot.rotation * Quaternion.Euler(tiltBack, 0f, 0f);
+                float carryY = Mathf.Lerp(0.21f, 0.16f, _carryHeaviness);
                 Vector3 center = anchor + rigRoot.TransformVector(
-                    new Vector3(0f, 0.19f, 0.205f + _shapeExtents.z));
+                    new Vector3(0f, carryY, 0.205f + _shapeExtents.z));
                 Vector3 position = center - rotation * Vector3.Scale(_shapeCenter, transform.lossyScale);
                 transform.SetPositionAndRotation(Vector3.Lerp(rigRoot.TransformPoint(_liftStart), position, lift),
                     Quaternion.Slerp(rigRoot.rotation * _liftRotation, rotation, lift));
             }
 
+            ComputePalmTargets(rigRoot, out left, out right);
+            return Mathf.SmoothStep(0f, 1f, elapsed / ReachDuration);
+        }
+
+        private void ComputePalmTargets(Transform rigRoot, out Vector3 left, out Vector3 right)
+        {
             Vector3 localRight = transform.InverseTransformDirection(rigRoot.right);
             Vector3 side;
             if (Mathf.Abs(localRight.y) > 0.82f)
             {
-                side = Vector3.up * (Mathf.Sign(localRight.y) * _shapeExtents.y * 0.5f);
+                side = Vector3.up * (Mathf.Sign(localRight.y) * (_shapeExtents.y * 0.5f + 0.024f));
             }
             else if (_roundGrip)
             {
                 localRight.y = 0f;
-                side = localRight.normalized * (_gripRadius + 0.003f);
+                Vector3 rightFlat = localRight.sqrMagnitude > 0.0001f ? localRight.normalized : Vector3.right;
+                side = rightFlat * (_gripRadius + 0.026f);
             }
             else
             {
                 side = Mathf.Abs(localRight.x) >= Mathf.Abs(localRight.z)
-                    ? Vector3.right * (Mathf.Sign(localRight.x) * _shapeExtents.x)
-                    : Vector3.forward * (Mathf.Sign(localRight.z) * _shapeExtents.z);
+                    ? Vector3.right * (Mathf.Sign(localRight.x) * (_shapeExtents.x + 0.024f))
+                    : Vector3.forward * (Mathf.Sign(localRight.z) * (_shapeExtents.z + 0.024f));
             }
             Vector3 nearSide = Vector3.Cross(Vector3.up, side.normalized);
             if (nearSide.sqrMagnitude < 0.001f)
@@ -197,7 +395,6 @@ namespace OurWorld.World
                 Vector3.up * (_shapeExtents.y * 0.17f);
             left = transform.TransformPoint(gripCenter - side);
             right = transform.TransformPoint(gripCenter + side);
-            return Mathf.SmoothStep(0f, 1f, elapsed / ReachDuration);
         }
 
         public void Throw(Vector3 forwardDir)
@@ -247,6 +444,10 @@ namespace OurWorld.World
             _mode = null;
             _reachStarted = -1f;
             _attached = false;
+            _puttingDown = false;
+            _putDownStarted = -1f;
+            _throwing = false;
+            _throwStarted = -1f;
             if (wasHeld && isActiveAndEnabled) GameFeelAudio.PlayDoorLatch();
         }
 
@@ -292,7 +493,20 @@ namespace OurWorld.World
 
             if (_currentlyHeld == this)
             {
-                if (_holder == null || !_holder.isActiveAndEnabled) Drop(Vector3.zero);
+                if (_holder == null || !_holder.isActiveAndEnabled)
+                {
+                    Drop(Vector3.zero);
+                }
+                else if (_throwing && Time.time - _throwStarted > ThrowReleaseTime + 0.12f)
+                {
+                    Throw(_throwDirection);
+                }
+                else if (_puttingDown && Time.time - _putDownStarted > PutDownDuration + 0.12f)
+                {
+                    PlayerModeController m = _mode;
+                    Drop(Vector3.zero);
+                    if (m != null) m.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                }
                 return;
             }
 

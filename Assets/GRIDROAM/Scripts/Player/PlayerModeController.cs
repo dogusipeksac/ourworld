@@ -1182,12 +1182,7 @@ namespace OurWorld.Player
             }
 
             Quaternion rotation = _currentBicycle.transform.rotation;
-            if (_currentBicycle.IsMotorcycle)
-            {
-                _currentBicycle.Dismount(position, rotation, () => FinishBicycleExit(position, rotation));
-                return;
-            }
-            FinishBicycleExit(position, rotation);
+            _currentBicycle.Dismount(position, rotation, () => FinishBicycleExit(position, rotation));
         }
 
         private void FinishBicycleExit(Vector3 position, Quaternion rotation)

@@ -24,12 +24,15 @@ namespace OurWorld.Player
     [DefaultExecutionOrder(200)]
     public class PlayerConsumeAnimator : MonoBehaviour
     {
+        private static PlayerConsumeAnimator _activeInstance;
+
         private PlayerFootController _foot;
         private CharacterController _cc;
         private Coroutine _activeRoutine;
         private GameObject _heldProp;
         private ConsumeAnimKind _heldKind;
         private float _sipTiltPhase;
+        private float _putAwayProgress;
         private bool _holdingModalLock;
 
         private static readonly string[] DrinkPropNames = { "DrinkFridge", "Fridge", "Kitchen", "Vending", "CayOcagi_Fridge", "CayOcagi_Counter", "Shelf" };
@@ -39,6 +42,7 @@ namespace OurWorld.Player
         private static readonly string[] HotCupPropNames = { "TeaTable", "Kettle", "CayOcagi_Counter", "CayOcagi_Fridge", "KasaBandi", "Shelf" };
 
         public bool IsPlaying => _activeRoutine != null;
+        internal static bool IsAnyPlaying => _activeInstance != null && _activeInstance.IsPlaying;
 
         public static void PlayPurchase(
             PlayerFootController foot,
@@ -69,6 +73,7 @@ namespace OurWorld.Player
         {
             _foot = GetComponent<PlayerFootController>();
             _cc = GetComponent<CharacterController>();
+            _activeInstance = this;
         }
 
         private void OnDisable()
@@ -79,6 +84,7 @@ namespace OurWorld.Player
         private void OnDestroy()
         {
             CancelActive();
+            if (_activeInstance == this) _activeInstance = null;
         }
 
         public void CancelActive()
@@ -164,35 +170,42 @@ namespace OurWorld.Player
                 lookDelta.y = 0f;
                 if (lookDelta.sqrMagnitude > 0.01f) faceDir = lookDelta.normalized;
 
-                float grabY = kind == ConsumeAnimKind.EatIceCream ? 0.96f : 1.24f;
-                grabWorldPos = new Vector3(shelfPos.x, _foot.transform.position.y + grabY, shelfPos.z)
-                               - faceDir * 0.25f;
+                float defaultGrabY = kind == ConsumeAnimKind.EatIceCream ? 0.96f : 1.24f;
+                float footY = _foot.transform.position.y;
+                float grabY = (explicitTarget != null && shelfPos.y >= footY + 0.62f && shelfPos.y <= footY + 1.58f)
+                    ? shelfPos.y
+                    : footY + defaultGrabY;
+                float horizToShelf = Mathf.Clamp(lookDelta.magnitude - 0.22f, 0.36f, 0.62f);
+                grabWorldPos = new Vector3(_foot.transform.position.x, grabY, _foot.transform.position.z) + faceDir * horizToShelf;
             }
             else
             {
                 // Graceful fallback: reach cleanly forward to the counter/stand in front of player
-                grabWorldPos = _foot.transform.position + faceDir * 0.62f + Vector3.up * 1.18f;
+                grabWorldPos = _foot.transform.position + faceDir * 0.56f + Vector3.up * 1.18f;
             }
 
             // Turn smoothly to face the shelf/fridge
             float turnT = 0f;
             Quaternion shelfFaceRot = Quaternion.LookRotation(faceDir, Vector3.up);
-            while (turnT < 0.22f)
+            hum.SetLookAtPoint(true, grabWorldPos);
+            while (turnT < 0.30f && Quaternion.Angle(_foot.transform.rotation, shelfFaceRot) > 5f)
             {
+                if (mode.CurrentMode != ControlMode.OnFoot) break;
                 turnT += Time.deltaTime;
                 _foot.transform.rotation = Quaternion.Slerp(_foot.transform.rotation, shelfFaceRot, 1f - Mathf.Exp(-14f * Time.deltaTime));
                 hum.SetLocomotion(0f, true, 0f, faceDir);
                 yield return null;
             }
 
-            // --- STAGE 2: Reach right arm onto the shelf with 2-bone IK & pick up 3D item ---
+            // --- STAGE 2: Reach right arm onto the shelf with 2-bone IK, grasp item, bring smoothly to chest hold ---
             const float reachOutDur = 0.34f;
-            const float grabHoldDur = 0.18f;
-            const float pullBackDur = 0.26f;
+            const float grabHoldDur = 0.16f;
+            const float pullBackDur = 0.28f;
 
             float t = 0f;
             while (t < reachOutDur)
             {
+                if (mode.CurrentMode != ControlMode.OnFoot) break;
                 t += Time.deltaTime;
                 float w = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / reachOutDur));
                 hum.SetShelfReach(true, grabWorldPos, w);
@@ -202,6 +215,7 @@ namespace OurWorld.Player
             // Spawn the visible 3D item right in the player's right hand as fingers touch the shelf!
             _heldKind = kind;
             _sipTiltPhase = 0f;
+            _putAwayProgress = 0f;
             _heldProp = SpawnHandProp(kind);
             SyncHeldPropToPalm();
             GameFeelAudio.PlayUiClick();
@@ -210,20 +224,25 @@ namespace OurWorld.Player
             t = 0f;
             while (t < grabHoldDur)
             {
+                if (mode.CurrentMode != ControlMode.OnFoot) break;
                 t += Time.deltaTime;
                 hum.SetShelfReach(true, grabWorldPos, 1f);
                 yield return null;
             }
 
+            // Pull item smoothly from shelf directly into the chest hold pose (seamless handoff to Stage 3, no arm drop!)
             t = 0f;
             while (t < pullBackDur)
             {
+                if (mode.CurrentMode != ControlMode.OnFoot) break;
                 t += Time.deltaTime;
-                float w = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / pullBackDur));
-                hum.SetShelfReach(true, grabWorldPos, w);
+                float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / pullBackDur));
+                Vector3 holdPos = GetChestHoldPosition(hum);
+                Vector3 carryPoint = Vector3.Lerp(grabWorldPos, holdPos, u);
+                hum.SetShelfReach(true, carryPoint, 1f);
+                hum.SetLookAtPoint(true, carryPoint);
                 yield return null;
             }
-            hum.SetShelfReach(false, Vector3.zero, 0f);
 
             // Unlock movement now so player can walk around while drinking/eating!
             if (_holdingModalLock && PlayerModeController.Instance != null)
@@ -232,11 +251,15 @@ namespace OurWorld.Player
                 _holdingModalLock = false;
             }
 
-            // --- STAGE 3: Drink water/cup or Eat snack/ice cream with realistic sips/bites ---
+            // --- STAGE 3: Drink water/cup or Eat snack/ice cream with realistic sips/bites & smooth put-away ---
             bool isDrink = kind == ConsumeAnimKind.DrinkWater || kind == ConsumeAnimKind.DrinkHotCup;
             int poseMode = isDrink ? 1 : 2;
             const float consumeTotal = 2.45f;
             bool midEnergyApplied = false;
+
+            hum.SetShelfReach(false, Vector3.zero, 0f);
+            hum.SetLookAtPoint(false, Vector3.zero);
+            hum.SetConsumePose(poseMode, 1f, 0f);
 
             if (PlayerModeController.Instance != null)
             {
@@ -253,29 +276,29 @@ namespace OurWorld.Player
                 t += Time.deltaTime;
                 float norm = Mathf.Clamp01(t / consumeTotal);
 
-                // Smooth entry & exit arm blend
-                float armWeight = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(norm / 0.16f)) *
-                                  (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.84f) / 0.16f)));
+                // Already raised seamlessly at weight 1.0 from Stage 2; lower smoothly to side in final 20%
+                float armWeight = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.80f) / 0.20f));
+                _putAwayProgress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.84f) / 0.16f));
 
-                // Two distinct natural sips (for drinking) or two crisp bites (for eating)
+                // Two distinct natural sips (for drinking) or two crisp bites (for eating) with ease-in/out pause for swallow/chew
                 float cycle;
                 if (isDrink)
                 {
-                    float sip1 = Mathf.Sin(Mathf.Clamp01((norm - 0.10f) / 0.34f) * Mathf.PI);
-                    float sip2 = Mathf.Sin(Mathf.Clamp01((norm - 0.50f) / 0.34f) * Mathf.PI);
-                    cycle = Mathf.Max(sip1, sip2);
+                    float sip1 = Mathf.Sin(Mathf.Clamp01((norm - 0.08f) / 0.32f) * Mathf.PI);
+                    float sip2 = Mathf.Sin(Mathf.Clamp01((norm - 0.47f) / 0.31f) * Mathf.PI);
+                    cycle = Mathf.SmoothStep(0f, 1f, Mathf.Max(sip1, sip2));
                 }
                 else
                 {
-                    float bite1 = Mathf.Sin(Mathf.Clamp01((norm - 0.12f) / 0.30f) * Mathf.PI);
-                    float bite2 = Mathf.Sin(Mathf.Clamp01((norm - 0.50f) / 0.30f) * Mathf.PI);
-                    cycle = Mathf.Max(bite1, bite2);
+                    float bite1 = Mathf.Sin(Mathf.Clamp01((norm - 0.09f) / 0.28f) * Mathf.PI);
+                    float bite2 = Mathf.Sin(Mathf.Clamp01((norm - 0.47f) / 0.29f) * Mathf.PI);
+                    cycle = Mathf.SmoothStep(0f, 1f, Mathf.Max(bite1, bite2));
                 }
 
                 hum.SetConsumePose(poseMode, armWeight, cycle);
 
-                // Smoothly tilt the upright bottle/cup backward toward the mouth on each sip
-                _sipTiltPhase = isDrink ? cycle : 0f;
+                // Smoothly tilt bottle/cup/snack toward the mouth on each sip/bite
+                _sipTiltPhase = cycle;
 
                 // Restore energy + sparkle at the first sip/bite climax
                 if (!midEnergyApplied && norm >= 0.45f)
@@ -311,13 +334,26 @@ namespace OurWorld.Player
             _activeRoutine = null;
         }
 
+        private Vector3 GetChestHoldPosition(ProceduralHumanoid hum)
+        {
+            Transform hTr = hum != null ? hum.transform : _foot.transform;
+            if (hum != null && hum.HeadTransform != null)
+            {
+                return hum.HeadTransform.position + hTr.forward * 0.28f + hTr.right * 0.14f - hTr.up * 0.24f;
+            }
+            return _foot.transform.position + _foot.transform.forward * 0.32f + _foot.transform.right * 0.14f + Vector3.up * 1.26f;
+        }
+
         private void CleanupVisualsAndLocks()
         {
             if (_foot != null && _foot.Humanoid != null)
             {
                 _foot.Humanoid.SetShelfReach(false, Vector3.zero, 0f);
                 _foot.Humanoid.SetConsumePose(0, 0f, 0f);
+                _foot.Humanoid.SetLookAtPoint(false, Vector3.zero);
             }
+            _putAwayProgress = 0f;
+            _sipTiltPhase = 0f;
 
             if (_heldProp != null)
             {
@@ -392,9 +428,11 @@ namespace OurWorld.Player
             // Orient in world space relative to the character (upright +Y) so bone rotation never flips props sideways/upside-down!
             Vector3 palmWorld = _foot.Humanoid.RightForearm.TransformPoint(new Vector3(0f, -0.305f, 0f));
             bool isDrink = _heldKind == ConsumeAnimKind.DrinkWater || _heldKind == ConsumeAnimKind.DrinkHotCup;
-            float tiltX = isDrink ? Mathf.Lerp(0f, -62f, _sipTiltPhase) : 0f;
-            _heldProp.transform.position = palmWorld - Vector3.up * 0.045f + _foot.transform.forward * 0.025f;
+            float tiltX = isDrink ? Mathf.Lerp(0f, -58f, _sipTiltPhase) : Mathf.Lerp(0f, -20f, _sipTiltPhase);
+            _heldProp.transform.position = palmWorld - Vector3.up * (0.045f + _putAwayProgress * 0.04f) + _foot.transform.forward * 0.025f;
             _heldProp.transform.rotation = _foot.transform.rotation * Quaternion.Euler(tiltX, 0f, 0f);
+            float scaleFade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_putAwayProgress - 0.55f) / 0.45f));
+            _heldProp.transform.localScale = Vector3.one * Mathf.Max(0.01f, scaleFade);
         }
 
         private static GameObject SpawnHandProp(ConsumeAnimKind kind)

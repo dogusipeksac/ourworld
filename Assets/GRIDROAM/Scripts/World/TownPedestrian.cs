@@ -111,11 +111,33 @@ namespace OurWorld.World
         private float _midWalkIdleCooldown = 12f;
         private float _currentSpeed;
 
+        private enum SeatPhase
+        {
+            None = 0,
+            Approaching = 1,
+            Turning = 2,
+            SittingDown = 3,
+            Seated = 4,
+            StandingUp = 5
+        }
+
         // Bench sitting state
         private SeatInteractable _occupiedSeat;
+        private SeatPhase _seatPhase;
+        private float _seatPhaseTimer;
+        private float _seatStandUpDuration = 0.85f;
+        private Vector3 _seatApproachPoint;
+        private Vector3 _seatStandPoint;
+        private float _seatFloorY;
+        private Vector3 _seatMoveFrom;
+        private Quaternion _seatRotFrom = Quaternion.identity;
         private Vector3 _preSitPosition;
         private Quaternion _preSitRotation = Quaternion.identity;
         private float _sitTimer;
+
+        // Smooth stationary turn state (greetings, conversations, watching, confrontation)
+        private Quaternion _faceTarget = Quaternion.identity;
+        private float _faceTurnTimer;
 
         // Smart Brain State & Social Memory
         private CitizenBrainState _brainState = CitizenBrainState.Patrol;
@@ -139,11 +161,18 @@ namespace OurWorld.World
         private float _watchTimer;
         private bool _watchingCat;
 
-        // Brave confrontation & horn sidestep state
+        // Brave confrontation, vehicle yield & horn sidestep state
         private float _confrontTimer;
         private float _confrontPunchCooldown;
-        private Vector3 _sidestepVelocity;
+        private Vector3 _sidestepDir = Vector3.right;
+        private float _sidestepPeakSpeed;
+        private float _sidestepDuration = 0.85f;
         private float _sidestepTimer;
+        private float _carSidestepCooldown;
+
+        // Rain head-shield smooth blend state
+        private float _rainShieldWeight;
+        private bool _rainShieldActive;
 
         // Startled / combat / vehicle-impact ballistic state
         private float _startledCooldown;
@@ -188,7 +217,7 @@ namespace OurWorld.World
             toPlayer.y = 0f;
             if (toPlayer.sqrMagnitude > 0.01f && _occupiedSeat == null)
             {
-                transform.rotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+                BeginSmoothFace(toPlayer);
             }
 
             bool isEn = IsEnglish;
@@ -425,7 +454,7 @@ namespace OurWorld.World
             if (isBrave && !triggerKnockdown)
             {
                 // Brave citizen stands ground, confronts, and punches back!
-                transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+                BeginSmoothFace(-knockDir);
                 _confrontTimer = 7.0f;
                 _confrontPunchCooldown = 0.9f;
                 _brainState = CitizenBrainState.ConfrontPlayer;
@@ -637,13 +666,16 @@ namespace OurWorld.World
             // Smartly sidestep perpendicular away from the honking car's lane!
             Vector3 rightOfCar = Vector3.Cross(Vector3.up, carForward).normalized;
             float sideSign = Vector3.Dot(toMe, rightOfCar) >= 0f ? 1f : -1f;
-            _sidestepVelocity = rightOfCar * (sideSign * 2.8f);
+            _sidestepDir = rightOfCar * sideSign;
+            _sidestepPeakSpeed = 3.2f;
+            _sidestepDuration = 0.85f;
             _sidestepTimer = 0.85f;
+            _carSidestepCooldown = 1.2f;
             _idleTimer = Mathf.Max(_idleTimer, 1.4f);
 
             if (toMe.sqrMagnitude > 0.04f)
             {
-                transform.rotation = Quaternion.LookRotation((-toMe).normalized, Vector3.up);
+                BeginSmoothFace(-toMe);
             }
 
             if (dist <= 11.5f)
@@ -667,6 +699,7 @@ namespace OurWorld.World
             _watchTimer = 3.2f;
             _watchingCat = false;
             _brainState = CitizenBrainState.WatchingInterest;
+            BeginSmoothFace(arenaPos - transform.position);
             if (humanoid != null) humanoid.PlaySportAnim(SportAnimKind.VictoryJump, 0.62f);
 
             bool isEn = IsEnglish;
@@ -674,13 +707,57 @@ namespace OurWorld.World
             NpcSpeechBubbleManager.Say(transform, citizenName, cheer, 3.2f, NpcBubbleMood.Weather);
         }
 
+        private static Vector3 FlatForward(Transform t)
+        {
+            Vector3 f = t != null ? t.forward : Vector3.forward;
+            f.y = 0f;
+            return f.sqrMagnitude > 0.0001f ? f.normalized : Vector3.forward;
+        }
+
+        private static float ComputeSeatFloor(Transform sitPoint, float fallbackY)
+        {
+            if (sitPoint == null) return fallbackY;
+            Vector3 origin = sitPoint.position + sitPoint.forward * 0.47f + Vector3.up * 0.2f;
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 1.35f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                hit.point.y < sitPoint.position.y - 0.15f)
+            {
+                return hit.point.y;
+            }
+            return fallbackY;
+        }
+
+        private void BeginSmoothFace(Vector3 worldDir, float duration = 0.35f)
+        {
+            worldDir.y = 0f;
+            if (worldDir.sqrMagnitude <= 0.001f) return;
+            _faceTarget = Quaternion.LookRotation(worldDir.normalized, Vector3.up);
+            _faceTurnTimer = Mathf.Max(_faceTurnTimer, duration);
+        }
+
+        private bool UpdateSmoothFace(float dt)
+        {
+            if (_faceTurnTimer <= 0f) return false;
+            _faceTurnTimer = Mathf.Max(0f, _faceTurnTimer - dt);
+            transform.rotation = Quaternion.Slerp(transform.rotation, _faceTarget, 1f - Mathf.Exp(-12f * dt));
+            return Quaternion.Angle(transform.rotation, _faceTarget) > 4f;
+        }
+
         private void ReleaseBenchIfSeated()
         {
             if (_occupiedSeat != null)
             {
+                if ((_seatPhase == SeatPhase.Seated || _seatPhase == SeatPhase.SittingDown || _seatPhase == SeatPhase.StandingUp) &&
+                    _occupiedSeat.SitPoint != null)
+                {
+                    Vector3 standPos = _occupiedSeat.SitPoint.position + FlatForward(_occupiedSeat.SitPoint) * 0.6f;
+                    standPos.y = _preSitPosition.y;
+                    transform.position = standPos;
+                }
                 _occupiedSeat.SetOccupied(false);
                 _occupiedSeat = null;
             }
+            _seatPhase = SeatPhase.None;
+            _seatPhaseTimer = 0f;
             if (humanoid != null && humanoid.IsSitting)
             {
                 humanoid.SetSitting(false, driving: false);
@@ -689,9 +766,59 @@ namespace OurWorld.World
 
         private void ClearDualHandPose()
         {
+            _rainShieldWeight = 0f;
+            _rainShieldActive = false;
             if (humanoid != null)
             {
                 humanoid.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+            }
+        }
+
+        private void UpdateRainShieldPose(float dt, bool wantShield)
+        {
+            if (humanoid == null) return;
+            float rate = wantShield ? 3.0f : 3.6f;
+            _rainShieldWeight = Mathf.MoveTowards(_rainShieldWeight, wantShield ? 1f : 0f, rate * dt);
+            if (_rainShieldWeight > 0.001f)
+            {
+                float scaleY = humanoid.transform.lossyScale.y;
+                Vector3 headBase = humanoid.HeadTransform != null
+                    ? humanoid.HeadTransform.position
+                    : transform.position + Vector3.up * (1.56f * scaleY);
+                Vector3 shieldHand = headBase
+                    + transform.up * (0.21f * scaleY)
+                    + transform.forward * (0.14f * scaleY)
+                    + transform.right * (0.05f * scaleY);
+                float w = Mathf.SmoothStep(0f, 1f, _rainShieldWeight);
+                humanoid.SetDualHandAction(true, Vector3.zero, shieldHand, 0f, w * 0.84f, w * 11f, w * 9f, w * 0.015f);
+                _rainShieldActive = true;
+            }
+            else if (_rainShieldActive)
+            {
+                ClearDualHandPose();
+            }
+        }
+
+        private void UpdateVehicleSidestep(float dt)
+        {
+            if (_rainShieldActive) UpdateRainShieldPose(dt, false);
+            _sidestepTimer = Mathf.Max(0f, _sidestepTimer - dt);
+            float u = 1f - Mathf.Clamp01(_sidestepTimer / Mathf.Max(0.1f, _sidestepDuration));
+            float env = Mathf.Sin(u * Mathf.PI);
+            float stepSpd = _sidestepPeakSpeed * env;
+            bool turning = UpdateSmoothFace(dt);
+
+            Vector3 dir = _sidestepDir.sqrMagnitude > 0.001f ? _sidestepDir : transform.right;
+            if (stepSpd > 0.01f)
+            {
+                Vector3 moveRef = dir;
+                MoveSafely(dir * (stepSpd * dt), ref moveRef, false);
+            }
+            _currentSpeed = stepSpd;
+            if (humanoid != null)
+            {
+                float locoSpeed = turning && stepSpd < 0.45f ? 0.5f : stepSpd;
+                humanoid.SetLocomotion(locoSpeed, grounded: true, verticalVelocity: 0f, dir);
             }
         }
 
@@ -730,31 +857,18 @@ namespace OurWorld.World
             if (_startledCooldown > 0f) _startledCooldown -= dt;
             if (_hitCooldown > 0f) _hitCooldown -= dt;
             if (_vehicleHitCooldown > 0f) _vehicleHitCooldown -= dt;
+            if (_carSidestepCooldown > 0f) _carSidestepCooldown -= dt;
             if (_playerGreetCooldown > 0f) _playerGreetCooldown -= dt;
             if (_socialChatCooldown > 0f) _socialChatCooldown -= dt;
             if (_curiosityCooldown > 0f) _curiosityCooldown -= dt;
             if (_rainSpeechCooldown > 0f) _rainSpeechCooldown -= dt;
             if (_grudgeTimer > 0f) _grudgeTimer -= dt;
 
-            // 1. Seated bench break (stand up early if rain starts!)
+            // 1. Seated bench state machine (walk to bench -> turn -> sit -> seated -> stand up smoothly)
             if (_occupiedSeat != null)
             {
-                _brainState = CitizenBrainState.BenchBreak;
-                bool raining = IsRaining();
-                _sitTimer -= dt;
-                if (_sitTimer <= 0f || raining)
-                {
-                    _occupiedSeat.SetOccupied(false);
-                    _occupiedSeat = null;
-                    transform.SetPositionAndRotation(_preSitPosition, _preSitRotation);
-                    if (humanoid != null) humanoid.SetSitting(false, driving: false);
-                    _idleTimer = raining ? 0f : 0.6f;
-                    _brainState = raining ? CitizenBrainState.RainHurry : CitizenBrainState.Patrol;
-                }
-                else
-                {
-                    UpdateHeadEyeContact();
-                }
+                if (_rainShieldActive) UpdateRainShieldPose(dt, false);
+                UpdateBenchSeatStateMachine(dt);
                 return;
             }
 
@@ -824,19 +938,17 @@ namespace OurWorld.World
                 return;
             }
 
-            // 6. Horn sidestep dodge (wall-safe)
+            // 6. Vehicle yield / horn sidestep dodge (smooth eased turn + wall-safe side-step)
             if (_sidestepTimer > 0f)
             {
-                _sidestepTimer -= dt;
-                Vector3 sidestepDir = _sidestepVelocity.sqrMagnitude > 0.001f ? _sidestepVelocity.normalized : transform.right;
-                MoveSafely(_sidestepVelocity * dt, ref sidestepDir, false);
-                if (humanoid != null) humanoid.SetLocomotion(2.6f, grounded: true, verticalVelocity: 0f, _sidestepVelocity.normalized);
+                UpdateVehicleSidestep(dt);
                 return;
             }
 
             // 7. Brave Citizen Confrontation!
             if (_confrontTimer > 0f)
             {
+                if (_rainShieldActive) UpdateRainShieldPose(dt, false);
                 UpdateBraveConfrontation(dt);
                 return;
             }
@@ -844,6 +956,7 @@ namespace OurWorld.World
             // 8. Autonomous Neighbor-to-Neighbor Sidewalk Conversation!
             if (_brainState == CitizenBrainState.ChattingWithNeighbor)
             {
+                if (_rainShieldActive) UpdateRainShieldPose(dt, false);
                 UpdateNeighborChat(dt);
                 return;
             }
@@ -851,6 +964,7 @@ namespace OurWorld.World
             // 9. Curious World Watching (Cat petting / Sports cheering!)
             if (_watchTimer > 0f)
             {
+                if (_rainShieldActive && !_watchingCat) UpdateRainShieldPose(dt, false);
                 UpdateWatchingInterest(dt);
                 return;
             }
@@ -863,42 +977,42 @@ namespace OurWorld.World
                 EvaluateSmartBrain();
             }
 
-            // Check approaching player vehicle for yield / startled pose
+            // Check approaching player vehicle for yield / smooth side-step / startled pose
             bool yieldingToCar = EvaluateApproachingCar();
+            if (_sidestepTimer > 0f)
+            {
+                UpdateVehicleSidestep(dt);
+                return;
+            }
+
             bool isRaining = IsRaining();
             bool isNight = IsNightTime();
             _brainState = isRaining ? CitizenBrainState.RainHurry : CitizenBrainState.Patrol;
-
-            // Rain head-shield IK pose while hurrying in rain (bent elbow across forehead + brisk forward lean)
-            if (isRaining && humanoid != null)
-            {
-                Vector3 shieldHand = transform.position + Vector3.up * 1.56f + transform.forward * 0.25f + transform.right * 0.04f;
-                humanoid.SetDualHandAction(true, Vector3.zero, shieldHand, 0f, 0.78f, 14f, 14f, 0.02f);
-            }
-            else
-            {
-                ClearDualHandPose();
-            }
 
             UpdateHeadEyeContact();
 
             if (waypoints == null || waypoints.Length < 2)
             {
-                if (humanoid != null) humanoid.SetLocomotion(0f, grounded: true, verticalVelocity: 0f);
+                UpdateRainShieldPose(dt, false);
+                bool turningIdle = UpdateSmoothFace(dt);
+                if (humanoid != null) humanoid.SetLocomotion(turningIdle ? 0.5f : 0f, grounded: true, verticalVelocity: 0f);
                 return;
             }
 
             float desiredSpeed = 0f;
             float effectiveWalkSpeed = isRaining ? Mathf.Max(walkSpeed * 1.9f, 2.55f) : (isNight ? walkSpeed * 1.25f : walkSpeed);
+            bool turningInPlace = false;
 
             if (yieldingToCar)
             {
                 desiredSpeed = 0f;
+                turningInPlace = UpdateSmoothFace(dt);
             }
             else if (_idleTimer > 0f && !isRaining)
             {
                 _idleTimer -= dt;
                 desiredSpeed = 0f;
+                turningInPlace = UpdateSmoothFace(dt);
             }
             else
             {
@@ -914,6 +1028,7 @@ namespace OurWorld.World
 
                 if (_idleTimer <= 0f || isRaining)
                 {
+                    _faceTurnTimer = 0f;
                     Vector3 target = waypoints[_waypointIndex];
                     Vector3 toTarget = target - transform.position;
                     toTarget.y = 0f;
@@ -940,9 +1055,191 @@ namespace OurWorld.World
 
             _currentSpeed = Mathf.MoveTowards(_currentSpeed, desiredSpeed, 4.8f * dt);
 
+            // Smoothly blend single-hand overhead rain shield in while hurrying in rain, and release smoothly when stopping or rain ends!
+            bool wantRainShield = isRaining && !yieldingToCar && _occupiedSeat == null && _currentSpeed > 0.35f;
+            UpdateRainShieldPose(dt, wantRainShield);
+
             if (humanoid != null)
             {
-                humanoid.SetLocomotion(_currentSpeed, grounded: true, verticalVelocity: 0f);
+                humanoid.SetLocomotion(turningInPlace ? Mathf.Max(_currentSpeed, 0.5f) : _currentSpeed, grounded: true, verticalVelocity: 0f);
+            }
+        }
+
+        private void UpdateBenchSeatStateMachine(float dt)
+        {
+            if (_occupiedSeat == null || _occupiedSeat.SitPoint == null)
+            {
+                ReleaseBenchIfSeated();
+                return;
+            }
+
+            _brainState = CitizenBrainState.BenchBreak;
+            bool raining = IsRaining();
+            Transform sitPoint = _occupiedSeat.SitPoint;
+
+            // Fallback to instant behaviour if humanoid rig is absent
+            if (humanoid == null)
+            {
+                _sitTimer -= dt;
+                if (_sitTimer <= 0f || raining)
+                {
+                    _occupiedSeat.SetOccupied(false);
+                    _occupiedSeat = null;
+                    _seatPhase = SeatPhase.None;
+                    transform.SetPositionAndRotation(_preSitPosition, _preSitRotation);
+                    _idleTimer = raining ? 0f : 0.6f;
+                    _brainState = raining ? CitizenBrainState.RainHurry : CitizenBrainState.Patrol;
+                }
+                return;
+            }
+
+            Vector3 seatFwd = FlatForward(sitPoint);
+
+            switch (_seatPhase)
+            {
+                case SeatPhase.Approaching:
+                {
+                    if (raining)
+                    {
+                        _occupiedSeat.SetOccupied(false);
+                        _occupiedSeat = null;
+                        _seatPhase = SeatPhase.None;
+                        _seatPhaseTimer = 0f;
+                        _idleTimer = 0f;
+                        _brainState = CitizenBrainState.RainHurry;
+                        return;
+                    }
+
+                    _seatPhaseTimer += dt;
+                    Vector3 toApproach = _seatApproachPoint - transform.position;
+                    toApproach.y = 0f;
+                    float dist = toApproach.magnitude;
+
+                    if (dist < 0.12f || _seatPhaseTimer >= 6f)
+                    {
+                        if (_seatPhaseTimer >= 6f && dist >= 0.12f)
+                        {
+                            transform.position = _seatApproachPoint;
+                        }
+                        _seatPhase = SeatPhase.Turning;
+                        _seatPhaseTimer = 0f;
+                        _seatRotFrom = transform.rotation;
+                        _currentSpeed = 0f;
+                        humanoid.SetLocomotion(0.6f, true, 0f);
+                    }
+                    else
+                    {
+                        Vector3 dir = toApproach / dist;
+                        Quaternion walkRot = Quaternion.LookRotation(dir, Vector3.up);
+                        transform.rotation = Quaternion.Slerp(transform.rotation, walkRot, 1f - Mathf.Exp(-turnSpeed * dt));
+                        float facingDot = Mathf.Clamp01(Vector3.Dot(transform.forward, dir));
+                        float desiredWalk = walkSpeed * Mathf.Lerp(0.45f, 1f, facingDot);
+                        _currentSpeed = Mathf.MoveTowards(_currentSpeed, desiredWalk, 5.2f * dt);
+                        float stepDist = Mathf.Min(dist, _currentSpeed * dt);
+                        Vector3 moveDir = dir;
+                        MoveSafely(dir * stepDist, ref moveDir, false);
+                        humanoid.SetLocomotion(_currentSpeed, true, 0f, dir);
+                    }
+
+                    UpdateHeadEyeContact();
+                    break;
+                }
+
+                case SeatPhase.Turning:
+                {
+                    if (raining)
+                    {
+                        _occupiedSeat.SetOccupied(false);
+                        _occupiedSeat = null;
+                        _seatPhase = SeatPhase.None;
+                        _seatPhaseTimer = 0f;
+                        _idleTimer = 0f;
+                        _brainState = CitizenBrainState.RainHurry;
+                        return;
+                    }
+
+                    _seatPhaseTimer += dt;
+                    float t = Mathf.Clamp01(_seatPhaseTimer / 0.4f);
+                    Quaternion targetRot = Quaternion.LookRotation(seatFwd, Vector3.up);
+                    transform.rotation = Quaternion.Slerp(_seatRotFrom, targetRot, Mathf.SmoothStep(0f, 1f, t));
+                    humanoid.SetLocomotion(0.6f * (1f - t), true, 0f);
+
+                    if (t >= 1f)
+                    {
+                        transform.rotation = targetRot;
+                        _seatMoveFrom = transform.position;
+                        _seatRotFrom = transform.rotation;
+                        _seatPhase = SeatPhase.SittingDown;
+                        _seatPhaseTimer = 0f;
+                        humanoid.BeginSeatTransition(_seatFloorY, true, 0.9f);
+                    }
+                    break;
+                }
+
+                case SeatPhase.SittingDown:
+                {
+                    _seatPhaseTimer += dt;
+                    float posT = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_seatPhaseTimer / 0.9f));
+                    float rotT = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_seatPhaseTimer / (0.9f * 0.66f)));
+                    transform.SetPositionAndRotation(
+                        Vector3.Lerp(_seatMoveFrom, sitPoint.position, posT),
+                        Quaternion.Slerp(_seatRotFrom, sitPoint.rotation, rotT));
+                    humanoid.SetLocomotion(0f, true, 0f);
+
+                    if (_seatPhaseTimer >= 0.9f)
+                    {
+                        transform.SetPositionAndRotation(sitPoint.position, sitPoint.rotation);
+                        _seatPhase = SeatPhase.Seated;
+                        _seatPhaseTimer = 0f;
+                    }
+                    break;
+                }
+
+                case SeatPhase.Seated:
+                {
+                    _sitTimer -= dt;
+                    if (_sitTimer <= 0f || raining)
+                    {
+                        _seatStandPoint = sitPoint.position + seatFwd * 0.6f;
+                        _seatStandPoint.y = _preSitPosition.y;
+                        _seatMoveFrom = transform.position;
+                        _seatStandUpDuration = raining ? 0.6f : 0.85f;
+                        _seatPhase = SeatPhase.StandingUp;
+                        _seatPhaseTimer = 0f;
+                        humanoid.BeginSeatTransition(_seatFloorY, false, _seatStandUpDuration);
+                    }
+                    else
+                    {
+                        UpdateHeadEyeContact();
+                    }
+                    break;
+                }
+
+                case SeatPhase.StandingUp:
+                {
+                    _seatPhaseTimer += dt;
+                    float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_seatPhaseTimer / Mathf.Max(0.1f, _seatStandUpDuration)));
+                    transform.position = Vector3.Lerp(_seatMoveFrom, _seatStandPoint, t);
+                    humanoid.SetLocomotion(0f, true, 0f);
+
+                    if (_seatPhaseTimer >= _seatStandUpDuration &&
+                        (!humanoid.IsSeatTransitionActive || _seatPhaseTimer >= _seatStandUpDuration + 0.5f))
+                    {
+                        transform.position = _seatStandPoint;
+                        _occupiedSeat.SetOccupied(false);
+                        _occupiedSeat = null;
+                        _seatPhase = SeatPhase.None;
+                        _seatPhaseTimer = 0f;
+                        if (humanoid.IsSitting) humanoid.SetSitting(false, driving: false);
+                        _idleTimer = raining ? 0f : 0.6f;
+                        _brainState = raining ? CitizenBrainState.RainHurry : CitizenBrainState.Patrol;
+                    }
+                    break;
+                }
+
+                default:
+                    ReleaseBenchIfSeated();
+                    break;
             }
         }
 
@@ -1246,15 +1543,16 @@ namespace OurWorld.World
 
             Vector3 toPartner = _chatPartner.transform.position - transform.position;
             toPartner.y = 0f;
+            bool turning = false;
             if (toPartner.sqrMagnitude > 0.01f)
             {
-                Quaternion rot = Quaternion.LookRotation(toPartner.normalized, Vector3.up);
-                transform.rotation = Quaternion.Slerp(transform.rotation, rot, 1f - Mathf.Exp(-7f * dt));
+                BeginSmoothFace(toPartner, 0.25f);
+                turning = UpdateSmoothFace(dt);
             }
 
             if (humanoid != null)
             {
-                humanoid.SetLocomotion(0f, true, 0f);
+                humanoid.SetLocomotion(turning ? 0.5f : 0f, true, 0f);
                 humanoid.SetLookAtPoint(true, _chatPartner.transform.position + Vector3.up * 1.55f);
             }
 
@@ -1275,14 +1573,16 @@ namespace OurWorld.World
             _watchTimer -= dt;
             Vector3 toTarget = _watchTargetPos - transform.position;
             toTarget.y = 0f;
+            bool turning = false;
             if (toTarget.sqrMagnitude > 0.01f)
             {
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toTarget.normalized, Vector3.up), 1f - Mathf.Exp(-7f * dt));
+                BeginSmoothFace(toTarget, 0.25f);
+                turning = UpdateSmoothFace(dt);
             }
 
             if (humanoid != null)
             {
-                humanoid.SetLocomotion(0f, true, 0f);
+                humanoid.SetLocomotion(turning ? 0.5f : 0f, true, 0f);
                 humanoid.SetLookAtPoint(true, _watchTargetPos + Vector3.up * (_watchingCat ? 0.35f : 1.5f));
                 if (_watchingCat)
                 {
@@ -1321,9 +1621,11 @@ namespace OurWorld.World
                 return;
             }
 
+            bool turning = false;
             if (toPlayer.sqrMagnitude > 0.01f)
             {
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toPlayer.normalized, Vector3.up), 1f - Mathf.Exp(-10f * dt));
+                BeginSmoothFace(toPlayer, 0.25f);
+                turning = UpdateSmoothFace(dt);
             }
 
             float spd = 0f;
@@ -1344,7 +1646,7 @@ namespace OurWorld.World
 
             if (humanoid != null)
             {
-                humanoid.SetLocomotion(spd, true, 0f);
+                humanoid.SetLocomotion(spd > 0f ? spd : (turning ? 0.5f : 0f), true, 0f);
                 humanoid.SetLookAtPoint(true, mode.ActiveWorldPosition + Vector3.up * 1.55f);
             }
         }
@@ -1384,7 +1686,7 @@ namespace OurWorld.World
                 for (int i = 0; i < candidateSeats.Length; i++)
                 {
                     SeatInteractable seat = candidateSeats[i];
-                    if (seat == null || seat.IsOccupied) continue;
+                    if (seat == null || seat.IsOccupied || seat.SitPoint == null) continue;
 
                     float distSq = (seat.SitPoint.position - transform.position).sqrMagnitude;
                     if (distSq <= 42f)
@@ -1394,12 +1696,21 @@ namespace OurWorld.World
                         _occupiedSeat = seat;
                         _occupiedSeat.SetOccupied(true);
                         _sitTimer = Random.Range(10f, 16f);
-                        _currentSpeed = 0f;
-                        transform.SetPositionAndRotation(seat.SitPoint.position, seat.SitPoint.rotation);
-                        if (humanoid != null)
+                        _faceTurnTimer = 0f;
+
+                        if (humanoid == null)
                         {
-                            humanoid.SetLocomotion(0f, true, 0f);
-                            humanoid.SetSitting(true, driving: false);
+                            _currentSpeed = 0f;
+                            _seatPhase = SeatPhase.Seated;
+                            transform.SetPositionAndRotation(seat.SitPoint.position, seat.SitPoint.rotation);
+                        }
+                        else
+                        {
+                            _seatApproachPoint = seat.SitPoint.position + FlatForward(seat.SitPoint) * 0.55f;
+                            _seatApproachPoint.y = transform.position.y;
+                            _seatFloorY = ComputeSeatFloor(seat.SitPoint, transform.position.y);
+                            _seatPhase = SeatPhase.Approaching;
+                            _seatPhaseTimer = 0f;
                         }
                         return;
                     }
@@ -1441,16 +1752,57 @@ namespace OurWorld.World
             Vector3 toPed = transform.position - car.transform.position;
             toPed.y = 0f;
             float dist = toPed.magnitude;
-            if (dist > 6.5f) return false;
+            if (dist > 13.5f || dist < 0.05f) return false;
 
             float carKmh = car.SpeedKmh;
-            if (carKmh >= 18f) return false;
+            Vector3 carMoveDir = car.ForwardSpeedMs < -0.5f ? -car.transform.forward : car.transform.forward;
+            carMoveDir.y = 0f;
+            if (carMoveDir.sqrMagnitude < 0.001f) carMoveDir = Vector3.forward;
+            else carMoveDir.Normalize();
 
-            Vector3 toCar = -toPed;
-            bool inFrontOfPed = dist <= 3.6f && Vector3.Dot(transform.forward, toCar.normalized) > 0.35f;
-            bool carHeadingTowardPed = dist <= 4.0f && carKmh > 2.5f && Vector3.Dot(car.transform.forward, toPed.normalized) > 0.65f;
+            Vector3 carRight = Vector3.Cross(Vector3.up, carMoveDir).normalized;
+            float forwardDist = Vector3.Dot(toPed, carMoveDir);
+            float lateralOffset = Vector3.Dot(toPed, carRight);
+            float absLateral = Mathf.Abs(lateralOffset);
 
-            return inFrontOfPed || carHeadingTowardPed;
+            float detectRange = Mathf.Clamp(4.8f + carKmh * 0.16f, 4.8f, 12.5f);
+            bool approachingInPath = carKmh > 2.2f && forwardDist > 0.35f && forwardDist <= detectRange && absLateral <= 2.65f;
+            bool blockingInFront = dist <= 3.6f && Vector3.Dot(transform.forward, -toPed / dist) > 0.35f;
+
+            if (!approachingInPath && !blockingInFront) return false;
+
+            // Smoothly turn and watch the approaching vehicle (never snap or teleport!)
+            BeginSmoothFace(-toPed, 0.35f);
+            if (humanoid != null)
+            {
+                humanoid.SetLookAtPoint(true, car.transform.position + Vector3.up * 1.25f);
+            }
+
+            if (approachingInPath)
+            {
+                // Startled arms-up pose ONLY when the vehicle is fast and close
+                bool fastAndClose = carKmh >= 18f && dist <= 7.5f && absLateral <= 2.15f;
+                if (fastAndClose && humanoid != null && _startledCooldown <= 0f)
+                {
+                    humanoid.PlayStartled(0.85f);
+                    _startledCooldown = 3.0f;
+                }
+
+                // Smoothly side-step perpendicular out of the vehicle's lane
+                if (absLateral < 2.35f && _carSidestepCooldown <= 0f)
+                {
+                    float sideSign = absLateral > 0.12f
+                        ? (lateralOffset >= 0f ? 1f : -1f)
+                        : (Vector3.Dot(transform.right, carRight) >= 0f ? 1f : -1f);
+                    _sidestepDir = carRight * sideSign;
+                    _sidestepDuration = fastAndClose ? 0.65f : 0.80f;
+                    _sidestepPeakSpeed = fastAndClose ? 3.2f : 1.85f;
+                    _sidestepTimer = _sidestepDuration;
+                    _carSidestepCooldown = 1.4f;
+                }
+            }
+
+            return true;
         }
     }
 }

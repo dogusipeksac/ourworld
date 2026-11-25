@@ -26,6 +26,7 @@ namespace OurWorld.Vehicle
     /// fuel tank consumption (~15 min full tank), night-aware headlights, collision impulse reporting,
     /// and seated driver + steering wheel animation.
     /// </summary>
+    [DefaultExecutionOrder(-20)]
     [RequireComponent(typeof(Rigidbody))]
     public class SedanVehicleController : MonoBehaviour
     {
@@ -680,20 +681,49 @@ namespace OurWorld.Vehicle
 
         public Vector3 GetSafeExitPosition(float playerRadius = 0.42f, float playerHeight = 1.8f)
         {
-            Transform[] candidates = { leftExitPoint, rightExitPoint };
-            foreach (Transform candidate in candidates)
+            if (leftExitPoint != null && TryValidateExitPoint(leftExitPoint.position, playerRadius, playerHeight, out Vector3 safePos))
             {
-                if (candidate == null) continue;
-                Vector3 pos = candidate.position;
-                Vector3 bottom = pos + Vector3.up * (playerRadius + 0.1f);
-                Vector3 top = pos + Vector3.up * Mathf.Max(playerHeight - playerRadius, playerRadius + 0.2f);
-                if (!Physics.CheckCapsule(bottom, top, playerRadius, ~0, QueryTriggerInteraction.Ignore))
-                {
-                    return pos;
-                }
+                return safePos;
+            }
+            if (rightExitPoint != null && TryValidateExitPoint(rightExitPoint.position, playerRadius, playerHeight, out safePos))
+            {
+                return safePos;
             }
 
-            return transform.position + (-transform.right * 2.2f) + Vector3.up * 0.2f;
+            // Wider left/right and rear-quarter fallbacks when parked close to a wall or curb
+            Vector3 basePos = transform.position;
+            Vector3 right = transform.right;
+            Vector3 fwd = transform.forward;
+            if (TryValidateExitPoint(basePos - right * 2.15f, playerRadius, playerHeight, out safePos)) return safePos;
+            if (TryValidateExitPoint(basePos + right * 2.15f, playerRadius, playerHeight, out safePos)) return safePos;
+            if (TryValidateExitPoint(basePos - right * 1.65f - fwd * 2.2f, playerRadius, playerHeight, out safePos)) return safePos;
+            if (TryValidateExitPoint(basePos + right * 1.65f - fwd * 2.2f, playerRadius, playerHeight, out safePos)) return safePos;
+
+            Vector3 fallback = basePos - right * 2.2f;
+            if (Physics.Raycast(fallback + Vector3.up * 1.6f, Vector3.down, out RaycastHit hit, 4.0f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                fallback.y = hit.point.y + 0.05f;
+            }
+            else
+            {
+                fallback.y += 0.12f;
+            }
+            return fallback;
+        }
+
+        private bool TryValidateExitPoint(Vector3 candidatePos, float playerRadius, float playerHeight, out Vector3 snappedPos)
+        {
+            snappedPos = candidatePos;
+            if (!Physics.Raycast(candidatePos + Vector3.up * 1.35f, Vector3.down, out RaycastHit ground, 3.2f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || ground.normal.y < 0.65f)
+            {
+                return false;
+            }
+
+            snappedPos = new Vector3(candidatePos.x, ground.point.y + 0.05f, candidatePos.z);
+            Vector3 bottom = snappedPos + Vector3.up * (playerRadius + 0.12f);
+            Vector3 top = snappedPos + Vector3.up * Mathf.Max(playerHeight - playerRadius, playerRadius + 0.25f);
+            return !Physics.CheckCapsule(bottom, top, playerRadius, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
         }
 
         public void TeleportAndReset(Vector3 position, Quaternion rotation)
@@ -1228,13 +1258,15 @@ namespace OurWorld.Vehicle
 
             if (steeringWheelTransform != null && _steeringWheelCached)
             {
-                steeringWheelTransform.localRotation = _steeringWheelBaseRot * Quaternion.Euler(0f, -_currentSteerAngle * 8f, 0f);
+                steeringWheelTransform.localRotation = _steeringWheelBaseRot * Quaternion.Euler(0f, -_currentSteerAngle * 4.5f, 0f);
             }
 
             if (_isPlayerDriving && _seatedDriverHumanoid != null)
             {
                 _seatedDriverHumanoid.SetSteeringAngle(_currentSteerAngle);
                 _seatedDriverHumanoid.SetSteeringWheel(steeringWheelTransform);
+                float pedalHint = IsBraking ? -0.85f : CurrentThrottle;
+                _seatedDriverHumanoid.SetDrivingDynamics(pedalHint, -_bodyPitch * 4.0f);
             }
         }
 

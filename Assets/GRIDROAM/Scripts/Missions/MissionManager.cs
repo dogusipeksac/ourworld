@@ -780,6 +780,7 @@ namespace OurWorld.Missions
                 ? string.Empty
                 : LocalizationService.Tr(line.speakerKey, line.speakerKey);
             string text = LocalizationService.Tr(line.textKey, line.textKey);
+            VoiceoverManager.PlayDialogue(line.textKey, text);
             OnDialogueLineShown?.Invoke(speaker, text);
         }
 
@@ -792,6 +793,7 @@ namespace OurWorld.Missions
 
         private void CloseDialogueImmediate()
         {
+            VoiceoverManager.StopDialogue();
             _activeDialogue = null;
             _dialogueLineIndex = 0;
             _onDialogueCompleted = null;

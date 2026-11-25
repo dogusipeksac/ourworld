@@ -255,7 +255,10 @@ namespace OurWorld.World
             _radialPoolTex = BuildRadialGlowTexture(64);
 
             // Use URP/Lit for emissive bulbs and poles (always included in scene builds -> 100% iOS shader-strip-proof!)
-            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit")
+                ?? Shader.Find("Standard")
+                ?? Shader.Find("Sprites/Default");
+            if (litShader == null) return;
 
             _bulbWarmMat = new Material(litShader) { name = "MAT_RuntimeStreetBulb_Warm" };
             SetColorProp(_bulbWarmMat, new Color(1.0f, 0.92f, 0.68f, 1f));

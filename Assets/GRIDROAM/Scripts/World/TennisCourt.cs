@@ -657,7 +657,7 @@ namespace OurWorld.World
         private void ExecuteImmediateNetVolley(Vector3 contact)
         {
             _stamina = Mathf.Max(0f, _stamina - 14f);
-            _player.Humanoid?.PlayTennisSwing(transform.TransformPoint(contact), 0f);
+            _player.Humanoid?.PlayTennisSwing(transform.TransformPoint(contact), 0.06f);
             float targetX = _queuedAim * 3.85f;
             _lastShotKind = ShotKind.Volley;
             _lastShotWasPerfect = true;
@@ -727,6 +727,7 @@ namespace OurWorld.World
                     {
                         _serveCharge += dt / 0.82f;
                         if (Mathf.Abs(mv.x) > 0.12f) _queuedAim = Mathf.Clamp(_queuedAim + mv.x * 2.2f * dt, -1f, 1f);
+                        _player.Humanoid?.SetLocomotion(0f, true, 0f);
                         if (_serveCharge >= 1.0f)
                         {
                             _serveCharge = 1.0f;
@@ -735,13 +736,22 @@ namespace OurWorld.World
                     }
                     else if (Mathf.Abs(mv.x) > 0.12f)
                     {
-                        float serveMoveX = Mathf.Clamp(PlayerX + mv.x * 3.1f * dt, -2.6f, 2.6f);
+                        float prevX = PlayerX;
+                        float serveMoveX = Mathf.Clamp(prevX + mv.x * 3.1f * dt, -2.6f, 2.6f);
                         _playerZ = PlayerBaseline;
                         SetPlayerPosition(serveMoveX, _playerZ);
+                        float dx = serveMoveX - prevX;
+                        float spd = dt > 0.0001f ? Mathf.Abs(dx) / dt : 0f;
+                        Vector3 moveDir = spd > 0.05f ? transform.right * Mathf.Sign(dx) : transform.forward;
+                        _player.Humanoid?.SetLocomotion(spd, true, 0f, moveDir);
                         _queuedAim = Mathf.Clamp(-serveMoveX * 0.35f + mv.x * 0.6f, -1f, 1f);
                         Vector3 hand = new Vector3(serveMoveX - 0.25f, 1.12f, _playerZ + 0.33f);
                         _player.Humanoid?.SetTennisLeftHand(transform.TransformPoint(hand));
                         SetBallPosition(hand + Vector3.up * 0.065f);
+                    }
+                    else
+                    {
+                        _player.Humanoid?.SetLocomotion(0f, true, 0f);
                     }
                     UpdateAimReticle(show: true, targetZ: 6.4f);
                     break;
@@ -1362,7 +1372,11 @@ namespace OurWorld.World
         private float MoveNpc(ProceduralHumanoid npc, float targetX, float targetZ, float speed)
         {
             Vector3 pos = npc.transform.localPosition;
-            Vector3 target = new Vector3(targetX, CourtSurface, Mathf.Clamp(targetZ, 1.5f, HalfLength - 0.5f));
+            bool isSouthNpc = npc == _ambientPlayer;
+            float clampedZ = isSouthNpc
+                ? Mathf.Clamp(targetZ, -HalfLength + 0.5f, -1.5f)
+                : Mathf.Clamp(targetZ, 1.5f, HalfLength - 0.5f);
+            Vector3 target = new Vector3(targetX, CourtSurface, clampedZ);
             Vector3 delta = target - pos;
             delta.y = 0f;
             float dist = delta.magnitude;

@@ -23,16 +23,35 @@ namespace OurWorld.World
         private readonly Vector3[] _legPositions = new Vector3[4];
         private readonly Transform[] _eyes = new Transform[2];
         private readonly Vector3[] _eyeScales = new Vector3[2];
+        private readonly Transform[] _ears = new Transform[2];
+        private readonly Quaternion[] _earBaseRots = { Quaternion.identity, Quaternion.identity };
         private Transform _head, _tail;
         private Mesh _tailMesh;
         private Vector3 _homePos, _targetPos;
         private float _stateTimer;
         private float _gaitPhase;
         private float _walkWeight;
+        private float _currentSpeed;
+        private float _animSeed;
+        private float _petBlend;
+        private float _petStrokeSweep;
+        private float _cautionBlend;
+        private float _curiousBlend;
+        private float _reactCooldown;
+        private float _lookYawSmoothed;
+        private float _lookPitchSmoothed;
+        private float _earBackSmoothed;
+        private float _earSplaySmoothed;
+        private float _blinkSmoothed;
+        private Vector3 _headEulerSmoothed;
+        private Vector3 _tailEulerSmoothed;
         private float _lastEnergyPetTime = -99f;
         private float _petDeadline;
         private float _petStarted = -1f;
         private bool _walking;
+        private bool _retreating;
+        private bool _approachingPlayer;
+        private bool _isCurious;
         private bool _contactMade;
         private PlayerModeController _petMode;
         private PlayerFootController _petPlayer;
@@ -50,6 +69,8 @@ namespace OurWorld.World
             _homePos = transform.position;
             _targetPos = _homePos;
             _stateTimer = Random.Range(1.5f, 4.5f);
+            _animSeed = Random.Range(0f, 50f);
+            _isCurious = (Mathf.Abs(Mathf.RoundToInt(_homePos.x * 7f + _homePos.z * 13f)) % 3) != 0;
             BindModel();
             ApplyFurColor();
         }
@@ -76,6 +97,10 @@ namespace OurWorld.World
             _eyes[1] = _head.Find("Cat_EyeR");
             for (int i = 0; i < _eyes.Length; i++)
                 if (_eyes[i] != null) _eyeScales[i] = _eyes[i].localScale;
+            _ears[0] = _head.Find("Cat_EarL");
+            _ears[1] = _head.Find("Cat_EarR");
+            for (int i = 0; i < _ears.Length; i++)
+                if (_ears[i] != null) _earBaseRots[i] = _ears[i].localRotation;
 
             Transform tailMesh = model.Find("Cat_Tail_0");
             if (tailMesh != null) BuildTail(model, tailMesh.GetComponent<Renderer>());
@@ -254,6 +279,7 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
             _stateTimer -= dt;
+            if (_reactCooldown > 0f) _reactCooldown -= dt;
 
             if (ActivePet == this)
             {
@@ -263,6 +289,9 @@ namespace OurWorld.World
                 }
                 else
                 {
+                    _retreating = false;
+                    _approachingPlayer = false;
+                    _currentSpeed = Mathf.Lerp(_currentSpeed, 0f, 1f - Mathf.Exp(-10f * dt));
                     LookToward(_petPlayer.transform.position, 8f, dt);
                     if (_petStarted >= 0f)
                     {
@@ -286,47 +315,131 @@ namespace OurWorld.World
                 }
             }
 
+            // Evaluate approaching player reaction (curious approach vs cautious retreat)
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode != null)
+            {
+                Vector3 toPlayer = Vector3.ProjectOnPlane(mode.ActiveWorldPosition - transform.position, Vector3.up);
+                float pDist = toPlayer.magnitude;
+                bool playerDriving = mode.IsDriving;
+                float playerSpeed = playerDriving
+                    ? (mode.CurrentVehicle != null ? mode.CurrentVehicle.SpeedKmh / 3.6f : 4f)
+                    : (mode.FootController != null ? mode.FootController.CurrentSpeed : 0f);
+                bool playerFast = (playerDriving && playerSpeed > 1.2f) || playerSpeed > 3.1f;
+
+                float retreatDist = playerDriving ? 5.6f : (playerFast ? 4.0f : (!_isCurious && playerSpeed > 0.65f ? 2.1f : 0f));
+                if (retreatDist > 0f && pDist < retreatDist && pDist > 0.05f)
+                {
+                    Vector3 away = -toPlayer / pDist;
+                    Vector3 desiredRetreat = transform.position + away * 2.6f;
+                    Vector3 fromHome = desiredRetreat - _homePos;
+                    fromHome.y = 0f;
+                    float maxRoam = wanderRadius + 2.4f;
+                    if (fromHome.sqrMagnitude > maxRoam * maxRoam)
+                    {
+                        desiredRetreat = _homePos + fromHome.normalized * maxRoam;
+                    }
+                    desiredRetreat.y = transform.position.y;
+                    _targetPos = desiredRetreat;
+                    _retreating = true;
+                    _approachingPlayer = false;
+                    _walking = true;
+                    _stateTimer = Mathf.Max(_stateTimer, 1.35f);
+                }
+                else if (!_retreating && _isCurious && !playerDriving && !playerFast && _reactCooldown <= 0f &&
+                         pDist >= 1.55f && pDist <= 4.3f)
+                {
+                    Vector3 playerFromHome = mode.ActiveWorldPosition - _homePos;
+                    playerFromHome.y = 0f;
+                    float maxCuriousRange = wanderRadius + 2.8f;
+                    if (playerFromHome.sqrMagnitude <= maxCuriousRange * maxCuriousRange)
+                    {
+                        Vector3 stopShort = mode.ActiveWorldPosition - (toPlayer / pDist) * 1.15f;
+                        stopShort.y = transform.position.y;
+                        _targetPos = stopShort;
+                        _approachingPlayer = true;
+                        _walking = true;
+                        _stateTimer = Random.Range(2.4f, 3.6f);
+                        _reactCooldown = Random.Range(9f, 14f);
+                    }
+                }
+                else if (_approachingPlayer)
+                {
+                    if (playerDriving || playerFast || pDist <= 1.25f || pDist > 5.5f)
+                    {
+                        _walking = false;
+                        _approachingPlayer = false;
+                        _stateTimer = Random.Range(2.8f, 4.8f);
+                    }
+                    else
+                    {
+                        Vector3 stopShort = mode.ActiveWorldPosition - (toPlayer / pDist) * 1.15f;
+                        stopShort.y = transform.position.y;
+                        _targetPos = stopShort;
+                    }
+                }
+            }
+
             if (_walking)
             {
                 Vector3 direction = Vector3.ProjectOnPlane(_targetPos - transform.position, Vector3.up);
-                if (direction.magnitude < 0.15f || _stateTimer <= 0f || !TryStep(direction.normalized, dt))
+                float dist = direction.magnitude;
+                float moveSpeed = walkSpeed * (_retreating ? 1.42f : (_approachingPlayer ? 0.90f : 1f));
+                if (dist < 0.16f || _stateTimer <= 0f || !TryStep(direction / Mathf.Max(0.0001f, dist), dist, moveSpeed, dt))
                 {
                     _walking = false;
+                    _retreating = false;
+                    _approachingPlayer = false;
                     _stateTimer = Random.Range(2.5f, 6f);
                 }
             }
             else
             {
-                PlayerModeController mode = PlayerModeController.Instance;
-                if (mode != null && !mode.IsDriving && (mode.ActiveWorldPosition - transform.position).sqrMagnitude < 9f)
-                    LookToward(mode.ActiveWorldPosition, 1.8f, dt);
+                _currentSpeed = Mathf.Lerp(_currentSpeed, 0f, 1f - Mathf.Exp(-9f * dt));
+                if (mode != null && !mode.IsDriving && (mode.ActiveWorldPosition - transform.position).sqrMagnitude < 12.25f)
+                    LookToward(mode.ActiveWorldPosition, 2.2f, dt);
 
                 if (_stateTimer <= 0f)
                 {
                     Vector2 target = Random.insideUnitCircle * wanderRadius;
                     _targetPos = _homePos + new Vector3(target.x, 0f, target.y);
                     _walking = true;
+                    _retreating = false;
+                    _approachingPlayer = false;
                     _stateTimer = Random.Range(2.2f, 4.5f);
                 }
             }
             AnimateModel(dt);
         }
 
-        private bool TryStep(Vector3 direction, float dt)
+        private bool TryStep(Vector3 direction, float remainingDist, float maxSpeed, float dt)
         {
-            LookToward(_targetPos, 8f, dt);
-            float alignment = Mathf.Max(0f, Vector3.Dot(transform.forward, direction));
-            float distance = walkSpeed * alignment * dt;
+            LookToward(_targetPos, _retreating ? 10.5f : 7.5f, dt);
+            float alignment = Vector3.Dot(transform.forward, direction);
+            float alignGate = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.25f, 0.90f, alignment));
+            float arriveGate = Mathf.Clamp01(remainingDist / 0.45f);
+            float targetSpeed = maxSpeed * alignGate * arriveGate;
+            _currentSpeed = Mathf.Lerp(_currentSpeed, targetSpeed, 1f - Mathf.Exp(-9f * dt));
+
+            float distance = _currentSpeed * dt;
             if (distance < 0.0001f) return true;
             if (Physics.SphereCast(transform.position + Vector3.up * 0.17f, 0.08f, transform.forward, out _,
-                    distance + 0.23f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)) return false;
+                    distance + 0.23f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                _currentSpeed = 0f;
+                return false;
+            }
 
             Vector3 next = transform.position + transform.forward * distance;
             if (!Physics.Raycast(next + Vector3.up * 0.25f, Vector3.down, out RaycastHit ground, 0.43f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || ground.normal.y < 0.72f) return false;
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || ground.normal.y < 0.72f)
+            {
+                _currentSpeed = 0f;
+                return false;
+            }
             next.y = ground.point.y + 0.016f;
             transform.position = next;
-            _gaitPhase = Mathf.Repeat(_gaitPhase + distance / 0.35f, 1f);
+            _gaitPhase = Mathf.Repeat(_gaitPhase + distance / 0.332f, 1f);
             return true;
         }
 
@@ -339,7 +452,10 @@ namespace OurWorld.World
 
         private void AnimateModel(float dt)
         {
-            _walkWeight = Mathf.MoveTowards(_walkWeight, _walking ? 1f : 0f, 7f * dt);
+            float tNow = Time.time + _animSeed;
+            float speedNorm = Mathf.Clamp01(_currentSpeed / Mathf.Max(0.2f, walkSpeed));
+            _walkWeight = Mathf.Lerp(_walkWeight, speedNorm, 1f - Mathf.Exp(-10f * dt));
+
             for (int i = 0; i < _legs.Length; i++)
             {
                 Transform leg = _legs[i];
@@ -351,22 +467,102 @@ namespace OurWorld.World
                 float lift = Mathf.Sin(swing * Mathf.PI) * 0.043f;
                 leg.localPosition = _legPositions[i] + leg.parent.InverseTransformVector((transform.forward * placement +
                     transform.up * lift) * _walkWeight);
-                leg.rotation = transform.rotation * Quaternion.Euler(swing * 12f * _walkWeight, 0f, 0f);
+                Quaternion targetLegRot = transform.rotation * Quaternion.Euler(swing * 12f * _walkWeight, 0f, 0f);
+                leg.rotation = Quaternion.Slerp(leg.rotation, targetLegRot, 1f - Mathf.Exp(-16f * dt));
             }
 
-            float pet = _petStarted >= 0f
-                ? Mathf.SmoothStep(0f, 1f, (Time.time - _petStarted - 0.30f) / 0.32f) *
-                  (1f - Mathf.SmoothStep(0f, 1f, (Time.time - _petStarted - 1.44f) / 0.4f))
-                : 0f;
+            // Smooth petting blend & stroke phase (fades gently even if pet is cancelled early!)
+            float petTarget = 0f;
+            float sweepTarget = 0f;
+            if (_petStarted >= 0f)
+            {
+                float petTime = Time.time - _petStarted;
+                petTarget = Mathf.SmoothStep(0f, 1f, (petTime - 0.24f) / 0.32f) *
+                            (1f - Mathf.SmoothStep(0f, 1f, (petTime - 1.44f) / 0.44f));
+                float stroke = Mathf.Clamp01((petTime - PetReachTime) / 0.90f);
+                sweepTarget = 0.5f - 0.5f * Mathf.Cos(stroke * 4f * Mathf.PI);
+            }
+            _petBlend = Mathf.Lerp(_petBlend, petTarget, 1f - Mathf.Exp(-8.5f * dt));
+            _petStrokeSweep = Mathf.Lerp(_petStrokeSweep, sweepTarget, 1f - Mathf.Exp(-12f * dt));
+
+            // Smooth player head look-at & curious/cautious emotional blends
+            float desiredLookYaw = 0f;
+            float desiredLookPitch = 0f;
+            bool watchingPlayer = false;
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode != null && _petBlend < 0.35f)
+            {
+                Vector3 headOrigin = _head != null ? _head.position : transform.position + Vector3.up * 0.30f;
+                Vector3 toEye = (mode.ActiveWorldPosition + Vector3.up * (mode.IsDriving ? 1.15f : 1.35f)) - headOrigin;
+                float dSq = toEye.sqrMagnitude;
+                if (dSq > 0.09f && dSq < 36f) // Within 6 m
+                {
+                    Vector3 localDir = transform.InverseTransformDirection(toEye.normalized);
+                    float yaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
+                    if (Mathf.Abs(yaw) < 115f)
+                    {
+                        watchingPlayer = true;
+                        desiredLookYaw = Mathf.Clamp(yaw, -48f, 48f);
+                        desiredLookPitch = Mathf.Clamp(-Mathf.Asin(Mathf.Clamp(localDir.y, -0.75f, 0.75f)) * Mathf.Rad2Deg, -26f, 14f);
+                    }
+                }
+            }
+            float lookRate = 1f - Mathf.Exp(-7f * dt);
+            _lookYawSmoothed = Mathf.Lerp(_lookYawSmoothed, desiredLookYaw, lookRate);
+            _lookPitchSmoothed = Mathf.Lerp(_lookPitchSmoothed, desiredLookPitch, lookRate);
+
+            _cautionBlend = Mathf.Lerp(_cautionBlend, _retreating ? 1f : 0f, 1f - Mathf.Exp(-6f * dt));
+            bool isCuriousNow = !_retreating && (_approachingPlayer || (watchingPlayer && _petBlend < 0.2f));
+            _curiousBlend = Mathf.Lerp(_curiousBlend, isCuriousNow ? 1f : 0f, 1f - Mathf.Exp(-5f * dt));
+
+            // Head: idle bob + player look-at + pushing gently UP into the petting hand
             if (_head != null)
             {
-                _head.rotation = transform.rotation * Quaternion.Euler(-pet * 13f + Mathf.Sin(Time.time * 3f) * 3f,
-                    pet * Mathf.Sin(Time.time * 7f) * 8f, -pet * 8f);
+                float idlePitch = Mathf.Sin(tNow * 2.4f) * 2.6f;
+                float idleYaw = watchingPlayer ? 0f : Mathf.Sin(tNow * 0.85f) * 9f;
+                float petPushPitch = -14f - (1f - _petStrokeSweep) * 6.5f;
+                float petNuzzleYaw = Mathf.Sin(tNow * 5.2f) * 7.5f;
+                float petNuzzleRoll = -8.5f + Mathf.Sin(tNow * 3.1f) * 3.5f;
+
+                Vector3 targetHeadEuler = new Vector3(
+                    Mathf.Lerp(idlePitch + _lookPitchSmoothed + _cautionBlend * 6f, petPushPitch, _petBlend),
+                    Mathf.Lerp(idleYaw + _lookYawSmoothed, petNuzzleYaw, _petBlend),
+                    Mathf.Lerp(_curiousBlend * Mathf.Sin(tNow * 1.3f) * 5.5f, petNuzzleRoll, _petBlend));
+                _headEulerSmoothed = Vector3.Lerp(_headEulerSmoothed, targetHeadEuler, 1f - Mathf.Exp(-9f * dt));
+                _head.rotation = transform.rotation * Quaternion.Euler(_headEulerSmoothed);
             }
-            if (_tail != null) _tail.rotation = transform.rotation * Quaternion.Euler(-8f * pet, Mathf.Sin(Time.time * 3.6f) * (9f + pet * 14f), 0f);
-            float blink = Mathf.Max(pet * 0.83f, Mathf.Clamp01((Mathf.Sin(Time.time * 2.4f) - 0.96f) * 25f));
+
+            // Ears: perk forward when curious, relax softly back into hand when petted, flatten back when cautious
+            float targetEarBack = _curiousBlend * 6.5f - _petBlend * (11f + _petStrokeSweep * 4.5f) - _cautionBlend * 22f;
+            float targetEarSplay = _petBlend * (14f + _petStrokeSweep * 4f) + _cautionBlend * 20f;
+            float earBlend = 1f - Mathf.Exp(-8f * dt);
+            _earBackSmoothed = Mathf.Lerp(_earBackSmoothed, targetEarBack, earBlend);
+            _earSplaySmoothed = Mathf.Lerp(_earSplaySmoothed, targetEarSplay, earBlend);
+            for (int i = 0; i < _ears.Length; i++)
+            {
+                if (_ears[i] == null) continue;
+                float sign = i == 0 ? 1f : -1f;
+                _ears[i].localRotation = Quaternion.Euler(_earBackSmoothed, 0f, sign * _earSplaySmoothed) * _earBaseRots[i];
+            }
+
+            // Tail: happy upright soft purr sway when petted, perky when curious, lowered quick twitch when cautious
+            if (_tail != null)
+            {
+                float tailPitch = _petBlend * 11f + _curiousBlend * 7f - _cautionBlend * 18f;
+                float swayFreq = Mathf.Lerp(3.2f, 5.2f, Mathf.Max(_petBlend * 0.5f, _cautionBlend));
+                float swayAmp = 8.5f + _petBlend * 13f + _cautionBlend * 11f + _walkWeight * 4f;
+                float tailYaw = Mathf.Sin(tNow * swayFreq) * swayAmp;
+                float tailRoll = Mathf.Cos(tNow * swayFreq * 0.5f) * (2.5f + _petBlend * 5f);
+                Vector3 targetTailEuler = new Vector3(tailPitch, tailYaw, tailRoll);
+                _tailEulerSmoothed = Vector3.Lerp(_tailEulerSmoothed, targetTailEuler, 1f - Mathf.Exp(-7.5f * dt));
+                _tail.rotation = transform.rotation * Quaternion.Euler(_tailEulerSmoothed);
+            }
+
+            // Eyes: desynchronized natural blink + blissful soft squint when petted
+            float blinkTarget = Mathf.Max(_petBlend * 0.82f, Mathf.Clamp01((Mathf.Sin(tNow * 2.4f) - 0.96f) * 25f));
+            _blinkSmoothed = Mathf.Lerp(_blinkSmoothed, blinkTarget, 1f - Mathf.Exp(-14f * dt));
             for (int i = 0; i < _eyes.Length; i++)
-                if (_eyes[i] != null) _eyes[i].localScale = _eyeScales[i] * Mathf.Lerp(1f, 0.33f, blink);
+                if (_eyes[i] != null) _eyes[i].localScale = _eyeScales[i] * Mathf.Lerp(1f, 0.33f, _blinkSmoothed);
         }
 
         private void OnDisable()

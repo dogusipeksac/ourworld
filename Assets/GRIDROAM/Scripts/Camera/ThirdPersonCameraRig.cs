@@ -58,6 +58,88 @@ namespace OurWorld.CameraSystem
         private float? _sportLockedYaw;
         private float _timeSinceManualLook = 99f;
 
+        // Over-the-shoulder TPS Aiming / ADS / Sniper Scope profile (Shooting Range)
+        private bool _aimCameraActive;
+        private Vector3 _aimShoulderOffset = new Vector3(0.48f, 1.56f, 0f);
+        private float _aimDistance = 2.15f;
+        private float _aimFov = 50f;
+        private float _aimSensScale = 0.72f;
+        private float _aimMinPitch = -32f;
+        private float _aimMaxPitch = 42f;
+        private float _aimYawCenter = 180f;
+        private float _aimYawMaxHalfArc = 64f;
+        private float _aimSwayPitch;
+        private float _aimSwayYaw;
+
+        public void SetAimCameraOverride(
+            bool active,
+            Vector3 shoulderOffset,
+            float distance,
+            float fov,
+            float sensScale = 0.72f,
+            float minPitch = -32f,
+            float maxPitch = 42f,
+            float yawCenterDeg = 180f,
+            float yawMaxHalfArcDeg = 64f)
+        {
+            _aimCameraActive = active;
+            _aimShoulderOffset = shoulderOffset;
+            _aimDistance = distance;
+            _aimFov = fov;
+            _aimSensScale = Mathf.Clamp(sensScale, 0.08f, 1.5f);
+            _aimMinPitch = minPitch;
+            _aimMaxPitch = maxPitch;
+            _aimYawCenter = yawCenterDeg;
+            _aimYawMaxHalfArc = Mathf.Clamp(yawMaxHalfArcDeg, 10f, 180f);
+            if (!active)
+            {
+                _aimSwayPitch = 0f;
+                _aimSwayYaw = 0f;
+            }
+        }
+
+        public void SetAimAngles(float yawDeg, float pitchDeg)
+        {
+            _yaw = yawDeg;
+            _pitch = pitchDeg;
+            SnapAimPivotImmediate();
+        }
+
+        public void SnapAimPivotImmediate()
+        {
+            if (target == null) return;
+            Vector3 aimRight = Quaternion.Euler(0f, _yaw, 0f) * Vector3.right;
+            _smoothedPivot = target.position
+                + Vector3.up * _aimShoulderOffset.y
+                + aimRight * _aimShoulderOffset.x;
+            _currentDistance = _aimDistance;
+        }
+
+        public void AddAimDelta(float yawDeltaDeg, float pitchDeltaDeg)
+        {
+            _yaw += yawDeltaDeg;
+            _pitch += pitchDeltaDeg;
+        }
+
+        public void ApplyAimKick(float pitchUpDeg, float yawDeg)
+        {
+            _pitch -= pitchUpDeg;
+            _yaw += yawDeg;
+        }
+
+        public void SetAimSway(float swayPitchDeg, float swayYawDeg)
+        {
+            _aimSwayPitch = swayPitchDeg;
+            _aimSwayYaw = swayYawDeg;
+        }
+
+        public float Pitch => _pitch;
+
+        public Ray GetAimRay()
+        {
+            return new Ray(transform.position, transform.forward);
+        }
+
         public void SetSportCameraOverride(bool active, float distance = 7.8f, float pitch = 24f, float fov = 62f, float? lockYaw = null)
         {
             _sportCameraActive = active;
@@ -205,14 +287,70 @@ namespace OurWorld.CameraSystem
                 Vector2 look = input.LookDelta;
                 if (look.sqrMagnitude > 0.00001f)
                 {
-                    _yaw += look.x;
-                    _pitch -= look.y;
+                    float scale = _aimCameraActive ? _aimSensScale : 1f;
+                    _yaw += look.x * scale;
+                    _pitch -= look.y * scale;
                     _timeSinceManualLook = 0f;
                 }
                 else
                 {
                     _timeSinceManualLook += Time.deltaTime;
                 }
+            }
+
+            if (_aimCameraActive)
+            {
+                float yawDelta = Mathf.DeltaAngle(_aimYawCenter, _yaw);
+                yawDelta = Mathf.Clamp(yawDelta, -_aimYawMaxHalfArc, _aimYawMaxHalfArc);
+                _yaw = _aimYawCenter + yawDelta;
+                _pitch = Mathf.Clamp(_pitch, _aimMinPitch, _aimMaxPitch);
+
+                float dt = Time.deltaTime;
+                Vector3 aimRight = Quaternion.Euler(0f, _yaw, 0f) * Vector3.right;
+                Vector3 desiredAimPivot = target.position
+                    + Vector3.up * _aimShoulderOffset.y
+                    + aimRight * _aimShoulderOffset.x;
+                _smoothedPivot = Vector3.Lerp(_smoothedPivot, desiredAimPivot, 1f - Mathf.Exp(-18f * dt));
+                _currentDistance = Mathf.Lerp(_currentDistance, _aimDistance, 1f - Mathf.Exp(-14f * dt));
+
+                if (_camera == null) _camera = GetComponent<Camera>();
+                if (_camera != null)
+                {
+                    float aspect = _camera.aspect > 0.1f ? _camera.aspect : (16f / 9f);
+                    float tabletBoost = (_aimFov >= 28f && aspect < 1.70f)
+                        ? Mathf.Clamp((1.70f - aspect) * 18f, 0f, 8f)
+                        : 0f;
+                    _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, _aimFov + tabletBoost, 1f - Mathf.Exp(-15f * dt));
+                }
+
+                Quaternion aimRot = Quaternion.Euler(_pitch + _aimSwayPitch, _yaw + _aimSwayYaw, 0f);
+                Vector3 aimShake = Vector3.zero;
+                if (_shakeTimer > 0f)
+                {
+                    _shakeTimer -= Time.unscaledDeltaTime;
+                    float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
+                    aimShake = new Vector3(
+                        (Mathf.PerlinNoise(Time.unscaledTime * 54f, 1.3f) - 0.5f) * 2f * amp,
+                        (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 54f) - 0.5f) * 2f * amp,
+                        0f);
+                }
+
+                Vector3 aimCamPos;
+                if (_aimDistance <= 0.15f)
+                {
+                    // Full-screen Sniper Scope view: sit cleanly ahead of player head so player mesh never blocks optics!
+                    aimCamPos = _smoothedPivot + (aimRot * Vector3.forward) * 0.52f + aimRot * (aimShake * 0.2f);
+                }
+                else
+                {
+                    Vector3 aimBack = aimRot * Vector3.back;
+                    float safeAimDist = ComputeCollisionAdjustedDistance(_smoothedPivot, aimBack, _currentDistance);
+                    aimCamPos = _smoothedPivot + aimBack * safeAimDist + aimRot * aimShake;
+                }
+
+                transform.position = aimCamPos;
+                transform.rotation = aimRot;
+                return;
             }
 
             if (_sportCameraActive && _sportLockedYaw.HasValue)

@@ -23,6 +23,8 @@ namespace OurWorld.World
         private Vector2 _pastureHalfSize;
         private InteractableTrigger _trigger;
 
+        private static readonly float[] QuadOffsets = { 0.25f, 0.75f, 0.00f, 0.50f };
+
         private Transform _visualRoot;
         private Transform _bodyMesh;
         private Transform _headPivot;
@@ -34,6 +36,8 @@ namespace OurWorld.World
         private Transform _skelHeadBone;
         private bool _usingSkeletal;
         private float _curHeadLookYaw;
+        private float _curHeadLookPitch;
+        private bool _wasLookingAtPlayer;
         private readonly List<Transform> _legs = new List<Transform>(4);
         private readonly List<GameObject> _woolPuffs = new List<GameObject>(6);
         private GameObject _readyVisual; // Egg next to chicken, golden milk/wool ready sparkle above cow/sheep
@@ -41,7 +45,15 @@ namespace OurWorld.World
         private Vector3 _targetPos;
         private Vector3 _bodyBaseScale = Vector3.one;
         private float _idleTimer;
+        private float _interactionPauseTimer;
+        private float _interactFaceTimer;
+        private Quaternion _interactFaceTarget = Quaternion.identity;
+        private float _currentMoveSpeed;
+        private float _walkBlend;
         private float _walkPhase;
+        private float _playerReactCooldown;
+        private bool _isFleeingPlayer;
+        private bool _isApproachingFood;
         private float _produceTimer;
         private float _produceInterval;
         private bool _productReady;
@@ -111,6 +123,10 @@ namespace OurWorld.World
             if (dt <= 0f) return;
 
             if (_soundCooldown > 0f) _soundCooldown -= dt;
+            if (_interactionPauseTimer > 0f) _interactionPauseTimer = Mathf.Max(0f, _interactionPauseTimer - dt);
+            if (_playerReactCooldown > 0f) _playerReactCooldown = Mathf.Max(0f, _playerReactCooldown - dt);
+            if (_happyAnimTimer > 0f) _happyAnimTimer = Mathf.Max(0f, _happyAnimTimer - dt);
+            if (_feedEatingTimer > 0f) _feedEatingTimer = Mathf.Max(0f, _feedEatingTimer - dt);
 
             // Production timer (eggs, milk, wool regrowing)
             if (!_productReady)
@@ -123,15 +139,73 @@ namespace OurWorld.World
                 }
             }
 
-            // Roaming & grazing animation
-            float speed = _kind == FarmAnimalKind.Chicken ? 1.15f : (_kind == FarmAnimalKind.Sheep ? 0.95f : 0.85f);
-            bool walking = false;
+            // Smooth turn during Feed & Pet interaction (never snaps!)
+            if (_interactFaceTimer > 0f)
+            {
+                _interactFaceTimer = Mathf.Max(0f, _interactFaceTimer - dt);
+                transform.rotation = Quaternion.Slerp(transform.rotation, _interactFaceTarget, 1f - Mathf.Exp(-7f * dt));
+            }
 
-            if (_idleTimer > 0f)
+            // Player proximity reaction (step away if player sprints/drives close; come closer for food if calm!)
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode != null && _interactionPauseTimer <= 0f && _happyAnimTimer <= 0f && _feedEatingTimer <= 0f)
+            {
+                Vector3 toPlayer = mode.ActiveWorldPosition - transform.position;
+                toPlayer.y = 0f;
+                float pDist = toPlayer.magnitude;
+                bool playerDriving = mode.IsDriving;
+                float playerSpeed = playerDriving
+                    ? (mode.CurrentVehicle != null ? mode.CurrentVehicle.SpeedKmh / 3.6f : 5f)
+                    : (mode.FootController != null ? mode.FootController.CurrentSpeed : 0f);
+                bool playerFast = (playerDriving && playerSpeed > 1.2f) || playerSpeed > 3.0f;
+                bool shyChickenFlee = _kind == FarmAnimalKind.Chicken && playerSpeed > 2.2f && pDist < 2.8f;
+
+                if (_playerReactCooldown <= 0f && pDist > 0.05f && ((playerFast && pDist < 3.8f) || shyChickenFlee))
+                {
+                    Vector3 away = -toPlayer / pDist;
+                    Vector3 fleeTarget = transform.position + away * Random.Range(2.2f, 3.0f);
+                    _targetPos = ClampInsidePasture(fleeTarget);
+                    _idleTimer = 0f;
+                    _isFleeingPlayer = true;
+                    _isApproachingFood = false;
+                    _playerReactCooldown = 3.5f;
+                }
+                else if (_playerReactCooldown <= 0f && !playerDriving && playerSpeed < 2.1f &&
+                         pDist >= 2.3f && pDist <= 5.4f && (!_productReady || _kind != FarmAnimalKind.Chicken))
+                {
+                    Vector3 approachRaw = mode.ActiveWorldPosition - (toPlayer / pDist) * 1.85f;
+                    Vector3 approachClamped = ClampInsidePasture(approachRaw);
+                    Vector3 moveDelta = approachClamped - transform.position;
+                    moveDelta.y = 0f;
+                    if (moveDelta.sqrMagnitude >= 0.81f)
+                    {
+                        _targetPos = approachClamped;
+                        _idleTimer = 0f;
+                        _isApproachingFood = true;
+                        _isFleeingPlayer = false;
+                        _playerReactCooldown = Random.Range(9f, 15f);
+                    }
+                }
+            }
+
+            // Roaming & grazing locomotion with smooth turn-before-walk & eased speed
+            float baseSpeed = _kind == FarmAnimalKind.Chicken ? 1.15f : (_kind == FarmAnimalKind.Sheep ? 0.95f : 0.85f);
+            float maxSpeed = baseSpeed * (_isFleeingPlayer ? 1.38f : (_isApproachingFood ? 0.90f : 1f));
+            float desiredMoveSpeed = 0f;
+            bool turningInPlace = false;
+
+            if (_interactionPauseTimer > 0f)
+            {
+                _isFleeingPlayer = false;
+                _isApproachingFood = false;
+            }
+            else if (_idleTimer > 0f)
             {
                 _idleTimer -= dt;
                 if (_idleTimer <= 0f)
                 {
+                    _isFleeingPlayer = false;
+                    _isApproachingFood = false;
                     PickNextRoamTarget();
                 }
             }
@@ -143,42 +217,58 @@ namespace OurWorld.World
                 if (dist < 0.35f)
                 {
                     _idleTimer = Random.Range(2.4f, 5.2f);
+                    _isFleeingPlayer = false;
+                    _isApproachingFood = false;
                 }
                 else
                 {
-                    walking = true;
                     Vector3 dir = to / dist;
                     Quaternion targetRot = Quaternion.LookRotation(dir, Vector3.up);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 1f - Mathf.Exp(-4.5f * dt));
-                    transform.position += transform.forward * (speed * dt);
+                    float alignDot = Vector3.Dot(transform.forward, dir);
+                    float turnRate = _kind == FarmAnimalKind.Chicken ? 7.5f : (_kind == FarmAnimalKind.Sheep ? 5.8f : 4.5f);
+                    if (_isFleeingPlayer) turnRate *= 1.35f;
+                    else if (alignDot < 0.45f) turnRate *= 1.25f;
+
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 1f - Mathf.Exp(-turnRate * dt));
+
+                    float alignGate = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.25f, 0.90f, alignDot));
+                    float arriveGate = Mathf.Clamp01((dist - 0.16f) / 0.65f);
+                    desiredMoveSpeed = maxSpeed * alignGate * arriveGate;
+                    turningInPlace = alignDot < 0.88f && desiredMoveSpeed < 0.18f;
                 }
             }
 
-            // Animate realistic biomechanical gait, ribcage breathing, curious player look-at, wings, wool regrowth & fly-swat tail whips!
-            if (_happyAnimTimer > 0f)
+            _currentMoveSpeed = Mathf.Lerp(_currentMoveSpeed, desiredMoveSpeed, 1f - Mathf.Exp(-6.5f * dt));
+            float actualSpeed = 0f;
+            if (_currentMoveSpeed > 0.005f)
             {
-                _happyAnimTimer = Mathf.Max(0f, _happyAnimTimer - dt);
+                Vector3 prevPos = transform.position;
+                Vector3 nextPos = ClampInsidePasture(prevPos + transform.forward * (_currentMoveSpeed * dt));
+                nextPos.y = prevPos.y;
+                transform.position = nextPos;
+                Vector3 moved = nextPos - prevPos;
+                moved.y = 0f;
+                actualSpeed = moved.magnitude / dt;
             }
-            if (_feedEatingTimer > 0f)
-            {
-                _feedEatingTimer = Mathf.Max(0f, _feedEatingTimer - dt);
-            }
+            bool walking = actualSpeed > 0.08f;
 
             float tNow = Time.time + _animSeed;
 
-            // Check if player is nearby (< 6.5m) for curious living head-tracking!
+            // Check if player is nearby for curious living head-tracking (with hysteresis to prevent Eating/Idle flicker)
             bool lookingAtPlayer = false;
             float playerYawLocal = 0f;
             float playerPitchLocal = 0f;
-            if (PlayerModeController.Instance != null && _happyAnimTimer <= 0f)
+            if (mode != null && _happyAnimTimer <= 0f && _feedEatingTimer <= 0f)
             {
-                Vector3 toP = PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 1.15f - (transform.position + Vector3.up * (_kind == FarmAnimalKind.Cow ? 1.35f : 0.72f));
+                float maxRangeSq = _wasLookingAtPlayer ? 56.25f : 42.25f; // 7.5m exit / 6.5m enter
+                float maxYawDeg = _wasLookingAtPlayer ? 96f : 82f;
+                Vector3 toP = mode.ActiveWorldPosition + Vector3.up * 1.15f - (transform.position + Vector3.up * (_kind == FarmAnimalKind.Cow ? 1.35f : 0.72f));
                 float dSq = toP.sqrMagnitude;
-                if (dSq > 0.25f && dSq < 42.25f) // within 6.5m
+                if (dSq > 0.25f && dSq < maxRangeSq)
                 {
                     Vector3 localDir = transform.InverseTransformDirection(toP.normalized);
                     float yaw = Mathf.Atan2(localDir.x, localDir.z) * Mathf.Rad2Deg;
-                    if (Mathf.Abs(yaw) < 88f)
+                    if (Mathf.Abs(yaw) < maxYawDeg)
                     {
                         lookingAtPlayer = true;
                         playerYawLocal = Mathf.Clamp(yaw, -55f, 55f);
@@ -186,41 +276,49 @@ namespace OurWorld.World
                     }
                 }
             }
-            _curHeadLookYaw = Mathf.Lerp(_curHeadLookYaw, lookingAtPlayer ? playerYawLocal * 0.55f : 0f, 1f - Mathf.Exp(-6f * dt));
+            _wasLookingAtPlayer = lookingAtPlayer;
+            float headTrackRate = 1f - Mathf.Exp(-5.5f * dt);
+            _curHeadLookYaw = Mathf.Lerp(_curHeadLookYaw, lookingAtPlayer ? playerYawLocal * 0.55f : 0f, headTrackRate);
+            _curHeadLookPitch = Mathf.Lerp(_curHeadLookPitch, lookingAtPlayer ? Mathf.Clamp(playerPitchLocal * 0.45f, -14f, 12f) : 0f, headTrackRate);
 
             // REAL SKELETAL ANIMATION PATH (PlayableGraph mixing baked Blender / CC0 FBX clips!)
             if (_usingSkeletal && _skeletal != null && _skeletal.HasClips)
             {
+                float refWalkSpeed = _kind == FarmAnimalKind.Chicken ? 0.95f : (_kind == FarmAnimalKind.Sheep ? 0.86f : 0.90f);
                 if (_happyAnimTimer > 0f)
                 {
-                    if (!_skeletal.PlayClip("Happy", 0.14f, 1.15f))
-                        _skeletal.PlayClip("Idle", 0.14f, 1.2f);
+                    if (!_skeletal.PlayClip("Happy", 0.16f, 1.15f))
+                        _skeletal.PlayClip("Idle", 0.16f, 1.2f);
                 }
                 else if (_feedEatingTimer > 0f)
                 {
-                    if (!_skeletal.PlayClip("Eating", 0.24f, 1.15f))
-                        _skeletal.PlayClip("Idle", 0.24f, 1.0f);
+                    if (!_skeletal.PlayClip("Eating", 0.26f, 1.12f))
+                        _skeletal.PlayClip("Idle", 0.26f, 1.0f);
                 }
                 else if (walking)
                 {
-                    float walkSpd = _kind == FarmAnimalKind.Chicken ? 1.25f : (_kind == FarmAnimalKind.Sheep ? 1.10f : 0.95f);
-                    _skeletal.PlayClip("Walk", 0.22f, walkSpd);
+                    float walkClipSpd = Mathf.Clamp(actualSpeed / refWalkSpeed, 0.6f, 1.6f);
+                    _skeletal.PlayClip("Walk", 0.24f, walkClipSpd);
+                }
+                else if (turningInPlace)
+                {
+                    _skeletal.PlayClip("Walk", 0.26f, 0.6f);
                 }
                 else if (lookingAtPlayer)
                 {
-                    _skeletal.PlayClip("Idle", 0.32f, 1.0f);
+                    _skeletal.PlayClip("Idle", 0.34f, 1.0f);
                 }
                 else
                 {
                     float grazeCycle = Mathf.Repeat(tNow * 0.16f, 1f);
                     if (grazeCycle < 0.56f)
                     {
-                        if (!_skeletal.PlayClip("Eating", 0.35f, 1.0f))
-                            _skeletal.PlayClip("Idle", 0.35f, 1.0f);
+                        if (!_skeletal.PlayClip("Eating", 0.38f, 1.0f))
+                            _skeletal.PlayClip("Idle", 0.38f, 1.0f);
                     }
                     else
                     {
-                        _skeletal.PlayClip("Idle", 0.35f, 1.0f);
+                        _skeletal.PlayClip("Idle", 0.38f, 1.0f);
                     }
                 }
 
@@ -246,6 +344,10 @@ namespace OurWorld.World
                 return;
             }
 
+            // Smooth procedural walk blend driven by actual ground speed (zero foot sliding!)
+            float speedRatio = Mathf.Clamp01(actualSpeed / Mathf.Max(0.2f, baseSpeed));
+            _walkBlend = Mathf.Lerp(_walkBlend, walking ? speedRatio : 0f, 1f - Mathf.Exp(-9f * dt));
+
             // Subtle living ribcage breathing on torso (procedural fallback path)
             if (_bodyMesh != null)
             {
@@ -255,14 +357,12 @@ namespace OurWorld.World
 
             if (_visualRoot != null)
             {
-                float walkBounce = walking
-                    ? Mathf.Abs(Mathf.Sin(_walkPhase * 2f)) * (_kind == FarmAnimalKind.Chicken ? 0.028f : 0.032f)
-                    : 0f;
+                float walkBounce = Mathf.Abs(Mathf.Sin(_walkPhase * 2f)) * (_kind == FarmAnimalKind.Chicken ? 0.028f : 0.032f) * _walkBlend;
                 float happyHop = _happyAnimTimer > 0f
                     ? Mathf.Abs(Mathf.Sin(_happyAnimTimer * Mathf.PI * 3.5f)) * (_kind == FarmAnimalKind.Chicken ? 0.24f : 0.14f)
                     : 0f;
-                float walkRoll = walking ? Mathf.Sin(_walkPhase) * (_kind == FarmAnimalKind.Cow ? 2.6f : 3.8f) : 0f;
-                float walkPitch = walking ? Mathf.Cos(_walkPhase * 2f) * (_kind == FarmAnimalKind.Chicken ? 3.2f : 1.6f) : 0f;
+                float walkRoll = Mathf.Sin(_walkPhase) * (_kind == FarmAnimalKind.Cow ? 2.6f : 3.8f) * _walkBlend;
+                float walkPitch = Mathf.Cos(_walkPhase * 2f) * (_kind == FarmAnimalKind.Chicken ? 3.2f : 1.6f) * _walkBlend;
                 _visualRoot.localPosition = new Vector3(0f, walkBounce + happyHop, 0f);
                 _visualRoot.localRotation = Quaternion.Slerp(
                     _visualRoot.localRotation,
@@ -270,21 +370,25 @@ namespace OurWorld.World
                     1f - Mathf.Exp(-10f * dt));
             }
 
-            if (walking)
+            if (walking || _walkBlend > 0.02f)
             {
-                _walkPhase += dt * (_kind == FarmAnimalKind.Chicken ? 9.2f : (_kind == FarmAnimalKind.Sheep ? 5.6f : 4.2f));
+                float phaseScale = Mathf.Clamp(actualSpeed / Mathf.Max(0.2f, baseSpeed), 0.5f, 1.6f);
+                if (walking)
+                {
+                    _walkPhase += dt * (_kind == FarmAnimalKind.Chicken ? 9.2f : (_kind == FarmAnimalKind.Sheep ? 5.6f : 4.2f)) * phaseScale;
+                }
                 // Authentic 4-beat lateral-sequence quadruped gait: FL=0.25, FR=0.75, BL=0.00, BR=0.50!
                 // With asymmetric stance (60% smooth push-back) vs swing (40% quick lift-forward) curve!
-                float[] quadOffsets = { 0.25f, 0.75f, 0.00f, 0.50f };
-                float amp = _kind == FarmAnimalKind.Chicken ? 32f : (_kind == FarmAnimalKind.Sheep ? 24f : 15f);
+                float amp = (_kind == FarmAnimalKind.Chicken ? 32f : (_kind == FarmAnimalKind.Sheep ? 24f : 15f)) * _walkBlend;
+                float legSmooth = 1f - Mathf.Exp(-14f * dt);
                 for (int i = 0; i < _legs.Count; i++)
                 {
                     if (_legs[i] == null) continue;
-                    float cyc = Mathf.Repeat(_walkPhase / (Mathf.PI * 2f) + (_legs.Count == 4 ? quadOffsets[i] : i * 0.5f), 1f);
+                    float cyc = Mathf.Repeat(_walkPhase / (Mathf.PI * 2f) + (_legs.Count == 4 ? QuadOffsets[i] : i * 0.5f), 1f);
                     float deg = EvaluateAsymmetricLegAngle(cyc, amp);
-                    _legs[i].localRotation = Quaternion.Euler(deg, 0f, 0f);
+                    _legs[i].localRotation = Quaternion.Slerp(_legs[i].localRotation, Quaternion.Euler(deg, 0f, 0f), legSmooth);
                 }
-                if (_headPivot != null)
+                if (walking && _headPivot != null)
                 {
                     float pitch;
                     if (_kind == FarmAnimalKind.Chicken)
@@ -296,7 +400,7 @@ namespace OurWorld.World
                     }
                     else
                     {
-                        pitch = Mathf.Sin(_walkPhase * 2f) * 4.5f;
+                        pitch = Mathf.Sin(_walkPhase * 2f) * 4.5f * _walkBlend;
                     }
                     float yaw = lookingAtPlayer ? playerYawLocal * 0.65f : 0f;
                     _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(pitch, yaw, 0f), 1f - Mathf.Exp(-12f * dt));
@@ -311,51 +415,51 @@ namespace OurWorld.World
                         _legs[i].localRotation = Quaternion.Slerp(_legs[i].localRotation, Quaternion.identity, 1f - Mathf.Exp(-8f * dt));
                     }
                 }
-                if (_headPivot != null)
+            }
+
+            if (!walking && _headPivot != null)
+            {
+                if (_happyAnimTimer > 0f)
                 {
-                    if (_happyAnimTimer > 0f)
-                    {
-                        float nod = Mathf.Sin(_happyAnimTimer * 18f) * 20f - 8f;
-                        _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(nod, 0f, 0f), 1f - Mathf.Exp(-14f * dt));
-                    }
-                    else if (lookingAtPlayer)
-                    {
-                        // Curious look straight at approaching player with subtle head tilt!
-                        float tilt = Mathf.Sin(tNow * 1.2f) * 7f;
-                        _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation,
-                            Quaternion.Euler(playerPitchLocal, playerYawLocal, tilt), 1f - Mathf.Exp(-5.5f * dt));
-                    }
-                    else if (_kind == FarmAnimalKind.Chicken)
-                    {
-                        // Crisp double-peck ground bursts then alert look-around!
-                        float cycle = Mathf.Repeat(tNow * 0.45f, 1f);
-                        float peck = cycle < 0.14f ? Mathf.Sin((cycle / 0.14f) * Mathf.PI) * 48f
-                                   : (cycle < 0.28f ? Mathf.Sin(((cycle - 0.14f) / 0.14f) * Mathf.PI) * 44f : 0f);
-                        float alertYaw = cycle > 0.35f ? Mathf.Sin(tNow * 1.9f) * 26f : 0f;
-                        _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(peck, alertYaw, 0f), 1f - Mathf.Exp(-16f * dt));
-                    }
-                    else
-                    {
-                        // Organic Graze-Bite -> Head-Lift -> Rhythmic Jaw-Chew cycle!
-                        float grazeCycle = Mathf.Repeat(tNow * 0.14f, 1f);
-                        float pitch;
-                        if (grazeCycle < 0.58f)
-                        {
-                            // Down grazing grass with gentle tugs
-                            pitch = 30f + Mathf.Sin(tNow * 3.8f) * 7f;
-                        }
-                        else
-                        {
-                            // Raised head calmly chewing cud & scanning pasture
-                            pitch = 2f + Mathf.Sin(tNow * 5.2f) * 3.2f;
-                        }
-                        float lookYaw = grazeCycle >= 0.58f ? Mathf.Sin(tNow * 0.9f) * 22f : Mathf.Sin(tNow * 0.4f) * 8f;
-                        _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(pitch, lookYaw, 0f), 1f - Mathf.Exp(-5f * dt));
-                    }
+                    float nod = Mathf.Sin(_happyAnimTimer * 18f) * 20f - 8f;
+                    _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(nod, 0f, 0f), 1f - Mathf.Exp(-14f * dt));
+                }
+                else if (_feedEatingTimer > 0f)
+                {
+                    float eatPitch = 32f + Mathf.Sin(tNow * 6.4f) * 8f;
+                    _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(eatPitch, 0f, 0f), 1f - Mathf.Exp(-8f * dt));
+                }
+                else if (lookingAtPlayer)
+                {
+                    // Curious look straight at approaching player with subtle head tilt!
+                    float tilt = Mathf.Sin(tNow * 1.2f) * 7f;
+                    _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation,
+                        Quaternion.Euler(playerPitchLocal, playerYawLocal, tilt), 1f - Mathf.Exp(-5.5f * dt));
+                }
+                else if (_kind == FarmAnimalKind.Chicken)
+                {
+                    // Crisp double-peck ground bursts then alert look-around!
+                    float cycle = Mathf.Repeat(tNow * 0.45f, 1f);
+                    float peck = cycle < 0.14f ? Mathf.Sin((cycle / 0.14f) * Mathf.PI) * 48f
+                               : (cycle < 0.28f ? Mathf.Sin(((cycle - 0.14f) / 0.14f) * Mathf.PI) * 44f : 0f);
+                    float alertYaw = cycle > 0.35f ? Mathf.Sin(tNow * 1.9f) * 26f : 0f;
+                    _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(peck, alertYaw, 0f), 1f - Mathf.Exp(-16f * dt));
+                }
+                else
+                {
+                    // Organic Graze-Bite -> Head-Lift -> Rhythmic Jaw-Chew cycle with eased transitions!
+                    float grazeCycle = Mathf.Repeat(tNow * 0.14f, 1f);
+                    float downBlend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(grazeCycle / 0.08f)) *
+                                      (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((grazeCycle - 0.54f) / 0.10f)));
+                    float grazePitch = 30f + Mathf.Sin(tNow * 3.8f) * 7f;
+                    float chewPitch = 2f + Mathf.Sin(tNow * 5.2f) * 3.2f;
+                    float pitch = Mathf.Lerp(chewPitch, grazePitch, downBlend);
+                    float lookYaw = Mathf.Lerp(Mathf.Sin(tNow * 0.9f) * 22f, Mathf.Sin(tNow * 0.4f) * 8f, downBlend);
+                    _headPivot.localRotation = Quaternion.Slerp(_headPivot.localRotation, Quaternion.Euler(pitch, lookYaw, 0f), 1f - Mathf.Exp(-5.5f * dt));
                 }
             }
 
-            // Expressive Chicken Wing Flap during happy hops & spontaneous feather-fluff!
+            // Expressive Chicken Wing Flap during happy hops, startled retreat & walking!
             if (_wingL != null && _wingR != null)
             {
                 float flap = 0f;
@@ -363,9 +467,13 @@ namespace OurWorld.World
                 {
                     flap = 42f + Mathf.Sin(_happyAnimTimer * 34f) * 32f;
                 }
-                else if (walking)
+                else if (_isFleeingPlayer && walking)
                 {
-                    flap = 6f + Mathf.Abs(Mathf.Sin(_walkPhase)) * 9f;
+                    flap = 28f + Mathf.Abs(Mathf.Sin(_walkPhase * 1.8f)) * 26f;
+                }
+                else if (_walkBlend > 0.05f)
+                {
+                    flap = (6f + Mathf.Abs(Mathf.Sin(_walkPhase)) * 9f) * _walkBlend;
                 }
                 _wingL.localRotation = Quaternion.Slerp(_wingL.localRotation, Quaternion.Euler(0f, 0f, -flap), 1f - Mathf.Exp(-14f * dt));
                 _wingR.localRotation = Quaternion.Slerp(_wingR.localRotation, Quaternion.Euler(0f, 0f,  flap), 1f - Mathf.Exp(-14f * dt));
@@ -383,7 +491,7 @@ namespace OurWorld.World
                 if (visible) _woolCoat.localScale = Vector3.one * _woolScaleCurrent;
             }
 
-            // Organic Tail Animation: calm gentle sway punctuated by realistic quick fly-swat tail whips!
+            // Organic Tail Animation: calm gentle sway punctuated by eased fly-swat tail whips!
             if (_tailPivot != null)
             {
                 _tailFlickCooldown -= dt;
@@ -401,7 +509,8 @@ namespace OurWorld.World
                 }
                 else if (_tailFlickTimer > 0f)
                 {
-                    tailYaw = Mathf.Sin(_tailFlickTimer * 24f) * 34f;
+                    float flickEnv = Mathf.Sin(Mathf.Clamp01(_tailFlickTimer / 0.65f) * Mathf.PI);
+                    tailYaw = Mathf.Sin(_tailFlickTimer * 24f) * 34f * flickEnv;
                 }
                 else
                 {
@@ -420,15 +529,32 @@ namespace OurWorld.World
         private void LateUpdate()
         {
             // Additive living head look-at layered smoothly on top of skeletal animation!
-            if (_usingSkeletal && _skelHeadBone != null && Mathf.Abs(_curHeadLookYaw) > 0.5f)
+            if (_usingSkeletal && _skelHeadBone != null)
             {
-                _skelHeadBone.Rotate(transform.up, _curHeadLookYaw, Space.World);
+                if (Mathf.Abs(_curHeadLookYaw) > 0.5f)
+                {
+                    _skelHeadBone.Rotate(transform.up, _curHeadLookYaw, Space.World);
+                }
+                if (Mathf.Abs(_curHeadLookPitch) > 0.5f)
+                {
+                    _skelHeadBone.Rotate(transform.right, _curHeadLookPitch, Space.World);
+                }
             }
         }
 
         public void PauseForInteraction(float seconds = 3.6f)
         {
             _idleTimer = Mathf.Max(_idleTimer, seconds);
+            _interactionPauseTimer = Mathf.Max(_interactionPauseTimer, seconds);
+            _isFleeingPlayer = false;
+            _isApproachingFood = false;
+        }
+
+        private Vector3 ClampInsidePasture(Vector3 worldPos)
+        {
+            float x = Mathf.Clamp(worldPos.x, _pastureCenter.x - _pastureHalfSize.x, _pastureCenter.x + _pastureHalfSize.x);
+            float z = Mathf.Clamp(worldPos.z, _pastureCenter.z - _pastureHalfSize.y, _pastureCenter.z + _pastureHalfSize.y);
+            return new Vector3(x, worldPos.y, z);
         }
 
         private void ApplySheepWoolTint(float sheared01)
@@ -553,7 +679,8 @@ namespace OurWorld.World
                 toP.y = 0f;
                 if (toP.sqrMagnitude > 0.04f)
                 {
-                    transform.rotation = Quaternion.LookRotation(toP.normalized, Vector3.up);
+                    _interactFaceTarget = Quaternion.LookRotation(toP.normalized, Vector3.up);
+                    _interactFaceTimer = 0.60f;
                 }
                 string startMsg = IsEn ? $"Feeding & petting {_displayName}..." : $"{_displayName} besleniyor ve seviliyor...";
 

@@ -2636,6 +2636,10 @@
     {
       "key": "m26.c3.f2",
       "value": "Geçmişten geleceğe uzanan bu sevgi bağı hiç kopmasın! İyi ki varsın Deniz!"
+    },
+    {
+      "key": "sports.shooting.controls",
+      "value": "Sürükle/Fare: Nişan Al · Sol Tık/F: Ateş Et · Sağ Tık/Boşluk: Nişan/Dürbün · R: Şarjör · 1-4: Silah · Shift: Nefes Tut · E: Çıkış"
     }
   ]
 }

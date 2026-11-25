@@ -50,7 +50,12 @@ namespace OurWorld.World
         private Transform _windmillBlades;
         private Transform _lakeSurface;
         private readonly List<(Transform duck, SkeletalClipPlayer skel, Vector3 center, float radius, float speed, float phase)> _ducks = new List<(Transform, SkeletalClipPlayer, Vector3, float, float, float)>();
+        private readonly List<float> _duckAngles = new List<float>(4);
+        private readonly List<float> _duckSpeedScales = new List<float>(4);
+        private readonly List<bool> _duckInitialized = new List<bool>(4);
         private readonly List<Transform> _sprinklerHeads = new List<Transform>();
+        private static readonly float[] DogTrotPhase = { 0f, 0.5f, 0.5f, 0f };
+        private static readonly RaycastHit[] DogHits = new RaycastHit[4];
         private Transform _shepherdDog;
         private SkeletalClipPlayer _shepherdSkel;
         private Transform _shepherdHead;
@@ -59,6 +64,10 @@ namespace OurWorld.World
         private Vector3 _dogHome;
         private float _dogPhase;
         private float _dogWalkPhase;
+        private float _dogCurrentSpeed;
+        private float _dogWalkBlend;
+        private bool _dogMoving;
+        private bool _dogGalloping;
 
         private Transform _farmRoot;
         private int _spawnedChickens;
@@ -128,41 +137,78 @@ namespace OurWorld.World
                 _lakeSurface.localPosition = p;
             }
 
-            // Gliding & dabbling pond ducks (smooth buoyancy pitch/roll + periodic playful water head-dips!)
+            // Gliding & dabbling pond ducks (smooth velocity-aligned facing, dabble slowdown, pier clearance & buoyancy!)
+            while (_duckAngles.Count < _ducks.Count)
+            {
+                int idx = _duckAngles.Count;
+                _duckAngles.Add(_ducks[idx].phase);
+                _duckSpeedScales.Add(1f);
+                _duckInitialized.Add(false);
+            }
             for (int i = 0; i < _ducks.Count; i++)
             {
                 var d = _ducks[i];
                 if (d.duck == null) continue;
-                float a = Time.time * d.speed + d.phase;
+                float dabbleCycle = Mathf.Repeat(Time.time * 0.22f + d.phase, 1f);
+                bool dabbling = dabbleCycle < 0.24f;
+                float speedScale = Mathf.Lerp(_duckSpeedScales[i], dabbling ? 0.24f : 1.0f, 1f - Mathf.Exp(-4.5f * dt));
+                _duckSpeedScales[i] = speedScale;
+                float a = _duckAngles[i] + dt * d.speed * speedScale;
+                _duckAngles[i] = a;
+
                 float bob = Mathf.Sin(a * 3f) * 0.022f;
                 Vector3 pos = d.center + new Vector3(Mathf.Cos(a) * d.radius, 0.09f + bob, Mathf.Sin(a) * d.radius * 0.72f);
-                Vector3 nextPos = d.center + new Vector3(Mathf.Cos(a + 0.08f) * d.radius, 0.09f, Mathf.Sin(a + 0.08f) * d.radius * 0.72f);
-                d.duck.position = pos;
-                Vector3 dir = nextPos - pos;
-                dir.y = 0f;
-                if (dir.sqrMagnitude > 0.0001f)
+
+                // Smoothly deflect west of wooden viewing pier (x = -183..-168, z = -2.1..+2.1) so ducks never clip pier pilings!
+                if (pos.x > -184.6f)
                 {
-                    float dabbleCycle = Mathf.Repeat(Time.time * 0.22f + d.phase, 1f);
-                    bool dabbling = dabbleCycle < 0.24f;
+                    float pierZone = 1f - Mathf.SmoothStep(2.2f, 4.4f, Mathf.Abs(pos.z));
+                    pos.x = Mathf.Lerp(pos.x, -184.6f, pierZone);
+                }
+
+                if (!_duckInitialized[i])
+                {
+                    _duckInitialized[i] = true;
+                    d.duck.position = pos;
+                    Vector3 initDir = new Vector3(-Mathf.Sin(a) * d.radius, 0f, Mathf.Cos(a) * d.radius * 0.72f);
+                    if (initDir.sqrMagnitude > 0.0001f)
+                    {
+                        d.duck.rotation = Quaternion.LookRotation(initDir.normalized, Vector3.up);
+                    }
+                    continue;
+                }
+
+                Vector3 prevPos = d.duck.position;
+                d.duck.position = pos;
+                Vector3 vel = pos - prevPos;
+                vel.y = 0f;
+                float waterSpd = vel.magnitude / dt;
+                if (waterSpd > 0.02f)
+                {
+                    Quaternion yawRot = Quaternion.LookRotation(vel.normalized, Vector3.up);
                     if (d.skel != null && d.skel.HasClips)
                     {
-                        d.skel.PlayClip(dabbling ? "Dabble" : "Swim", 0.30f, 1.0f);
-                        d.duck.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+                        float swimClipSpd = Mathf.Clamp(waterSpd / 2.2f, 0.7f, 1.35f);
+                        d.skel.PlayClip(dabbling ? "Dabble" : "Swim", 0.30f, dabbling ? 1.0f : swimClipSpd);
+                        float gentlePitch = Mathf.Sin(a * 2.4f) * 2.4f;
+                        float gentleRoll = Mathf.Cos(a * 2.1f) * 3.2f;
+                        d.duck.rotation = Quaternion.Slerp(d.duck.rotation, yawRot * Quaternion.Euler(gentlePitch, 0f, gentleRoll), 1f - Mathf.Exp(-6f * dt));
                     }
                     else
                     {
                         float dipPitch = dabbling ? Mathf.Sin((dabbleCycle / 0.24f) * Mathf.PI) * 26f : Mathf.Sin(a * 2.4f) * 3.5f;
                         float roll = Mathf.Cos(a * 2.1f) * 5.5f;
-                        d.duck.rotation = Quaternion.LookRotation(dir.normalized, Vector3.up) * Quaternion.Euler(dipPitch, 0f, roll);
+                        d.duck.rotation = Quaternion.Slerp(d.duck.rotation, yawRot * Quaternion.Euler(dipPitch, 0f, roll), 1f - Mathf.Exp(-7.5f * dt));
                     }
                 }
             }
 
-            // Friendly Anatolian shepherd dog Karabaş: patrols sheep pen & gallops/trots enthusiastically to greet Deniz!
+            // Friendly Anatolian shepherd dog Karabaş: patrols clear of paddock fences & trots/gallops smoothly to greet Deniz!
             if (_shepherdDog != null)
             {
                 _dogPhase += dt * 0.52f;
-                Vector3 target = _dogHome + new Vector3(Mathf.Sin(_dogPhase) * 4.5f, 0f, Mathf.Cos(_dogPhase * 0.7f) * 2.2f);
+                // Keep patrol safely between chicken coop fence (x=170) and sheep pen fence (x=180)
+                Vector3 target = _dogHome + new Vector3(Mathf.Sin(_dogPhase) * 2.0f - 1.2f, 0f, Mathf.Cos(_dogPhase * 0.7f) * 3.4f);
                 bool greetingPlayer = false;
                 if (PlayerModeController.Instance != null)
                 {
@@ -175,19 +221,36 @@ namespace OurWorld.World
                         Vector3 greetSpot = _dogHome + Vector3.ClampMagnitude(fromHome, 6.5f);
                         Vector3 toP = pPos - greetSpot;
                         toP.y = 0f;
-                        if (toP.magnitude < 1.8f) greetSpot = pPos - toP.normalized * 1.8f;
+                        float toPMag = toP.magnitude;
+                        if (toPMag < 1.8f && toPMag > 0.001f) greetSpot = pPos - (toP / toPMag) * 1.8f;
+                        // Keep clear of chicken fence (x=170) and solid sheep fence (x=180, open gate at z=-19.6..-16.4)
+                        bool inSheepGate = greetSpot.z >= -19.6f && greetSpot.z <= -16.4f;
+                        greetSpot.x = Mathf.Clamp(greetSpot.x, 171.2f, inSheepGate ? 184f : 179.0f);
                         target = new Vector3(greetSpot.x, _dogHome.y, greetSpot.z);
                     }
                 }
 
                 Vector3 delta = target - _shepherdDog.position;
                 delta.y = 0f;
-                bool moving = delta.sqrMagnitude > 0.04f;
-                if (moving)
+                float dist = delta.magnitude;
+                if (!_dogMoving && dist > 0.36f) _dogMoving = true;
+                else if (_dogMoving && dist < 0.16f) _dogMoving = false;
+
+                if (!_dogGalloping && greetingPlayer && dist > 2.6f) _dogGalloping = true;
+                else if (_dogGalloping && (!greetingPlayer || dist < 1.7f)) _dogGalloping = false;
+
+                float desiredDogSpd = 0f;
+                if (_dogMoving && dist > 0.02f)
                 {
-                    float dogSpd = greetingPlayer ? 2.65f : 1.50f;
-                    _shepherdDog.rotation = Quaternion.Slerp(_shepherdDog.rotation, Quaternion.LookRotation(delta.normalized, Vector3.up), 1f - Mathf.Exp(-6.5f * dt));
-                    _shepherdDog.position = Vector3.MoveTowards(_shepherdDog.position, target, dogSpd * dt);
+                    Vector3 dir = delta / dist;
+                    float turnRate = greetingPlayer ? 7.5f : 5.8f;
+                    _shepherdDog.rotation = Quaternion.Slerp(_shepherdDog.rotation, Quaternion.LookRotation(dir, Vector3.up), 1f - Mathf.Exp(-turnRate * dt));
+
+                    float alignDot = Vector3.Dot(_shepherdDog.forward, dir);
+                    float alignGate = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.25f, 0.90f, alignDot));
+                    float arriveGate = Mathf.Clamp01((dist - 0.10f) / 0.85f);
+                    float maxDogSpd = _dogGalloping ? 2.65f : (greetingPlayer ? 1.85f : 1.45f);
+                    desiredDogSpd = maxDogSpd * alignGate * arriveGate;
                 }
                 else if (greetingPlayer && PlayerModeController.Instance != null)
                 {
@@ -199,11 +262,40 @@ namespace OurWorld.World
                     }
                 }
 
+                _dogCurrentSpeed = Mathf.Lerp(_dogCurrentSpeed, desiredDogSpd, 1f - Mathf.Exp(-7f * dt));
+                bool dogBlocked = false;
+                if (_dogCurrentSpeed > 0.1f && (Time.frameCount & 1) == 0)
+                {
+                    int hits = Physics.SphereCastNonAlloc(_shepherdDog.position + Vector3.up * 0.62f, 0.28f,
+                        _shepherdDog.forward, DogHits, 0.65f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                    for (int h = 0; h < hits; h++)
+                    {
+                        if (DogHits[h].collider == null || DogHits[h].collider.transform.IsChildOf(_shepherdDog)) continue;
+                        if (DogHits[h].normal.y > 0.65f) continue;
+                        if (DogHits[h].collider.GetComponentInParent<PlayerFootController>() != null) continue;
+                        dogBlocked = true;
+                        break;
+                    }
+                }
+                if (dogBlocked)
+                {
+                    _dogCurrentSpeed = 0f;
+                }
+                else if (_dogCurrentSpeed > 0.01f)
+                {
+                    Vector3 nextDog = _shepherdDog.position + _shepherdDog.forward * (_dogCurrentSpeed * dt);
+                    nextDog.y = _dogHome.y;
+                    _shepherdDog.position = nextDog;
+                }
+
+                bool actuallyMoving = _dogCurrentSpeed > 0.12f;
                 if (_shepherdSkel != null && _shepherdSkel.HasClips)
                 {
-                    if (moving)
+                    if (actuallyMoving)
                     {
-                        _shepherdSkel.PlayClip(greetingPlayer ? "Gallop" : "Walk", 0.22f, greetingPlayer ? 1.15f : 1.05f);
+                        bool useGallop = _dogGalloping && _dogCurrentSpeed > 1.75f;
+                        float clipSpd = Mathf.Clamp(_dogCurrentSpeed / (useGallop ? 2.4f : 1.4f), 0.6f, 1.6f);
+                        _shepherdSkel.PlayClip(useGallop ? "Gallop" : "Walk", 0.24f, clipSpd);
                     }
                     else
                     {
@@ -212,15 +304,20 @@ namespace OurWorld.World
                 }
                 else
                 {
-                    if (moving)
+                    _dogWalkBlend = Mathf.Lerp(_dogWalkBlend, actuallyMoving ? Mathf.Clamp01(_dogCurrentSpeed / 1.45f) : 0f, 1f - Mathf.Exp(-9f * dt));
+                    if (actuallyMoving || _dogWalkBlend > 0.02f)
                     {
-                        _dogWalkPhase += dt * (greetingPlayer ? 13.5f : 9.2f);
-                        float[] trotPhase = { 0f, 0.5f, 0.5f, 0f };
+                        if (actuallyMoving)
+                        {
+                            _dogWalkPhase += dt * (_dogCurrentSpeed * 5.8f);
+                        }
+                        float amp = (_dogGalloping ? 32f : 24f) * _dogWalkBlend;
+                        float legRate = 1f - Mathf.Exp(-14f * dt);
                         for (int i = 0; i < _shepherdLegs.Count; i++)
                         {
                             if (_shepherdLegs[i] == null) continue;
-                            float ang = Mathf.Sin(_dogWalkPhase + trotPhase[i] * Mathf.PI * 2f) * (greetingPlayer ? 32f : 24f);
-                            _shepherdLegs[i].localRotation = Quaternion.Euler(ang, 0f, 0f);
+                            float ang = Mathf.Sin(_dogWalkPhase + DogTrotPhase[i] * Mathf.PI * 2f) * amp;
+                            _shepherdLegs[i].localRotation = Quaternion.Slerp(_shepherdLegs[i].localRotation, Quaternion.Euler(ang, 0f, 0f), legRate);
                         }
                     }
                     else
@@ -233,7 +330,7 @@ namespace OurWorld.World
                     }
                     if (_shepherdHead != null)
                     {
-                        float headPitch = greetingPlayer ? -12f : Mathf.Sin(_dogWalkPhase * 0.5f) * 5f;
+                        float headPitch = greetingPlayer ? -12f : Mathf.Sin(_dogWalkPhase * 0.5f) * 5f * _dogWalkBlend;
                         float headYaw = greetingPlayer ? Mathf.Sin(Time.time * 2.5f) * 8f : Mathf.Sin(Time.time * 1.4f) * 16f;
                         _shepherdHead.localRotation = Quaternion.Slerp(_shepherdHead.localRotation, Quaternion.Euler(headPitch, headYaw, greetingPlayer ? 8f : 0f), 1f - Mathf.Exp(-8f * dt));
                     }
@@ -241,7 +338,8 @@ namespace OurWorld.World
                     {
                         float wagFreq = greetingPlayer ? 16f : 8.5f;
                         float wagAmp = greetingPlayer ? 38f : 22f;
-                        _shepherdTail.localRotation = Quaternion.Euler(greetingPlayer ? 22f : 12f, Mathf.Sin(Time.time * wagFreq) * wagAmp, 0f);
+                        Quaternion targetTail = Quaternion.Euler(greetingPlayer ? 22f : 12f, Mathf.Sin(Time.time * wagFreq) * wagAmp, 0f);
+                        _shepherdTail.localRotation = Quaternion.Slerp(_shepherdTail.localRotation, targetTail, 1f - Mathf.Exp(-12f * dt));
                     }
                 }
             }

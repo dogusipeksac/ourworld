@@ -20,11 +20,13 @@ namespace OurWorld.World
         private PlayableGraph _graph;
         private AnimationMixerPlayable _mixer;
         private readonly List<AnimationClip> _clips = new List<AnimationClip>(8);
+        private readonly List<string> _shortNames = new List<string>(8);
         private readonly List<AnimationClipPlayable> _playables = new List<AnimationClipPlayable>(8);
         private readonly List<float> _weights = new List<float>(8);
 
         private int _activeIndex = -1;
         private float _fadeSpeed = 4f;
+        private bool _isFading;
         private bool _graphValid;
 
         public bool HasClips => _graphValid && _clips.Count > 0;
@@ -59,6 +61,7 @@ namespace OurWorld.World
             anim.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
 
             _clips.Clear();
+            _shortNames.Clear();
             _playables.Clear();
             _weights.Clear();
 
@@ -83,6 +86,9 @@ namespace OurWorld.World
                 _graph.Connect(cp, 0, _mixer, i);
                 _mixer.SetInputWeight(i, 0f);
                 _clips.Add(clip);
+                string cn = clip.name;
+                int bar = cn.LastIndexOf('|');
+                _shortNames.Add(bar >= 0 ? cn.Substring(bar + 1) : cn);
                 _playables.Add(cp);
                 _weights.Add(0f);
             }
@@ -95,6 +101,7 @@ namespace OurWorld.World
             _activeIndex = startIdx;
             _weights[startIdx] = 1f;
             _mixer.SetInputWeight(startIdx, 1f);
+            _isFading = false;
             return true;
         }
 
@@ -104,7 +111,10 @@ namespace OurWorld.World
             int idx = FindClipIndex(preferredName);
             if (idx < 0) return false;
 
-            _playables[idx].SetSpeed(speed);
+            if (Math.Abs(_playables[idx].GetSpeed() - speed) > 0.001)
+            {
+                _playables[idx].SetSpeed(speed);
+            }
             if (_activeIndex == idx) return true;
 
             _activeIndex = idx;
@@ -116,6 +126,32 @@ namespace OurWorld.World
                     _weights[i] = i == idx ? 1f : 0f;
                     _mixer.SetInputWeight(i, _weights[i]);
                 }
+                _isFading = false;
+            }
+            else
+            {
+                _isFading = true;
+            }
+            return true;
+        }
+
+        public void SetActiveSpeed(float speed)
+        {
+            if (!HasClips || _activeIndex < 0 || _activeIndex >= _playables.Count) return;
+            if (Math.Abs(_playables[_activeIndex].GetSpeed() - speed) > 0.001)
+            {
+                _playables[_activeIndex].SetSpeed(speed);
+            }
+        }
+
+        public bool SetClipSpeed(string preferredName, float speed)
+        {
+            if (!HasClips) return false;
+            int idx = FindClipIndex(preferredName);
+            if (idx < 0) return false;
+            if (Math.Abs(_playables[idx].GetSpeed() - speed) > 0.001)
+            {
+                _playables[idx].SetSpeed(speed);
             }
             return true;
         }
@@ -148,19 +184,25 @@ namespace OurWorld.World
         private int FindClipIndex(string name)
         {
             if (string.IsNullOrEmpty(name)) return -1;
+            // Fast path: check currently active clip first (avoids scanning when already playing)
+            if (_activeIndex >= 0 && _activeIndex < _clips.Count)
+            {
+                if (string.Equals(_clips[_activeIndex].name, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(_shortNames[_activeIndex], name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return _activeIndex;
+                }
+            }
             // 1. Exact case-insensitive match
             for (int i = 0; i < _clips.Count; i++)
             {
                 if (string.Equals(_clips[i].name, name, StringComparison.OrdinalIgnoreCase))
                     return i;
             }
-            // 2. Suffix after '|' match (e.g. "AnimalArmature|Walk")
-            for (int i = 0; i < _clips.Count; i++)
+            // 2. Cached suffix after '|' match (e.g. "AnimalArmature|Walk") — zero per-frame allocations
+            for (int i = 0; i < _shortNames.Count; i++)
             {
-                string cn = _clips[i].name;
-                int bar = cn.LastIndexOf('|');
-                string shortName = bar >= 0 ? cn.Substring(bar + 1) : cn;
-                if (string.Equals(shortName, name, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(_shortNames[i], name, StringComparison.OrdinalIgnoreCase))
                     return i;
             }
             // 3. Contains match
@@ -179,34 +221,51 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
-            float step = _fadeSpeed * dt;
-            float total = 0f;
-            for (int i = 0; i < _weights.Count; i++)
+            if (_isFading)
             {
-                float target = (i == _activeIndex) ? 1f : 0f;
-                if (!Mathf.Approximately(_weights[i], target))
-                {
-                    _weights[i] = Mathf.MoveTowards(_weights[i], target, step);
-                }
-                total += _weights[i];
-            }
-
-            if (total > 0.0001f)
-            {
+                float step = _fadeSpeed * dt;
+                float total = 0f;
+                bool anyMoving = false;
                 for (int i = 0; i < _weights.Count; i++)
                 {
-                    _mixer.SetInputWeight(i, _weights[i] / total);
+                    float target = (i == _activeIndex) ? 1f : 0f;
+                    float cur = _weights[i];
+                    if (Mathf.Abs(cur - target) > 0.0001f)
+                    {
+                        cur = Mathf.MoveTowards(cur, target, step);
+                        _weights[i] = cur;
+                        if (Mathf.Abs(cur - target) > 0.0001f)
+                        {
+                            anyMoving = true;
+                        }
+                    }
+                    total += Mathf.SmoothStep(0f, 1f, cur);
                 }
+
+                if (total > 0.0001f)
+                {
+                    float invTotal = 1f / total;
+                    for (int i = 0; i < _weights.Count; i++)
+                    {
+                        float eased = Mathf.SmoothStep(0f, 1f, _weights[i]);
+                        _mixer.SetInputWeight(i, eased * invTotal);
+                    }
+                }
+                _isFading = anyMoving;
             }
 
-            // Manually keep non-looping imported clips looping smoothly as a fail-safe
-            AnimationClip activeClip = _clips[_activeIndex];
-            if (activeClip != null && activeClip.length > 0.05f)
+            // Manually keep active & fading non-looping imported clips looping smoothly as a fail-safe
+            for (int i = 0; i < _clips.Count; i++)
             {
-                double cur = _playables[_activeIndex].GetTime();
-                if (cur >= activeClip.length)
+                if (i != _activeIndex && _weights[i] <= 0.001f) continue;
+                AnimationClip clip = _clips[i];
+                if (clip != null && clip.length > 0.05f)
                 {
-                    _playables[_activeIndex].SetTime(cur % activeClip.length);
+                    double cur = _playables[i].GetTime();
+                    if (cur >= clip.length)
+                    {
+                        _playables[i].SetTime(cur % clip.length);
+                    }
                 }
             }
         }
@@ -223,6 +282,7 @@ namespace OurWorld.World
                 _graph.Destroy();
             }
             _graphValid = false;
+            _isFading = false;
             _activeIndex = -1;
         }
     }

@@ -247,6 +247,7 @@ namespace OurWorld.World
         private ProceduralHumanoid _rivalTop;
         private ProceduralHumanoid _rivalBot;
         private float _rivalTopX, _rivalBotX;
+        private float _rivalTopYaw = 90f, _rivalBotYaw = 90f;
         private int _rivalTopLap, _rivalBotLap;
         private int _rivalTopDir, _rivalBotDir;
         private bool _rivalTopDone, _rivalBotDone;
@@ -255,6 +256,7 @@ namespace OurWorld.World
         private int _leagueTier;
         private int _playerLap;
         private int _playerDir; // +1 going East, -1 going West
+        private float _playerVisualYaw = 90f;
         private float _playerX;
         private float _playerSpeed;
         private float _stamina = 100f;
@@ -355,6 +357,7 @@ namespace OurWorld.World
             _phase = RacePhase.ReadyBlock;
             _playerLap = 0;
             _playerDir = 1;
+            _playerVisualYaw = 90f;
             _playerX = LaneMinX - 0.85f;
             _playerSpeed = 0f;
             _stamina = 100f;
@@ -369,6 +372,8 @@ namespace OurWorld.World
 
             _rivalTopX = LaneMinX + 0.2f;
             _rivalBotX = LaneMinX + 0.2f;
+            _rivalTopYaw = 90f;
+            _rivalBotYaw = 90f;
             _rivalTopLap = 0;
             _rivalBotLap = 0;
             _rivalTopDir = 1;
@@ -379,6 +384,12 @@ namespace OurWorld.World
             _player.TeleportTo(transform.TransformPoint(new Vector3(_playerX, DeckY, 0f)), Quaternion.Euler(0f, 90f, 0f));
             _player.Humanoid?.SetSwimming(false, 0f, false);
             _player.Humanoid?.SetLocomotion(0f, true, 0f);
+            // Olympic starting-block crouched track-start stance
+            Vector3 blockEdge = transform.TransformPoint(new Vector3(_playerX + 0.26f, DeckY + 0.08f, 0f));
+            _player.Humanoid?.SetDualHandAction(true,
+                blockEdge - _player.transform.right * 0.19f,
+                blockEdge + _player.transform.right * 0.19f,
+                0.75f, 0.75f, spineLeanDeg: 44f, headPitchDeg: 18f, hipsDrop: 0.16f);
 
             if (_rivalTop != null)
             {
@@ -404,6 +415,7 @@ namespace OurWorld.World
             }
             if (_player != null)
             {
+                _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f);
                 _player.Humanoid?.SetSwimming(false, 0f, false);
                 _player.Humanoid?.SetLocomotion(0f, true, 0f);
                 _player.SetSeatedState(false);
@@ -522,6 +534,7 @@ namespace OurWorld.World
                 _diveStartPos = new Vector3(_playerX, DeckY, 0f);
                 _diveEndPos = new Vector3(golden ? -3.1f : -4.4f, WaterBodyY, 0f);
                 _playerSpeed = golden ? 4.95f : 3.25f;
+                _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f);
                 _player.Humanoid?.PlaySportAnim(SportAnimKind.SwimDiveStart, 0.62f);
                 GameFeelAudio.PlayRefereeWhistle(doubleBlast: false);
                 if (golden)
@@ -705,8 +718,9 @@ namespace OurWorld.World
             _playerSpeed = Mathf.MoveTowards(_playerSpeed, cruise, 2.2f * dt);
 
             _playerX += _playerDir * _playerSpeed * dt;
-            float yaw = _playerDir > 0 ? 90f : -90f;
-            _player.TeleportTo(transform.TransformPoint(new Vector3(_playerX, WaterBodyY, 0f)), Quaternion.Euler(0f, yaw, 0f));
+            float targetYaw = _playerDir > 0 ? 90f : -90f;
+            _playerVisualYaw = Mathf.MoveTowardsAngle(_playerVisualYaw, targetYaw, 520f * dt);
+            _player.TeleportTo(transform.TransformPoint(new Vector3(_playerX, WaterBodyY, 0f)), Quaternion.Euler(0f, _playerVisualYaw, 0f));
             _player.Humanoid?.SetSwimming(true, _playerSpeed, _breaststroke);
 
             _splashTimer -= dt;
@@ -736,6 +750,7 @@ namespace OurWorld.World
                 {
                     // Auto-turn if player missed the golden flip-turn window
                     _playerSpeed = 2.4f;
+                    _player.Humanoid?.PlaySportAnim(SportAnimKind.SwimFlipTurn, 0.44f);
                     ExecuteLapTurn();
                 }
             }
@@ -745,11 +760,11 @@ namespace OurWorld.World
         {
             float baseSpd1 = 3.15f + _leagueTier * 0.42f;
             float baseSpd2 = 3.38f + _leagueTier * 0.46f;
-            StepRival(_rivalTop, ref _rivalTopX, ref _rivalTopLap, ref _rivalTopDir, ref _rivalTopDone, 2.55f, baseSpd1, dt);
-            StepRival(_rivalBot, ref _rivalBotX, ref _rivalBotLap, ref _rivalBotDir, ref _rivalBotDone, -2.55f, baseSpd2, dt);
+            StepRival(_rivalTop, ref _rivalTopX, ref _rivalTopYaw, ref _rivalTopLap, ref _rivalTopDir, ref _rivalTopDone, 2.55f, baseSpd1, dt);
+            StepRival(_rivalBot, ref _rivalBotX, ref _rivalBotYaw, ref _rivalBotLap, ref _rivalBotDir, ref _rivalBotDone, -2.55f, baseSpd2, dt);
         }
 
-        private void StepRival(ProceduralHumanoid hum, ref float rx, ref int lap, ref int dir, ref bool done, float laneZ, float speed, float dt)
+        private void StepRival(ProceduralHumanoid hum, ref float rx, ref float rYaw, ref int lap, ref int dir, ref bool done, float laneZ, float speed, float dt)
         {
             if (hum == null || done) return;
             float wave = 1f + Mathf.Sin(Time.time * 2.2f + laneZ) * 0.08f;
@@ -765,9 +780,12 @@ namespace OurWorld.World
                     return;
                 }
                 dir = -dir;
+                hum.PlaySportAnim(SportAnimKind.SwimFlipTurn, 0.48f);
             }
+            float targetYaw = dir > 0 ? 90f : -90f;
+            rYaw = Mathf.MoveTowardsAngle(rYaw, targetYaw, 500f * dt);
             hum.transform.localPosition = new Vector3(rx, WaterBodyY, laneZ);
-            hum.transform.localRotation = Quaternion.Euler(0f, dir > 0 ? 90f : -90f, 0f);
+            hum.transform.localRotation = Quaternion.Euler(0f, rYaw, 0f);
             hum.SetSwimming(true, speed, false);
         }
     }
@@ -794,6 +812,7 @@ namespace OurWorld.World
         private float _peakHeight = 4.4f;
         private int _flipsDone;
         private int _twistsDone;
+        private float _currentTwistDeg;
         private float _juryScore;
         private float _scoreWaitTimer;
         private Vector3 _launchWorldPos;
@@ -840,6 +859,7 @@ namespace OurWorld.World
             _airElapsed = 0f;
             _flipsDone = 0;
             _twistsDone = 0;
+            _currentTwistDeg = 0f;
             _juryScore = 0f;
             _calloutText = "TRAMPLEN DALIŞI · Altın bölgede zıpla!";
             _calloutColor = new Color(0.28f, 0.94f, 0.86f);
@@ -862,6 +882,7 @@ namespace OurWorld.World
             }
             if (_player != null)
             {
+                _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f);
                 _player.Humanoid?.SetSwimming(false, 0f, false);
                 _player.SetSeatedState(false);
             }
@@ -943,6 +964,7 @@ namespace OurWorld.World
                 _airElapsed = 0f;
                 _peakHeight = golden ? 4.85f : Mathf.Lerp(2.4f, 3.8f, _springCharge);
                 _airDuration = golden ? 1.75f : 1.35f;
+                _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f);
                 _player.Humanoid?.PlaySportAnim(SportAnimKind.SwimDiveStart, 0.55f);
                 GameFeelAudio.PlaySlideWhoosh();
                 _calloutText = golden ? "ALTIN SIÇRAMA! Havada Takla & Burgu bas!" : "ATLADIN! Havada Takla bas!";
@@ -994,6 +1016,11 @@ namespace OurWorld.World
                 _springCharge += _springDir * dt * 1.18f;
                 if (_springCharge >= 1f) { _springCharge = 1f; _springDir = -1f; }
                 else if (_springCharge <= 0.08f) { _springCharge = 0.08f; _springDir = 1f; }
+                // Subtle rhythmic knee-dip bounce while charging springboard launch
+                _player.Humanoid?.SetDualHandAction(true, Vector3.zero, Vector3.zero, 0f, 0f,
+                    spineLeanDeg: Mathf.Lerp(6f, 22f, _springCharge),
+                    headPitchDeg: 6f,
+                    hipsDrop: Mathf.Lerp(0.02f, 0.14f, _springCharge));
                 return;
             }
 
@@ -1003,8 +1030,10 @@ namespace OurWorld.World
                 float u = Mathf.Clamp01(_airElapsed / _airDuration);
                 Vector3 pos = Vector3.Lerp(_launchWorldPos, _entryWorldPos, u);
                 pos.y += 4f * _peakHeight * u * (1f - u);
-                float twistAngle = _twistsDone * 360f * u;
-                _player.TeleportTo(pos, transform.rotation * Quaternion.Euler(0f, twistAngle, 0f));
+                float targetTwistDeg = _twistsDone * 360f;
+                float twistSpeed = Mathf.Max(560f, (targetTwistDeg - _currentTwistDeg) * 7.5f);
+                _currentTwistDeg = Mathf.MoveTowards(_currentTwistDeg, targetTwistDeg, twistSpeed * dt);
+                _player.TeleportTo(pos, transform.rotation * Quaternion.Euler(0f, _currentTwistDeg, 0f));
 
                 if (u >= 1f)
                 {

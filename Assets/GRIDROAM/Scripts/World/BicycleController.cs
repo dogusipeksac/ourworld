@@ -23,7 +23,11 @@ namespace OurWorld.World
         private float _fallSpeed;
         private float _wheelAngle;
         private float _crankAngle;
+        private float _crankSpinRate;
         private float _lean;
+        private float _pitch;
+        private float _smoothedSteer;
+        private float _accelLean;
         private float _mountProgress = 1f;
         private Vector3 _mountPosition;
         private Quaternion _mountRotation;
@@ -70,9 +74,13 @@ namespace OurWorld.World
             _rider = rider;
             _speed = 0f;
             _fallSpeed = 0f;
+            _crankSpinRate = 0f;
+            _smoothedSteer = 0f;
+            _pitch = 0f;
+            _accelLean = 0f;
             _mountPosition = rider.transform.position;
             _mountRotation = rider.transform.rotation;
-            _mountProgress = IsMotorcycle ? 0f : 1f;
+            _mountProgress = 0f;
             rider.SetSeatedState(true);
             UpdateRider();
             if (_engine != null) _engine.Play();
@@ -90,10 +98,14 @@ namespace OurWorld.World
             _rider = null;
             _dismountFinished = null;
             _speed = 0f;
+            _crankSpinRate = 0f;
             _mountProgress = 1f;
             _lean = 0f;
-            _visual.localRotation = Quaternion.identity;
-            _fork.localRotation = Quaternion.identity;
+            _pitch = 0f;
+            _smoothedSteer = 0f;
+            _accelLean = 0f;
+            if (_visual != null) _visual.localRotation = Quaternion.identity;
+            if (_fork != null) _fork.localRotation = Quaternion.identity;
             if (_engine != null) _engine.Stop();
             enabled = false;
         }
@@ -137,7 +149,14 @@ namespace OurWorld.World
 
             if (_dismountFinished != null)
             {
-                _mountProgress = Mathf.MoveTowards(_mountProgress, 0f, dt / 0.52f);
+                float settle = 1f - Mathf.Exp(-10f * dt);
+                _lean = Mathf.Lerp(_lean, 0f, settle);
+                _pitch = Mathf.Lerp(_pitch, 0f, settle);
+                _smoothedSteer = Mathf.Lerp(_smoothedSteer, 0f, settle);
+                _accelLean = Mathf.Lerp(_accelLean, 0f, settle);
+                if (_visual != null) _visual.localRotation = Quaternion.Euler(_pitch, 0f, _lean);
+                if (_fork != null) _fork.localRotation = Quaternion.Euler(0f, _smoothedSteer * 20f, 0f);
+                _mountProgress = Mathf.MoveTowards(_mountProgress, 0f, dt / (IsMotorcycle ? 0.52f : 0.44f));
                 UpdateRider();
                 if (_mountProgress <= 0f) _dismountFinished.Invoke();
                 return;
@@ -145,7 +164,13 @@ namespace OurWorld.World
 
             if (IsMounting)
             {
-                _mountProgress = Mathf.MoveTowards(_mountProgress, 1f, dt / 0.58f);
+                float settle = 1f - Mathf.Exp(-10f * dt);
+                _lean = Mathf.Lerp(_lean, 0f, settle);
+                _pitch = Mathf.Lerp(_pitch, 0f, settle);
+                _smoothedSteer = Mathf.Lerp(_smoothedSteer, 0f, settle);
+                if (_visual != null) _visual.localRotation = Quaternion.Euler(_pitch, 0f, _lean);
+                if (_fork != null) _fork.localRotation = Quaternion.Euler(0f, _smoothedSteer * 20f, 0f);
+                _mountProgress = Mathf.MoveTowards(_mountProgress, 1f, dt / (IsMotorcycle ? 0.58f : 0.46f));
                 UpdateRider();
                 return;
             }
@@ -159,10 +184,12 @@ namespace OurWorld.World
             float targetSpeed = brake > 0f ? 0f : throttle * topSpeed;
             float rate = brake > 0f ? (IsMotorcycle ? 15f : 10f) * brake :
                 throttle > 0f ? (IsMotorcycle ? 6.1f : 3.2f) : (IsMotorcycle ? 2.1f : 0.9f);
+            float prevSpeed = _speed;
             _speed = Mathf.MoveTowards(_speed, targetSpeed, rate * dt);
 
             float speedFactor = Mathf.InverseLerp(0.12f, 2.1f, _speed);
             float turnRate = Mathf.Lerp(95f, IsMotorcycle ? 31f : 43f, _speed / topSpeed);
+            _smoothedSteer = Mathf.Lerp(_smoothedSteer, steer, 1f - Mathf.Exp(-11f * dt));
             transform.Rotate(0f, steer * speedFactor * turnRate * dt, 0f, Space.World);
             _fallSpeed = _body.isGrounded ? -2f : Mathf.Max(-15f, _fallSpeed - 16f * dt);
             Vector3 before = transform.position;
@@ -173,14 +200,31 @@ namespace OurWorld.World
             travel.y = 0f;
             float tireRadius = IsMotorcycle ? 0.36f : WheelRadius;
             _wheelAngle = Mathf.Repeat(_wheelAngle + travel.magnitude / tireRadius * Mathf.Rad2Deg, 360f);
-            if (_crank != null && throttle > 0f && brake <= 0f)
+            if (_crank != null)
             {
-                _crankAngle = Mathf.Repeat(_crankAngle + Mathf.Lerp(105f, 340f, _speed / TopSpeed) * throttle * dt, 360f);
+                float targetCrankRate = (throttle > 0.02f && brake <= 0.01f)
+                    ? Mathf.Lerp(105f, 340f, _speed / TopSpeed) * throttle
+                    : 0f;
+                _crankSpinRate = Mathf.Lerp(_crankSpinRate, targetCrankRate, 1f - Mathf.Exp(-7f * dt));
+                if (_crankSpinRate > 2f)
+                {
+                    _crankAngle = Mathf.Repeat(_crankAngle + _crankSpinRate * dt, 360f);
+                }
             }
 
-            _lean = Mathf.Lerp(_lean, -steer * (IsMotorcycle ? 26f : 15f) * speedFactor, 1f - Mathf.Exp(-8f * dt));
-            _visual.localRotation = Quaternion.Euler(0f, 0f, _lean);
-            _fork.localRotation = Quaternion.Euler(0f, steer * Mathf.Lerp(23f, 12f, IsMotorcycle ? _speed / topSpeed : 0f), 0f);
+            float accelRaw = (_speed - prevSpeed) / Mathf.Max(0.005f, dt);
+            float targetPitch = brake > 0.05f && _speed > 0.4f
+                ? Mathf.Clamp((IsMotorcycle ? 4.2f : 2.8f) * brake, 0f, 4.5f)
+                : Mathf.Clamp(-accelRaw * (IsMotorcycle ? 0.42f : 0.25f), -2.6f, 3.2f);
+            _pitch = Mathf.Lerp(_pitch, targetPitch, 1f - Mathf.Exp(-9f * dt));
+            float targetAccelLean = brake > 0.05f && _speed > 0.4f
+                ? 0.65f * brake
+                : Mathf.Clamp(-accelRaw * 0.14f, -0.55f, 0.70f);
+            _accelLean = Mathf.Lerp(_accelLean, targetAccelLean, 1f - Mathf.Exp(-8f * dt));
+
+            _lean = Mathf.Lerp(_lean, -_smoothedSteer * (IsMotorcycle ? 26f : 15f) * speedFactor, 1f - Mathf.Exp(-8f * dt));
+            _visual.localRotation = Quaternion.Euler(_pitch, 0f, _lean);
+            _fork.localRotation = Quaternion.Euler(0f, _smoothedSteer * Mathf.Lerp(23f, 12f, IsMotorcycle ? _speed / topSpeed : 0.25f * _speed / topSpeed), 0f);
             _frontWheel.localRotation = Quaternion.Euler(_wheelAngle, 0f, 0f);
             _rearWheel.localRotation = _frontWheel.localRotation;
             if (_crank != null) _crank.localRotation = Quaternion.Euler(_crankAngle, 0f, 0f);
@@ -205,20 +249,33 @@ namespace OurWorld.World
             {
                 float footPeg = Mathf.SmoothStep(0f, 1f, _speed / 2.2f);
                 Vector3 leftStand = transform.TransformPoint(new Vector3(-0.40f, 0.015f, -0.14f));
+                if (footPeg < 0.98f && Physics.Raycast(leftStand + Vector3.up * 0.65f, Vector3.down, out RaycastHit gHit, 1.4f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    leftStand.y = gHit.point.y + 0.015f;
+                }
                 Vector3 leftPeg = _visual.TransformPoint(new Vector3(-0.25f, 0.31f, -0.10f));
                 _rider.Humanoid.SetMotorcyclePose(
                     Vector3.Lerp(leftStand, leftPeg, footPeg),
                     _visual.TransformPoint(new Vector3(0.25f, 0.31f, -0.10f)),
                     _fork.TransformPoint(new Vector3(-0.33f, 0.70f, -0.38f)),
-                    _fork.TransformPoint(new Vector3(0.33f, 0.70f, -0.38f)), mount, footPeg);
+                    _fork.TransformPoint(new Vector3(0.33f, 0.70f, -0.38f)), mount, footPeg, _smoothedSteer, _accelLean);
             }
             else
             {
+                float footPeg = Mathf.SmoothStep(0f, 1f, _speed / 0.85f);
+                Vector3 leftStand = transform.TransformPoint(new Vector3(-0.32f, 0.015f, -0.10f));
+                if (footPeg < 0.98f && Physics.Raycast(leftStand + Vector3.up * 0.65f, Vector3.down, out RaycastHit gHit, 1.4f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    leftStand.y = gHit.point.y + 0.015f;
+                }
                 Vector3 leftPedal = _crank.TransformPoint(new Vector3(-0.16f, 0f, -CrankRadius));
                 Vector3 rightPedal = _crank.TransformPoint(new Vector3(0.16f, 0f, CrankRadius));
                 Vector3 leftGrip = _fork.TransformPoint(new Vector3(-0.24f, 0.69f, -0.18f));
                 Vector3 rightGrip = _fork.TransformPoint(new Vector3(0.24f, 0.69f, -0.18f));
-                _rider.Humanoid.SetCycling(true, leftPedal, rightPedal, leftGrip, rightGrip);
+                _rider.Humanoid.SetCycling(true, Vector3.Lerp(leftStand, leftPedal, footPeg), rightPedal, leftGrip, rightGrip,
+                    mount, footPeg, _smoothedSteer, _accelLean);
             }
         }
     }

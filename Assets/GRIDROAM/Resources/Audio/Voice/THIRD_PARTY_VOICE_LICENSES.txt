@@ -1,0 +1,20 @@
+Third-Party Open-Source Voice Synthesis Licenses (Offline Pre-Rendered Audio Assets)
+====================================================================================
+
+All Turkish character voiceover audio files under Assets/GRIDROAM/Resources/Audio/Voice/tr/
+were pre-rendered offline using open-source, commercially permissible Apache-2.0 neural TTS models:
+
+1. yazgi-tts-1 (https://huggingface.co/erkamk/yazgi-tts-1)
+   - License: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+   - Used voices: female-01, female-02, female-03, female-04, male-01, male-02, male-03, male-04
+
+2. EMA Lightning (https://huggingface.co/canberkkkkkk/ema-lightning)
+   - License: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+   - Synthetic AI-generated Turkish voice (no real person's voice recording).
+
+3. Antalia-2 Mini (https://huggingface.co/cloud0day3/antalia-mini)
+   - License: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+   - Synthetic AI-generated Turkish male voice (no real person's voice recording).
+
+No third-party runtime Python code or GPL dependencies are bundled in the game binary;
+only the rendered mono Vorbis-compressed audio assets are included in the application.

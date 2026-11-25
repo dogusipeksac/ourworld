@@ -271,6 +271,8 @@ namespace OurWorld.World
 
         private void ShowSpeech(Transform speaker, string speakerName, string text, float duration, NpcBubbleMood mood, float headHeight)
         {
+            OurWorld.Core.VoiceoverManager.PlayWorldSpeech(speaker, text, mood, speakerName);
+
             float now = Time.time;
             for (int i = 0; i < _speeches.Count; i++)
             {

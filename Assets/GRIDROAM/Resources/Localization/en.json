@@ -2636,6 +2636,10 @@
     {
       "key": "m26.c3.f2",
       "value": "May this bond from past to future never fade. Thank you for everything, Deniz!"
+    },
+    {
+      "key": "sports.shooting.controls",
+      "value": "Drag/Mouse: Aim · Left Click/F: Fire · Right Click/Space: ADS/Scope · R: Reload · 1-4: Weapon · Shift: Hold Breath · E: Exit"
     }
   ]
 }

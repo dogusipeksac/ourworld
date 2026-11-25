@@ -24,6 +24,7 @@ namespace OurWorld.World
         private float _lastKickTime = -99f;
         private float _lastDribbleTime = -99f;
         private bool _goalResetting;
+        private bool _kickPending;
 
         private void Awake()
         {
@@ -52,23 +53,50 @@ namespace OurWorld.World
 
         public void KickFromPlayer(PlayerModeController mode, float powerMultiplier = 1f)
         {
-            if (mode == null || _rb == null || Time.time - _lastKickTime < 0.25f) return;
+            if (mode == null || _rb == null || _kickPending || Time.time - _lastKickTime < 0.25f) return;
             _lastKickTime = Time.time;
 
-            Vector3 dir;
-            if (mode.FootController != null)
+            if (mode.FootController != null && mode.FootController.Humanoid != null)
             {
-                dir = mode.FootController.transform.forward;
-                if (mode.FootController.Humanoid != null)
-                {
-                    mode.FootController.Humanoid.PlaySportAnim(SportAnimKind.SoccerKick, 0.50f);
-                }
-            }
-            else
-            {
-                dir = (transform.position - mode.ActiveWorldPosition);
+                mode.FootController.Humanoid.PlaySportAnim(SportAnimKind.SoccerKick, 0.50f);
+                StartCoroutine(DelayedKickImpulseRoutine(mode.FootController, powerMultiplier));
+                return;
             }
 
+            Vector3 dir = transform.position - mode.ActiveWorldPosition;
+            ApplyKickImpulse(dir, powerMultiplier);
+        }
+
+        private IEnumerator DelayedKickImpulseRoutine(PlayerFootController foot, float powerMultiplier)
+        {
+            _kickPending = true;
+            const float contactDelay = 0.17f; // matches SoccerKick right-foot strike peak
+            float elapsed = 0f;
+            while (elapsed < contactDelay)
+            {
+                float dt = Time.deltaTime;
+                elapsed += dt;
+                if (foot != null)
+                {
+                    Vector3 toBall = transform.position - foot.transform.position;
+                    toBall.y = 0f;
+                    if (toBall.sqrMagnitude > 0.04f && toBall.sqrMagnitude < 9f)
+                    {
+                        Quaternion face = Quaternion.LookRotation(toBall.normalized, Vector3.up);
+                        foot.transform.rotation = Quaternion.Slerp(foot.transform.rotation, face, 1f - Mathf.Exp(-14f * dt));
+                    }
+                }
+                yield return null;
+            }
+
+            Vector3 dir = foot != null ? foot.transform.forward : Vector3.forward;
+            ApplyKickImpulse(dir, powerMultiplier);
+            _kickPending = false;
+        }
+
+        private void ApplyKickImpulse(Vector3 dir, float powerMultiplier)
+        {
+            if (_rb == null) return;
             dir.y = 0f;
             if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
             dir.Normalize();

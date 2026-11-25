@@ -51,6 +51,7 @@ namespace OurWorld.World
         private float _carriageBaseY;
         private float _carriageTargetLift;
         private float _carriageCurrentLift;
+        private float _carriageLiftVelocity;
         private bool _hasActiveCustomer;
         private float _nextCustomerTimer;
         private int _orderCounter;
@@ -105,10 +106,10 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
-            // Smooth hydraulic lift animation!
+            // Smooth hydraulic lift animation with gentle ramp-up and cushioned stop
             if (_liftCarriage != null)
             {
-                _carriageCurrentLift = Mathf.MoveTowards(_carriageCurrentLift, _carriageTargetLift, 0.85f * dt);
+                _carriageCurrentLift = Mathf.SmoothDamp(_carriageCurrentLift, _carriageTargetLift, ref _carriageLiftVelocity, 0.36f, 0.92f, dt);
                 Vector3 lp = _liftCarriage.localPosition;
                 lp.y = _carriageBaseY + _carriageCurrentLift;
                 _liftCarriage.localPosition = lp;

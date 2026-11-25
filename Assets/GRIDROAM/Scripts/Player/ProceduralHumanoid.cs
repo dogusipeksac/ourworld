@@ -59,32 +59,53 @@ namespace OurWorld.Player
         private const float WalkSpeedRef = 2.25f;
         private const float RunSpeedRef = 4.25f;
         private const float WaveDuration = 1.5f;
-        private const float LandSquatDuration = 0.15f;
+        private const float LandSquatDuration = 0.28f;
         private const float HandLength = 0.30f;
         private const float AnkleHeight = 0.081f;
         private const float TwoPi = 2f * Mathf.PI;
 
         private float _speedMs;
         private Vector3 _travelDirection = Vector3.forward;
+        private Vector3 _smoothedTravelDir = Vector3.forward;
         private bool _sampleGround;
         private float _gaitWeight;
         private bool _grounded = true;
         private bool _wasGrounded = true;
         private float _airborneTimer;
+        private float _peakFallSpeed;
         private float _landSquatTimer = -1f;
+        private float _landSquatDuration = LandSquatDuration;
+        private float _landImpact01;
         private float _verticalVelocity;
         private float _steerAngleDeg;
+        private float _smoothedDriveSteerNorm;
+        private float _driveThrottleInput;
+        private float _driveLongitudinalAccel;
         private Transform _steeringWheel;
         private float? _seatFloor;
         private float _seatAmount;
+        private bool _autoSeatActive;
+        private float _autoSeatFrom;
+        private float _autoSeatTo;
+        private float _autoSeatElapsed;
+        private float _autoSeatDuration = 0.85f;
+        private int _seatGestureKind;
+        private float _seatGestureTimer = -1f;
+        private float _seatGestureDuration;
+        private float _seatGestureCooldown = -1f;
         private Transform _doorHandle;
         private float _doorReachStarted;
         private float _doorReachDuration;
+        private float _doorReachTime = 0.16f;
         private bool _doorReachRight;
         private bool _cycling;
         private bool _motorcyclePose;
-        private float _motorcycleMount;
-        private float _motorcycleFootPeg;
+        private float _cycleMount = 1f;
+        private float _cycleFootPeg = 1f;
+        private float _cycleSteerNorm;
+        private float _cycleAccelLean;
+        private float _cycleSmoothedSteer;
+        private float _cycleSmoothedAccel;
         private Vector3 _leftPedal, _rightPedal, _leftGrip, _rightGrip;
         private Transform _tennisRacket;
         private Vector3 _tennisContact;
@@ -111,10 +132,14 @@ namespace OurWorld.Player
         private float _smoothedTurnLean;
         // v13 animation polish: acceleration lean, idle weight shifts, run crouch, fall flail
         private float _prevSpeedMs;
+        private float _recentPeakSpeed;
         private float _smoothedAccelLean;
         private float _smoothedHeadTurnLead;
         private float _stopSettleTimer = -1f;
         private float _stopSettleStrength;
+        private float _turnInPlaceWeight;
+        private float _turnStepPhase;
+        private float _turnYawSign = 1f;
         private float _idleShift;
         private float _idleShiftTarget;
         private float _idleShiftCountdown = 7f;
@@ -138,11 +163,21 @@ namespace OurWorld.Player
         private int _prayerStage;
         private float _prayerSelamYaw;
         private bool _prayerHandsInit;
+        private float _prayerHandFade;
         private Vector3 _prayerLeftHandLocal;
         private Vector3 _prayerRightHandLocal;
         private bool _isLyingDown;
+        private float _lyingBlend;
+        private bool _lyingTarget;
+        private float _lyingTransition = 1.1f;
+        private int _lyingVariant;
+        private float _lyingStirTimer = -1f;
+        private float _lyingStirCountdown = 12f;
+        private float _lyingStirSide = 1f;
         private float _startledTimer = -1f;
         private float _startledDuration = 1.1f;
+        private float _startledDodgeSide = 1f;
+        private bool _startledHasThreat;
         private float _autoWaveCountdown = 8f;
         private const float PunchDuration = 0.36f;
         private const float KickDuration = 0.44f;
@@ -157,6 +192,42 @@ namespace OurWorld.Player
         private Vector3 _lookWorldPoint;
         private float _smoothedLookYaw;
         private float _smoothedLookPitch;
+        private float _lookWeight;
+
+        // Ground sampling & stair smoothing state
+        private Vector3 _prevWorldPos;
+        private float _leftGroundYOffset;
+        private float _rightGroundYOffset;
+        private float _leftRawGroundYOffset;
+        private float _rightRawGroundYOffset;
+        private Vector3 _leftGroundNormal = Vector3.up;
+        private Vector3 _rightGroundNormal = Vector3.up;
+        private Vector3 _leftRawGroundNormal = Vector3.up;
+        private Vector3 _rightRawGroundNormal = Vector3.up;
+        private float _groundCacheTimer;
+        private bool _groundSampleValid;
+        private float _smoothedPelvisDrop;
+        private Vector3 _baseHipsLocalPos;
+
+        // Carry release fade, throw follow-through & load smoothing
+        private float _carryLoadBlend;
+        private float _carryReleaseTimer = -1f;
+        private const float CarryReleaseFadeDuration = 0.24f;
+        private Vector3 _carryReleaseLeft;
+        private Vector3 _carryReleaseRight;
+        private float _carryReleaseCrouch;
+        private float _carryThrowTimer = -1f;
+        private const float CarryThrowFollowDuration = 0.30f;
+        private float _carryThrowHeaviness;
+        private Vector3 _carryThrowLeftLocal;
+        private Vector3 _carryThrowRightLocal;
+
+        // Petting smooth surface & early-cancel fade state
+        private float _petFadeBlend;
+        private Vector3 _lastPetHandWorld;
+        private Vector3 _prevPetHandSample;
+        private bool _hasPrevPetSample;
+        private float _petReturnLift;
 
         // Shop shelf reach & drinking/eating animation state
         private bool _hasShelfReach;
@@ -176,11 +247,36 @@ namespace OurWorld.Player
         private float _dualHeadPitch;
         private float _dualHipsDrop;
 
+        // One-knee kneel overlay (farm work & low interactions)
+        private float _kneelWeight;
+        private float _kneelBlend;
+        private bool _kneelRight = true;
+        private bool _activeKneelRight = true;
+
+        // Shooting Range two-handed tactical aiming, recoil kick & reload overlay
+        private bool _weaponAimActive;
+        private bool _weaponIsLongGun;
+        private float _weaponAimBlend;
+        private float _weaponLongGunBlend;
+        private float _weaponAimPitchDeg;
+        private float _weaponRecoilKick;
+        private float _weaponReloadPhase;
+        private int _weaponActionKind; // 0 = none, 1 = shotgun pump, 2 = sniper bolt
+        private float _weaponActionPhase;
+        private int _weaponReloadStyle; // 0 = mag swap, 1 = shotgun shell load, 2 = sniper mag+bolt
+
+        public Vector3 WeaponGripWorldPos { get; private set; }
+        public Quaternion WeaponGripWorldRot { get; private set; }
+
         public Transform HeadTransform => head;
         public Transform RightForearm => rElbow;
         public Transform LeftForearm => lElbow;
 
         public bool IsSitting => isSitting;
+        public bool IsSeatTransitionActive => _autoSeatActive;
+        public bool IsSeatedOnFloorContact => isSitting && _seatFloor.HasValue && !isDrivingSeat;
+        public float KneelWeight => _kneelWeight;
+        public bool HasUnevenGroundSample => Mathf.Abs(_leftGroundYOffset) > 0.015f || Mathf.Abs(_rightGroundYOffset) > 0.015f;
         public event Action<float> OnFootstepContact;
         public event Action OnLanded;
 
@@ -408,6 +504,8 @@ namespace OurWorld.Player
         {
             if (_initialized && !_wasGrounded && grounded && _airborneTimer > 0.08f)
             {
+                _landImpact01 = Mathf.Clamp01((_peakFallSpeed - 2.5f) / 10f);
+                _landSquatDuration = Mathf.Lerp(0.26f, 0.42f, _landImpact01);
                 _landSquatTimer = 0f;
                 OnLanded?.Invoke();
             }
@@ -416,6 +514,11 @@ namespace OurWorld.Player
             if (grounded)
             {
                 _airborneTimer = 0f;
+                _peakFallSpeed = 0f;
+            }
+            else if (verticalVelocity < 0f)
+            {
+                _peakFallSpeed = Mathf.Max(_peakFallSpeed, -verticalVelocity);
             }
 
             _speedMs = Mathf.Max(0f, speedMs);
@@ -440,6 +543,9 @@ namespace OurWorld.Player
 
         public void PlayWave()
         {
+            CarryableProp carry = CarryableProp.CurrentlyHeld;
+            if (carry != null && carry.UsesRig(this)) return;
+            if (_consumeWeight > 0.05f || _hasShelfReach || _hasDualAction) return;
             _waveTimer = 0f;
             _idleGestureTimer = -1f;
         }
@@ -513,6 +619,8 @@ namespace OurWorld.Player
 
         public void PlayLanding()
         {
+            _landImpact01 = Mathf.Max(_landImpact01, 0.35f);
+            _landSquatDuration = Mathf.Lerp(0.26f, 0.40f, _landImpact01);
             _landSquatTimer = 0f;
             _vaultTimer = -1f;
             OnLanded?.Invoke();
@@ -523,6 +631,11 @@ namespace OurWorld.Player
             _isSwimming = swimming;
             _swimSpeed = Mathf.Max(0f, swimSpeed);
             _swimBreaststroke = breaststroke;
+            if (swimming)
+            {
+                _kneelWeight = 0f;
+                _kneelBlend = 0f;
+            }
         }
 
         /// <summary>
@@ -547,6 +660,9 @@ namespace OurWorld.Player
                 _punchTimer = -1f;
                 _startledTimer = -1f;
                 _isLyingDown = false;
+                _lyingTarget = false;
+                _lyingBlend = 0f;
+                _lyingStirTimer = -1f;
             }
             else
             {
@@ -554,28 +670,87 @@ namespace OurWorld.Player
             }
         }
 
-        public void SetLyingDown(bool lying)
+        public void SetLyingDown(bool lying, float transitionSeconds = 1.1f)
         {
-            _isLyingDown = lying;
+            _lyingTransition = transitionSeconds;
+            _lyingTarget = lying;
+
             if (lying)
             {
+                if (!_isLyingDown)
+                {
+                    _lyingVariant = UnityEngine.Random.Range(0, 3);
+                    _lyingStirCountdown = UnityEngine.Random.Range(8f, 16f);
+                    _lyingStirTimer = -1f;
+                    _isLyingDown = true;
+                }
                 _waveTimer = -1f;
                 _punchTimer = -1f;
                 _prayerStage = 0;
+                _kneelWeight = 0f;
+                _kneelBlend = 0f;
+            }
+
+            if (transitionSeconds <= 0.01f)
+            {
+                _lyingBlend = lying ? 1f : 0f;
+                if (!lying)
+                {
+                    _isLyingDown = false;
+                    _lyingStirTimer = -1f;
+                }
             }
         }
 
-        public void PlayStartled(float duration = 1.1f)
+        public void PlayStartled(float duration = 1.1f, Vector3? threatWorldPos = null)
         {
             _startledDuration = Mathf.Max(0.35f, duration);
             _startledTimer = 0f;
+            _startledHasThreat = false;
+
+            if (threatWorldPos.HasValue)
+            {
+                float localX = transform.InverseTransformPoint(threatWorldPos.Value).x;
+                _startledDodgeSide = localX >= 0f ? -1f : 1f;
+                _startledHasThreat = true;
+            }
+            else
+            {
+                PlayerModeController mode = PlayerModeController.Instance;
+                if (mode != null && mode.IsDriving)
+                {
+                    Vector3 carPos = mode.ActiveWorldPosition;
+                    Vector3 toCar = carPos - transform.position;
+                    toCar.y = 0f;
+                    if (toCar.sqrMagnitude <= 18f * 18f)
+                    {
+                        float localX = transform.InverseTransformPoint(carPos).x;
+                        _startledDodgeSide = localX >= 0f ? -1f : 1f;
+                        _startledHasThreat = true;
+                    }
+                }
+                if (!_startledHasThreat)
+                {
+                    _startledDodgeSide = (_noiseSeed % 2f) >= 1f ? 1f : -1f;
+                }
+            }
         }
 
         public void SetSitting(bool sitting, bool driving = false)
         {
             isSitting = sitting;
             isDrivingSeat = sitting && driving;
-            if (!sitting || driving) _seatFloor = null;
+            if (sitting)
+            {
+                _kneelWeight = 0f;
+                _kneelBlend = 0f;
+            }
+            if (!sitting || driving)
+            {
+                _seatFloor = null;
+                _autoSeatActive = false;
+                ResetSeatedGesture();
+            }
             if (!Application.isPlaying && sitting)
             {
                 ApplySittingPoseImmediate();
@@ -592,6 +767,12 @@ namespace OurWorld.Player
             _steerAngleDeg = wheelDegrees;
         }
 
+        public void SetDrivingDynamics(float throttleOrBrake, float longitudinalAccel)
+        {
+            _driveThrottleInput = Mathf.Clamp(throttleOrBrake, -1f, 1f);
+            _driveLongitudinalAccel = Mathf.Clamp(longitudinalAccel, -12f, 12f);
+        }
+
         public void SetSteeringWheel(Transform wheel)
         {
             _steeringWheel = wheel;
@@ -603,12 +784,88 @@ namespace OurWorld.Player
             _seatAmount = seatedAmount;
         }
 
-        public void PlayDoorReach(Transform handle, float duration)
+        /// <summary>
+        /// Caller moves the root from the approach point onto the seat point during the same duration (sit down)
+        /// or back off it (stand up). When a stand-up transition finishes, SetSitting(false) is called automatically.
+        /// </summary>
+        public void BeginSeatTransition(float floorHeight, bool sitDown, float duration = 0.85f)
         {
+            bool wasAlreadySittingWithContact = isSitting && _seatFloor.HasValue && !isDrivingSeat;
+            isSitting = true;
+            isDrivingSeat = false;
+            _seatFloor = floorHeight;
+            _autoSeatFrom = sitDown ? (wasAlreadySittingWithContact ? _seatAmount : 0f) : _seatAmount;
+            _autoSeatTo = sitDown ? 1f : 0f;
+            _autoSeatElapsed = 0f;
+            _autoSeatDuration = Mathf.Max(0.3f, duration);
+            _autoSeatActive = true;
+            if (sitDown && !wasAlreadySittingWithContact)
+            {
+                _seatAmount = 0f;
+            }
+            ResetSeatedGesture();
+        }
+
+        private void ResetSeatedGesture()
+        {
+            _seatGestureKind = 0;
+            _seatGestureTimer = -1f;
+            _seatGestureCooldown = -1f;
+        }
+
+        public void PlayDoorReach(Transform handle, float duration, float reachTime = 0.16f)
+        {
+            if (handle == null) return;
+            if (_isLyingDown || isSitting || _cycling || _weaponAimActive || _prayerStage > 0) return;
+            if (CarryableProp.CurrentlyHeld != null && CarryableProp.CurrentlyHeld.UsesRig(this)) return;
             _doorHandle = handle;
             _doorReachStarted = Time.time;
-            _doorReachDuration = duration;
+            _doorReachDuration = Mathf.Max(0.15f, duration);
+            _doorReachTime = Mathf.Clamp(reachTime, 0.06f, _doorReachDuration * 0.65f);
             _doorReachRight = transform.InverseTransformPoint(handle.position).x >= -0.08f;
+        }
+
+        internal void BeginCarryReleaseFade(Vector3 leftGripWorld, Vector3 rightGripWorld, float crouchAmount)
+        {
+            _carryReleaseLeft = leftGripWorld;
+            _carryReleaseRight = rightGripWorld;
+            _carryReleaseCrouch = Mathf.Clamp01(crouchAmount);
+            _carryReleaseTimer = 0f;
+            _carryThrowTimer = -1f;
+        }
+
+        public void PlayCarryThrowFollowThrough(float heaviness = 0.7f, Vector3? releaseLeftWorld = null, Vector3? releaseRightWorld = null)
+        {
+            _carryThrowHeaviness = Mathf.Clamp01(heaviness);
+            _carryThrowTimer = 0f;
+            _carryReleaseTimer = -1f;
+            _waveTimer = -1f;
+            _carryThrowLeftLocal = releaseLeftWorld.HasValue
+                ? transform.InverseTransformPoint(releaseLeftWorld.Value)
+                : new Vector3(-0.18f, 1.32f, 0.56f);
+            _carryThrowRightLocal = releaseRightWorld.HasValue
+                ? transform.InverseTransformPoint(releaseRightWorld.Value)
+                : new Vector3(0.18f, 1.32f, 0.56f);
+        }
+
+        public void SetWeaponAimPose(
+            bool active,
+            bool isLongGun,
+            float aimPitchDeg,
+            float recoilKick01 = 0f,
+            float reloadProgress01 = 0f,
+            int weaponActionKind = 0,
+            float weaponActionPhase01 = 0f,
+            int reloadStyle = 0)
+        {
+            _weaponAimActive = active;
+            _weaponIsLongGun = isLongGun;
+            _weaponAimPitchDeg = Mathf.Clamp(aimPitchDeg, -45f, 45f);
+            _weaponRecoilKick = Mathf.Clamp01(recoilKick01);
+            _weaponReloadPhase = Mathf.Clamp01(reloadProgress01);
+            _weaponActionKind = active ? weaponActionKind : 0;
+            _weaponActionPhase = active ? Mathf.Clamp01(weaponActionPhase01) : 0f;
+            _weaponReloadStyle = reloadStyle;
         }
 
         public void SetDualHandAction(
@@ -635,6 +892,12 @@ namespace OurWorld.Player
             }
         }
 
+        public void SetKneel(float weight, bool rightKneeDown = true)
+        {
+            _kneelWeight = Mathf.Clamp01(weight);
+            _kneelRight = rightKneeDown;
+        }
+
         private void Start()
         {
             InitializeRuntime();
@@ -649,6 +912,9 @@ namespace OurWorld.Player
             if (_initialized) return;
             _initialized = true;
             _prevYaw = transform.eulerAngles.y;
+            _prevWorldPos = transform.position;
+            _smoothedTravelDir = transform.forward;
+            _baseHipsLocalPos = hips != null ? hips.localPosition : new Vector3(0f, hipsBaseY, 0f);
             _noiseSeed = UnityEngine.Random.Range(0f, 100f);
             _autoWaveCountdown = UnityEngine.Random.Range(4f, 10f);
             if (chestVisual != null)
@@ -713,11 +979,32 @@ namespace OurWorld.Player
 
             if (_cycling)
             {
-                AnimateCycling();
+                _idleTime += dt;
+                AnimateCycling(dt);
+                _baseHipsLocalPos = hips.localPosition;
                 return;
             }
 
             _idleTime += dt;
+            if (_isLyingDown)
+            {
+                _lyingBlend = Mathf.MoveTowards(_lyingBlend, _lyingTarget ? 1f : 0f, dt / Mathf.Max(0.05f, _lyingTransition));
+                if (!_lyingTarget && _lyingBlend <= 0f)
+                {
+                    _isLyingDown = false;
+                    _lyingStirTimer = -1f;
+                }
+                else if (_lyingBlend >= 0.999f && _lyingStirTimer < 0f)
+                {
+                    _lyingStirCountdown -= dt;
+                    if (_lyingStirCountdown <= 0f)
+                    {
+                        _lyingStirTimer = 0f;
+                        _lyingStirSide = UnityEngine.Random.value < 0.5f ? -1f : 1f;
+                        _lyingStirCountdown = UnityEngine.Random.Range(9f, 20f);
+                    }
+                }
+            }
             if (!_grounded)
             {
                 _airborneTimer += dt;
@@ -726,11 +1013,44 @@ namespace OurWorld.Player
             if (_landSquatTimer >= 0f)
             {
                 _landSquatTimer += dt;
-                if (_landSquatTimer >= LandSquatDuration)
+                if (_landSquatTimer >= _landSquatDuration)
                 {
                     _landSquatTimer = -1f;
                 }
             }
+
+            if (_carryReleaseTimer >= 0f)
+            {
+                _carryReleaseTimer += dt;
+                if (_carryReleaseTimer >= CarryReleaseFadeDuration)
+                {
+                    _carryReleaseTimer = -1f;
+                }
+            }
+
+            if (_carryThrowTimer >= 0f)
+            {
+                _carryThrowTimer += dt;
+                if (_carryThrowTimer >= CarryThrowFollowDuration)
+                {
+                    _carryThrowTimer = -1f;
+                }
+            }
+
+            if ((transform.position - _prevWorldPos).sqrMagnitude > 1.0f)
+            {
+                _leftGroundYOffset = 0f;
+                _rightGroundYOffset = 0f;
+                _leftRawGroundYOffset = 0f;
+                _rightRawGroundYOffset = 0f;
+                _leftGroundNormal = transform.up;
+                _rightGroundNormal = transform.up;
+                _leftRawGroundNormal = transform.up;
+                _rightRawGroundNormal = transform.up;
+                _smoothedPelvisDrop = 0f;
+                _groundSampleValid = false;
+            }
+            _prevWorldPos = transform.position;
 
             if (_startledTimer >= 0f)
             {
@@ -741,7 +1061,7 @@ namespace OurWorld.Player
                 }
             }
 
-            if (autoRandomWave && !isSitting && _speedMs < 0.1f)
+            if (autoRandomWave && !isSitting && !_isLyingDown && _speedMs < 0.1f)
             {
                 _autoWaveCountdown -= dt;
                 if (_autoWaveCountdown <= 0f)
@@ -810,7 +1130,59 @@ namespace OurWorld.Player
             if (isSitting)
             {
                 AnimateSitting(dt);
+                _baseHipsLocalPos = hips.localPosition;
                 return;
+            }
+
+            // Detect active carry and cat petting early so conflicting arm overlays never fight them.
+            CarryableProp carry = CarryableProp.CurrentlyHeld;
+            bool carrying = carry != null && carry.UsesRig(this);
+            if (carrying)
+            {
+                _carryReleaseTimer = -1f;
+                _carryThrowTimer = -1f;
+                _waveTimer = -1f;
+            }
+            float targetCarryLoad = (carrying && carry.IsAttached) ? carry.CarryHeaviness : 0f;
+            _carryLoadBlend = Mathf.Lerp(_carryLoadBlend, targetCarryLoad, 1f - Mathf.Exp(-8f * dt));
+
+            Vector3 petHand = Vector3.zero;
+            float petCrouch = 0f;
+            float petWeight = 0f;
+            StreetCatController cat = StreetCatController.ActivePet;
+            bool petting = cat != null && cat.TryGetPetPose(this, out petCrouch, out petWeight, out petHand);
+            if (petting)
+            {
+                float scaleY = transform.lossyScale.y;
+                Vector3 rawPetHand = petHand;
+                if (_hasPrevPetSample)
+                {
+                    float fwdMotion = Vector3.Dot(rawPetHand - _prevPetHandSample, cat.transform.forward);
+                    float desiredReturnLift = fwdMotion > 0.0004f ? 0.024f : 0f;
+                    _petReturnLift = Mathf.Lerp(_petReturnLift, desiredReturnLift, 1f - Mathf.Exp(-14f * dt));
+                }
+                else
+                {
+                    _petReturnLift = 0f;
+                    _hasPrevPetSample = true;
+                }
+                _prevPetHandSample = rawPetHand;
+                // Keep palm surface gliding cleanly over the cat's head->back coat, never sinking into the body.
+                petHand += transform.up * (0.036f * scaleY + _petReturnLift);
+                float catBackMinY = cat.transform.position.y + 0.305f * cat.transform.lossyScale.y;
+                if (petHand.y < catBackMinY) petHand.y = catBackMinY;
+                _lastPetHandWorld = petHand;
+                _petFadeBlend = petWeight;
+            }
+            else
+            {
+                _hasPrevPetSample = false;
+                _petReturnLift = 0f;
+                if (_petFadeBlend > 0.001f)
+                {
+                    _petFadeBlend = Mathf.Lerp(_petFadeBlend, 0f, 1f - Mathf.Exp(-14f * dt));
+                    if (_petFadeBlend < 0.005f) _petFadeBlend = 0f;
+                }
             }
 
             // Track yaw change rate of root for turning lean (+/- 10 deg) AND natural head turn anticipation!
@@ -824,16 +1196,25 @@ namespace OurWorld.Player
             float targetHeadLead = Mathf.Clamp(yawRate * 0.14f, -22f, 22f) * Mathf.Clamp01(moveFactor + 0.35f);
             _smoothedHeadTurnLead = Mathf.Lerp(_smoothedHeadTurnLead, targetHeadLead, 1f - Mathf.Exp(-9f * dt));
 
-            // Detect crisp braking / stopping settle impulse from brisk walk/run!
-            if (_grounded && _prevSpeedMs > 1.75f && _speedMs < 0.35f && _stopSettleTimer < 0f)
+            // Track recent peak speed so stopping from normal walk/run deceleration triggers braking settle.
+            if (_speedMs > _recentPeakSpeed)
+            {
+                _recentPeakSpeed = _speedMs;
+            }
+            else
+            {
+                _recentPeakSpeed = Mathf.MoveTowards(_recentPeakSpeed, _speedMs, 2.4f * dt);
+            }
+            if (_grounded && _recentPeakSpeed > 1.45f && _speedMs < 0.25f && _prevSpeedMs >= 0.25f && _stopSettleTimer < 0f)
             {
                 _stopSettleTimer = 0f;
-                _stopSettleStrength = Mathf.Clamp01((_prevSpeedMs - 1.2f) / 3.0f);
+                _stopSettleStrength = Mathf.Clamp01((_recentPeakSpeed - 1.05f) / 3.0f);
+                _recentPeakSpeed = 0f;
             }
             if (_stopSettleTimer >= 0f)
             {
                 _stopSettleTimer += dt;
-                if (_stopSettleTimer >= 0.36f || _speedMs > 0.8f)
+                if (_stopSettleTimer >= 0.38f || _speedMs > 0.8f)
                 {
                     _stopSettleTimer = -1f;
                 }
@@ -846,15 +1227,37 @@ namespace OurWorld.Player
             float desiredTalkBlend = (_talkingTimer > 0f && _speedMs < 0.45f && _grounded) ? 1f : 0f;
             _talkingBlend = Mathf.Lerp(_talkingBlend, desiredTalkBlend, 1f - Mathf.Exp(-7.5f * dt));
 
-            // Compute idle / walk / run blends
+            // Compute idle / walk / run blends and smooth travel direction (prevents 1-frame foot pop on sharp cuts).
             float moveBlend = Mathf.Clamp01((_speedMs - 0.08f) / 1.2f);
             float runBlend = Mathf.InverseLerp(WalkSpeedRef, RunSpeedRef, _speedMs);
+
+            if (_gaitWeight < 0.04f && _speedMs > 0.05f)
+            {
+                _smoothedTravelDir = _travelDirection;
+            }
+            else if (_travelDirection.sqrMagnitude > 0.0001f)
+            {
+                _smoothedTravelDir = Vector3.Slerp(_smoothedTravelDir, _travelDirection, 1f - Mathf.Exp(-14f * dt));
+                if (_smoothedTravelDir.sqrMagnitude > 0.0001f) _smoothedTravelDir.Normalize();
+            }
+            Vector3 localTravel = transform.InverseTransformDirection(_smoothedTravelDir);
+            localTravel.y = 0f;
+            if (localTravel.sqrMagnitude > 0.0001f) localTravel.Normalize();
+            else localTravel = Vector3.forward;
+
+            float fwdDot = localTravel.z;
+            float lateralMag = Mathf.Abs(localTravel.x);
+            float cutIntensity = (_grounded && _speedMs > 1.0f)
+                ? Mathf.Clamp01((1f - Vector3.Dot(_smoothedTravelDir, _travelDirection)) * 1.4f)
+                : 0f;
 
             _gaitWeight = Mathf.MoveTowards(_gaitWeight, moveBlend, 9f * dt);
             bool tennisStance = _tennisRacket != null;
             float stance = tennisStance ? 0.54f : Mathf.Lerp(0.61f, 0.44f, runBlend);
-            float strideLength = tennisStance ? 1.12f : Mathf.Lerp(1.22f, 1.72f, runBlend);
-            strideLength *= Mathf.Lerp(0.68f, 1f, _gaitWeight);
+            float dirStrideScale = Mathf.Lerp(1f, 0.50f, lateralMag) * (fwdDot < 0f ? Mathf.Lerp(1f, 0.72f, -fwdDot) : 1f);
+            float carryStrideScale = Mathf.Lerp(1f, 0.78f, _carryLoadBlend);
+            float baseStride = (tennisStance ? 1.12f : Mathf.Lerp(1.22f, 1.72f, runBlend)) * dirStrideScale * carryStrideScale;
+            float strideLength = baseStride * Mathf.Max(0.28f, _gaitWeight);
 
             // Advance gait phase by distance travelled & fire footstep contact events
             if (_speedMs > 0.05f && _grounded)
@@ -878,10 +1281,29 @@ namespace OurWorld.Player
                 }
             }
 
+            // Turn-in-place foot shuffle when yaw rotates while stationary
+            bool canTurnInPlace = _grounded && _speedMs < 0.28f && !_isLyingDown && _prayerStage == 0 &&
+                                  !_isSwimming && _kneelBlend < 0.12f && !petting &&
+                                  _knockdownTimer < 0f && _vaultTimer < 0f;
+            float absYawRate = Mathf.Abs(yawRate);
+            float desiredTurnW = (canTurnInPlace && absYawRate > 18f) ? Mathf.Clamp01((absYawRate - 18f) / 55f) : 0f;
+            _turnInPlaceWeight = Mathf.Lerp(_turnInPlaceWeight, desiredTurnW,
+                1f - Mathf.Exp(-(desiredTurnW > _turnInPlaceWeight ? 14f : 8.5f) * dt));
+            if (_turnInPlaceWeight > 0.01f)
+            {
+                if (absYawRate > 12f) _turnYawSign = Mathf.Sign(yawRate);
+                _turnStepPhase += Mathf.Max(absYawRate, 68f * desiredTurnW) * dt / 95f * TwoPi;
+                if (_turnStepPhase > TwoPi * 100f) _turnStepPhase -= TwoPi * 100f;
+            }
+            else
+            {
+                _turnInPlaceWeight = 0f;
+            }
+
             // --- Idle components ---
-            float breathWave = Mathf.Sin(_idleTime * Mathf.PI * 2f * 0.25f);
+            float breathWave = Mathf.Sin((_idleTime + _noiseSeed) * Mathf.PI * 2f * 0.25f);
             float idleChestPitch = breathWave * 1.5f;
-            float idleWeightShiftX = Mathf.Sin(_idleTime * Mathf.PI * 2f * 0.2f) * 0.015f;
+            float idleWeightShiftX = Mathf.Sin((_idleTime + _noiseSeed * 0.5f) * Mathf.PI * 2f * 0.2f) * 0.015f;
             float headNoise = (Mathf.PerlinNoise(_noiseSeed, _idleTime * 0.18f) - 0.5f) * 2f;
             float idleHeadYaw = headNoise * 10f;
 
@@ -889,7 +1311,7 @@ namespace OurWorld.Player
             float desiredLookYaw = 0f;
             float desiredLookPitch = 0f;
             bool useLookIk = false;
-            if (_hasLookPoint && _grounded)
+            if (_hasLookPoint && _grounded && !_isLyingDown)
             {
                 Vector3 localTarget = transform.InverseTransformPoint(_lookWorldPoint) - new Vector3(0f, 1.54f, 0f);
                 float horizDist = new Vector2(localTarget.x, localTarget.z).magnitude;
@@ -899,7 +1321,7 @@ namespace OurWorld.Player
                     if (Mathf.Abs(rawYaw) <= 100f)
                     {
                         desiredLookYaw = Mathf.Clamp(rawYaw, -60f, 60f);
-                        desiredLookPitch = Mathf.Clamp(-Mathf.Atan2(localTarget.y, horizDist) * Mathf.Rad2Deg, -18f, 18f);
+                        desiredLookPitch = Mathf.Clamp(-Mathf.Atan2(localTarget.y, horizDist) * Mathf.Rad2Deg, -24f, 24f);
                         useLookIk = true;
                     }
                 }
@@ -908,10 +1330,13 @@ namespace OurWorld.Player
             float lookBlendRate = 1f - Mathf.Exp(-7.5f * dt);
             _smoothedLookYaw = Mathf.Lerp(_smoothedLookYaw, useLookIk ? desiredLookYaw : 0f, lookBlendRate);
             _smoothedLookPitch = Mathf.Lerp(_smoothedLookPitch, useLookIk ? desiredLookPitch : 0f, lookBlendRate);
+            _lookWeight = Mathf.Lerp(_lookWeight, useLookIk ? 1f : 0f, lookBlendRate);
 
             // Biomechanical arm pendulum with realistic elbow phase-lag & inward cross-body arc!
-            float armCycle = Mathf.Cos(_phase - 0.19f);
-            float forearmLagL = Mathf.Cos(_phase - 0.62f);
+            float armDirScale = Mathf.Lerp(-0.65f, 1f, Mathf.InverseLerp(-1f, 0.25f, fwdDot)) * Mathf.Lerp(1f, 0.45f, lateralMag);
+            float carrySwingDamp = Mathf.Lerp(1f, 0.35f, _carryLoadBlend);
+            float armCycle = Mathf.Cos(_phase - 0.19f) * armDirScale * carrySwingDamp;
+            float forearmLagL = Mathf.Cos(_phase - 0.62f) * armDirScale * carrySwingDamp;
             float forearmLagR = -forearmLagL;
             float armAmp = Mathf.Lerp(19f, 44f, runBlend);
             float elbowBaseBend = Mathf.Lerp(18f, 70f, runBlend);
@@ -921,28 +1346,33 @@ namespace OurWorld.Player
             float walkShoulderYawR = -Mathf.Lerp(6f, 14f, runBlend) * Mathf.Max(0f, armCycle);
             float walkElbowL = -(elbowBaseBend + Mathf.Max(0f, -forearmLagL) * Mathf.Lerp(18f, 28f, runBlend));
             float walkElbowR = -(elbowBaseBend + Mathf.Max(0f, -forearmLagR) * Mathf.Lerp(18f, 28f, runBlend));
-            float torsoForwardLean = Mathf.Lerp(3.5f, 12.5f, runBlend);
-            float walkBobY = -Mathf.Cos(_phase * 2f) * Mathf.Lerp(0.020f, 0.042f, runBlend);
-            float walkHipYaw = Mathf.Cos(_phase) * Mathf.Lerp(6.2f, 10.5f, runBlend);
+            float torsoForwardLean = fwdDot >= 0f
+                ? Mathf.Lerp(3.5f, 12.5f, runBlend) * Mathf.Lerp(0.35f, 1f, fwdDot)
+                : Mathf.Lerp(1f, -4.5f, -fwdDot);
+            float strafeLeanZ = -localTravel.x * Mathf.Lerp(3f, 6.5f, runBlend) * moveBlend;
+            float walkBobY = -Mathf.Cos(_phase * 2f) * Mathf.Lerp(0.020f, 0.042f, runBlend) * Mathf.Lerp(1f, 0.65f, lateralMag);
+            float walkHipYaw = Mathf.Cos(_phase) * Mathf.Lerp(6.2f, 10.5f, runBlend) * Mathf.Lerp(1f, 0.4f, lateralMag) * carrySwingDamp;
             float walkHipRoll = -Mathf.Sin(_phase) * Mathf.Lerp(3.4f, 4.6f, runBlend);
             float walkHipSwayX = -Mathf.Sin(_phase) * Mathf.Lerp(0.020f, 0.015f, runBlend);
 
             // Blend Idle <-> Locomotion
             Vector3 targetHipsPos = new Vector3(
                 Mathf.Lerp(idleWeightShiftX, walkHipSwayX, moveBlend),
-                hipsBaseY - _gaitWeight * 0.064f + walkBobY * moveBlend,
+                hipsBaseY - _gaitWeight * 0.064f + walkBobY * moveBlend - 0.055f * cutIntensity - 0.014f * _turnInPlaceWeight,
                 0f);
 
             float defaultHeadYaw = Mathf.Lerp(idleHeadYaw, 0f, moveBlend) + _smoothedHeadTurnLead * 0.65f;
-            float finalHeadYaw = useLookIk || Mathf.Abs(_smoothedLookYaw) > 0.5f
-                ? (_smoothedLookYaw * 0.75f + _smoothedHeadTurnLead * 0.25f)
-                : defaultHeadYaw;
+            float lookHeadYaw = _smoothedLookYaw * 0.75f + _smoothedHeadTurnLead * 0.25f;
+            float finalHeadYaw = Mathf.Lerp(defaultHeadYaw, lookHeadYaw, _lookWeight);
 
-            Vector3 targetHipsRot = new Vector3(0f, walkHipYaw * moveBlend, walkHipRoll * moveBlend);
+            Vector3 targetHipsRot = new Vector3(
+                0f,
+                walkHipYaw * moveBlend - _turnYawSign * 7f * _turnInPlaceWeight,
+                walkHipRoll * moveBlend);
             Vector3 targetSpineRot = new Vector3(
                 Mathf.Lerp(idleChestPitch, torsoForwardLean, moveBlend),
                 -walkHipYaw * 1.20f * moveBlend,
-                _smoothedTurnLean - walkHipRoll * 0.72f * moveBlend);
+                _smoothedTurnLean + strafeLeanZ - Mathf.Sign(localTravel.x) * 7f * cutIntensity - walkHipRoll * 0.72f * moveBlend);
             Vector3 targetNeckRot = new Vector3(
                 -targetSpineRot.x * 0.35f + _smoothedLookPitch * 0.25f,
                 _smoothedLookYaw * 0.25f + _smoothedHeadTurnLead * 0.35f,
@@ -971,18 +1401,24 @@ namespace OurWorld.Player
             // Braking / stopping forward-dip & rebound settle!
             if (_stopSettleTimer >= 0f && _grounded)
             {
-                float sn = Mathf.Clamp01(_stopSettleTimer / 0.36f);
+                float sn = Mathf.Clamp01(_stopSettleTimer / 0.38f);
                 float settleWave = Mathf.Sin(sn * Mathf.PI) * (1f - sn * 0.45f) * _stopSettleStrength;
-                targetHipsPos.y -= 0.044f * settleWave;
-                targetSpineRot.x += 6.5f * settleWave;
-                targetLShoulderRot.x += 12f * settleWave;
-                targetRShoulderRot.x += 12f * settleWave;
+                targetHipsPos.y -= 0.048f * settleWave;
+                targetHipsPos.z += 0.032f * settleWave * Mathf.Sign(fwdDot >= -0.1f ? 1f : -1f);
+                targetSpineRot.x += 7.0f * settleWave * (fwdDot >= -0.1f ? 1f : -0.6f);
+                if (!carrying)
+                {
+                    targetLShoulderRot.x += 12f * settleWave;
+                    targetRShoulderRot.x += 12f * settleWave;
+                }
                 targetLKneeRot.x += 12f * settleWave;
                 targetRKneeRot.x += 12f * settleWave;
             }
 
             // Natural Idle Micro-Fidgets (Hands-on-hips, Neck/Shoulder Stretch, Wrist Glance) when standing idle!
             bool canFidget = moveBlend < 0.04f && _grounded && _talkingBlend < 0.1f && !_hasDualAction &&
+                             !carrying && !petting && _consumeWeight < 0.02f && !_hasShelfReach &&
+                             _carryReleaseTimer < 0f && _carryThrowTimer < 0f &&
                              _prayerStage == 0 && !_isSwimming && !_isLyingDown && _waveTimer < 0f &&
                              _sportAnimTimer < 0f && _tennisRacket == null;
             if (canFidget)
@@ -1049,16 +1485,19 @@ namespace OurWorld.Player
             }
 
             // Natural Conversational Hand Gestures & Expressive Head Nods when speaking!
-            if (_talkingBlend > 0.02f && !_hasDualAction && _waveTimer < 0f && _prayerStage == 0)
+            if (_talkingBlend > 0.02f && !carrying && !petting && _consumeWeight < 0.05f && !_hasShelfReach &&
+                !_hasDualAction && _waveTimer < 0f && _prayerStage == 0 && !_isLyingDown)
             {
                 float t = _idleTime + _noiseSeed;
-                float gR = Mathf.Sin(t * 3.8f);
-                float gL = Mathf.Sin(t * 2.9f + 1.4f);
-                float emphasize = Mathf.Clamp01(Mathf.Sin(t * 1.9f) * 0.5f + 0.5f);
+                // Phrase-modulated cadence so hands pause naturally between sentences instead of metronomic swinging
+                float phrase = Mathf.SmoothStep(0.15f, 0.85f, Mathf.Sin(t * 1.45f) * 0.5f + 0.5f);
+                float gR = Mathf.Sin(t * 3.6f) * phrase;
+                float gL = Mathf.Sin(t * 2.7f + 1.6f) * (0.35f + 0.65f * (1f - phrase * 0.5f));
+                float emphasize = Mathf.SmoothStep(0f, 1f, Mathf.Sin(t * 1.9f) * 0.5f + 0.5f);
 
-                Vector3 talkRSh = new Vector3(-34f - gR * 18f * emphasize, -12f + gR * 10f, 16f + Mathf.Abs(gR) * 12f);
+                Vector3 talkRSh = new Vector3(-34f - gR * 20f * emphasize, -12f + gR * 12f, 16f + Mathf.Abs(gR) * 14f);
                 Vector3 talkRElb = new Vector3(-68f + gR * 22f, 0f, 0f);
-                Vector3 talkLSh = new Vector3(-28f - gL * 14f, 10f - gL * 8f, -14f - Mathf.Abs(gL) * 10f);
+                Vector3 talkLSh = new Vector3(-26f - gL * 14f, 10f - gL * 9f, -14f - Mathf.Abs(gL) * 11f);
                 Vector3 talkLElb = new Vector3(-64f + gL * 18f, 0f, 0f);
 
                 targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, talkRSh, _talkingBlend);
@@ -1066,15 +1505,23 @@ namespace OurWorld.Player
                 targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, talkLSh, _talkingBlend * 0.85f);
                 targetLElbowRot = Vector3.Lerp(targetLElbowRot, talkLElb, _talkingBlend * 0.85f);
                 targetSpineRot.x += (4f + Mathf.Sin(t * 2.1f) * 2.5f) * _talkingBlend;
-                targetSpineRot.y += Mathf.Sin(t * 1.6f) * 6f * _talkingBlend;
-                targetHeadRot.x += Mathf.Sin(t * 4.4f) * 7f * _talkingBlend;
-                targetHeadRot.z += Mathf.Sin(t * 2.3f) * 5f * _talkingBlend;
+                targetSpineRot.y += Mathf.Sin(t * 1.5f) * 6.5f * _talkingBlend;
+                targetHeadRot.x += Mathf.Sin(t * 4.2f) * 7f * _talkingBlend * (0.4f + 0.6f * phrase);
+                targetHeadRot.z += Mathf.Sin(t * 2.2f) * 5.5f * _talkingBlend;
+            }
+            else if (_talkingBlend > 0.02f && carrying && _prayerStage == 0 && !_isLyingDown)
+            {
+                // Keep hands firmly on the carried object; only animate expressive head nods while talking.
+                float t = _idleTime + _noiseSeed;
+                targetHeadRot.x += Mathf.Sin(t * 4.0f) * 6f * _talkingBlend;
+                targetHeadRot.z += Mathf.Sin(t * 2.1f) * 4f * _talkingBlend;
             }
 
             // --- v13 polish: lean into acceleration, settle back when stopping ---
             float accel = (_speedMs - _prevSpeedMs) / dt;
             _prevSpeedMs = _speedMs;
-            float targetAccelLean = _grounded ? Mathf.Clamp(accel * 1.4f, -7f, 9f) : 0f;
+            float accelDirSign = fwdDot >= -0.15f ? 1f : -0.7f;
+            float targetAccelLean = _grounded ? Mathf.Clamp(accel * 1.4f * accelDirSign, -7f, 9f) : 0f;
             _smoothedAccelLean = Mathf.Lerp(_smoothedAccelLean, targetAccelLean, 1f - Mathf.Exp(-6f * dt));
             targetSpineRot.x += _smoothedAccelLean;
             targetNeckRot.x -= _smoothedAccelLean * 0.4f; // keep gaze level
@@ -1083,7 +1530,7 @@ namespace OurWorld.Player
             targetHipsPos.y -= 0.035f * runBlend * moveBlend;
 
             // --- v13 polish: natural idle weight shift from leg to leg (contrapposto) every few seconds ---
-            if (moveBlend < 0.05f && _grounded)
+            if (moveBlend < 0.05f && _grounded && !_isLyingDown && _turnInPlaceWeight < 0.1f)
             {
                 _idleShiftCountdown -= dt;
                 if (_idleShiftCountdown <= 0f)
@@ -1106,48 +1553,76 @@ namespace OurWorld.Player
             targetLHipRot.x -= Mathf.Max(0f, idleW) * 4f;
             targetRHipRot.x -= Mathf.Max(0f, -idleW) * 4f;
 
-            // --- Airborne override ---
+            // --- Airborne override (take-off extension -> apex tuck & air balance -> landing reach) ---
             if (!_grounded)
             {
-                float tuckScale = Mathf.Clamp01(0.75f + Mathf.Clamp(_verticalVelocity * 0.05f, -0.2f, 0.25f));
-                targetHipsPos.y = hipsBaseY + 0.04f;
-                targetLHipRot = new Vector3(-28f * tuckScale, 0f, -4f);
-                targetRHipRot = new Vector3(-22f * tuckScale, 0f, 4f);
-                targetLKneeRot = new Vector3(50f, 0f, 0f);
-                targetRKneeRot = new Vector3(50f, 0f, 0f);
-                targetLAnkleRot = new Vector3(14f, 0f, 0f);
-                targetRAnkleRot = new Vector3(14f, 0f, 0f);
+                float launchImpulse = _verticalVelocity > 1.2f
+                    ? (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_airborneTimer / 0.18f)))
+                    : 0f;
+                float descendPrep = Mathf.Clamp01((-_verticalVelocity - 1.5f) / 5.5f);
+                float apexTuck = Mathf.Clamp01(1f - launchImpulse * 0.85f - descendPrep * 0.55f);
+                float airBalance = Mathf.Sin(_idleTime * 6.5f) * 8f;
 
-                targetLShoulderRot = new Vector3(-18f, 0f, -34f);
-                targetRShoulderRot = new Vector3(-18f, 0f, 34f);
-                targetLElbowRot = new Vector3(-32f, 0f, 0f);
-                targetRElbowRot = new Vector3(-32f, 0f, 0f);
-                targetSpineRot.x = 6f;
+                targetHipsPos.y = hipsBaseY + Mathf.Lerp(0.02f, 0.06f, apexTuck) - 0.04f * launchImpulse;
+                targetLHipRot = new Vector3(Mathf.Lerp(-8f, -34f, apexTuck) + 14f * launchImpulse, 0f, -5f);
+                targetRHipRot = new Vector3(Mathf.Lerp(-16f, -24f, apexTuck) + 10f * launchImpulse, 0f, 5f);
+                targetLKneeRot = new Vector3(Mathf.Lerp(22f, 58f, apexTuck) * (1f - 0.55f * launchImpulse), 0f, 0f);
+                targetRKneeRot = new Vector3(Mathf.Lerp(18f, 48f, apexTuck) * (1f - 0.55f * launchImpulse), 0f, 0f);
+                targetLAnkleRot = new Vector3(Mathf.Lerp(12f, 26f, launchImpulse) - 10f * descendPrep, 0f, 0f);
+                targetRAnkleRot = new Vector3(Mathf.Lerp(12f, 26f, launchImpulse) - 10f * descendPrep, 0f, 0f);
+
+                if (!carrying)
+                {
+                    float armPitch = Mathf.Lerp(-26f, -64f, launchImpulse) + descendPrep * -18f;
+                    float armOut = Mathf.Lerp(36f, 24f, launchImpulse) + descendPrep * 10f;
+                    targetLShoulderRot = new Vector3(armPitch + airBalance, 0f, -armOut - _smoothedTurnLean * 0.8f);
+                    targetRShoulderRot = new Vector3(armPitch - airBalance, 0f, armOut - _smoothedTurnLean * 0.8f);
+                    targetLElbowRot = new Vector3(Mathf.Lerp(-38f, -26f, descendPrep), 0f, 0f);
+                    targetRElbowRot = new Vector3(Mathf.Lerp(-38f, -26f, descendPrep), 0f, 0f);
+                }
+                targetSpineRot.x = Mathf.Lerp(8f, -4f, launchImpulse) + 6f * descendPrep;
             }
-            // --- Jump landing squat (knees 35 deg for 0.15 s) ---
+            // --- Jump landing squat (fast compression + smooth recovery scaled by fall impact) ---
             else if (_landSquatTimer >= 0f)
             {
-                float squatNorm = Mathf.Clamp01(_landSquatTimer / LandSquatDuration);
-                float squatEnv = Mathf.Sin(squatNorm * Mathf.PI);
-                targetHipsPos.y -= 0.11f * squatEnv;
-                targetLHipRot.x -= 18f * squatEnv;
-                targetRHipRot.x -= 18f * squatEnv;
-                targetLKneeRot.x = Mathf.Max(targetLKneeRot.x, 35f * squatEnv);
-                targetRKneeRot.x = Mathf.Max(targetRKneeRot.x, 35f * squatEnv);
+                float squatNorm = Mathf.Clamp01(_landSquatTimer / Mathf.Max(0.15f, _landSquatDuration));
+                float squatEnv = squatNorm < 0.28f
+                    ? Mathf.SmoothStep(0f, 1f, squatNorm / 0.28f)
+                    : Mathf.SmoothStep(1f, 0f, (squatNorm - 0.28f) / 0.72f);
+                float impactScale = Mathf.Lerp(1f, 1.85f, _landImpact01);
+                targetHipsPos.y -= 0.135f * impactScale * squatEnv;
+                targetHipsPos.z -= 0.025f * impactScale * squatEnv;
+                targetLHipRot.x -= 20f * impactScale * squatEnv;
+                targetRHipRot.x -= 20f * impactScale * squatEnv;
+                targetLKneeRot.x = Mathf.Max(targetLKneeRot.x, 38f * impactScale * squatEnv);
+                targetRKneeRot.x = Mathf.Max(targetRKneeRot.x, 38f * impactScale * squatEnv);
                 targetLAnkleRot.x -= 17f * squatEnv;
                 targetRAnkleRot.x -= 17f * squatEnv;
-                targetSpineRot.x += 7f * squatEnv;
+                targetSpineRot.x += Mathf.Lerp(10f, 20f, _landImpact01) * squatEnv;
+                if (!carrying)
+                {
+                    targetLShoulderRot.x = Mathf.Lerp(targetLShoulderRot.x, 12f, squatEnv * 0.55f);
+                    targetRShoulderRot.x = Mathf.Lerp(targetRShoulderRot.x, 12f, squatEnv * 0.55f);
+                    targetLShoulderRot.z -= 16f * squatEnv;
+                    targetRShoulderRot.z += 16f * squatEnv;
+                    targetLElbowRot.x = Mathf.Lerp(targetLElbowRot.x, -42f, squatEnv * 0.65f);
+                    targetRElbowRot.x = Mathf.Lerp(targetRElbowRot.x, -42f, squatEnv * 0.65f);
+                }
             }
 
-            // --- v13 polish: arms flail and legs reach when falling from height ---
-            if (!_grounded && _verticalVelocity < -3.5f && _airborneTimer > 0.35f)
+            // --- v13 polish: arms flail and legs reach smoothly when falling from height ---
+            if (!_grounded && _verticalVelocity < -3.5f && _airborneTimer > 0.30f)
             {
-                float fall = Mathf.Clamp01((-_verticalVelocity - 3.5f) / 6f);
+                float fallTimeRamp = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_airborneTimer - 0.30f) / 0.22f));
+                float fall = Mathf.Clamp01((-_verticalVelocity - 3.5f) / 6f) * fallTimeRamp;
                 float flail = Mathf.Sin(_idleTime * 14f);
-                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-95f + flail * 18f, 0f, -55f), fall);
-                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-95f - flail * 18f, 0f, 55f), fall);
-                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-20f, 0f, 0f), fall);
-                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-20f, 0f, 0f), fall);
+                if (!carrying)
+                {
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-95f + flail * 18f, 0f, -55f), fall);
+                    targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-95f - flail * 18f, 0f, 55f), fall);
+                    targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-20f, 0f, 0f), fall);
+                    targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-20f, 0f, 0f), fall);
+                }
                 targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-10f - flail * 8f, 0f, -6f), fall);
                 targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-10f + flail * 8f, 0f, 6f), fall);
                 targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(22f, 0f, 0f), fall);
@@ -1155,24 +1630,124 @@ namespace OurWorld.Player
                 targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -6f, fall);
             }
 
-            // --- Bed sleep lying-down override ---
+            float knockdownFootBlend = 1f;
+            float startledStepW = 0f;
+            float hitStaggerW = 0f;
+
+            // --- Bed sleep lying-down override (Stand -> SitOnMattress -> Lie variant + breathing + stirring) ---
             if (_isLyingDown)
             {
-                targetHipsPos = new Vector3(0f, 0.16f, 0f);
-                targetHipsRot = new Vector3(-90f, 0f, 0f);
-                targetSpineRot = new Vector3(2f + idleChestPitch * 0.4f, 0f, 0f);
-                targetNeckRot = new Vector3(6f, 0f, 0f);
-                targetHeadRot = new Vector3(10f, 6f, 0f);
-                targetLShoulderRot = new Vector3(4f, 0f, -10f);
-                targetRShoulderRot = new Vector3(4f, 0f, 10f);
-                targetLElbowRot = new Vector3(-16f, 0f, 0f);
-                targetRElbowRot = new Vector3(-16f, 0f, 0f);
-                targetLHipRot = new Vector3(2f, 0f, -4f);
-                targetRHipRot = new Vector3(2f, 0f, 4f);
-                targetLKneeRot = new Vector3(6f, 0f, 0f);
-                targetRKneeRot = new Vector3(6f, 0f, 0f);
-                targetLAnkleRot = new Vector3(18f, 0f, 0f);
-                targetRAnkleRot = new Vector3(18f, 0f, 0f);
+                float e = _lyingBlend;
+                float a = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(e / 0.45f));
+                float b = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((e - 0.45f) / 0.55f));
+
+                // Intermediate pose: sitting upright on the mattress, legs straight forward, hands beside hips
+                Vector3 sitHipsPos = new Vector3(0f, 0.22f, 0f);
+                Vector3 sitHipsRot = Vector3.zero;
+                Vector3 sitSpine = new Vector3(-4f, 0f, 0f);
+                Vector3 sitNeck = new Vector3(4f, 0f, 0f);
+                Vector3 sitHead = new Vector3(6f, 0f, 0f);
+                Vector3 sitLHip = new Vector3(-86f, 0f, -5f);
+                Vector3 sitRHip = new Vector3(-86f, 0f, 5f);
+                Vector3 sitLKnee = new Vector3(12f, 0f, 0f);
+                Vector3 sitRKnee = new Vector3(12f, 0f, 0f);
+                Vector3 sitLAnkle = new Vector3(10f, 0f, 0f);
+                Vector3 sitRAnkle = new Vector3(10f, 0f, 0f);
+                Vector3 sitLSh = new Vector3(14f, 0f, -14f);
+                Vector3 sitRSh = new Vector3(14f, 0f, 14f);
+                Vector3 sitLElb = new Vector3(-30f, 0f, 0f);
+                Vector3 sitRElb = new Vector3(-30f, 0f, 0f);
+
+                // Final lying pose (Variant 0 default: on back, hands resting on belly)
+                Vector3 lieHipsPos = new Vector3(0f, 0.16f, 0f);
+                Vector3 lieHipsRot = new Vector3(-90f, 0f, 0f);
+                Vector3 lieSpine = new Vector3(2f, 0f, 0f);
+                Vector3 lieNeck = new Vector3(6f, 0f, 0f);
+                Vector3 lieHead = new Vector3(10f, 6f, 0f);
+                Vector3 lieLSh = new Vector3(-22f, 0f, -6f);
+                Vector3 lieRSh = new Vector3(-22f, 0f, 6f);
+                Vector3 lieLElb = new Vector3(-78f, 0f, 14f);
+                Vector3 lieRElb = new Vector3(-78f, 0f, -14f);
+                Vector3 lieLHip = new Vector3(2f, 0f, -4f);
+                Vector3 lieRHip = new Vector3(2f, 0f, 4f);
+                Vector3 lieLKnee = new Vector3(6f, 0f, 0f);
+                Vector3 lieRKnee = new Vector3(6f, 0f, 0f);
+                Vector3 lieLAnkle = new Vector3(18f, 0f, 0f);
+                Vector3 lieRAnkle = new Vector3(18f, 0f, 0f);
+
+                if (_lyingVariant == 1)
+                {
+                    // On back, right knee raised, right hand resting behind head
+                    lieRHip = new Vector3(-42f, 0f, 6f);
+                    lieRKnee = new Vector3(78f, 0f, 0f);
+                    lieRAnkle = new Vector3(-6f, 0f, 0f);
+                    lieRSh = new Vector3(-158f, 0f, 28f);
+                    lieRElb = new Vector3(-118f, 0f, 0f);
+                    lieHead = new Vector3(8f, 14f, 0f);
+                }
+                else if (_lyingVariant == 2)
+                {
+                    // Slightly turned onto the right side, knees gently bent, left arm across body
+                    lieHipsPos = new Vector3(0f, 0.19f, 0f);
+                    lieHipsRot = new Vector3(-90f, 0f, 24f);
+                    lieSpine = new Vector3(2f, 0f, 10f);
+                    lieHead = new Vector3(8f, -10f, 6f);
+                    lieLHip = new Vector3(-28f, 0f, -2f);
+                    lieRHip = new Vector3(-20f, 0f, 4f);
+                    lieLKnee = new Vector3(42f, 0f, 0f);
+                    lieRKnee = new Vector3(34f, 0f, 0f);
+                    lieLAnkle = new Vector3(14f, 0f, 0f);
+                    lieRAnkle = new Vector3(14f, 0f, 0f);
+                    lieLSh = new Vector3(-48f, 0f, -4f);
+                    lieLElb = new Vector3(-62f, 0f, 10f);
+                    lieRSh = new Vector3(-8f, 0f, 16f);
+                    lieRElb = new Vector3(-24f, 0f, 0f);
+                }
+
+                targetHipsPos = Vector3.Lerp(Vector3.Lerp(targetHipsPos, sitHipsPos, a), lieHipsPos, b);
+                targetHipsRot = Vector3.Lerp(Vector3.Lerp(targetHipsRot, sitHipsRot, a), lieHipsRot, b);
+                targetSpineRot = Vector3.Lerp(Vector3.Lerp(targetSpineRot, sitSpine, a), lieSpine, b);
+                targetNeckRot = Vector3.Lerp(Vector3.Lerp(targetNeckRot, sitNeck, a), lieNeck, b);
+                targetHeadRot = Vector3.Lerp(Vector3.Lerp(targetHeadRot, sitHead, a), lieHead, b);
+                targetLShoulderRot = Vector3.Lerp(Vector3.Lerp(targetLShoulderRot, sitLSh, a), lieLSh, b);
+                targetRShoulderRot = Vector3.Lerp(Vector3.Lerp(targetRShoulderRot, sitRSh, a), lieRSh, b);
+                targetLElbowRot = Vector3.Lerp(Vector3.Lerp(targetLElbowRot, sitLElb, a), lieLElb, b);
+                targetRElbowRot = Vector3.Lerp(Vector3.Lerp(targetRElbowRot, sitRElb, a), lieRElb, b);
+                targetLHipRot = Vector3.Lerp(Vector3.Lerp(targetLHipRot, sitLHip, a), lieLHip, b);
+                targetRHipRot = Vector3.Lerp(Vector3.Lerp(targetRHipRot, sitRHip, a), lieRHip, b);
+                targetLKneeRot = Vector3.Lerp(Vector3.Lerp(targetLKneeRot, sitLKnee, a), lieLKnee, b);
+                targetRKneeRot = Vector3.Lerp(Vector3.Lerp(targetRKneeRot, sitRKnee, a), lieRKnee, b);
+                targetLAnkleRot = Vector3.Lerp(Vector3.Lerp(targetLAnkleRot, sitLAnkle, a), lieLAnkle, b);
+                targetRAnkleRot = Vector3.Lerp(Vector3.Lerp(targetRAnkleRot, sitRAnkle, a), lieRAnkle, b);
+
+                // Slow sleep breathing scaled by lying stage
+                float lieBreathArg = (_idleTime + _noiseSeed) * TwoPi * 0.22f;
+                targetSpineRot.x += Mathf.Sin(lieBreathArg) * 1.8f * b;
+                targetHeadRot.x += Mathf.Sin(lieBreathArg - 0.6f) * 0.8f * b;
+
+                // Periodic gentle sleep stir (head turn, knee flex & subtle torso roll)
+                if (_lyingStirTimer >= 0f)
+                {
+                    float s = Mathf.Clamp01(_lyingStirTimer / 1.8f);
+                    float w = Mathf.Sin(s * Mathf.PI) * b;
+                    targetHeadRot.y += 18f * _lyingStirSide * w;
+                    if (_lyingStirSide < 0f)
+                    {
+                        targetLKneeRot.x += 16f * w;
+                        targetLHipRot.x -= 10f * w;
+                    }
+                    else
+                    {
+                        targetRKneeRot.x += 16f * w;
+                        targetRHipRot.x -= 10f * w;
+                    }
+                    targetSpineRot.z += 4f * _lyingStirSide * w;
+                    _lyingStirTimer += dt;
+                    if (_lyingStirTimer >= 1.8f)
+                    {
+                        _lyingStirTimer = -1f;
+                    }
+                }
             }
             // --- Prayer (Namaz / Salah) mathematically exact pose override (Tekbir -> Kıyam -> Rükû -> Kavme -> Secde -> Oturuş/Selam) ---
             else if (_prayerStage > 0)
@@ -1317,52 +1892,227 @@ namespace OurWorld.Player
             {
                 float vNorm = Mathf.Clamp01(_vaultTimer / VaultDuration);
                 float vEnv = Mathf.Sin(vNorm * Mathf.PI);
-                targetHipsPos.y = hipsBaseY - 0.11f * vEnv;
-                targetSpineRot = new Vector3(49f * vEnv, -12f * vEnv, 14f * vEnv);
-                targetLShoulderRot = new Vector3(-86f * vEnv, 12f * vEnv, -16f * vEnv);
-                targetRShoulderRot = new Vector3(-72f * vEnv, -12f * vEnv, 24f * vEnv);
-                targetLElbowRot = new Vector3(-24f * vEnv, 0f, 0f);
-                targetRElbowRot = new Vector3(-34f * vEnv, 0f, 0f);
+                targetHipsPos.y = Mathf.Lerp(targetHipsPos.y, hipsBaseY - 0.11f, vEnv);
+                targetSpineRot = Vector3.Lerp(targetSpineRot, new Vector3(49f, -12f, 14f), vEnv);
+                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-86f, 12f, -16f), vEnv);
+                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-72f, -12f, 24f), vEnv);
+                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-24f, 0f, 0f), vEnv);
+                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-34f, 0f, 0f), vEnv);
                 float leadingLeg = Mathf.Sin(Mathf.Clamp01(vNorm * 1.24f) * Mathf.PI);
                 float trailingLeg = Mathf.Sin(Mathf.Clamp01((vNorm - 0.15f) * 1.17f) * Mathf.PI);
-                targetLHipRot = new Vector3(-89f * leadingLeg, 0f, -14f * vEnv);
-                targetRHipRot = new Vector3(-72f * trailingLeg, 0f, 18f * vEnv);
-                targetLKneeRot = new Vector3(105f * vEnv, 0f, 0f);
-                targetRKneeRot = new Vector3(95f * vEnv, 0f, 0f);
+                targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-89f, 0f, -14f), leadingLeg);
+                targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-72f, 0f, 18f), trailingLeg);
+                targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(105f, 0f, 0f), vEnv);
+                targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(95f, 0f, 0f), vEnv);
             }
-            // --- Full NPC Knockdown onto back & smooth recovery stand-up ---
+            // --- Full NPC Knockdown onto back & multi-stage recovery (Fall -> Lie -> Sit-Up -> Kneel -> Stand) ---
             else if (_knockdownTimer >= 0f)
             {
-                float kNorm = Mathf.Clamp01(_knockdownTimer / Mathf.Max(1.0f, _activeKnockdownDuration));
-                float downFactor = kNorm < 0.16f
-                    ? Mathf.SmoothStep(0f, 1f, kNorm / 0.16f)
-                    : (kNorm < 0.72f ? 1f : Mathf.SmoothStep(1f, 0f, (kNorm - 0.72f) / 0.28f));
+                float totalDur = Mathf.Max(1.2f, _activeKnockdownDuration);
+                float fallDur = Mathf.Min(0.36f, totalDur * 0.22f);
+                float getUpDur = Mathf.Min(1.26f, totalDur * 0.52f);
+                float getUpStart = totalDur - getUpDur;
 
-                targetHipsPos = Vector3.Lerp(targetHipsPos, new Vector3(0f, 0.20f, -0.18f), downFactor);
-                targetHipsRot = Vector3.Lerp(targetHipsRot, new Vector3(-86f, 8f, 6f), downFactor);
-                targetSpineRot = Vector3.Lerp(targetSpineRot, new Vector3(10f, 0f, 0f), downFactor);
-                targetHeadRot = Vector3.Lerp(targetHeadRot, new Vector3(18f, -14f, 0f), downFactor);
-                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-25f, 0f, -62f), downFactor);
-                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-18f, 0f, 58f), downFactor);
-                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-28f, 0f, 0f), downFactor);
-                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-34f, 0f, 0f), downFactor);
-                targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(6f, 0f, -14f), downFactor);
-                targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-12f, 0f, 16f), downFactor);
-                targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(18f, 0f, 0f), downFactor);
-                targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(32f, 0f, 0f), downFactor);
+                // Stand baseline captured before override so final stand stage converges seamlessly to standing pose
+                Vector3 standHipsPos = targetHipsPos;
+                Vector3 standHipsRot = targetHipsRot;
+                Vector3 standSpine = targetSpineRot;
+                Vector3 standNeck = targetNeckRot;
+                Vector3 standHead = targetHeadRot;
+                Vector3 standLSh = targetLShoulderRot;
+                Vector3 standRSh = targetRShoulderRot;
+                Vector3 standLElb = targetLElbowRot;
+                Vector3 standRElb = targetRElbowRot;
+                Vector3 standLHip = targetLHipRot;
+                Vector3 standRHip = targetRHipRot;
+                Vector3 standLKnee = targetLKneeRot;
+                Vector3 standRKnee = targetRKneeRot;
+                Vector3 standLAnkle = targetLAnkleRot;
+                Vector3 standRAnkle = targetRAnkleRot;
+
+                // Keyframe 1: Supine knockdown on back
+                float lieBreath = Mathf.Sin((_idleTime + _noiseSeed) * 3.2f) * 2.2f;
+                Vector3 lieHipsPos = new Vector3(0f, 0.20f, -0.18f);
+                Vector3 lieHipsRot = new Vector3(-86f, 8f, 6f);
+                Vector3 lieSpine = new Vector3(10f + lieBreath, 0f, 0f);
+                Vector3 lieNeck = new Vector3(8f, 0f, 0f);
+                Vector3 lieHead = new Vector3(16f, -14f, 0f);
+                Vector3 lieLSh = new Vector3(-25f, 0f, -62f);
+                Vector3 lieRSh = new Vector3(-18f, 0f, 58f);
+                Vector3 lieLElb = new Vector3(-28f, 0f, 0f);
+                Vector3 lieRElb = new Vector3(-34f, 0f, 0f);
+                Vector3 lieLHip = new Vector3(6f, 0f, -14f);
+                Vector3 lieRHip = new Vector3(-12f, 0f, 16f);
+                Vector3 lieLKnee = new Vector3(18f, 0f, 0f);
+                Vector3 lieRKnee = new Vector3(32f, 0f, 0f);
+                Vector3 lieLAnkle = new Vector3(18f, 0f, 0f);
+                Vector3 lieRAnkle = new Vector3(18f, 0f, 0f);
+
+                // Keyframe 2: Sit-up on ground with knees bent & hands pushing off floor
+                Vector3 sitHipsPos = new Vector3(0f, 0.21f, -0.06f);
+                Vector3 sitHipsRot = new Vector3(-6f, 4f, 0f);
+                Vector3 sitSpine = new Vector3(20f, -4f, 0f);
+                Vector3 sitNeck = new Vector3(4f, 0f, 0f);
+                Vector3 sitHead = new Vector3(14f, 0f, 0f);
+                Vector3 sitLSh = new Vector3(26f, 0f, -24f);
+                Vector3 sitRSh = new Vector3(22f, 0f, 26f);
+                Vector3 sitLElb = new Vector3(-26f, 0f, 0f);
+                Vector3 sitRElb = new Vector3(-26f, 0f, 0f);
+                Vector3 sitLHip = new Vector3(-126f, 0f, -8f);
+                Vector3 sitRHip = new Vector3(-118f, 0f, 10f);
+                Vector3 sitLKnee = new Vector3(106f, 0f, 0f);
+                Vector3 sitRKnee = new Vector3(102f, 0f, 0f);
+                Vector3 sitLAnkle = new Vector3(-8f, 0f, 0f);
+                Vector3 sitRAnkle = new Vector3(-4f, 0f, 0f);
+
+                // Keyframe 3: One-knee kneel (left foot planted forward, right knee down, left hand bracing on knee)
+                Vector3 kneelHipsPos = new Vector3(0f, 0.57f, 0.04f);
+                Vector3 kneelHipsRot = new Vector3(6f, -6f, 0f);
+                Vector3 kneelSpine = new Vector3(24f, 6f, 0f);
+                Vector3 kneelNeck = new Vector3(-6f, 0f, 0f);
+                Vector3 kneelHead = new Vector3(10f, 0f, 0f);
+                Vector3 kneelLSh = new Vector3(-48f, 12f, -10f);
+                Vector3 kneelRSh = new Vector3(-26f, 0f, 22f);
+                Vector3 kneelLElb = new Vector3(-44f, 0f, 0f);
+                Vector3 kneelRElb = new Vector3(-38f, 0f, 0f);
+                Vector3 kneelLHip = new Vector3(-82f, 0f, -6f);
+                Vector3 kneelRHip = new Vector3(12f, 0f, 6f);
+                Vector3 kneelLKnee = new Vector3(82f, 0f, 0f);
+                Vector3 kneelRKnee = new Vector3(86f, 0f, 0f);
+                Vector3 kneelLAnkle = new Vector3(-6f, 0f, 0f);
+                Vector3 kneelRAnkle = new Vector3(48f, 0f, 0f);
+
+                if (_knockdownTimer < fallDur)
+                {
+                    knockdownFootBlend = 0f;
+                    float fallU = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_knockdownTimer / fallDur));
+                    float bounce = Mathf.Sin(Mathf.Clamp01((_knockdownTimer / fallDur - 0.72f) / 0.28f) * Mathf.PI) * 0.03f;
+                    targetHipsPos = Vector3.Lerp(standHipsPos, lieHipsPos + Vector3.up * bounce, fallU);
+                    targetHipsRot = Vector3.Lerp(standHipsRot, lieHipsRot, fallU);
+                    targetSpineRot = Vector3.Lerp(standSpine, lieSpine, fallU);
+                    targetNeckRot = Vector3.Lerp(standNeck, lieNeck, fallU);
+                    targetHeadRot = Vector3.Lerp(standHead, lieHead, fallU);
+                    targetLShoulderRot = Vector3.Lerp(standLSh, lieLSh, fallU);
+                    targetRShoulderRot = Vector3.Lerp(standRSh, lieRSh, fallU);
+                    targetLElbowRot = Vector3.Lerp(standLElb, lieLElb, fallU);
+                    targetRElbowRot = Vector3.Lerp(standRElb, lieRElb, fallU);
+                    targetLHipRot = Vector3.Lerp(standLHip, lieLHip, fallU);
+                    targetRHipRot = Vector3.Lerp(standRHip, lieRHip, fallU);
+                    targetLKneeRot = Vector3.Lerp(standLKnee, lieLKnee, fallU);
+                    targetRKneeRot = Vector3.Lerp(standRKnee, lieRKnee, fallU);
+                    targetLAnkleRot = Vector3.Lerp(standLAnkle, lieLAnkle, fallU);
+                    targetRAnkleRot = Vector3.Lerp(standRAnkle, lieRAnkle, fallU);
+                }
+                else if (_knockdownTimer < getUpStart)
+                {
+                    knockdownFootBlend = 0f;
+                    targetHipsPos = lieHipsPos;
+                    targetHipsRot = lieHipsRot;
+                    targetSpineRot = lieSpine;
+                    targetNeckRot = lieNeck;
+                    targetHeadRot = lieHead;
+                    targetLShoulderRot = lieLSh;
+                    targetRShoulderRot = lieRSh;
+                    targetLElbowRot = lieLElb;
+                    targetRElbowRot = lieRElb;
+                    targetLHipRot = lieLHip;
+                    targetRHipRot = lieRHip;
+                    targetLKneeRot = lieLKnee;
+                    targetRKneeRot = lieRKnee;
+                    targetLAnkleRot = lieLAnkle;
+                    targetRAnkleRot = lieRAnkle;
+                }
+                else
+                {
+                    float gNorm = Mathf.Clamp01((_knockdownTimer - getUpStart) / Mathf.Max(0.25f, getUpDur));
+                    if (gNorm < 0.34f)
+                    {
+                        // Stage A: Lie -> Sit-Up
+                        knockdownFootBlend = 0f;
+                        float u = Mathf.SmoothStep(0f, 1f, gNorm / 0.34f);
+                        targetHipsPos = Vector3.Lerp(lieHipsPos, sitHipsPos, u);
+                        targetHipsRot = Vector3.Lerp(lieHipsRot, sitHipsRot, u);
+                        targetSpineRot = Vector3.Lerp(lieSpine, sitSpine, u);
+                        targetNeckRot = Vector3.Lerp(lieNeck, sitNeck, u);
+                        targetHeadRot = Vector3.Lerp(lieHead, sitHead, u);
+                        targetLShoulderRot = Vector3.Lerp(lieLSh, sitLSh, u);
+                        targetRShoulderRot = Vector3.Lerp(lieRSh, sitRSh, u);
+                        targetLElbowRot = Vector3.Lerp(lieLElb, sitLElb, u);
+                        targetRElbowRot = Vector3.Lerp(lieRElb, sitRElb, u);
+                        targetLHipRot = Vector3.Lerp(lieLHip, sitLHip, u);
+                        targetRHipRot = Vector3.Lerp(lieRHip, sitRHip, u);
+                        targetLKneeRot = Vector3.Lerp(lieLKnee, sitLKnee, u);
+                        targetRKneeRot = Vector3.Lerp(lieRKnee, sitRKnee, u);
+                        targetLAnkleRot = Vector3.Lerp(lieLAnkle, sitLAnkle, u);
+                        targetRAnkleRot = Vector3.Lerp(lieRAnkle, sitRAnkle, u);
+                    }
+                    else if (gNorm < 0.68f)
+                    {
+                        // Stage B: Sit-Up -> One-Knee Kneel
+                        knockdownFootBlend = 0f;
+                        float u = Mathf.SmoothStep(0f, 1f, (gNorm - 0.34f) / 0.34f);
+                        targetHipsPos = Vector3.Lerp(sitHipsPos, kneelHipsPos, u);
+                        targetHipsRot = Vector3.Lerp(sitHipsRot, kneelHipsRot, u);
+                        targetSpineRot = Vector3.Lerp(sitSpine, kneelSpine, u);
+                        targetNeckRot = Vector3.Lerp(sitNeck, kneelNeck, u);
+                        targetHeadRot = Vector3.Lerp(sitHead, kneelHead, u);
+                        targetLShoulderRot = Vector3.Lerp(sitLSh, kneelLSh, u);
+                        targetRShoulderRot = Vector3.Lerp(sitRSh, kneelRSh, u);
+                        targetLElbowRot = Vector3.Lerp(sitLElb, kneelLElb, u);
+                        targetRElbowRot = Vector3.Lerp(sitRElb, kneelRElb, u);
+                        targetLHipRot = Vector3.Lerp(sitLHip, kneelLHip, u);
+                        targetRHipRot = Vector3.Lerp(sitRHip, kneelRHip, u);
+                        targetLKneeRot = Vector3.Lerp(sitLKnee, kneelLKnee, u);
+                        targetRKneeRot = Vector3.Lerp(sitRKnee, kneelRKnee, u);
+                        targetLAnkleRot = Vector3.Lerp(sitLAnkle, kneelLAnkle, u);
+                        targetRAnkleRot = Vector3.Lerp(sitRAnkle, kneelRAnkle, u);
+                    }
+                    else
+                    {
+                        // Stage C: One-Knee Kneel -> Stand-Up with smooth PlantFeet handoff (zero end pop)
+                        float standU = Mathf.Clamp01((gNorm - 0.68f) / 0.32f);
+                        float u = Mathf.SmoothStep(0f, 1f, standU);
+                        knockdownFootBlend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((standU - 0.28f) / 0.72f));
+                        float riseArch = Mathf.Sin(u * Mathf.PI);
+                        targetHipsPos = Vector3.Lerp(kneelHipsPos, standHipsPos, u);
+                        targetHipsRot = Vector3.Lerp(kneelHipsRot, standHipsRot, u);
+                        targetSpineRot = Vector3.Lerp(kneelSpine, standSpine, u) + new Vector3(6f * riseArch, 0f, 0f);
+                        targetNeckRot = Vector3.Lerp(kneelNeck, standNeck, u);
+                        targetHeadRot = Vector3.Lerp(kneelHead, standHead, u);
+                        targetLShoulderRot = Vector3.Lerp(kneelLSh, standLSh, u);
+                        targetRShoulderRot = Vector3.Lerp(kneelRSh, standRSh, u);
+                        targetLElbowRot = Vector3.Lerp(kneelLElb, standLElb, u);
+                        targetRElbowRot = Vector3.Lerp(kneelRElb, standRElb, u);
+                        targetLHipRot = Vector3.Lerp(kneelLHip, standLHip, u);
+                        targetRHipRot = Vector3.Lerp(kneelRHip, standRHip, u);
+                        targetLKneeRot = Vector3.Lerp(kneelLKnee, standLKnee, u);
+                        targetRKneeRot = Vector3.Lerp(kneelRKnee, standRKnee, u);
+                        targetLAnkleRot = Vector3.Lerp(kneelLAnkle, standLAnkle, u);
+                        targetRAnkleRot = Vector3.Lerp(kneelRAnkle, standRAnkle, u);
+                    }
+                }
             }
-            // --- Hit recoil stagger animation (when punched) ---
+            // --- Hit recoil stagger animation (crisp impact snap -> weighted stagger -> smooth recovery) ---
             else if (_hitReactTimer >= 0f)
             {
                 float hNorm = Mathf.Clamp01(_hitReactTimer / HitReactDuration);
-                float hEnv = Mathf.Sin(hNorm * Mathf.PI);
-                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -28f, hEnv);
+                float hEnv = hNorm < 0.22f
+                    ? Mathf.SmoothStep(0f, 1f, hNorm / 0.22f)
+                    : Mathf.SmoothStep(1f, 0f, (hNorm - 0.22f) / 0.78f);
+                hitStaggerW = hEnv;
+                targetHipsPos.y -= 0.095f * hEnv;
+                targetHipsPos.z -= 0.075f * hEnv;
+                targetHipsRot.y += 10f * hEnv;
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -26f, hEnv);
                 targetSpineRot.y = Mathf.Lerp(targetSpineRot.y, 22f, hEnv);
-                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -26f, hEnv);
-                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-78f, 0f, -40f), hEnv);
-                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-70f, 0f, 38f), hEnv);
-                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-52f, 0f, 0f), hEnv);
-                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-56f, 0f, 0f), hEnv);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -24f, hEnv);
+                if (!carrying)
+                {
+                    targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-78f, 0f, -40f), hEnv);
+                    targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-70f, 0f, 38f), hEnv);
+                    targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-52f, 0f, 0f), hEnv);
+                    targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-56f, 0f, 0f), hEnv);
+                }
             }
             // --- 3-Hit Weighted Street Combat Combo: 0 = Left Jab, 1 = Heavy Right Hook, 2 = Front Push Kick ---
             else if (_punchTimer >= 0f)
@@ -1409,57 +2159,127 @@ namespace OurWorld.Player
                     targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(26f, 0f, 28f), guardEnv);
                 }
             }
-            // --- Startled arms-up pose (pedestrian near fast vehicle) ---
+            // --- Startled / vehicle-dodge pose (step & lean away from threat side with defensive arms) ---
             else if (_startledTimer >= 0f)
             {
                 float sNorm = Mathf.Clamp01(_startledTimer / _startledDuration);
-                float sEnv = Mathf.Sin(sNorm * Mathf.PI);
-                sEnv = Mathf.Clamp01(sEnv * 2.0f);
+                float sEnv = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(sNorm / 0.14f)) *
+                             (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sNorm - 0.52f) / 0.48f)));
 
-                targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-135f, 0f, -28f), sEnv);
-                targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-135f, 0f, 28f), sEnv);
-                targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-22f, 0f, 0f), sEnv);
-                targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(-22f, 0f, 0f), sEnv);
-                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -8f, sEnv);
+                if (_speedMs > 0.35f && Mathf.Abs(localTravel.x) > 0.35f)
+                {
+                    _startledDodgeSide = Mathf.Sign(localTravel.x);
+                    _startledHasThreat = true;
+                }
+
+                float dodgeSide = _startledDodgeSide;
+                float lateralScale = _startledHasThreat ? 1f : 0.45f;
+                startledStepW = (_grounded && _speedMs < 0.35f) ? (sEnv * lateralScale) : 0f;
+
+                // Lean and shift away from the approaching vehicle while turning gaze toward it
+                targetHipsPos.x += dodgeSide * 0.13f * sEnv * lateralScale;
+                targetHipsPos.y -= 0.095f * sEnv;
+                targetHipsPos.z -= 0.06f * sEnv;
+                targetHipsRot.z -= dodgeSide * 6f * sEnv * lateralScale;
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -10f, sEnv);
+                targetSpineRot.y += dodgeSide * 18f * sEnv * lateralScale;
+                targetSpineRot.z -= dodgeSide * 17f * sEnv * lateralScale;
+                targetHeadRot.y -= dodgeSide * 24f * sEnv * lateralScale;
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -6f, sEnv);
+
+                if (!carrying)
+                {
+                    // Near-side arm shields toward threat; far-side arm reaches out toward dodge side for balance
+                    Vector3 shieldSh = new Vector3(-112f, dodgeSide * 16f, -dodgeSide * 26f);
+                    Vector3 shieldElb = new Vector3(-68f, 0f, 0f);
+                    Vector3 balanceSh = new Vector3(-76f, -dodgeSide * 10f, dodgeSide * 48f);
+                    Vector3 balanceElb = new Vector3(-40f, 0f, 0f);
+
+                    if (dodgeSide > 0f)
+                    {
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, shieldSh, sEnv);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, shieldElb, sEnv);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, balanceSh, sEnv);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, balanceElb, sEnv);
+                    }
+                    else
+                    {
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, shieldSh, sEnv);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, shieldElb, sEnv);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, balanceSh, sEnv);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, balanceElb, sEnv);
+                    }
+                }
             }
             // --- One-shot right-arm wave overlay (~1.5 s) ---
-            else if (_waveTimer >= 0f)
+            else if (_waveTimer >= 0f && !carrying && !petting && _consumeWeight < 0.05f && !_hasShelfReach && !_hasDualAction)
             {
                 float norm = _waveTimer / WaveDuration;
                 float env = Mathf.SmoothStep(0f, 1f, norm / 0.24f) *
                     (1f - Mathf.SmoothStep(0f, 1f, (norm - 0.73f) / 0.27f));
-                float waveOsc = Mathf.Sin(_waveTimer * 15f) * 18f * env;
+                float waveOsc = Mathf.Sin(_waveTimer * 15f) * 20f * env;
 
-                Vector3 waveShoulder = new Vector3(-31f, 0f, 113f);
-                Vector3 waveElbow = new Vector3(-18f, 0f, 22f + waveOsc);
+                Vector3 waveShoulder = new Vector3(-42f, 10f, 118f + waveOsc * 0.22f);
+                Vector3 waveElbow = new Vector3(-26f, 0f, 50f + waveOsc);
                 targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, waveShoulder, env);
                 targetRElbowRot = Vector3.Lerp(targetRElbowRot, waveElbow, env);
-                targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, 8f, env * 0.5f);
+                targetSpineRot.z -= 4f * env;
+                targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, 10f, env * 0.55f);
+                targetHeadRot.z += 5f * env;
             }
 
-            CarryableProp carry = CarryableProp.CurrentlyHeld;
-            bool carrying = carry != null && carry.UsesRig(this);
-            Vector3 petHand = Vector3.zero;
-            float petCrouch = 0f;
-            float petWeight = 0f;
-            StreetCatController cat = StreetCatController.ActivePet;
-            bool petting = cat != null && cat.TryGetPetPose(this, out petCrouch, out petWeight, out petHand);
             if (petting)
             {
-                targetHipsPos.y -= 0.42f * petCrouch;
-                targetHipsPos.z -= 0.04f * petCrouch;
-                targetSpineRot = Vector3.Lerp(targetSpineRot, new Vector3(43f, -7f, -5f), petCrouch);
-                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 14f, petCrouch);
-                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 12f, petCrouch);
+                // Kneel drop is handled cleanly by _kneelBlend; keep spine gently leaned & head warmly tilted toward cat
+                targetHipsPos.y -= 0.05f * petCrouch;
+                targetHipsPos.z -= 0.03f * petCrouch;
+                targetSpineRot = Vector3.Lerp(targetSpineRot, new Vector3(28f, -8f, -4f), petCrouch);
+                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 12f, petCrouch);
+                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 14f, petCrouch);
+                targetHeadRot.z += 7f * petCrouch;
             }
             if (carrying)
             {
                 float crouch = carry.PickupCrouch;
-                targetHipsPos.y -= 0.52f * crouch;
-                targetHipsPos.z -= 0.075f * crouch;
-                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x * 0.55f + 5f, 53f, crouch);
-                targetSpineRot.y *= 0.35f;
-                targetHeadRot.x += 14f * crouch;
+                float heaviness = carry.CarryHeaviness;
+                // Squat lift with hips/knees (back stays straighter ~30 deg instead of hunched 53 deg)
+                // and counter-lean backward while carrying heavier items.
+                float squatDrop = Mathf.Lerp(0.38f, 0.48f, heaviness);
+                float liftSpineLean = Mathf.Lerp(32f, 26f, heaviness);
+                float carryCounterLean = carry.IsAttached ? -Mathf.Lerp(3.5f, 10.5f, heaviness) : 2f;
+
+                targetHipsPos.y -= squatDrop * crouch;
+                targetHipsPos.z -= 0.095f * crouch;
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x * 0.45f + carryCounterLean, liftSpineLean, crouch);
+                targetSpineRot.y *= Mathf.Lerp(0.35f, 0.18f, heaviness);
+                targetHeadRot.x += Mathf.Lerp(10f, 16f, heaviness) * crouch;
+
+                if (carry.IsThrowing)
+                {
+                    float tp = carry.ThrowProgress;
+                    float wind = tp < 0.64f
+                        ? Mathf.SmoothStep(0f, 1f, tp / 0.64f)
+                        : (1f - Mathf.SmoothStep(0f, 1f, (tp - 0.64f) / 0.36f));
+                    float heave = tp >= 0.58f ? Mathf.SmoothStep(0f, 1f, (tp - 0.58f) / 0.42f) : 0f;
+                    targetSpineRot.x += -14f * wind + 20f * heave;
+                    targetHipsPos.z += -0.05f * wind + 0.07f * heave;
+                }
+            }
+            else if (_carryReleaseTimer >= 0f)
+            {
+                float relU = Mathf.Clamp01(_carryReleaseTimer / CarryReleaseFadeDuration);
+                float relEnv = 1f - Mathf.SmoothStep(0f, 1f, relU);
+                targetHipsPos.y -= 0.42f * _carryReleaseCrouch * relEnv;
+                targetHipsPos.z -= 0.08f * _carryReleaseCrouch * relEnv;
+                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 26f, _carryReleaseCrouch * relEnv);
+            }
+            else if (_carryThrowTimer >= 0f)
+            {
+                float fNorm = Mathf.Clamp01(_carryThrowTimer / CarryThrowFollowDuration);
+                float fEnv = 1f - Mathf.SmoothStep(0f, 1f, fNorm);
+                targetSpineRot.x += Mathf.Lerp(14f, 22f, _carryThrowHeaviness) * fEnv;
+                targetHipsPos.z += 0.05f * fEnv;
+                targetHipsPos.y -= 0.04f * fEnv;
             }
 
             // --- Dedicated Full-Body Sports Action Animations (Soccer, Basketball, Volleyball, Celebration) ---
@@ -1472,18 +2292,20 @@ namespace OurWorld.Player
                 {
                     case SportAnimKind.SoccerKick:
                     {
-                        // Authentic windup -> explosive right-foot strike -> follow-through
-                        float cock = sn < 0.34f ? Mathf.SmoothStep(0f, 1f, sn / 0.34f) : 0f;
-                        float whip = sn >= 0.28f ? Mathf.Sin(Mathf.Clamp01((sn - 0.28f) / 0.72f) * Mathf.PI) : 0f;
+                        // Authentic windup -> explosive right-foot strike -> follow-through (continuous curves, zero snap)
+                        float strikeBlend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.24f) / 0.16f));
+                        float cock = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(sn / 0.26f)) * (1f - strikeBlend);
+                        float whip = Mathf.Sin(Mathf.Clamp01((sn - 0.22f) / 0.78f) * Mathf.PI);
                         targetHipsPos.y -= 0.06f * env;
-                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, cock > 0f ? 8f : -16f, env);
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, Mathf.Lerp(8f, -16f, strikeBlend), env);
                         targetSpineRot.y += 22f * cock - 28f * whip;
                         targetSpineRot.z += -12f * whip;
                         // Planted left leg bends naturally, right leg cocks far back then whips through ball
                         targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-18f, 0f, -6f), env);
                         targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(24f, 0f, 0f), env);
                         float kickHip = Mathf.Lerp(46f * cock, -78f, whip);
-                        float kickKnee = sn < 0.44f ? Mathf.Lerp(10f, 76f, cock) : Mathf.Lerp(76f, 12f, Mathf.Clamp01((sn - 0.44f) / 0.28f));
+                        float kneeExtend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.34f) / 0.26f));
+                        float kickKnee = Mathf.Lerp(Mathf.Lerp(14f, 76f, cock), Mathf.Lerp(76f, 12f, kneeExtend), strikeBlend);
                         targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(kickHip, 0f, 8f), env);
                         targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(kickKnee, 0f, 0f), env);
                         targetRAnkleRot = Vector3.Lerp(targetRAnkleRot, new Vector3(28f, 0f, 0f), whip);
@@ -1510,33 +2332,37 @@ namespace OurWorld.Player
                     }
                     case SportAnimKind.BasketballJumpShot:
                     {
-                        // Squat -> explosive 0.56 m jump -> high 2-hand overhead shot release & wrist follow-through!
-                        float dip = sn < 0.22f ? Mathf.Sin((sn / 0.22f) * Mathf.PI) : 0f;
+                        // Squat -> explosive 0.56 m jump -> high 2-hand overhead shot release & smooth wrist extension
+                        float dip = sn < 0.24f ? Mathf.Sin((sn / 0.24f) * Mathf.PI) : 0f;
                         float air = sn >= 0.16f ? Mathf.Sin(Mathf.Clamp01((sn - 0.16f) / 0.84f) * Mathf.PI) : 0f;
-                        float release = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.22f) / 0.28f)) *
+                        float riseBlend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.14f) / 0.16f));
+                        float release = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.20f) / 0.26f)) *
                                         (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.80f) / 0.20f)));
+                        float shootExtend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.34f) / 0.20f));
                         targetHipsPos.y += air * 0.56f - dip * 0.14f;
-                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, dip > 0f ? 14f : -10f, Mathf.Max(dip, air));
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, Mathf.Lerp(14f, -10f, riseBlend), Mathf.Max(dip, air));
                         targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-18f * air + 16f * dip, 0f, -5f), Mathf.Max(dip, air));
                         targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-14f * air + 16f * dip, 0f, 5f), Mathf.Max(dip, air));
                         targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(26f * air + 36f * dip, 0f, 0f), Mathf.Max(dip, air));
                         targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(22f * air + 36f * dip, 0f, 0f), Mathf.Max(dip, air));
                         // Right shooting arm extends straight overhead, left guide hand supports cleanly
                         targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-164f, 0f, 12f), release);
-                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(sn < 0.48f ? -52f : -12f, 0f, 0f), release);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(Mathf.Lerp(-54f, -10f, shootExtend), 0f, 0f), release);
                         targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-146f, 14f, -12f), release);
-                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-34f, 0f, 0f), release);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(Mathf.Lerp(-44f, -26f, shootExtend), 0f, 0f), release);
                         break;
                     }
                     case SportAnimKind.BasketballPass:
                     {
-                        // Snappy two-hand chest pass push
+                        // Snappy two-hand chest pass push with smooth elbow extension
+                        float pushExtend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.22f) / 0.24f));
                         targetHipsPos.y -= 0.06f * env;
                         targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 14f, env);
                         targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-84f, 16f, -8f), env);
                         targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-84f, -16f, 8f), env);
-                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(sn < 0.35f ? -72f : -10f, 0f, 0f), env);
-                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(sn < 0.35f ? -72f : -10f, 0f, 0f), env);
+                        float passElbow = Mathf.Lerp(-74f, -8f, pushExtend);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(passElbow, 0f, 0f), env);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(passElbow, 0f, 0f), env);
                         break;
                     }
                     case SportAnimKind.VolleyballBump:
@@ -1558,21 +2384,23 @@ namespace OurWorld.Player
                     }
                     case SportAnimKind.VolleyballSpike:
                     {
-                        // Explosive 0.66 m airborne leap -> arched back cock -> violent overhead spike whip!
+                        // Explosive 0.66 m airborne leap -> arched back cock -> smooth overhead spike whip!
                         float air = Mathf.Sin(sn * Mathf.PI);
-                        float cock = sn < 0.44f ? Mathf.SmoothStep(0f, 1f, sn / 0.44f) : 0f;
-                        float slam = sn >= 0.38f ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.38f) / 0.26f)) * (1f - Mathf.Clamp01((sn - 0.78f) / 0.22f)) : 0f;
+                        float swingBlend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.34f) / 0.18f));
+                        float cock = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(sn / 0.34f)) * (1f - swingBlend);
+                        float slam = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.36f) / 0.24f)) *
+                                     (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.78f) / 0.22f)));
                         targetHipsPos.y += air * 0.66f;
-                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, cock > 0f ? -20f : 16f, air);
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, Mathf.Lerp(-20f, 16f, swingBlend), air);
                         targetSpineRot.y += 28f * cock - 34f * slam;
                         targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(-22f, 0f, -5f), air);
                         targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(-18f, 0f, 5f), air);
                         targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(58f, 0f, 0f), air);
                         targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(64f, 0f, 0f), air);
-                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(cock > 0f ? -145f : -40f, 0f, -24f), air);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(Mathf.Lerp(-145f, -40f, swingBlend), 0f, -24f), air);
                         targetLElbowRot = Vector3.Lerp(targetLElbowRot, new Vector3(-18f, 0f, 0f), air);
                         targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(Mathf.Lerp(-172f, -48f, slam), -14f, 22f), air);
-                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(cock > 0f ? -78f : -12f, 0f, 0f), air);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, new Vector3(Mathf.Lerp(-78f, -12f, swingBlend), 0f, 0f), air);
                         break;
                     }
                     case SportAnimKind.VictoryJump:
@@ -1684,20 +2512,24 @@ namespace OurWorld.Player
                     }
                     case SportAnimKind.SwimDiveStart:
                     {
-                        // Olympic streamlined arrow dive off block or springboard: arms locked overhead, crisp entry angle!
+                        // Olympic streamlined arrow dive: holds crisp head-first entry through water splash before leveling into stroke
+                        float entryIn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(sn / 0.22f));
+                        float entryOut = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((sn - 0.84f) / 0.16f));
+                        float diveW = entryIn * entryOut;
+                        float pitchT = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(sn / 0.65f));
                         float arc = Mathf.Sin(sn * Mathf.PI);
-                        targetHipsRot.x = Mathf.Lerp(targetHipsRot.x, Mathf.Lerp(28f, 108f, sn), env);
-                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 12f, env);
-                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-176f, 0f, -6f), env);
-                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-176f, 0f, 6f), env);
-                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, Vector3.zero, env);
-                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, Vector3.zero, env);
-                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(12f * arc, 0f, -4f), env);
-                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(12f * arc, 0f, 4f), env);
-                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(6f, 0f, 0f), env);
-                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(6f, 0f, 0f), env);
-                        targetLAnkleRot = new Vector3(42f, 0f, 0f);
-                        targetRAnkleRot = new Vector3(42f, 0f, 0f);
+                        targetHipsRot.x = Mathf.Lerp(targetHipsRot.x, Mathf.Lerp(28f, 96f, pitchT), diveW);
+                        targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, 12f, diveW);
+                        targetLShoulderRot = Vector3.Lerp(targetLShoulderRot, new Vector3(-176f, 0f, -6f), diveW);
+                        targetRShoulderRot = Vector3.Lerp(targetRShoulderRot, new Vector3(-176f, 0f, 6f), diveW);
+                        targetLElbowRot = Vector3.Lerp(targetLElbowRot, Vector3.zero, diveW);
+                        targetRElbowRot = Vector3.Lerp(targetRElbowRot, Vector3.zero, diveW);
+                        targetLHipRot = Vector3.Lerp(targetLHipRot, new Vector3(12f * arc, 0f, -4f), diveW);
+                        targetRHipRot = Vector3.Lerp(targetRHipRot, new Vector3(12f * arc, 0f, 4f), diveW);
+                        targetLKneeRot = Vector3.Lerp(targetLKneeRot, new Vector3(6f, 0f, 0f), diveW);
+                        targetRKneeRot = Vector3.Lerp(targetRKneeRot, new Vector3(6f, 0f, 0f), diveW);
+                        targetLAnkleRot = Vector3.Lerp(targetLAnkleRot, new Vector3(42f, 0f, 0f), diveW);
+                        targetRAnkleRot = Vector3.Lerp(targetRAnkleRot, new Vector3(42f, 0f, 0f), diveW);
                         break;
                     }
                     case SportAnimKind.SwimFlipTurn:
@@ -1743,38 +2575,91 @@ namespace OurWorld.Player
                 }
             }
 
-            if (_hasShelfReach && _shelfReachWeight > 0.01f)
+            float doorBodyWeight = 0f;
+            if (!carrying && !petting && !tennisStance && !_isLyingDown && !_isSwimming && _doorHandle != null && _grounded)
             {
-                targetSpineRot.x += 9f * _shelfReachWeight;
-                targetSpineRot.y -= 10f * _shelfReachWeight;
-                targetHeadRot.x += 6f * _shelfReachWeight;
-            }
-            else if (_consumeMode == 1 && _consumeWeight > 0.01f)
-            {
-                // Realistic drinking tilt: gently tip head back on each sip
-                float sip = Mathf.Clamp01(_consumeCyclePhase);
-                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -26f, sip * _consumeWeight);
-                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, -9f, sip * _consumeWeight);
-                targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -4f, sip * _consumeWeight);
-            }
-            else if (_consumeMode == 2 && _consumeWeight > 0.01f)
-            {
-                // Realistic eating nod: lean slightly toward bite
-                float bite = Mathf.Clamp01(_consumeCyclePhase);
-                targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 14f, bite * _consumeWeight);
-                targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 5f, bite * _consumeWeight);
-            }
-            else if (_hasDualAction)
-            {
-                float actionBlend = Mathf.Max(_dualLeftWeight, _dualRightWeight);
-                if (actionBlend < 0.01f && (Mathf.Abs(_dualSpineLean) > 0.1f || Mathf.Abs(_dualHeadPitch) > 0.1f || Mathf.Abs(_dualHipsDrop) > 0.001f))
+                float dElapsed = Time.time - _doorReachStarted;
+                if (dElapsed < _doorReachDuration)
                 {
-                    actionBlend = 1f;
+                    float dIn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(dElapsed / _doorReachTime));
+                    float releaseStart = Mathf.Max(_doorReachTime, _doorReachDuration * 0.64f);
+                    float dOut = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((dElapsed - releaseStart) / Mathf.Max(0.08f, _doorReachDuration - releaseStart)));
+                    float doorScaleY = transform.lossyScale.y;
+                    Vector3 nominalSh = transform.TransformPoint(new Vector3(_doorReachRight ? 0.21f : -0.21f, 1.38f, 0f));
+                    float distFade = 1f - Mathf.InverseLerp(0.68f * doorScaleY, 1.18f * doorScaleY, Vector3.Distance(nominalSh, _doorHandle.position));
+                    doorBodyWeight = dIn * dOut * distFade;
+                    targetSpineRot.x += 7f * doorBodyWeight;
+                    targetSpineRot.y += (_doorReachRight ? -11f : 11f) * doorBodyWeight;
+                    targetHeadRot.y += (_doorReachRight ? 6f : -6f) * doorBodyWeight;
                 }
-                targetHipsPos.y -= _dualHipsDrop * actionBlend;
-                targetSpineRot.x += _dualSpineLean;
-                targetNeckRot.x += _dualHeadPitch * 0.35f;
-                targetHeadRot.x += _dualHeadPitch * 0.65f;
+            }
+
+            if (!carrying && !petting)
+            {
+                if (_hasShelfReach && _shelfReachWeight > 0.01f)
+                {
+                    targetSpineRot.x += 9f * _shelfReachWeight;
+                    targetSpineRot.y -= 10f * _shelfReachWeight;
+                    targetHeadRot.x += 6f * _shelfReachWeight;
+                }
+                else if (_consumeMode == 1 && _consumeWeight > 0.01f)
+                {
+                    // Realistic drinking tilt: approach cup gently, tip head back smoothly on sip, subtle swallow bob between sips
+                    float sip = Mathf.Clamp01(_consumeCyclePhase);
+                    float swallowBob = Mathf.Sin((_idleTime + _noiseSeed) * 8.5f) * 2.2f * (1f - sip) * _consumeWeight;
+                    float approachNod = Mathf.Sin(Mathf.Clamp01(sip * 2f) * Mathf.PI) * 4f * _consumeWeight;
+                    targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, -18f, sip * _consumeWeight) + approachNod + swallowBob;
+                    targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, 4f, sip * _consumeWeight * 0.5f);
+                    targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, -7f, sip * _consumeWeight);
+                    targetSpineRot.x = Mathf.Lerp(targetSpineRot.x, -3.5f, sip * _consumeWeight);
+                }
+                else if (_consumeMode == 2 && _consumeWeight > 0.01f)
+                {
+                    // Realistic eating nod toward snack + subtle chewing micro-motion between bites
+                    float bite = Mathf.Clamp01(_consumeCyclePhase);
+                    float chew = Mathf.Sin((_idleTime + _noiseSeed) * 19f) * 3.0f * (1f - bite) * _consumeWeight;
+                    targetHeadRot.x = Mathf.Lerp(targetHeadRot.x, 13f, bite * _consumeWeight) + chew;
+                    targetHeadRot.y = Mathf.Lerp(targetHeadRot.y, 6f, bite * _consumeWeight * 0.65f);
+                    targetHeadRot.z += 3.5f * bite * _consumeWeight;
+                    targetNeckRot.x = Mathf.Lerp(targetNeckRot.x, 5f, bite * _consumeWeight);
+                }
+                else if (_hasDualAction)
+                {
+                    float actionBlend = Mathf.Max(_dualLeftWeight, _dualRightWeight);
+                    if (actionBlend < 0.01f && (Mathf.Abs(_dualSpineLean) > 0.1f || Mathf.Abs(_dualHeadPitch) > 0.1f || Mathf.Abs(_dualHipsDrop) > 0.001f))
+                    {
+                        actionBlend = 1f;
+                    }
+                    targetHipsPos.y -= _dualHipsDrop * actionBlend;
+                    targetSpineRot.x += _dualSpineLean;
+                    targetNeckRot.x += _dualHeadPitch * 0.35f;
+                    targetHeadRot.x += _dualHeadPitch * 0.65f;
+                }
+            }
+
+            // One-knee kneel overlay (farm work, low interactions & cat petting; clamped to hipsBaseY * 0.5f)
+            bool canKneel = _grounded && !isSitting && !_isLyingDown && !_isSwimming && _prayerStage == 0 && _knockdownTimer < 0f;
+            float desiredKneel = petting ? Mathf.Max(_kneelWeight, petCrouch * 0.90f) : _kneelWeight;
+            _activeKneelRight = petting ? true : _kneelRight;
+            if (canKneel && (desiredKneel > 0.01f || _kneelBlend > 0.001f))
+            {
+                float kneelRate = petting ? 14f : 8f;
+                _kneelBlend = Mathf.Lerp(_kneelBlend, desiredKneel, 1f - Mathf.Exp(-kneelRate * dt));
+                if (desiredKneel <= 0.01f && _kneelBlend < 0.002f)
+                {
+                    _kneelBlend = 0f;
+                }
+                if (_kneelBlend > 0.01f)
+                {
+                    float kneelDrop = Mathf.Lerp(0f, hipsBaseY * 0.42f, _kneelBlend);
+                    targetHipsPos.y = Mathf.Max(hipsBaseY - hipsBaseY * 0.5f, targetHipsPos.y - kneelDrop);
+                    if (!petting) targetSpineRot.x += 6f * _kneelBlend;
+                }
+            }
+            else if (!canKneel && _kneelBlend > 0f)
+            {
+                _kneelBlend = Mathf.Lerp(_kneelBlend, 0f, 1f - Mathf.Exp(-10f * dt));
+                if (_kneelBlend < 0.002f) _kneelBlend = 0f;
             }
 
             if (chestVisual != null)
@@ -1787,12 +2672,13 @@ namespace OurWorld.Player
                 chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * dt));
             }
 
-            float damp = _prayerStage > 0 ? 6.5f : (_landSquatTimer >= 0f || carrying || petting ? 25f : (_grounded ? 14f : 10f));
-            hips.localPosition = Vector3.Lerp(hips.localPosition, targetHipsPos, 1f - Mathf.Exp(-damp * dt));
+            float damp = _isLyingDown ? 5.5f : (_prayerStage > 0 ? 6.5f : (_landSquatTimer >= 0f || carrying || petting || _carryThrowTimer >= 0f ? 25f : (_grounded ? 14f : 10f)));
+            _baseHipsLocalPos = Vector3.Lerp(_baseHipsLocalPos, targetHipsPos, 1f - Mathf.Exp(-damp * dt));
+            hips.localPosition = _baseHipsLocalPos;
             SmoothRotate(hips, targetHipsRot, damp, dt);
             SmoothRotate(spine, targetSpineRot, damp, dt);
             SmoothRotate(neck, targetNeckRot, damp, dt);
-            SmoothRotate(head, targetHeadRot, _prayerStage > 0 ? 6.0f : 9f, dt);
+            SmoothRotate(head, targetHeadRot, _isLyingDown ? 4.5f : (_prayerStage > 0 ? 6.0f : 9f), dt);
 
             SmoothRotate(lHip, targetLHipRot, damp, dt);
             SmoothRotate(rHip, targetRHipRot, damp, dt);
@@ -1812,15 +2698,25 @@ namespace OurWorld.Player
             if (carrying)
             {
                 carryWeight = carry.UpdateGrip(this, hips.position, out leftGrip, out rightGrip);
-                Vector3 leftReach = ShoulderReach(lShoulder, lElbow, leftGrip);
-                Vector3 rightReach = ShoulderReach(rShoulder, rElbow, rightGrip);
-                Vector3 reach = leftReach.sqrMagnitude > rightReach.sqrMagnitude ? leftReach : rightReach;
-                hips.position += Vector3.ClampMagnitude(reach, 0.16f * transform.lossyScale.y) * carryWeight;
+                if (carryWeight > 0f)
+                {
+                    Vector3 leftReach = ShoulderReach(lShoulder, lElbow, leftGrip);
+                    Vector3 rightReach = ShoulderReach(rShoulder, rElbow, rightGrip);
+                    Vector3 reach = leftReach.sqrMagnitude > rightReach.sqrMagnitude ? leftReach : rightReach;
+                    hips.position += Vector3.ClampMagnitude(reach, 0.16f * transform.lossyScale.y) * carryWeight;
+                }
             }
             if (petting)
             {
                 Vector3 reach = ShoulderReach(rShoulder, rElbow, petHand);
                 hips.position += Vector3.ClampMagnitude(reach, 0.13f * transform.lossyScale.y) * petWeight;
+            }
+            else if (doorBodyWeight > 0.01f && _doorHandle != null)
+            {
+                Transform dSh = _doorReachRight ? rShoulder : lShoulder;
+                Transform dElb = _doorReachRight ? rElbow : lElbow;
+                Vector3 dReach = ShoulderReach(dSh, dElb, _doorHandle.position);
+                hips.position += Vector3.ClampMagnitude(dReach, 0.08f * transform.lossyScale.y) * doorBodyWeight;
             }
 
             bool sportAirOrKick = _sportAnimTimer >= 0f &&
@@ -1839,12 +2735,19 @@ namespace OurWorld.Player
                                    _sportAnimKind == SportAnimKind.VictoryJump);
             bool tennisJumpServe = tennisStance && _tennisServing && swingTime >= -0.22f && swingTime <= 0.22f;
 
+            float footPlantWeight = _knockdownTimer >= 0f ? knockdownFootBlend : 1f;
             if (_grounded && !_isSwimming && !_isLyingDown && _prayerStage == 0 && _vaultTimer < 0f &&
-                _knockdownTimer < 0f && _hitReactTimer < 0f && _punchTimer < 0f &&
+                _punchTimer < 0f && footPlantWeight > 0.005f &&
                 !sportAirOrKick && !tennisJumpServe &&
                 lAnkle != null && rAnkle != null)
             {
-                PlantFeet(strideLength, stance, runBlend, tennisStance, idleW);
+                bool stationaryGround = _speedMs < 0.015f && absYawRate < 0.25f && _turnInPlaceWeight < 0.01f;
+                PlantFeet(strideLength, stance, runBlend, tennisStance, idleW, localTravel, dt,
+                    footPlantWeight, startledStepW, hitStaggerW, stationaryGround);
+            }
+            else
+            {
+                _smoothedPelvisDrop = Mathf.Lerp(_smoothedPelvisDrop, 0f, 1f - Mathf.Exp(-10f * dt));
             }
 
             // Smoothly blended 2-bone IK hand placements for every Prayer (Namaz) stage so hands glide naturally between ears, abdomen, knees, carpet & thighs!
@@ -1914,8 +2817,22 @@ namespace OurWorld.Player
                         _prayerLeftHandLocal = Vector3.Lerp(_prayerLeftHandLocal, targetL, hBlend);
                         _prayerRightHandLocal = Vector3.Lerp(_prayerRightHandLocal, targetR, hBlend);
                     }
-                    AimHand(lShoulder, lElbow, transform.TransformPoint(_prayerLeftHandLocal), leftPole, 1f);
-                    AimHand(rShoulder, rElbow, transform.TransformPoint(_prayerRightHandLocal), rightPole, 1f);
+                    _prayerHandFade = Mathf.MoveTowards(_prayerHandFade, 1f, dt * 6f);
+                    AimHand(lShoulder, lElbow, transform.TransformPoint(_prayerLeftHandLocal), leftPole, _prayerHandFade);
+                    AimHand(rShoulder, rElbow, transform.TransformPoint(_prayerRightHandLocal), rightPole, _prayerHandFade);
+                }
+            }
+            else if (_prayerHandFade > 0.005f && _prayerHandsInit && !_isLyingDown && lShoulder != null && lElbow != null && rShoulder != null && rElbow != null)
+            {
+                _prayerHandFade = Mathf.MoveTowards(_prayerHandFade, 0f, dt * 4.2f);
+                if (_prayerHandFade > 0.005f)
+                {
+                    AimHand(lShoulder, lElbow, transform.TransformPoint(_prayerLeftHandLocal), -transform.right, _prayerHandFade);
+                    AimHand(rShoulder, rElbow, transform.TransformPoint(_prayerRightHandLocal), transform.right, _prayerHandFade);
+                }
+                else
+                {
+                    _prayerHandsInit = false;
                 }
             }
 
@@ -1924,12 +2841,40 @@ namespace OurWorld.Player
                 AimHand(lShoulder, lElbow, leftGrip, -transform.right, carryWeight);
                 AimHand(rShoulder, rElbow, rightGrip, transform.right, carryWeight);
             }
+            else if (_carryReleaseTimer >= 0f)
+            {
+                float relW = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_carryReleaseTimer / CarryReleaseFadeDuration));
+                if (relW > 0.005f)
+                {
+                    AimHand(lShoulder, lElbow, _carryReleaseLeft, -transform.right, relW);
+                    AimHand(rShoulder, rElbow, _carryReleaseRight, transform.right, relW);
+                }
+            }
+            else if (_carryThrowTimer >= 0f)
+            {
+                float fNorm = Mathf.Clamp01(_carryThrowTimer / CarryThrowFollowDuration);
+                float arc = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(fNorm / 0.35f));
+                float fW = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((fNorm - 0.14f) / 0.86f));
+                if (fW > 0.005f)
+                {
+                    Vector3 followOff = new Vector3(0f, 0.08f * arc, 0.15f * arc);
+                    AimHand(lShoulder, lElbow, transform.TransformPoint(_carryThrowLeftLocal + followOff), -transform.right, fW);
+                    AimHand(rShoulder, rElbow, transform.TransformPoint(_carryThrowRightLocal + followOff), transform.right, fW);
+                }
+            }
             if (petting)
             {
                 AimHand(rShoulder, rElbow, petHand, transform.right, petWeight);
                 if (lKnee != null)
-                    AimHand(lShoulder, lElbow, lKnee.position + transform.up * 0.11f - transform.right * 0.04f,
+                    AimHand(lShoulder, lElbow, lKnee.position + transform.up * 0.09f - transform.right * 0.03f,
                         -transform.right, petWeight);
+            }
+            else if (_petFadeBlend > 0.005f)
+            {
+                AimHand(rShoulder, rElbow, _lastPetHandWorld, transform.right, _petFadeBlend);
+                if (lKnee != null)
+                    AimHand(lShoulder, lElbow, lKnee.position + transform.up * 0.09f - transform.right * 0.03f,
+                        -transform.right, _petFadeBlend);
             }
             if (_vaultTimer >= 0f && _vaultSupport.HasValue && rShoulder != null)
             {
@@ -1946,21 +2891,26 @@ namespace OurWorld.Player
                 AimHand(lShoulder, lElbow, SwimHand(-1f, _swimPhase), -transform.right, strokeBlend);
                 AimHand(rShoulder, rElbow, SwimHand(1f, _swimPhase + Mathf.PI), transform.right, strokeBlend);
             }
-            else if (!carrying && !petting && !tennisStance && _doorHandle != null && _grounded)
+            else if (!carrying && !petting && !tennisStance && !_isLyingDown && _doorHandle != null && _grounded)
             {
                 float elapsed = Time.time - _doorReachStarted;
-                float weight = Mathf.SmoothStep(0f, 1f, elapsed / 0.16f) *
-                    (1f - Mathf.SmoothStep(0f, 1f, (elapsed - _doorReachDuration * 0.66f) / (_doorReachDuration * 0.34f)));
-                if (weight > 0f)
-                    AimHand(_doorReachRight ? rShoulder : lShoulder, _doorReachRight ? rElbow : lElbow,
-                        _doorHandle.position, transform.right * (_doorReachRight ? 1f : -1f), weight);
+                Transform reachSh = _doorReachRight ? rShoulder : lShoulder;
+                Transform reachElb = _doorReachRight ? rElbow : lElbow;
+                float doorScaleY = transform.lossyScale.y;
+                float reachFade = reachSh != null
+                    ? (1f - Mathf.InverseLerp(0.68f * doorScaleY, 1.18f * doorScaleY, Vector3.Distance(reachSh.position, _doorHandle.position)))
+                    : 1f;
+                float weight = doorBodyWeight * reachFade;
+                if (weight > 0.005f)
+                    AimHand(reachSh, reachElb, _doorHandle.position, transform.right * (_doorReachRight ? 1f : -1f), weight);
                 if (elapsed >= _doorReachDuration) _doorHandle = null;
             }
 
             if (tennisStance) ApplyTennisRacketPose(swingTime);
 
             // Shop shelf IK reach & drink/eat mouth-target IK overlay
-            if (!carrying && !petting && !tennisStance && !_isSwimming && rShoulder != null && rElbow != null)
+            if (!carrying && !petting && _carryReleaseTimer < 0f && _carryThrowTimer < 0f &&
+                !tennisStance && !_isSwimming && !_isLyingDown && rShoulder != null && rElbow != null)
             {
                 if (_hasShelfReach && _shelfReachWeight > 0.01f)
                 {
@@ -1979,7 +2929,8 @@ namespace OurWorld.Player
             }
 
             // Dual-hand physical interaction IK overlay (washing face/hands, abdest, typing, ATM, remote, etc.)
-            if (!carrying && !petting && !tennisStance && !_isSwimming && _hasDualAction)
+            if (!carrying && !petting && _carryReleaseTimer < 0f && _carryThrowTimer < 0f &&
+                !tennisStance && !_isSwimming && !_isLyingDown && _hasDualAction)
             {
                 if (_dualLeftWeight > 0.01f && lShoulder != null && lElbow != null)
                 {
@@ -1989,6 +2940,115 @@ namespace OurWorld.Player
                 {
                     AimHand(rShoulder, rElbow, _dualRightTarget, transform.right, _dualRightWeight);
                 }
+            }
+
+            // Shooting Range two-handed sporting firearm stance (smooth raise/lower, weapon switch blend, pump/bolt/reload hand sync)
+            float weaponAimTarget = _weaponAimActive ? 1f : 0f;
+            _weaponAimBlend = Mathf.Lerp(_weaponAimBlend, weaponAimTarget, 1f - Mathf.Exp(-14f * dt));
+            if (_weaponAimBlend < 0.004f && !_weaponAimActive) _weaponAimBlend = 0f;
+            _weaponLongGunBlend = Mathf.Lerp(_weaponLongGunBlend, _weaponIsLongGun ? 1f : 0f, 1f - Mathf.Exp(-11f * dt));
+
+            if (_weaponAimBlend > 0.005f && rShoulder != null && rElbow != null && lShoulder != null && lElbow != null)
+            {
+                float longW = _weaponLongGunBlend;
+                float reloadDip = _weaponReloadPhase > 0.005f ? Mathf.Sin(_weaponReloadPhase * Mathf.PI) : 0f;
+                float kickPitch = _weaponRecoilKick * Mathf.Lerp(14.0f, 9.5f, longW);
+                float raiseDrop = (1f - _weaponAimBlend) * 24f;
+                Quaternion aimRot = transform.rotation * Quaternion.Euler(
+                    _weaponAimPitchDeg - kickPitch + reloadDip * 18f + raiseDrop,
+                    0f,
+                    reloadDip * -14f);
+                Vector3 aimFwd = aimRot * Vector3.forward;
+                Vector3 aimRight = aimRot * Vector3.right;
+                Vector3 aimUp = aimRot * Vector3.up;
+
+                if (spine != null)
+                {
+                    Quaternion aimSpine = Quaternion.Euler(
+                        4f - _weaponRecoilKick * 3.5f,
+                        Mathf.Lerp(-6f, -14f, longW),
+                        0f);
+                    spine.localRotation = Quaternion.Slerp(spine.localRotation, aimSpine, _weaponAimBlend);
+                }
+                if (head != null)
+                {
+                    Quaternion aimHead = Quaternion.Euler(
+                        Mathf.Clamp(_weaponAimPitchDeg * 0.55f, -24f, 24f),
+                        Mathf.Lerp(6f, 14f, longW),
+                        Mathf.Lerp(0f, 5f, longW));
+                    head.localRotation = Quaternion.Slerp(head.localRotation, aimHead, _weaponAimBlend);
+                }
+
+                Vector3 rPistol = rShoulder.position
+                    + aimFwd * (0.42f - _weaponRecoilKick * 0.055f)
+                    - aimRight * 0.11f
+                    + aimUp * (0.045f + _weaponRecoilKick * 0.025f);
+                Vector3 rLong = rShoulder.position
+                    + aimFwd * (0.27f - _weaponRecoilKick * 0.050f)
+                    - aimRight * 0.03f
+                    - aimUp * (0.015f - _weaponRecoilKick * 0.018f);
+                Vector3 rBase = Vector3.Lerp(rPistol, rLong, longW);
+                rBase -= aimUp * (reloadDip * 0.12f + (1f - _weaponAimBlend) * 0.16f);
+
+                Vector3 lPistol = rBase - aimFwd * 0.018f - aimRight * 0.028f - aimUp * 0.025f;
+                Vector3 lLong = rBase + aimFwd * 0.31f - aimRight * 0.025f + aimUp * 0.015f;
+                Vector3 lTarget = Vector3.Lerp(lPistol, lLong, longW);
+                Vector3 rHandTarget = rBase;
+
+                if (_weaponReloadPhase > 0.02f)
+                {
+                    if (_weaponReloadStyle == 1)
+                    {
+                        // Shotgun shell-by-shell feed: 3 rhythmic dips from hip shell pouch into underside loading port
+                        float shellPhase = Mathf.Repeat(_weaponReloadPhase * 3f, 1f);
+                        float shellDip = Mathf.Sin(shellPhase * Mathf.PI);
+                        lTarget = rBase + aimFwd * 0.14f - aimUp * (0.045f + shellDip * 0.28f) - aimRight * (0.03f + shellDip * 0.10f);
+                    }
+                    else if (_weaponReloadStyle == 2)
+                    {
+                        // Sniper reload: 0..0.72 mag swap with left hand, 0.72..1.0 right hand racks bolt cleanly
+                        if (_weaponReloadPhase < 0.72f)
+                        {
+                            float magNorm = _weaponReloadPhase / 0.72f;
+                            float pouchPull = Mathf.Sin(Mathf.Clamp01(magNorm * 1.35f) * Mathf.PI);
+                            lTarget = rBase + aimFwd * 0.14f - aimUp * (0.06f + pouchPull * 0.32f) - aimRight * (0.04f + pouchPull * 0.08f);
+                        }
+                        else
+                        {
+                            float boltCycle = Mathf.Clamp01((_weaponReloadPhase - 0.72f) / 0.28f);
+                            float liftW = Mathf.Sin(boltCycle * Mathf.PI);
+                            float pullBack = Mathf.Sin(Mathf.Clamp01((boltCycle - 0.15f) / 0.70f) * Mathf.PI);
+                            rHandTarget = rBase + aimUp * (0.065f * liftW) + aimRight * (0.06f * liftW) + aimFwd * (0.055f - 0.075f * pullBack);
+                        }
+                    }
+                    else
+                    {
+                        // Pistol / Carbine mag swap: left hand drops to belt pouch then seats magazine into magwell
+                        float pouchPull = Mathf.Sin(Mathf.Clamp01(_weaponReloadPhase * 1.45f) * Mathf.PI);
+                        lTarget = rBase + aimFwd * Mathf.Lerp(0.01f, 0.12f, longW)
+                            - aimUp * (0.06f + pouchPull * 0.34f)
+                            - aimRight * (0.04f + pouchPull * 0.08f);
+                    }
+                }
+                else if (_weaponActionKind == 1 && _weaponActionPhase > 0.005f)
+                {
+                    // Shotgun pump cycle: left hand tracks forend pump slider back and forward cleanly
+                    float pumpBack = Mathf.Sin(_weaponActionPhase * Mathf.PI);
+                    lTarget -= aimFwd * (pumpBack * 0.095f);
+                }
+                else if (_weaponActionKind == 2 && _weaponActionPhase > 0.005f)
+                {
+                    // Sniper bolt cycle: right hand lifts off grip to bolt handle, pulls back, pushes forward & locks
+                    float liftW = Mathf.Sin(_weaponActionPhase * Mathf.PI);
+                    float pullBack = Mathf.Sin(Mathf.Clamp01((_weaponActionPhase - 0.15f) / 0.70f) * Mathf.PI);
+                    rHandTarget = rBase + aimUp * (0.065f * liftW) + aimRight * (0.06f * liftW) + aimFwd * (0.055f - 0.075f * pullBack);
+                }
+
+                AimHand(rShoulder, rElbow, rHandTarget, transform.right * 0.75f - Vector3.up * 0.55f, _weaponAimBlend);
+                AimHand(lShoulder, lElbow, lTarget, -transform.right * 0.75f - Vector3.up * 0.55f, _weaponAimBlend);
+
+                WeaponGripWorldPos = rBase;
+                WeaponGripWorldRot = aimRot;
             }
         }
 
@@ -2000,26 +3060,139 @@ namespace OurWorld.Player
             return delta.normalized * Mathf.Max(0f, delta.magnitude - reach);
         }
 
-        private void PlantFeet(float strideLength, float stance, float runBlend, bool tennisStance, float idleWeight)
+        private void PlantFeet(float strideLength, float stance, float runBlend, bool tennisStance, float idleWeight,
+            Vector3 localDirection, float dt, float weight, float startledStepW, float hitStaggerW, bool stationaryGround)
         {
-            Vector3 direction = transform.InverseTransformDirection(_travelDirection);
-            Vector3 left = GaitFoot(Mathf.Repeat(_phase / TwoPi, 1f), -1f, direction,
-                strideLength, stance, runBlend, tennisStance, idleWeight, out Quaternion leftRotation);
-            Vector3 right = GaitFoot(Mathf.Repeat(_phase / TwoPi + 0.5f, 1f), 1f, direction,
-                strideLength, stance, runBlend, tennisStance, idleWeight, out Quaternion rightRotation);
+            bool refreshGround = !stationaryGround || !_groundSampleValid;
+            if (!refreshGround)
+            {
+                _groundCacheTimer -= dt;
+                if (_groundCacheTimer <= 0f)
+                {
+                    refreshGround = true;
+                    _groundCacheTimer = 0.25f;
+                }
+            }
+            else
+            {
+                _groundCacheTimer = 0.25f;
+            }
 
-            // Keep both targets within reach when a long step or a low curb extends the support leg.
-            float pelvisDrop = Mathf.Max(0f, Mathf.Max(LegExtension(lHip, lKnee, lAnkle, left),
+            Vector3 left = GaitFoot(Mathf.Repeat(_phase / TwoPi, 1f), -1f, localDirection,
+                strideLength, stance, runBlend, tennisStance, idleWeight, dt, refreshGround, out Quaternion leftRotation);
+            Vector3 right = GaitFoot(Mathf.Repeat(_phase / TwoPi + 0.5f, 1f), 1f, localDirection,
+                strideLength, stance, runBlend, tennisStance, idleWeight, dt, refreshGround, out Quaternion rightRotation);
+            if (_sampleGround && refreshGround) _groundSampleValid = true;
+            else if (!_sampleGround) _groundSampleValid = false;
+
+            float scaleY = transform.lossyScale.y;
+
+            // Stationary startled vehicle-dodge foot step away from threat side
+            if (startledStepW > 0.005f)
+            {
+                float sNorm = Mathf.Clamp01(_startledTimer / Mathf.Max(0.2f, _startledDuration));
+                float hopLift = Mathf.Sin(Mathf.Clamp01(sNorm / 0.22f) * Mathf.PI) * 0.085f * startledStepW * scaleY;
+                Vector3 dodgeOffset = (transform.right * (_startledDodgeSide * 0.21f) - transform.forward * 0.09f) * (startledStepW * scaleY) + transform.up * hopLift;
+                if (_startledDodgeSide > 0f) right += dodgeOffset;
+                else left += dodgeOffset;
+            }
+
+            // Grounded hit-react stagger back-step on right foot so legs absorb recoil naturally
+            if (hitStaggerW > 0.005f)
+            {
+                right += (-transform.forward * 0.14f + transform.right * 0.05f) * (hitStaggerW * scaleY);
+            }
+
+            if (_kneelBlend > 0.01f)
+            {
+                float frontSign = _activeKneelRight ? -1f : 1f;
+                float kneelSign = -frontSign;
+
+                Vector3 frontGround = SampleKneelGround(new Vector3(frontSign * 0.13f, 0f, 0.30f), out Vector3 frontNormal);
+                Vector3 kneelGround = SampleKneelGround(new Vector3(kneelSign * 0.12f, 0f, -0.34f), out Vector3 kneelNormal);
+
+                Vector3 frontTarget = frontGround + frontNormal * (AnkleHeight * scaleY);
+                Quaternion frontRot = Quaternion.FromToRotation(transform.up, frontNormal) * transform.rotation;
+
+                const float kneelToePitch = 55f;
+                float kneelSoleLift = Mathf.Sin(kneelToePitch * Mathf.Deg2Rad) * 0.19f;
+                Vector3 kneelTarget = kneelGround + kneelNormal * ((AnkleHeight + kneelSoleLift) * scaleY);
+                Quaternion kneelRot = Quaternion.FromToRotation(transform.up, kneelNormal) *
+                    transform.rotation * Quaternion.Euler(kneelToePitch, 0f, 0f);
+
+                if (_activeKneelRight)
+                {
+                    left = Vector3.Lerp(left, frontTarget, _kneelBlend);
+                    leftRotation = Quaternion.Slerp(leftRotation, frontRot, _kneelBlend);
+                    right = Vector3.Lerp(right, kneelTarget, _kneelBlend);
+                    rightRotation = Quaternion.Slerp(rightRotation, kneelRot, _kneelBlend);
+                }
+                else
+                {
+                    right = Vector3.Lerp(right, frontTarget, _kneelBlend);
+                    rightRotation = Quaternion.Slerp(rightRotation, frontRot, _kneelBlend);
+                    left = Vector3.Lerp(left, kneelTarget, _kneelBlend);
+                    leftRotation = Quaternion.Slerp(leftRotation, kneelRot, _kneelBlend);
+                }
+            }
+
+            Vector3 preHipsPos = hips.position;
+            Quaternion preLHip = lHip != null ? lHip.localRotation : Quaternion.identity;
+            Quaternion preLKnee = lKnee != null ? lKnee.localRotation : Quaternion.identity;
+            Quaternion preLAnkle = lAnkle.localRotation;
+            Quaternion preRHip = rHip != null ? rHip.localRotation : Quaternion.identity;
+            Quaternion preRKnee = rKnee != null ? rKnee.localRotation : Quaternion.identity;
+            Quaternion preRAnkle = rAnkle.localRotation;
+
+            // Keep both targets within reach when a long step or a curb/stair extends the support leg.
+            float rawDrop = Mathf.Max(0f, Mathf.Max(LegExtension(lHip, lKnee, lAnkle, left),
                 LegExtension(rHip, rKnee, rAnkle, right)));
-            hips.position -= transform.up * pelvisDrop;
+            rawDrop = Mathf.Min(rawDrop, 0.36f * scaleY);
+            if (rawDrop >= _smoothedPelvisDrop)
+            {
+                _smoothedPelvisDrop = rawDrop;
+            }
+            else
+            {
+                _smoothedPelvisDrop = Mathf.Lerp(_smoothedPelvisDrop, rawDrop, 1f - Mathf.Exp(-14f * dt));
+                if (_smoothedPelvisDrop < 0.001f) _smoothedPelvisDrop = 0f;
+            }
+            hips.position -= transform.up * _smoothedPelvisDrop;
+
             AimLimb(lHip, lKnee, left, transform.forward, lAnkle.localPosition.magnitude);
             AimLimb(rHip, rKnee, right, transform.forward, rAnkle.localPosition.magnitude);
             lAnkle.rotation = leftRotation;
             rAnkle.rotation = rightRotation;
+
+            if (weight < 0.999f)
+            {
+                hips.position = Vector3.Lerp(preHipsPos, hips.position, weight);
+                if (lHip != null) lHip.localRotation = Quaternion.Slerp(preLHip, lHip.localRotation, weight);
+                if (lKnee != null) lKnee.localRotation = Quaternion.Slerp(preLKnee, lKnee.localRotation, weight);
+                lAnkle.localRotation = Quaternion.Slerp(preLAnkle, lAnkle.localRotation, weight);
+                if (rHip != null) rHip.localRotation = Quaternion.Slerp(preRHip, rHip.localRotation, weight);
+                if (rKnee != null) rKnee.localRotation = Quaternion.Slerp(preRKnee, rKnee.localRotation, weight);
+                rAnkle.localRotation = Quaternion.Slerp(preRAnkle, rAnkle.localRotation, weight);
+            }
+        }
+
+        private Vector3 SampleKneelGround(Vector3 localPos, out Vector3 normal)
+        {
+            Vector3 ground = transform.TransformPoint(localPos);
+            normal = transform.up;
+            float scaleY = transform.lossyScale.y;
+            if (_sampleGround && Physics.Raycast(ground + transform.up * (0.42f * scaleY), -transform.up,
+                    out RaycastHit hit, 0.88f * scaleY, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                hit.normal.y >= 0.65f && hit.collider.transform.root != transform.root)
+            {
+                ground = hit.point;
+                normal = hit.normal;
+            }
+            return ground;
         }
 
         private Vector3 GaitFoot(float phase, float side, Vector3 direction, float strideLength, float stance,
-            float runBlend, bool tennisStance, float idleWeight, out Quaternion rotation)
+            float runBlend, bool tennisStance, float idleWeight, float dt, bool refreshGround, out Quaternion rotation)
         {
             float halfStep = strideLength * stance * 0.5f;
             float offset;
@@ -2043,26 +3216,111 @@ namespace OurWorld.Player
                 pitch = Mathf.Lerp(Mathf.Lerp(21f, 28f, runBlend), -15f, Mathf.SmoothStep(0f, 1f, swing));
             }
 
+            // Couple stride offset 1:1 with _phase advancement for all walking speeds >= 0.28 gaitWeight (zero foot sliding).
+            float footOffsetWeight = Mathf.Clamp01(_gaitWeight / 0.28f);
             float width = tennisStance ? 0.22f : Mathf.Lerp(0.13f, 0.102f, _gaitWeight);
-            Vector3 local = new Vector3(side * width, 0f, -side * idleWeight * 0.035f) +
-                direction * (offset * _gaitWeight);
+            float lateralMag = Mathf.Abs(direction.x);
+            float lateralClearance = Mathf.Max(0f, halfStep * lateralMag * footOffsetWeight - (width - 0.065f));
+
+            Vector3 local = new Vector3(side * (width + lateralClearance), 0f, -side * idleWeight * 0.035f) +
+                direction * (offset * footOffsetWeight);
             local.x = side * Mathf.Max(0.052f, side * local.x);
-            Vector3 ground = transform.TransformPoint(local);
-            Vector3 normal = transform.up;
-            if (_sampleGround && Physics.Raycast(ground + transform.up * 0.32f, -transform.up,
-                    out RaycastHit hit, 0.53f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
-                hit.normal.y >= 0.65f && hit.collider.transform.root != transform.root)
+
+            // Turn-in-place alternating shuffle step when yaw rotates while stationary
+            float turnLift = 0f;
+            float turnFootYaw = 0f;
+            if (_turnInPlaceWeight > 0.01f && _gaitWeight < 0.35f)
             {
-                ground = hit.point;
-                normal = hit.normal;
+                float turnBlend = _turnInPlaceWeight * (1f - Mathf.Clamp01(_gaitWeight / 0.35f));
+                float tPhase = Mathf.Repeat(_turnStepPhase / TwoPi + (side > 0f ? 0.5f : 0f), 1f);
+                if (tPhase < 0.55f)
+                {
+                    float hold = tPhase / 0.55f;
+                    local.z += side * _turnYawSign * Mathf.Lerp(0.036f, -0.036f, hold) * turnBlend;
+                    turnFootYaw = _turnYawSign * Mathf.Lerp(9f, -9f, hold) * turnBlend;
+                }
+                else
+                {
+                    float tSwing = (tPhase - 0.55f) / 0.45f;
+                    float sU = Mathf.SmoothStep(0f, 1f, tSwing);
+                    local.z += side * _turnYawSign * Mathf.Lerp(-0.036f, 0.036f, sU) * turnBlend;
+                    turnLift = Mathf.Sin(tSwing * Mathf.PI) * 0.065f * turnBlend;
+                    turnFootYaw = _turnYawSign * Mathf.Lerp(-9f, 9f, sU) * turnBlend;
+                }
             }
 
-            pitch *= _gaitWeight * (tennisStance ? 0.4f : 1f);
+            float scaleY = transform.lossyScale.y;
+            Vector3 ground = transform.TransformPoint(local);
+            Vector3 normal = transform.up;
+            bool isLeft = side < 0f;
+
+            if (_sampleGround)
+            {
+                if (refreshGround)
+                {
+                    float rawDelta = 0f;
+                    Vector3 rawNorm = transform.up;
+                    if (Physics.Raycast(ground + transform.up * (0.42f * scaleY), -transform.up,
+                            out RaycastHit hit, 0.88f * scaleY, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                        hit.normal.y >= 0.65f && hit.collider.transform.root != transform.root)
+                    {
+                        rawDelta = Mathf.Clamp(Vector3.Dot(hit.point - ground, transform.up), -0.38f * scaleY, 0.36f * scaleY);
+                        rawNorm = hit.normal;
+                    }
+                    if (isLeft)
+                    {
+                        _leftRawGroundYOffset = rawDelta;
+                        _leftRawGroundNormal = rawNorm;
+                    }
+                    else
+                    {
+                        _rightRawGroundYOffset = rawDelta;
+                        _rightRawGroundNormal = rawNorm;
+                    }
+                }
+
+                float smoothK = 1f - Mathf.Exp(-22f * dt);
+                if (isLeft)
+                {
+                    _leftGroundYOffset = Mathf.Lerp(_leftGroundYOffset, _leftRawGroundYOffset, smoothK);
+                    _leftGroundNormal = Vector3.Slerp(_leftGroundNormal, _leftRawGroundNormal, smoothK);
+                    ground += transform.up * _leftGroundYOffset;
+                    normal = _leftGroundNormal;
+                }
+                else
+                {
+                    _rightGroundYOffset = Mathf.Lerp(_rightGroundYOffset, _rightRawGroundYOffset, smoothK);
+                    _rightGroundNormal = Vector3.Slerp(_rightGroundNormal, _rightRawGroundNormal, smoothK);
+                    ground += transform.up * _rightGroundYOffset;
+                    normal = _rightGroundNormal;
+                }
+            }
+            else
+            {
+                float decayK = 1f - Mathf.Exp(-14f * dt);
+                if (isLeft)
+                {
+                    _leftGroundYOffset = Mathf.Lerp(_leftGroundYOffset, 0f, decayK);
+                    _leftGroundNormal = Vector3.Slerp(_leftGroundNormal, transform.up, decayK);
+                    ground += transform.up * _leftGroundYOffset;
+                    normal = _leftGroundNormal;
+                }
+                else
+                {
+                    _rightGroundYOffset = Mathf.Lerp(_rightGroundYOffset, 0f, decayK);
+                    _rightGroundNormal = Vector3.Slerp(_rightGroundNormal, transform.up, decayK);
+                    ground += transform.up * _rightGroundYOffset;
+                    normal = _rightGroundNormal;
+                }
+            }
+
+            // Orient heel/toe pitch along forward/back travel component (flat sole during pure sideways strafe).
+            pitch *= direction.z * _gaitWeight * (tennisStance ? 0.4f : 1f);
             float soleReach = pitch > 0f ? 0.19f : 0.075f;
             float soleLift = Mathf.Abs(Mathf.Sin(pitch * Mathf.Deg2Rad)) * soleReach;
             rotation = Quaternion.FromToRotation(transform.up, normal) * transform.rotation *
-                Quaternion.Euler(pitch, side * Mathf.Lerp(6f, 2f, _gaitWeight), 0f);
-            return ground + normal * ((AnkleHeight + soleLift + lift * _gaitWeight) * transform.lossyScale.y);
+                Quaternion.Euler(pitch, side * Mathf.Lerp(6f, 2f, _gaitWeight) + turnFootYaw, 0f);
+            return ground + normal * ((AnkleHeight + soleLift + lift * _gaitWeight + turnLift) * scaleY);
         }
 
         private float LegExtension(Transform hip, Transform knee, Transform ankle, Vector3 target)
@@ -2076,52 +3334,147 @@ namespace OurWorld.Player
 
         private void AnimateSitting(float dt)
         {
+            if (_autoSeatActive)
+            {
+                _autoSeatElapsed += dt;
+                float t = Mathf.Clamp01(_autoSeatElapsed / _autoSeatDuration);
+                _seatAmount = Mathf.Lerp(_autoSeatFrom, _autoSeatTo, Mathf.SmoothStep(0f, 1f, t));
+                if (t >= 1f)
+                {
+                    _autoSeatActive = false;
+                    if (_autoSeatTo <= 0f)
+                    {
+                        SetSitting(false);
+                        return;
+                    }
+                }
+            }
+
             float breath = Mathf.Sin(_idleTime * Mathf.PI * 2f * 0.25f) * 0.8f;
 
             if (isDrivingSeat)
             {
                 float steerNorm = Mathf.Clamp(_steerAngleDeg / 36f, -1f, 1f);
+                _smoothedDriveSteerNorm = Mathf.Lerp(_smoothedDriveSteerNorm, steerNorm, 1f - Mathf.Exp(-11f * dt));
+                float sNorm = _smoothedDriveSteerNorm;
+                float accelPitch = Mathf.Clamp(-_driveLongitudinalAccel * 0.75f, -5.5f, 6.5f);
 
                 hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.17f, 0f), 1f - Mathf.Exp(-12f * dt));
                 SmoothRotate(hips, Vector3.zero, 12f, dt);
                 float wheelLean = _steeringWheel != null ? 8f : -6f;
-                SmoothRotate(spine, new Vector3(wheelLean + breath, steerNorm * 5f, -steerNorm * 3f), 10f, dt);
-                SmoothRotate(neck, new Vector3(4f, 0f, 0f), 10f, dt);
-                SmoothRotate(head, new Vector3(0f, steerNorm * 14f, 0f), 8f, dt);
+                SmoothRotate(spine, new Vector3(wheelLean + breath + accelPitch, sNorm * 6f, -sNorm * 4f), 10f, dt);
+                SmoothRotate(neck, new Vector3(4f - accelPitch * 0.35f, sNorm * 4f, 0f), 10f, dt);
+                SmoothRotate(head, new Vector3(-accelPitch * 0.25f, sNorm * 16f, sNorm * 2.5f), 8f, dt);
 
                 SmoothRotate(lHip, new Vector3(-90f, 0f, -6f), 12f, dt);
                 SmoothRotate(rHip, new Vector3(-90f, 0f, 6f), 12f, dt);
                 SmoothRotate(lKnee, new Vector3(80f, 0f, 0f), 12f, dt);
-                SmoothRotate(rKnee, new Vector3(80f, 0f, 0f), 12f, dt);
+                SmoothRotate(rKnee, new Vector3(80f - _driveThrottleInput * 4f, 0f, 0f), 12f, dt);
                 SmoothRotate(lAnkle, new Vector3(10f, 0f, 0f), 12f, dt);
-                SmoothRotate(rAnkle, new Vector3(10f, 0f, 0f), 12f, dt);
+                SmoothRotate(rAnkle, new Vector3(10f + _driveThrottleInput * 14f, 0f, 0f), 12f, dt);
 
-                float leftReach = -62f - steerNorm * 14f;
-                float rightReach = -62f + steerNorm * 14f;
-                SmoothRotate(lShoulder, new Vector3(leftReach, 10f + steerNorm * 10f, -10f - steerNorm * 8f), 14f, dt);
-                SmoothRotate(rShoulder, new Vector3(rightReach, -10f + steerNorm * 10f, 10f - steerNorm * 8f), 14f, dt);
-                SmoothRotate(lElbow, new Vector3(-32f + steerNorm * 10f, 0f, 0f), 14f, dt);
-                SmoothRotate(rElbow, new Vector3(-32f - steerNorm * 10f, 0f, 0f), 14f, dt);
+                float leftReach = -62f - sNorm * 14f;
+                float rightReach = -62f + sNorm * 14f;
+                SmoothRotate(lShoulder, new Vector3(leftReach, 10f + sNorm * 10f, -10f - sNorm * 8f), 14f, dt);
+                SmoothRotate(rShoulder, new Vector3(rightReach, -10f + sNorm * 10f, 10f - sNorm * 8f), 14f, dt);
+                SmoothRotate(lElbow, new Vector3(-32f + sNorm * 10f, 0f, 0f), 14f, dt);
+                SmoothRotate(rElbow, new Vector3(-32f - sNorm * 10f, 0f, 0f), 14f, dt);
                 if (_steeringWheel != null)
                 {
-                    AimHand(lShoulder, lElbow, _steeringWheel.TransformPoint(new Vector3(-0.145f, 0f, 0.055f)), -transform.right, 1f);
-                    AimHand(rShoulder, rElbow, _steeringWheel.TransformPoint(new Vector3(0.145f, 0f, 0.055f)), transform.right, 1f);
+                    // Project driver basis onto steering wheel plane (invariant to wheel local-Y spin) so hands stay cleanly on the rim without ever tangling at full lock
+                    Vector3 wheelAxis = _steeringWheel.up.normalized;
+                    Vector3 wheelRight = Vector3.ProjectOnPlane(transform.right, wheelAxis);
+                    Vector3 wheelUp = Vector3.ProjectOnPlane(transform.up, wheelAxis);
+                    if (wheelRight.sqrMagnitude > 0.001f && wheelUp.sqrMagnitude > 0.001f)
+                    {
+                        wheelRight.Normalize();
+                        wheelUp.Normalize();
+                        const float rimRadius = 0.162f;
+                        float handTurnRad = Mathf.Clamp(sNorm * 68f, -68f, 68f) * Mathf.Deg2Rad;
+                        float rightAngle = 14f * Mathf.Deg2Rad - handTurnRad;
+                        float leftAngle = 166f * Mathf.Deg2Rad - handTurnRad;
+                        Vector3 rimCenter = _steeringWheel.position - wheelAxis * 0.024f;
+                        Vector3 leftTarget = rimCenter + (wheelRight * Mathf.Cos(leftAngle) + wheelUp * Mathf.Sin(leftAngle)) * rimRadius;
+                        Vector3 rightTarget = rimCenter + (wheelRight * Mathf.Cos(rightAngle) + wheelUp * Mathf.Sin(rightAngle)) * rimRadius;
+                        AimHand(lShoulder, lElbow, leftTarget, -transform.right - transform.up * 0.25f, 1f);
+                        AimHand(rShoulder, rElbow, rightTarget, transform.right - transform.up * 0.25f, 1f);
+                    }
+                    else
+                    {
+                        AimHand(lShoulder, lElbow, _steeringWheel.TransformPoint(new Vector3(-0.145f, 0f, 0.055f)), -transform.right, 1f);
+                        AimHand(rShoulder, rElbow, _steeringWheel.TransformPoint(new Vector3(0.145f, 0f, 0.055f)), transform.right, 1f);
+                    }
                 }
+                return;
             }
-            else if (_seatFloor.HasValue)
+
+            // Non-driving seated life: talking decay/blend + chest breathing (desynchronized via _noiseSeed)
+            if (_talkingTimer > 0f)
             {
-                AnimateSeatContact(_seatFloor.Value, _seatAmount, breath, dt);
+                _talkingTimer = Mathf.Max(0f, _talkingTimer - dt);
+            }
+            _talkingBlend = Mathf.Lerp(_talkingBlend, _talkingTimer > 0f ? 1f : 0f, 1f - Mathf.Exp(-6f * dt));
+
+            float seatedBreathWave = Mathf.Sin((_idleTime + _noiseSeed) * TwoPi * 0.25f);
+            float seatedBreath = seatedBreathWave * 0.8f;
+            if (chestVisual != null)
+            {
+                float breathScale = 1f + seatedBreathWave * 0.018f;
+                Vector3 targetScale = new Vector3(
+                    _chestBaseScale.x * breathScale,
+                    _chestBaseScale.y,
+                    _chestBaseScale.z * breathScale);
+                chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * dt));
+            }
+
+            if (_seatFloor.HasValue)
+            {
+                AnimateSeatContact(_seatFloor.Value, _seatAmount, seatedBreath, dt);
             }
             else
             {
                 float headNoise = (Mathf.PerlinNoise(_noiseSeed, _idleTime * 0.16f) - 0.5f) * 2f;
-                float headLookYaw = headNoise * 11f;
+                float headLookYaw = headNoise * 11f * (_hasLookPoint ? 0.15f : 1f);
+
+                float gestureW = UpdateSeatedGesture(dt, lookAroundOnly: true);
+                float gestureT = _seatGestureDuration > 0.01f ? Mathf.Clamp01(_seatGestureTimer / _seatGestureDuration) : 0f;
+
+                Vector3 spineRot = new Vector3(-7f + seatedBreath, 0f, 0f);
+                Vector3 neckRot = new Vector3(5f, 0f, 0f);
+                Vector3 headRot = new Vector3(0f, headLookYaw, 0f);
+
+                if (gestureW > 0.001f && _seatGestureKind == 4)
+                {
+                    float scan = Mathf.Sin(gestureT * TwoPi);
+                    headRot.y += scan * 38f * gestureW;
+                    spineRot.y += scan * 6f * gestureW;
+                }
+
+                Vector3 lShRot = new Vector3(8f + seatedBreath * 0.5f, 0f, -10f);
+                Vector3 rShRot = new Vector3(8f + seatedBreath * 0.5f, 0f, 10f);
+                Vector3 lElbRot = new Vector3(-44f, 0f, 10f);
+                Vector3 rElbRot = new Vector3(-44f, 0f, -10f);
+
+                if (_talkingBlend > 0.02f)
+                {
+                    float talkTime = _idleTime + _noiseSeed;
+                    float beatR = Mathf.Sin(talkTime * 6.2f);
+                    float beatL = Mathf.Sin(talkTime * 6.2f + 1.5f);
+                    headRot.x += Mathf.Sin(talkTime * 4.1f) * 4f * _talkingBlend;
+                    spineRot.x += 6f * _talkingBlend;
+                    rShRot = Vector3.Lerp(rShRot, new Vector3(-34f - beatR * 12f, -10f, 14f), _talkingBlend);
+                    rElbRot = Vector3.Lerp(rElbRot, new Vector3(-74f + beatR * 16f, 0f, -10f), _talkingBlend);
+                    lShRot = Vector3.Lerp(lShRot, new Vector3(-16f - beatL * 6f, 6f, -12f), _talkingBlend * 0.65f);
+                    lElbRot = Vector3.Lerp(lElbRot, new Vector3(-58f + beatL * 8f, 0f, 10f), _talkingBlend * 0.65f);
+                }
+
+                ApplySeatedLookAt(dt, ref spineRot, ref neckRot, ref headRot);
 
                 hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.08f, 0.02f), 1f - Mathf.Exp(-12f * dt));
                 SmoothRotate(hips, Vector3.zero, 12f, dt);
-                SmoothRotate(spine, new Vector3(-7f + breath, 0f, 0f), 10f, dt);
-                SmoothRotate(neck, new Vector3(5f, 0f, 0f), 10f, dt);
-                SmoothRotate(head, new Vector3(0f, headLookYaw, 0f), 6f, dt);
+                SmoothRotate(spine, spineRot, 10f, dt);
+                SmoothRotate(neck, neckRot, 10f, dt);
+                SmoothRotate(head, headRot, 6f, dt);
 
                 SmoothRotate(lHip, new Vector3(-88f, 0f, -5f), 12f, dt);
                 SmoothRotate(rHip, new Vector3(-88f, 0f, 5f), 12f, dt);
@@ -2131,25 +3484,170 @@ namespace OurWorld.Player
                 SmoothRotate(rAnkle, Vector3.zero, 12f, dt);
 
                 // Hands resting comfortably downward on lap/thighs (never floating out in front!)
-                SmoothRotate(lShoulder, new Vector3(8f, 0f, -10f), 12f, dt);
-                SmoothRotate(rShoulder, new Vector3(8f, 0f, 10f), 12f, dt);
-                SmoothRotate(lElbow, new Vector3(-44f, 0f, 10f), 12f, dt);
-                SmoothRotate(rElbow, new Vector3(-44f, 0f, -10f), 12f, dt);
+                SmoothRotate(lShoulder, lShRot, 12f, dt);
+                SmoothRotate(rShoulder, rShRot, 12f, dt);
+                SmoothRotate(lElbow, lElbRot, 12f, dt);
+                SmoothRotate(rElbow, rElbRot, 12f, dt);
             }
+        }
+
+        private float UpdateSeatedGesture(float dt, bool lookAroundOnly = false)
+        {
+            if (_seatGestureCooldown < 0f)
+            {
+                _seatGestureCooldown = UnityEngine.Random.Range(2f, 8f);
+            }
+
+            if (_seatGestureTimer >= 0f)
+            {
+                _seatGestureTimer += dt;
+                if (_seatGestureTimer >= _seatGestureDuration)
+                {
+                    _seatGestureTimer = -1f;
+                    _seatGestureKind = 0;
+                    _seatGestureCooldown = UnityEngine.Random.Range(5f, 13f);
+                    return 0f;
+                }
+
+                float fadeIn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_seatGestureTimer / 0.6f));
+                float fadeOut = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_seatGestureDuration - _seatGestureTimer) / 0.6f));
+                float w = Mathf.Min(fadeIn, fadeOut) * (1f - _talkingBlend);
+
+                if (_talkingTimer > 0f && _talkingBlend > 0.96f)
+                {
+                    _seatGestureTimer = -1f;
+                    _seatGestureKind = 0;
+                    _seatGestureCooldown = UnityEngine.Random.Range(5f, 13f);
+                    return 0f;
+                }
+                return w;
+            }
+
+            if (_talkingTimer > 0f) return 0f;
+
+            _seatGestureCooldown -= dt;
+            if (_seatGestureCooldown <= 0f)
+            {
+                _seatGestureKind = lookAroundOnly ? 4 : UnityEngine.Random.Range(1, 6);
+                _seatGestureDuration = _seatGestureKind == 1
+                    ? UnityEngine.Random.Range(6f, 12f)
+                    : UnityEngine.Random.Range(2.6f, 4.8f);
+                _seatGestureTimer = 0f;
+            }
+            return 0f;
+        }
+
+        private void ApplySeatedLookAt(float dt, ref Vector3 spineRot, ref Vector3 neckRot, ref Vector3 headRot)
+        {
+            float targetYaw = 0f;
+            float targetPitch = 0f;
+            if (_hasLookPoint)
+            {
+                Vector3 chestWorld = spine != null
+                    ? spine.position + transform.up * (0.30f * transform.lossyScale.y)
+                    : transform.TransformPoint(new Vector3(0f, 0.56f, 0f));
+                Vector3 localDelta = transform.InverseTransformDirection(_lookWorldPoint - chestWorld);
+                float horizDist = new Vector2(localDelta.x, localDelta.z).magnitude;
+                if (horizDist > 0.10f)
+                {
+                    float rawYaw = Mathf.Atan2(localDelta.x, localDelta.z) * Mathf.Rad2Deg;
+                    targetYaw = Mathf.Clamp(rawYaw, -70f, 70f);
+                    targetPitch = Mathf.Clamp(-Mathf.Atan2(localDelta.y, horizDist) * Mathf.Rad2Deg, -25f, 25f);
+                }
+            }
+
+            float blend = 1f - Mathf.Exp(-5f * dt);
+            _smoothedLookYaw = Mathf.Lerp(_smoothedLookYaw, targetYaw, blend);
+            _smoothedLookPitch = Mathf.Lerp(_smoothedLookPitch, targetPitch, blend);
+
+            headRot.y += _smoothedLookYaw * 0.70f;
+            headRot.x += _smoothedLookPitch * 0.70f;
+            neckRot.y += _smoothedLookYaw * 0.20f;
+            neckRot.x += _smoothedLookPitch * 0.30f;
+            spineRot.y += _smoothedLookYaw * 0.10f;
         }
 
         private void AnimateSeatContact(float floor, float seated, float breath, float dt)
         {
             float shift = Mathf.Sin(seated * Mathf.PI);
+
+            float gestureW = 0f;
+            int gestureKind = 0;
+            float gestureT = 0f;
+            if (seated >= 0.98f && !_autoSeatActive)
+            {
+                gestureW = UpdateSeatedGesture(dt, lookAroundOnly: false);
+                gestureKind = _seatGestureKind;
+                gestureT = _seatGestureDuration > 0.01f ? Mathf.Clamp01(_seatGestureTimer / _seatGestureDuration) : 0f;
+            }
+            else if (_seatGestureTimer >= 0f)
+            {
+                _seatGestureTimer = -1f;
+                _seatGestureKind = 0;
+            }
+
+            Vector3 spineRot = new Vector3(30f * shift - 5f * seated + breath, 0f, 0f);
+            Vector3 neckRot = new Vector3(-8f * shift + 5f * seated, 0f, 0f);
+            Vector3 headRot = new Vector3(12f * shift, 0f, 0f);
+
+            if (gestureW > 0.001f)
+            {
+                if (gestureKind == 1)
+                {
+                    spineRot.x -= 5f * gestureW;
+                }
+                else if (gestureKind == 2)
+                {
+                    spineRot.x -= 11f * gestureW;
+                    neckRot.x += 6f * gestureW;
+                }
+                else if (gestureKind == 3)
+                {
+                    spineRot.x += 24f * gestureW;
+                    neckRot.x -= 8f * gestureW;
+                    headRot.x -= 8f * gestureW;
+                }
+                else if (gestureKind == 4)
+                {
+                    float scan = Mathf.Sin(gestureT * TwoPi);
+                    headRot.y += scan * 38f * gestureW;
+                    spineRot.y += scan * 6f * gestureW;
+                }
+                else if (gestureKind == 5)
+                {
+                    spineRot.x += 12f * gestureW;
+                }
+            }
+
+            if (_talkingBlend > 0.02f)
+            {
+                float talkTime = _idleTime + _noiseSeed;
+                headRot.x += Mathf.Sin(talkTime * 4.1f) * 4f * _talkingBlend;
+                spineRot.x += 6f * _talkingBlend;
+            }
+
+            ApplySeatedLookAt(dt, ref spineRot, ref neckRot, ref headRot);
+
             hips.localPosition = new Vector3(0f, Mathf.Lerp(hipsBaseY, 0.08f, seated), 0.09f * shift);
             SmoothRotate(hips, Vector3.zero, 15f, dt);
-            SmoothRotate(spine, new Vector3(24f * shift - 5f * seated + breath, 0f, 0f), 16f, dt);
-            SmoothRotate(neck, new Vector3(-8f * shift + 5f * seated, 0f, 0f), 14f, dt);
-            SmoothRotate(head, Vector3.zero, 12f, dt);
-            Vector3 left = transform.TransformPoint(new Vector3(-0.14f, 0f, Mathf.Lerp(0.04f, 0.46f, seated)));
-            Vector3 right = transform.TransformPoint(new Vector3(0.14f, 0f, Mathf.Lerp(0.09f, 0.44f, seated)));
-            left.y = right.y = floor + AnkleHeight * transform.lossyScale.y;
-            if (lAnkle != null && rAnkle != null)
+            SmoothRotate(spine, spineRot, 16f, dt);
+            SmoothRotate(neck, neckRot, 14f, dt);
+            SmoothRotate(head, headRot, 10f, dt);
+
+            float scaleY = transform.lossyScale.y;
+            float footSlide = (gestureKind == 2 && gestureW > 0.001f) ? 0.14f * gestureW : 0f;
+            Vector3 left = transform.TransformPoint(new Vector3(-0.14f, 0f, Mathf.Lerp(0.04f, 0.46f, seated) + footSlide));
+            Vector3 right = transform.TransformPoint(new Vector3(0.14f, 0f, Mathf.Lerp(0.09f, 0.44f, seated) + footSlide));
+            left.y = right.y = floor + AnkleHeight * scaleY;
+
+            if (gestureKind == 1 && gestureW > 0.001f)
+            {
+                Vector3 crossedRight = transform.TransformPoint(new Vector3(-0.06f, 0f, 0.50f));
+                crossedRight.y = floor + AnkleHeight * scaleY + 0.30f * scaleY;
+                right = Vector3.Lerp(right, crossedRight, gestureW);
+            }
+
+            if (lHip != null && rHip != null && lKnee != null && rKnee != null && lAnkle != null && rAnkle != null)
             {
                 float drop = Mathf.Max(0f, Mathf.Max(LegExtension(lHip, lKnee, lAnkle, left),
                     LegExtension(rHip, rKnee, rAnkle, right)));
@@ -2157,14 +3655,59 @@ namespace OurWorld.Player
                 AimLimb(lHip, lKnee, left, transform.forward, lAnkle.localPosition.magnitude);
                 AimLimb(rHip, rKnee, right, transform.forward, rAnkle.localPosition.magnitude);
                 lAnkle.rotation = transform.rotation;
-                rAnkle.rotation = transform.rotation;
+                rAnkle.rotation = gestureKind == 1 && gestureW > 0.001f
+                    ? transform.rotation * Quaternion.Euler(14f * gestureW, -18f * gestureW, 0f)
+                    : transform.rotation;
             }
+
             if (lKnee != null && rKnee != null)
             {
                 Vector3 lRest = Vector3.Lerp(transform.TransformPoint(new Vector3(-0.27f, 0.82f, 0.06f)),
                     lKnee.position + transform.up * 0.10f, seated);
                 Vector3 rRest = Vector3.Lerp(transform.TransformPoint(new Vector3(0.27f, 0.82f, 0.06f)),
                     rKnee.position + transform.up * 0.10f, seated);
+
+                // Reach back to seat edge to support body weight during sit-down / stand-up transition
+                float edgeSupport = Mathf.Clamp01(shift * 1.3f);
+                if (edgeSupport > 0.001f)
+                {
+                    lRest = Vector3.Lerp(lRest, transform.TransformPoint(new Vector3(-0.25f, 0.04f, -0.04f)), edgeSupport);
+                    rRest = Vector3.Lerp(rRest, transform.TransformPoint(new Vector3(0.25f, 0.04f, -0.04f)), edgeSupport);
+                }
+
+                if (gestureW > 0.001f)
+                {
+                    if (gestureKind == 1)
+                    {
+                        lRest = Vector3.Lerp(lRest, rKnee.position + transform.up * 0.08f, gestureW);
+                    }
+                    else if (gestureKind == 2)
+                    {
+                        lRest = Vector3.Lerp(lRest, transform.TransformPoint(new Vector3(-0.24f, 0.10f, 0.06f)), gestureW);
+                        rRest = Vector3.Lerp(rRest, transform.TransformPoint(new Vector3(0.24f, 0.10f, 0.06f)), gestureW);
+                    }
+                    else if (gestureKind == 3)
+                    {
+                        Vector3 midKnees = (lKnee.position + rKnee.position) * 0.5f + transform.forward * 0.10f + transform.up * 0.16f;
+                        lRest = Vector3.Lerp(lRest, midKnees - transform.right * 0.04f, gestureW);
+                        rRest = Vector3.Lerp(rRest, midKnees + transform.right * 0.04f, gestureW);
+                    }
+                    else if (gestureKind == 5 && head != null)
+                    {
+                        Vector3 chin = head.position + transform.forward * 0.11f - transform.up * 0.11f;
+                        rRest = Vector3.Lerp(rRest, chin, gestureW);
+                    }
+                }
+
+                if (_talkingBlend > 0.02f)
+                {
+                    float talkTime = _idleTime + _noiseSeed;
+                    Vector3 talkR = rRest + transform.up * (0.22f + 0.06f * Mathf.Sin(talkTime * 6.2f)) + transform.forward * 0.16f;
+                    Vector3 talkL = lRest + transform.up * (0.11f + 0.03f * Mathf.Sin(talkTime * 6.2f + 1.5f)) + transform.forward * 0.08f;
+                    rRest = Vector3.Lerp(rRest, talkR, _talkingBlend);
+                    lRest = Vector3.Lerp(lRest, talkL, _talkingBlend);
+                }
+
                 AimHand(lShoulder, lElbow, lRest, -transform.right, 1f);
                 AimHand(rShoulder, rElbow, rRest, transform.right, 1f);
             }
@@ -2186,9 +3729,17 @@ namespace OurWorld.Player
         {
             _cycling = active;
             _motorcyclePose = false;
+            if (!active)
+            {
+                _cycleMount = 1f;
+                _cycleFootPeg = 1f;
+                _cycleSteerNorm = 0f;
+                _cycleAccelLean = 0f;
+            }
         }
 
-        public void SetCycling(bool active, Vector3 leftPedal, Vector3 rightPedal, Vector3 leftGrip, Vector3 rightGrip)
+        public void SetCycling(bool active, Vector3 leftPedal, Vector3 rightPedal, Vector3 leftGrip, Vector3 rightGrip,
+            float mount = 1f, float footPeg = 1f, float steerNorm = 0f, float accelLean = 0f)
         {
             _cycling = active;
             _motorcyclePose = false;
@@ -2196,14 +3747,17 @@ namespace OurWorld.Player
             _rightPedal = rightPedal;
             _leftGrip = leftGrip;
             _rightGrip = rightGrip;
+            _cycleMount = Mathf.Clamp01(mount);
+            _cycleFootPeg = Mathf.Clamp01(footPeg);
+            _cycleSteerNorm = Mathf.Clamp(steerNorm, -1f, 1f);
+            _cycleAccelLean = Mathf.Clamp(accelLean, -1f, 1f);
         }
 
-        public void SetMotorcyclePose(Vector3 leftPeg, Vector3 rightPeg, Vector3 leftGrip, Vector3 rightGrip, float mount, float footPeg)
+        public void SetMotorcyclePose(Vector3 leftPeg, Vector3 rightPeg, Vector3 leftGrip, Vector3 rightGrip,
+            float mount, float footPeg, float steerNorm = 0f, float accelLean = 0f)
         {
-            SetCycling(true, leftPeg, rightPeg, leftGrip, rightGrip);
+            SetCycling(true, leftPeg, rightPeg, leftGrip, rightGrip, mount, footPeg, steerNorm, accelLean);
             _motorcyclePose = true;
-            _motorcycleMount = mount;
-            _motorcycleFootPeg = footPeg;
         }
 
         public void SetTennisRacket(Transform racket)
@@ -2291,9 +3845,12 @@ namespace OurWorld.Player
                         float ease = strike * strike;
                         hand = Vector3.Lerp(backswingHand, strikeHand, ease);
                         axis = Vector3.Slerp(backswingAxis, strikeAxis, ease);
+                        Vector3 backBalance = _tennisBackhand
+                            ? new Vector3(-0.32f, 1.08f, 0.08f)
+                            : new Vector3(-0.42f, 1.16f, 0.42f);
                         balanceLeft = transform.TransformPoint(Vector3.Lerp(
-                            new Vector3(-0.42f, 1.16f, 0.42f),
-                            new Vector3(-0.46f, 1.04f, 0.04f),
+                            backBalance,
+                            new Vector3(-0.44f, 1.05f, 0.04f),
                             ease));
                     }
                 }
@@ -2311,7 +3868,10 @@ namespace OurWorld.Player
                         float follow = Mathf.SmoothStep(0f, 1f, swingTime / finishTime);
                         hand = Vector3.Lerp(strikeHand, finishHand, follow);
                         axis = Vector3.Slerp(strikeAxis, finishAxis, follow);
-                        balanceLeft = transform.TransformPoint(new Vector3(-0.44f, 1.06f, -0.06f));
+                        balanceLeft = transform.TransformPoint(Vector3.Lerp(
+                            new Vector3(-0.44f, 1.05f, 0.04f),
+                            new Vector3(-0.44f, 1.06f, -0.06f),
+                            follow));
                     }
                     else
                     {
@@ -2342,28 +3902,43 @@ namespace OurWorld.Player
             elbow.localRotation = Quaternion.Slerp(elbowPose, elbow.localRotation, weight);
         }
 
-        private void AnimateCycling()
+        private void AnimateCycling(float dt)
         {
-            float mount = _motorcyclePose ? _motorcycleMount : 1f;
+            float mount = _cycleMount;
+            float footPeg = _cycleFootPeg;
+            _cycleSmoothedSteer = Mathf.Lerp(_cycleSmoothedSteer, _cycleSteerNorm, 1f - Mathf.Exp(-10f * dt));
+            _cycleSmoothedAccel = Mathf.Lerp(_cycleSmoothedAccel, _cycleAccelLean, 1f - Mathf.Exp(-8f * dt));
+            float breathWave = Mathf.Sin((_idleTime + _noiseSeed) * TwoPi * 0.28f);
+            float breath = breathWave * 0.7f;
+
             Vector3 seatedHips = _motorcyclePose
-                ? new Vector3(Mathf.Lerp(-0.11f, 0f, _motorcycleFootPeg), Mathf.Lerp(0.91f, 0.97f, _motorcycleFootPeg), -0.25f)
-                : new Vector3(0f, hipsBaseY + 0.12f, -0.235f);
-            hips.localPosition = Vector3.Lerp(new Vector3(0f, hipsBaseY, 0f), seatedHips, mount);
-            hips.localRotation = Quaternion.identity;
-            float lean = (_motorcyclePose ? 19f : 33f) * mount;
-            if (spine != null) spine.localRotation = Quaternion.Euler(lean, 0f, 0f);
-            if (neck != null) neck.localRotation = Quaternion.Euler(-lean * 0.7f, 0f, 0f);
-            if (head != null) head.localRotation = Quaternion.Euler(-7f * mount, 0f, 0f);
+                ? new Vector3(Mathf.Lerp(-0.11f, 0f, footPeg), Mathf.Lerp(0.91f, 0.97f, footPeg), -0.25f)
+                : new Vector3(Mathf.Lerp(-0.07f, 0f, footPeg), Mathf.Lerp(hipsBaseY + 0.04f, hipsBaseY + 0.115f, footPeg), -0.235f);
+            Vector3 targetHipsPos = Vector3.Lerp(new Vector3(0f, hipsBaseY, 0f), seatedHips, mount);
+            hips.localPosition = Vector3.Lerp(hips.localPosition, targetHipsPos, 1f - Mathf.Exp(-18f * dt));
+            SmoothRotate(hips, new Vector3(0f, 0f, -_cycleSmoothedSteer * (_motorcyclePose ? 4f : 3f) * mount), 14f, dt);
+
+            float lean = ((_motorcyclePose ? 19f : 31f) + _cycleSmoothedAccel * (_motorcyclePose ? 8.5f : 5.5f) + breath) * mount;
+            SmoothRotate(spine, new Vector3(lean, _cycleSmoothedSteer * 7f * mount, -_cycleSmoothedSteer * 4.5f * mount), 12f, dt);
+            SmoothRotate(neck, new Vector3(-lean * 0.65f, _cycleSmoothedSteer * 5f * mount, 0f), 12f, dt);
+            SmoothRotate(head, new Vector3((-7f - _cycleSmoothedAccel * 2.5f) * mount, _cycleSmoothedSteer * 18f * mount, _cycleSmoothedSteer * 4f * mount), 10f, dt);
+
+            if (chestVisual != null)
+            {
+                float breathScale = 1f + breathWave * 0.015f;
+                Vector3 targetScale = new Vector3(_chestBaseScale.x * breathScale, _chestBaseScale.y, _chestBaseScale.z * breathScale);
+                chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * dt));
+            }
 
             Vector3 ankleOffset = transform.up * 0.065f - transform.forward * 0.04f;
             Vector3 leftFoot = Vector3.Lerp(transform.TransformPoint(new Vector3(-0.13f, AnkleHeight, 0f)),
                 _leftPedal + ankleOffset, mount);
             Vector3 rightFoot = Vector3.Lerp(transform.TransformPoint(new Vector3(0.13f,
-                AnkleHeight + Mathf.Sin(mount * Mathf.PI) * 0.30f, 0f)), _rightPedal + ankleOffset, mount);
+                AnkleHeight + Mathf.Sin(mount * Mathf.PI) * 0.34f, 0f)), _rightPedal + ankleOffset, mount);
             AimLimb(lHip, lKnee, leftFoot, transform.forward, 0.42f);
             AimLimb(rHip, rKnee, rightFoot, transform.forward, 0.42f);
-            if (lAnkle != null) lAnkle.rotation = transform.rotation;
-            if (rAnkle != null) rAnkle.rotation = transform.rotation;
+            if (lAnkle != null) lAnkle.rotation = transform.rotation * Quaternion.Euler(Mathf.Lerp(0f, 6f, footPeg * mount), 0f, 0f);
+            if (rAnkle != null) rAnkle.rotation = transform.rotation * Quaternion.Euler(6f * mount, 0f, 0f);
             Vector3 leftHand = Vector3.Lerp(transform.TransformPoint(new Vector3(-0.26f, 0.83f, 0.08f)), _leftGrip, mount);
             Vector3 rightHand = Vector3.Lerp(transform.TransformPoint(new Vector3(0.26f, 0.83f, 0.08f)), _rightGrip, mount);
             AimHand(lShoulder, lElbow, leftHand, -transform.right, 1f);

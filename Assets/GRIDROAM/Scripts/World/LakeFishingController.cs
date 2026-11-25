@@ -54,8 +54,27 @@ namespace OurWorld.World
         private GameObject _bobberObj;
         private Vector3 _bobberAnchor;
         private GameObject _leapingFishObj;
+        private SkeletalClipPlayer _leapingFishSkel;
         private Transform _leapingFishTail;
         private FishSpecies _hookedFish;
+        private Vector3 _fishLeapStart;
+        private Vector3 _fishLeapEnd;
+        private float _fishArcHeight = 2.15f;
+        private bool _fishExitSplashed;
+        private bool _fishEntrySplashed;
+        private bool _fishApexSparkled;
+
+        // Low-pass IK smoothing & organic fishing motion state
+        private Vector3 _smR;
+        private Vector3 _smL;
+        private float _smSpine;
+        private float _smHead;
+        private float _smDrop;
+        private bool _smInit;
+        private float _waitTwitchCountdown = 5f;
+        private float _waitTwitchTimer = -1f;
+        private float _fishPullCountdown = 0.5f;
+        private float _fishPullStrength;
 
         // Sleek Mobile Fishing Overlay HUD
         private GameObject _uiCanvas;
@@ -141,6 +160,11 @@ namespace OurWorld.World
             _phaseTimer = 0f;
             _reelProgress = 0.25f;
             _reelButtonHeld = false;
+            _smInit = false;
+            _waitTwitchCountdown = UnityEngine.Random.Range(4f, 7f);
+            _waitTwitchTimer = -1f;
+            _fishPullCountdown = UnityEngine.Random.Range(0.35f, 0.90f);
+            _fishPullStrength = 0f;
             _biteWaitDuration = UnityEngine.Random.Range(2.2f, 3.8f);
             _bobberAnchor = new Vector3(-191.5f, 0.08f, UnityEngine.Random.Range(-2.6f, 2.6f));
 
@@ -153,6 +177,9 @@ namespace OurWorld.World
         {
             _phase = FishingPhase.Idle;
             _reelButtonHeld = false;
+            _smInit = false;
+            _waitTwitchTimer = -1f;
+            _fishPullStrength = 0f;
             if (_activeRodRoot != null) _activeRodRoot.SetActive(false);
             if (_bobberObj != null) _bobberObj.SetActive(false);
             if (_leapingFishObj != null) _leapingFishObj.SetActive(false);
@@ -203,13 +230,29 @@ namespace OurWorld.World
                     float t = Mathf.Clamp01(_phaseTimer / 0.65f);
                     if (_activeRodRoot != null)
                     {
-                        float castAngle = Mathf.Lerp(45f, -14f, Mathf.SmoothStep(0f, 1f, t));
+                        float castAngle;
+                        if (t < 0.38f)
+                        {
+                            castAngle = Mathf.Lerp(10f, 52f, Mathf.SmoothStep(0f, 1f, t / 0.38f));
+                        }
+                        else if (t < 0.56f)
+                        {
+                            float lin = (t - 0.38f) / 0.18f;
+                            float easeOut = 1f - (1f - lin) * (1f - lin);
+                            castAngle = Mathf.Lerp(52f, -22f, easeOut);
+                        }
+                        else
+                        {
+                            castAngle = Mathf.Lerp(-22f, -12f, Mathf.SmoothStep(0f, 1f, (t - 0.56f) / 0.44f));
+                        }
                         _activeRodRoot.transform.rotation = Quaternion.Euler(castAngle, 90f, 0f);
                     }
                     if (t >= 1f)
                     {
                         _phase = FishingPhase.WaitingBite;
                         _phaseTimer = 0f;
+                        _waitTwitchCountdown = UnityEngine.Random.Range(4f, 7f);
+                        _waitTwitchTimer = -1f;
                         if (_bobberObj != null)
                         {
                             _bobberObj.SetActive(true);
@@ -229,7 +272,10 @@ namespace OurWorld.World
                     }
                     if (_activeRodRoot != null)
                     {
-                        _activeRodRoot.transform.rotation = Quaternion.Euler(-12f + Mathf.Sin(Time.time * 1.4f) * 2.5f, 90f, 0f);
+                        float twitchAngle = _waitTwitchTimer >= 0f
+                            ? Mathf.Sin(Mathf.Clamp01(_waitTwitchTimer / 0.25f) * Mathf.PI) * 7f
+                            : 0f;
+                        _activeRodRoot.transform.rotation = Quaternion.Euler(-12f + Mathf.Sin(Time.time * 1.4f) * 2.5f + twitchAngle, 90f, 0f);
                     }
                     if (_phaseTimer >= _biteWaitDuration)
                     {
@@ -237,6 +283,8 @@ namespace OurWorld.World
                         _phase = FishingPhase.BiteReeling;
                         _phaseTimer = 0f;
                         _reelProgress = 0.28f;
+                        _fishPullCountdown = UnityEngine.Random.Range(0.35f, 0.90f);
+                        _fishPullStrength = 0.08f;
                         GameFeelAudio.PlayUiClick();
                         GameFeelAudio.SpawnBurst(_bobberAnchor + Vector3.up * 0.2f, new Color(0.86f, 0.98f, 1f), count: 16, spread: 0.65f);
                         UpdateFishingUi();
@@ -257,10 +305,11 @@ namespace OurWorld.World
                         _reelProgress = Mathf.Max(0.05f, _reelProgress - dt * 0.12f);
                     }
 
-                    // Dynamic rod flex & bobber thrashing!
+                    // Dynamic rod flex responding to fish-pull impulses & bobber thrashing!
                     if (_activeRodRoot != null)
                     {
-                        float flex = reeling ? (-24f + Mathf.Sin(Time.time * 24f) * 5f) : (-16f + Mathf.Sin(Time.time * 14f) * 3f);
+                        float baseFlex = reeling ? -22f : -15f;
+                        float flex = baseFlex - _fishPullStrength * 110f + Mathf.Sin(Time.time * 9f) * 2.2f;
                         _activeRodRoot.transform.rotation = Quaternion.Euler(flex, 90f, 0f);
                     }
                     if (_bobberObj != null)
@@ -281,20 +330,72 @@ namespace OurWorld.World
 
                 case FishingPhase.CatchShowcase:
                 {
-                    // Parabolic leaping 3D Blender fish with frantic TailFinPivot wiggle!
-                    float t = Mathf.Clamp01(_phaseTimer / 2.2f);
+                    // Parabolic ballistic fish leap from open water -> showcase arc -> clean plunge back into lake!
+                    const float leapDuration = 1.92f;
+                    float u = Mathf.Clamp01(_phaseTimer / leapDuration);
                     if (_leapingFishObj != null)
                     {
-                        Vector3 start = _bobberAnchor + Vector3.up * 0.2f;
-                        Vector3 end = PierTipWorldPos + new Vector3(-1.4f, 1.35f, 0f);
-                        Vector3 p = Vector3.Lerp(start, end, Mathf.Clamp01(t * 2.1f));
-                        p.y += Mathf.Sin(Mathf.Clamp01(t * 2.1f) * Mathf.PI) * 2.4f;
-                        _leapingFishObj.transform.position = p;
-                        _leapingFishObj.transform.rotation = Quaternion.Euler(Mathf.Sin(Time.time * 8f) * 18f, 90f, 0f);
-                    }
-                    if (_leapingFishTail != null)
-                    {
-                        _leapingFishTail.localRotation = Quaternion.Euler(0f, Mathf.Sin(Time.time * 34f) * 34f, 0f);
+                        if (u < 1f)
+                        {
+                            Vector3 p = Vector3.Lerp(_fishLeapStart, _fishLeapEnd, u);
+                            p.y += 4f * _fishArcHeight * u * (1f - u);
+                            _leapingFishObj.transform.position = p;
+
+                            // Analytic trajectory velocity tangent -> body pitch follows ascent, apex & dive!
+                            Vector3 vel = (_fishLeapEnd - _fishLeapStart) / leapDuration;
+                            vel.y += (4f * _fishArcHeight * (1f - 2f * u)) / leapDuration;
+                            float airEnv = Mathf.Sin(u * Mathf.PI);
+                            if (vel.sqrMagnitude > 0.001f)
+                            {
+                                Quaternion trajRot = Quaternion.LookRotation(vel.normalized, Vector3.up);
+                                float wiggleYaw = Mathf.Sin(_phaseTimer * 22f) * 10f * airEnv;
+                                float wiggleRoll = Mathf.Sin(_phaseTimer * 17f) * 14f * airEnv;
+                                _leapingFishObj.transform.rotation = trajRot * Quaternion.Euler(0f, wiggleYaw, wiggleRoll);
+                            }
+
+                            // Water exit splash synced to exact surface breach (going UP)
+                            if (!_fishExitSplashed && u < 0.5f && p.y >= 0.04f)
+                            {
+                                _fishExitSplashed = true;
+                                GameFeelAudio.PlayWaterSplash();
+                                GameFeelAudio.SpawnBurst(new Vector3(p.x, 0.08f, p.z), new Color(0.84f, 0.97f, 1f), count: 16, spread: 0.65f);
+                            }
+
+                            // Celebration scale-colored sparkle burst right at apex showcase!
+                            if (!_fishApexSparkled && u >= 0.48f)
+                            {
+                                _fishApexSparkled = true;
+                                GameFeelAudio.SpawnBurst(p, _hookedFish.ScaleCol, count: 18, spread: 0.78f);
+                            }
+
+                            // Water entry splash synced to exact plunge re-entry (going DOWN)
+                            if (!_fishEntrySplashed && u > 0.5f && p.y <= 0.06f)
+                            {
+                                _fishEntrySplashed = true;
+                                GameFeelAudio.PlayWaterSplash();
+                                GameFeelAudio.SpawnBurst(new Vector3(p.x, 0.08f, p.z), new Color(0.82f, 0.96f, 1f), count: 18, spread: 0.72f);
+                            }
+
+                            if (_leapingFishSkel != null && _leapingFishSkel.HasClips)
+                            {
+                                _leapingFishSkel.SetActiveSpeed(Mathf.Lerp(1.25f, 2.15f, airEnv));
+                            }
+                            if (_leapingFishTail != null)
+                            {
+                                _leapingFishTail.localRotation = Quaternion.Euler(0f, Mathf.Sin(_phaseTimer * 36f) * (22f + 16f * airEnv), 0f);
+                            }
+                        }
+                        else if (_leapingFishObj.activeSelf)
+                        {
+                            if (!_fishEntrySplashed)
+                            {
+                                _fishEntrySplashed = true;
+                                GameFeelAudio.PlayWaterSplash();
+                                GameFeelAudio.SpawnBurst(new Vector3(_fishLeapEnd.x, 0.08f, _fishLeapEnd.z), new Color(0.82f, 0.96f, 1f), count: 18, spread: 0.72f);
+                            }
+                            // Cleanly hide beneath water surface after entry splash
+                            _leapingFishObj.SetActive(false);
+                        }
                     }
                     if (_phaseTimer >= 2.2f)
                     {
@@ -310,7 +411,7 @@ namespace OurWorld.World
                 }
             }
 
-            UpdatePlayerFishingIk(spaceOrE);
+            UpdatePlayerFishingIk(spaceOrE, dt);
         }
 
         private Vector3 _lastRightHandTarget;
@@ -328,7 +429,7 @@ namespace OurWorld.World
             _activeRodRoot.transform.position = palm;
         }
 
-        private void UpdatePlayerFishingIk(bool spaceOrE)
+        private void UpdatePlayerFishingIk(bool spaceOrE, float dt)
         {
             if (_activePlayer == null || _activePlayer.FootController == null || _activePlayer.FootController.Humanoid == null)
             {
@@ -346,56 +447,157 @@ namespace OurWorld.World
             float spineLean;
             float headPitch;
             float hipsDrop;
+            bool isForwardFlick = false;
 
             if (_phase == FishingPhase.Casting)
             {
+                // 3-phase cast (0.65 s total): 0–0.38 backswing, 0.38–0.56 forward whip, 0.56–1.0 settle with dip overshoot
                 float t = Mathf.Clamp01(_phaseTimer / 0.65f);
-                float whip = Mathf.SmoothStep(0f, 1f, t);
-                rHand = Vector3.Lerp(
-                    basePos + Vector3.up * 1.66f + right * 0.24f - fwd * 0.14f,
-                    basePos + Vector3.up * 1.18f + right * 0.14f + fwd * 0.44f,
-                    whip);
-                lHand = Vector3.Lerp(
-                    basePos + Vector3.up * 1.54f - right * 0.12f - fwd * 0.08f,
-                    basePos + Vector3.up * 1.10f - right * 0.04f + fwd * 0.36f,
-                    whip);
-                spineLean = Mathf.Lerp(-12f, 18f, whip);
-                headPitch = Mathf.Lerp(-8f, 10f, whip);
-                hipsDrop = 0.05f * Mathf.Sin(whip * Mathf.PI);
+                Vector3 rChest = basePos + Vector3.up * 1.12f + right * 0.16f + fwd * 0.30f;
+                Vector3 lChest = basePos + Vector3.up * 1.06f - right * 0.06f + fwd * 0.34f;
+                Vector3 rBack = basePos + Vector3.up * 1.68f + right * 0.24f - fwd * 0.16f;
+                Vector3 lBack = basePos + Vector3.up * 1.54f - right * 0.10f - fwd * 0.10f;
+                Vector3 rRelease = basePos + Vector3.up * 1.04f + right * 0.16f + fwd * 0.46f;
+                Vector3 lRelease = basePos + Vector3.up * 0.98f - right * 0.06f + fwd * 0.50f;
+                Vector3 rHold = basePos + Vector3.up * 1.06f + right * 0.16f + fwd * 0.36f;
+                Vector3 lHold = basePos + Vector3.up * 1.02f - right * 0.06f + fwd * 0.44f;
+
+                if (t < 0.38f)
+                {
+                    float u = Mathf.SmoothStep(0f, 1f, t / 0.38f);
+                    rHand = Vector3.Lerp(rChest, rBack, u);
+                    lHand = Vector3.Lerp(lChest, lBack, u);
+                    spineLean = Mathf.Lerp(2f, -12f, u);
+                    headPitch = Mathf.Lerp(4f, -8f, u);
+                    hipsDrop = Mathf.Lerp(0.02f, 0.05f, u);
+                }
+                else if (t < 0.56f)
+                {
+                    isForwardFlick = true;
+                    float lin = (t - 0.38f) / 0.18f;
+                    float u = 1f - (1f - lin) * (1f - lin);
+                    rHand = Vector3.Lerp(rBack, rRelease, u);
+                    lHand = Vector3.Lerp(lBack, lRelease, u);
+                    spineLean = Mathf.Lerp(-12f, 18f, u);
+                    headPitch = Mathf.Lerp(-8f, 12f, u);
+                    hipsDrop = Mathf.Lerp(0.05f, 0.08f, u);
+                }
+                else
+                {
+                    float u = Mathf.SmoothStep(0f, 1f, (t - 0.56f) / 0.44f);
+                    float dip = Mathf.Sin(u * Mathf.PI) * 0.04f;
+                    rHand = Vector3.Lerp(rRelease, rHold, u) - Vector3.up * dip;
+                    lHand = Vector3.Lerp(lRelease, lHold, u) - Vector3.up * (dip * 0.85f);
+                    spineLean = Mathf.Lerp(18f, 6f, u);
+                    headPitch = Mathf.Lerp(12f, 10f, u);
+                    hipsDrop = Mathf.Lerp(0.08f, 0.03f, u);
+                }
             }
             else if (_phase == FishingPhase.WaitingBite)
             {
                 float breath = Mathf.Sin(Time.time * 1.8f) * 0.025f;
-                rHand = basePos + Vector3.up * (1.06f + breath) + right * 0.16f + fwd * 0.36f;
-                lHand = basePos + Vector3.up * (1.02f + breath) - right * 0.06f + fwd * 0.44f;
-                spineLean = 6f;
-                headPitch = 10f;
+                float twitchLift = 0f;
+                if (_waitTwitchTimer >= 0f)
+                {
+                    _waitTwitchTimer += dt;
+                    float tw = _waitTwitchTimer / 0.25f;
+                    if (tw >= 1f)
+                    {
+                        _waitTwitchTimer = -1f;
+                        _waitTwitchCountdown = UnityEngine.Random.Range(4f, 7f);
+                    }
+                    else
+                    {
+                        twitchLift = Mathf.Sin(tw * Mathf.PI) * 0.05f;
+                    }
+                }
+                else
+                {
+                    _waitTwitchCountdown -= dt;
+                    if (_waitTwitchCountdown <= 0f)
+                    {
+                        _waitTwitchTimer = 0f;
+                    }
+                }
+
+                rHand = basePos + Vector3.up * (1.06f + breath + twitchLift) + right * 0.16f + fwd * 0.36f;
+                lHand = basePos + Vector3.up * (1.02f + breath + twitchLift * 0.5f) - right * 0.06f + fwd * 0.44f;
+                spineLean = 6f + Mathf.Sin(Time.time * 1.8f) * 0.8f;
+                headPitch = Mathf.Lerp(6f, 12f, Mathf.PerlinNoise(Time.time * 0.28f, 1.7f));
                 hipsDrop = 0.03f;
             }
             else if (_phase == FishingPhase.BiteReeling)
             {
+                // Fish-pull impulse model: random 0.06–0.11 m forward/down jerks every 0.35–0.90 s decaying ~6/s
+                _fishPullCountdown -= dt;
+                if (_fishPullCountdown <= 0f)
+                {
+                    _fishPullStrength = Mathf.Max(_fishPullStrength, UnityEngine.Random.Range(0.06f, 0.11f));
+                    _fishPullCountdown = UnityEngine.Random.Range(0.35f, 0.90f);
+                }
+                _fishPullStrength *= Mathf.Exp(-6f * dt);
+
                 bool reeling = _reelButtonHeld || spaceOrE;
-                float tug = Mathf.Sin(Time.time * 16f) * 0.04f;
                 float crank = Time.time * (reeling ? 13f : 4f);
+                float pullRatio = Mathf.Clamp01(_fishPullStrength / 0.11f);
+
                 // Athletic lean-back pulling rod while left hand physically orbits the spinning reel handle!
-                rHand = basePos + Vector3.up * (1.16f + tug) + right * 0.16f + fwd * 0.32f;
-                lHand = rHand - right * 0.12f + fwd * (0.20f + Mathf.Cos(crank) * 0.07f) + Vector3.up * (Mathf.Sin(crank) * 0.07f - 0.04f);
-                spineLean = reeling ? -16f : -9f;
-                headPitch = 4f;
-                hipsDrop = 0.10f;
+                rHand = basePos
+                    + Vector3.up * (1.16f - _fishPullStrength * 0.69f)
+                    + right * 0.16f
+                    + fwd * (0.32f + _fishPullStrength * 0.72f);
+                lHand = rHand - right * 0.12f
+                    + fwd * (0.20f + Mathf.Cos(crank) * 0.07f)
+                    + Vector3.up * (Mathf.Sin(crank) * 0.07f - 0.04f);
+                spineLean = (reeling ? -16f : -9f) - pullRatio * 2.5f;
+                headPitch = 4f + pullRatio * 5f;
+                hipsDrop = 0.10f + 0.03f * pullRatio;
             }
-            else // CatchShowcase — proud fisherman triumph pose!
+            else // CatchShowcase — proud 0.4 s lift, 2 happy bounce bells, then hold!
             {
-                float wave = Mathf.Sin(_phaseTimer * 5f) * 0.05f;
-                rHand = basePos + Vector3.up * (1.46f + wave) + right * 0.22f + fwd * 0.32f;
-                lHand = basePos + Vector3.up * (1.38f - wave) - right * 0.16f + fwd * 0.36f;
-                spineLean = -8f;
-                headPitch = -6f;
-                hipsDrop = 0f;
+                float liftLin = Mathf.Clamp01(_phaseTimer / 0.40f);
+                float lift = 1f - (1f - liftLin) * (1f - liftLin);
+                float holdBreath = Mathf.Sin(_phaseTimer * 2.6f) * 0.018f * lift;
+                Vector3 rFrom = basePos + Vector3.up * 1.16f + right * 0.16f + fwd * 0.32f;
+                Vector3 lFrom = basePos + Vector3.up * 1.10f - right * 0.04f + fwd * 0.40f;
+                Vector3 rProud = basePos + Vector3.up * (1.48f + holdBreath) + right * 0.22f + fwd * 0.32f;
+                Vector3 lProud = basePos + Vector3.up * (1.40f + holdBreath) - right * 0.16f + fwd * 0.36f;
+                rHand = Vector3.Lerp(rFrom, rProud, lift);
+                lHand = Vector3.Lerp(lFrom, lProud, lift);
+                spineLean = Mathf.Lerp(-4f, -8f, lift);
+                headPitch = Mathf.Lerp(2f, -6f, lift);
+
+                float bounce = 0f;
+                if (_phaseTimer >= 0.35f && _phaseTimer < 1.05f)
+                {
+                    float bNorm = (_phaseTimer - 0.35f) / 0.70f;
+                    bounce = Mathf.Abs(Mathf.Sin(bNorm * Mathf.PI * 2f)) * 0.04f;
+                }
+                hipsDrop = bounce;
             }
 
-            _lastRightHandTarget = rHand;
-            hum.SetDualHandAction(true, lHand, rHand, 0.95f, 1.0f, spineLean, headPitch, hipsDrop);
+            if (!_smInit)
+            {
+                _smR = rHand;
+                _smL = lHand;
+                _smSpine = spineLean;
+                _smHead = headPitch;
+                _smDrop = hipsDrop;
+                _smInit = true;
+            }
+            else
+            {
+                float smoothRate = isForwardFlick ? 30f : 14f;
+                float k = 1f - Mathf.Exp(-smoothRate * dt);
+                _smR = Vector3.Lerp(_smR, rHand, k);
+                _smL = Vector3.Lerp(_smL, lHand, k);
+                _smSpine = Mathf.Lerp(_smSpine, spineLean, k);
+                _smHead = Mathf.Lerp(_smHead, headPitch, k);
+                _smDrop = Mathf.Lerp(_smDrop, hipsDrop, k);
+            }
+
+            _lastRightHandTarget = _smR;
+            hum.SetDualHandAction(true, _smL, _smR, 0.95f, 1.0f, _smSpine, _smHead, _smDrop);
             hum.SetLocomotion(0f, true, 0f, fwd);
         }
 
@@ -420,27 +622,50 @@ namespace OurWorld.World
             NeighborhoodReputation.AddReputation(6, IsEn ? "Lake Fishing" : "Gölet Balıkçılığı");
 
             GameFeelAudio.PlayCoinChime();
-            GameFeelAudio.SpawnBurst(PierTipWorldPos + new Vector3(-2.5f, 1.4f, 0f), _hookedFish.ScaleCol, count: 20, spread: 0.9f);
+
+            // Compute open-water breach & re-entry spots cleanly west of the wooden pier deck (west edge x = -183.0)
+            float startX = (_bobberObj != null && _bobberObj.activeSelf)
+                ? Mathf.Clamp(_bobberObj.transform.position.x - 1.1f, -188.5f, -185.2f)
+                : -186.4f;
+            float startZ = (_bobberObj != null && _bobberObj.activeSelf)
+                ? Mathf.Clamp(_bobberObj.transform.position.z, -2.0f, 2.0f)
+                : Mathf.Clamp(_bobberAnchor.z * 0.55f, -2.0f, 2.0f);
+            if (Mathf.Abs(startZ) < 0.45f) startZ = startZ >= 0f ? 0.85f : -0.85f;
+            _fishLeapStart = new Vector3(startX, -0.22f, startZ);
+            _fishLeapEnd = new Vector3(-183.9f, -0.30f, Mathf.Clamp(-startZ * 0.75f, -2.0f, 2.0f));
+            _fishArcHeight = 2.05f + (_hookedFish.SizeScale - 1f) * 0.45f;
+            _fishExitSplashed = false;
+            _fishEntrySplashed = false;
+            _fishApexSparkled = false;
 
             // Spawn & tint our real rigged Blender/CC0 OW_LakeFish with skeletal Swim clip!
             if (_leapingFishObj == null)
             {
-                _leapingFishObj = OurWorldModelLibrary.InstantiateModel("OW_LakeFish", transform, PierTipWorldPos, Quaternion.identity);
+                _leapingFishObj = OurWorldModelLibrary.InstantiateModel("OW_LakeFish", transform, _fishLeapStart, Quaternion.identity);
                 if (_leapingFishObj != null)
                 {
                     SkeletalClipPlayer fishSkel = _leapingFishObj.AddComponent<SkeletalClipPlayer>();
                     if (!fishSkel.Initialize("OW_LakeFish", "Swim", 0f))
                     {
+                        _leapingFishSkel = null;
                         _leapingFishTail = OurWorldModelLibrary.FindPart(_leapingFishObj.transform, "TailFinPivot");
                     }
                     else
                     {
+                        _leapingFishSkel = fishSkel;
                         fishSkel.PlayClip("Swim", 0.05f, 1.8f);
                     }
                 }
             }
             if (_leapingFishObj != null)
             {
+                Vector3 initVel = (_fishLeapEnd - _fishLeapStart) / 1.92f;
+                initVel.y += (4f * _fishArcHeight) / 1.92f;
+                _leapingFishObj.transform.position = _fishLeapStart;
+                if (initVel.sqrMagnitude > 0.001f)
+                {
+                    _leapingFishObj.transform.rotation = Quaternion.LookRotation(initVel.normalized, Vector3.up);
+                }
                 _leapingFishObj.SetActive(true);
                 _leapingFishObj.transform.localScale = Vector3.one * _hookedFish.SizeScale;
                 OurWorldModelLibrary.TintMaterialByKeyword(_leapingFishObj, "FishScale", _hookedFish.ScaleCol);

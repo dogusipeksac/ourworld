@@ -228,14 +228,23 @@ namespace OurWorld.Player
     {
         private const int MaxCartItems = 3;
         private const float MaxLeaveDistance = 19f;
+        private const float InspectHoldDuration = 0.46f;
+        private const float InspectSettleDuration = 0.40f;
 
         private static PlayerShoppingCart _activeInstance;
 
         private readonly List<ShopCartItem> _items = new List<ShopCartItem>();
         private PlayerFootController _foot;
+        private PlayerConsumeAnimator _consumeAnim;
+        private PlayerActionAnimator _actionAnim;
         private GameObject _heldProp;
         private ShopPropVisual _heldVisual;
         private Vector3 _shopOrigin;
+        private bool _inspectActive;
+        private float _inspectTimer;
+        private float _inspectYaw;
+        private float _carryBlend;
+        private bool _wasBusy;
 
         public static bool HasActiveItems => _activeInstance != null && _activeInstance._items.Count > 0;
 
@@ -278,6 +287,8 @@ namespace OurWorld.Player
         private void Awake()
         {
             _foot = GetComponent<PlayerFootController>();
+            _consumeAnim = GetComponent<PlayerConsumeAnimator>();
+            _actionAnim = GetComponent<PlayerActionAnimator>();
             _activeInstance = this;
         }
 
@@ -303,26 +314,76 @@ namespace OurWorld.Player
                 return;
             }
 
-            // Keep arms visibly carrying the picked product while walking to Kasa Bandı
+            // Keep arms visibly inspecting & carrying the picked product while walking to Kasa Bandı
             if (_foot != null && _foot.Humanoid != null)
             {
-                PlayerConsumeAnimator consume = _foot.GetComponent<PlayerConsumeAnimator>();
-                PlayerActionAnimator action = _foot.GetComponent<PlayerActionAnimator>();
-                bool busy = (consume != null && consume.IsPlaying) || (action != null && action.IsPlaying);
+                bool busy = PlayerConsumeAnimator.IsAnyPlaying || PlayerActionAnimator.IsAnyPlaying ||
+                            (_consumeAnim != null && _consumeAnim.IsPlaying) || (_actionAnim != null && _actionAnim.IsPlaying);
+                _wasBusy = busy;
                 if (!busy)
                 {
-                    if (UsesTwoHandCarry(_heldVisual))
+                    float dt = Time.deltaTime;
+                    _carryBlend = Mathf.Lerp(_carryBlend, 1f, 1f - Mathf.Exp(-10f * dt));
+                    bool twoHand = UsesTwoHandCarry(_heldVisual);
+
+                    if (_inspectActive)
                     {
-                        Vector3 carryCenter = GetTwoHandCarryCenter();
-                        Vector3 leftGrip = carryCenter - transform.right * 0.135f + Vector3.up * 0.045f;
-                        Vector3 rightGrip = carryCenter + transform.right * 0.135f + Vector3.up * 0.045f;
-                        _foot.Humanoid.SetConsumePose(0, 0f, 0f);
-                        _foot.Humanoid.SetDualHandAction(true, leftGrip, rightGrip, 0.96f, 0.96f, 3f, 5f, 0f);
+                        _inspectTimer += dt;
+                        float totalInspect = InspectHoldDuration + InspectSettleDuration;
+                        if (_inspectTimer >= totalInspect)
+                        {
+                            _inspectActive = false;
+                            _inspectYaw = 0f;
+                        }
+                        else
+                        {
+                            float settleU = _inspectTimer < InspectHoldDuration
+                                ? 0f
+                                : Mathf.SmoothStep(0f, 1f, (_inspectTimer - InspectHoldDuration) / InspectSettleDuration);
+                            float inspectPhase = Mathf.Clamp01(_inspectTimer / InspectHoldDuration);
+                            _inspectYaw = Mathf.Sin(inspectPhase * Mathf.PI) * 18f * (1f - settleU);
+
+                            Vector3 inspectCenter = GetInspectCenter();
+                            Vector3 propCenter = Vector3.Lerp(inspectCenter, GetTwoHandCarryCenter(), settleU);
+                            _foot.Humanoid.SetLookAtPoint(true, propCenter);
+
+                            if (twoHand)
+                            {
+                                float spread = Mathf.Lerp(0.125f, 0.135f, settleU);
+                                Vector3 leftGrip = propCenter - transform.right * spread + Vector3.up * 0.045f;
+                                Vector3 rightGrip = propCenter + transform.right * spread + Vector3.up * 0.045f;
+                                _foot.Humanoid.SetConsumePose(0, 0f, 0f);
+                                _foot.Humanoid.SetDualHandAction(true, leftGrip, rightGrip, 0.96f * _carryBlend, 0.96f * _carryBlend,
+                                    Mathf.Lerp(5f, 3f, settleU) * _carryBlend, Mathf.Lerp(14f, 5f, settleU) * _carryBlend, 0f);
+                            }
+                            else
+                            {
+                                Vector3 oneHandTarget = Vector3.Lerp(inspectCenter + transform.right * 0.05f, GetOneHandCarryTarget(), settleU);
+                                Vector3 leftSupport = propCenter - transform.right * 0.14f - Vector3.up * 0.04f;
+                                float leftW = (1f - settleU) * 0.45f * _carryBlend;
+                                _foot.Humanoid.SetConsumePose(0, 0f, 0f);
+                                _foot.Humanoid.SetDualHandAction(true, leftSupport, oneHandTarget, leftW, 0.94f * _carryBlend,
+                                    Mathf.Lerp(4f, 1f, settleU) * _carryBlend, Mathf.Lerp(14f, 3f, settleU) * _carryBlend, 0f);
+                            }
+                        }
                     }
-                    else
+
+                    if (!_inspectActive)
                     {
-                        _foot.Humanoid.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
-                        _foot.Humanoid.SetConsumePose(1, 0.88f, 0f);
+                        if (twoHand)
+                        {
+                            Vector3 carryCenter = GetTwoHandCarryCenter();
+                            Vector3 leftGrip = carryCenter - transform.right * 0.135f + Vector3.up * 0.045f;
+                            Vector3 rightGrip = carryCenter + transform.right * 0.135f + Vector3.up * 0.045f;
+                            _foot.Humanoid.SetConsumePose(0, 0f, 0f);
+                            _foot.Humanoid.SetDualHandAction(true, leftGrip, rightGrip, 0.96f * _carryBlend, 0.96f * _carryBlend,
+                                3f * _carryBlend, 5f * _carryBlend, 0f);
+                        }
+                        else
+                        {
+                            _foot.Humanoid.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+                            _foot.Humanoid.SetConsumePose(1, 0.88f * _carryBlend, 0f);
+                        }
                     }
                 }
             }
@@ -339,19 +400,47 @@ namespace OurWorld.Player
         {
             if (_heldProp == null || _items.Count == 0 || _foot == null || _foot.Humanoid == null) return;
 
+            bool actionPulling = _wasBusy || PlayerActionAnimator.IsAnyPlaying || (_actionAnim != null && _actionAnim.IsPlaying);
+            if (actionPulling && _foot.Humanoid.RightForearm != null)
+            {
+                // During the shelf reach & pull-back, keep the item glued to the right palm so it only moves with the hand!
+                Vector3 palmPos = _foot.Humanoid.RightForearm.TransformPoint(new Vector3(0f, -0.305f, 0f));
+                _heldProp.transform.position = palmPos - Vector3.up * 0.055f + transform.forward * 0.02f;
+                _heldProp.transform.rotation = transform.rotation;
+                return;
+            }
+
             if (UsesTwoHandCarry(_heldVisual))
             {
-                // Level & upright squarely between both gripping hands in front of the chest
-                _heldProp.transform.position = GetTwoHandCarryCenter();
-                _heldProp.transform.rotation = transform.rotation;
+                // Level & upright squarely between both gripping hands (elevated during chest inspection, then settled into carry)
+                float settleU = !_inspectActive ? 1f : (_inspectTimer < InspectHoldDuration
+                    ? 0f
+                    : Mathf.SmoothStep(0f, 1f, (_inspectTimer - InspectHoldDuration) / InspectSettleDuration));
+                _heldProp.transform.position = Vector3.Lerp(GetInspectCenter(), GetTwoHandCarryCenter(), settleU);
+                _heldProp.transform.rotation = transform.rotation * Quaternion.Euler(0f, _inspectYaw, 0f);
             }
             else if (_foot.Humanoid.RightForearm != null)
             {
                 // Upright cleanly on top of the right palm (never rotated upside-down along forearm bone!)
                 Vector3 palmPos = _foot.Humanoid.RightForearm.TransformPoint(new Vector3(0f, -0.305f, 0f));
                 _heldProp.transform.position = palmPos - Vector3.up * 0.06f + transform.forward * 0.02f;
-                _heldProp.transform.rotation = transform.rotation;
+                _heldProp.transform.rotation = transform.rotation * Quaternion.Euler(0f, _inspectYaw, 0f);
             }
+        }
+
+        private Vector3 GetInspectCenter()
+        {
+            return transform.position + transform.forward * 0.38f + Vector3.up * 1.18f;
+        }
+
+        private Vector3 GetOneHandCarryTarget()
+        {
+            if (_foot != null && _foot.Humanoid != null && _foot.Humanoid.HeadTransform != null)
+            {
+                Transform hTr = _foot.Humanoid.transform;
+                return _foot.Humanoid.HeadTransform.position + hTr.forward * 0.28f + hTr.right * 0.14f - hTr.up * 0.24f;
+            }
+            return transform.position + transform.forward * 0.30f + transform.right * 0.14f + Vector3.up * 1.24f;
         }
 
         private Vector3 GetTwoHandCarryCenter()
@@ -392,8 +481,15 @@ namespace OurWorld.Player
             {
                 _shopOrigin = shelfWorldPos;
             }
+            if (_actionAnim == null && _foot != null) _actionAnim = _foot.GetComponent<PlayerActionAnimator>();
+            if (_consumeAnim == null && _foot != null) _consumeAnim = _foot.GetComponent<PlayerConsumeAnimator>();
+
             _items.Add(item);
-            RebuildHeldProp(item);
+            _inspectActive = true;
+            _inspectTimer = 0f;
+            _inspectYaw = 0f;
+            _carryBlend = 0.85f;
+            RebuildHeldProp(item, shelfWorldPos);
 
             if (mode != null)
             {
@@ -528,6 +624,11 @@ namespace OurWorld.Player
         public void ClearCart(bool silent, string message = null)
         {
             _items.Clear();
+            _inspectActive = false;
+            _inspectTimer = 0f;
+            _inspectYaw = 0f;
+            _carryBlend = 0f;
+            _wasBusy = false;
             if (_heldProp != null)
             {
                 Destroy(_heldProp);
@@ -544,7 +645,7 @@ namespace OurWorld.Player
             }
         }
 
-        private void RebuildHeldProp(ShopCartItem item)
+        private void RebuildHeldProp(ShopCartItem item, Vector3 spawnWorldPos)
         {
             if (_heldProp != null)
             {
@@ -554,11 +655,14 @@ namespace OurWorld.Player
             if (_foot == null || _foot.Humanoid == null) return;
 
             _heldVisual = item.Visual;
+            Vector3 initialPos = _foot.Humanoid.RightForearm != null
+                ? _foot.Humanoid.RightForearm.TransformPoint(new Vector3(0f, -0.305f, 0f)) - Vector3.up * 0.055f
+                : spawnWorldPos;
             // Keep unparented from forearm bone so LateUpdate keeps the prop 100% upright & level in hand(s)!
             _heldProp = ShopPropFactory.BuildProp(
                 null,
                 item.Visual,
-                GetTwoHandCarryCenter(),
+                initialPos,
                 uniformScale: UsesTwoHandCarry(item.Visual) ? 0.95f : 0.88f,
                 jacketColorIndex: item.JacketColorIndex);
         }

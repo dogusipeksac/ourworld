@@ -218,9 +218,9 @@ namespace OurWorld.Player
                 Vector3 bedTop = bedTransform.position + Vector3.up * 0.54f;
                 foot.TeleportTo(bedTop, bedTransform.rotation);
                 hum.SetLocomotion(0f, true, 0f);
-                hum.SetLyingDown(true);
+                hum.SetLyingDown(true, 1.2f);
                 OnNeedsMessage?.Invoke("Yatağına uzandın, uykuya dalıyorsun...");
-                yield return new WaitForSecondsRealtime(0.95f);
+                yield return new WaitForSecondsRealtime(1.45f);
             }
 
             if (sleepFadeCanvasGroup != null)
@@ -249,16 +249,9 @@ namespace OurWorld.Player
                 SaveManager.Instance.Save();
             }
 
-            // Stand cleanly back beside the bed before waking up
-            if (laidOnBed && foot != null)
-            {
-                if (hum != null) hum.SetLyingDown(false);
-                foot.TeleportTo(preSleepPos, preSleepRot);
-                foot.SetMovementEnabled(true);
-            }
-
             yield return new WaitForSecondsRealtime(0.3f);
 
+            // Fade out while still lying on the bed so the sit-up & rise animation is visible
             if (sleepFadeCanvasGroup != null)
             {
                 float fadeOut = 0.6f;
@@ -272,6 +265,14 @@ namespace OurWorld.Player
                 sleepFadeCanvasGroup.alpha = 0f;
                 sleepFadeCanvasGroup.blocksRaycasts = false;
                 sleepFadeCanvasGroup.gameObject.SetActive(false);
+            }
+
+            if (laidOnBed && foot != null)
+            {
+                if (hum != null) hum.SetLyingDown(false, 1.1f);
+                yield return new WaitForSecondsRealtime(1.15f);
+                foot.TeleportTo(preSleepPos, preSleepRot);
+                foot.SetMovementEnabled(true);
             }
 
             if (PlayerModeController.Instance != null)

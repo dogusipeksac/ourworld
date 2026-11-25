@@ -157,11 +157,48 @@ namespace OurWorld.World
         {
             ProceduralHumanoid humanoid = foot.Humanoid;
 
-            // Align cleanly onto the emerald saf carpet facing the Mihrab (Kıble)
+            // Smoothly step onto the emerald saf carpet and turn toward the Mihrab (Kıble) instead of popping
             Vector3 standWorld = transform.TransformPoint(prayerStandLocalOffset);
             Quaternion kibleRot = transform.rotation * Quaternion.Euler(0f, prayerFacingYawOffset, 0f);
-            foot.TeleportTo(standWorld, kibleRot);
             foot.SetMovementEnabled(false);
+            if (humanoid != null) humanoid.SetLookAtPoint(false, Vector3.zero);
+
+            Vector3 startDelta = standWorld - foot.transform.position;
+            startDelta.y = 0f;
+            CharacterController cc = foot.GetComponent<CharacterController>();
+            if (startDelta.magnitude > 0.14f && startDelta.magnitude <= 4.5f)
+            {
+                float walkElapsed = 0f;
+                const float maxWalkTime = 2.0f;
+                while (walkElapsed < maxWalkTime)
+                {
+                    float dt = Time.deltaTime;
+                    walkElapsed += dt;
+                    Vector3 toSpot = standWorld - foot.transform.position;
+                    toSpot.y = 0f;
+                    float dist = toSpot.magnitude;
+                    if (dist <= 0.12f) break;
+                    Vector3 dir = toSpot / dist;
+                    float spd = Mathf.Lerp(0.85f, 1.85f, Mathf.Clamp01(dist / 0.9f));
+                    Vector3 step = dir * Mathf.Min(dist, spd * dt);
+                    if (cc != null && cc.enabled) cc.Move(step + Vector3.down * (2f * dt));
+                    else foot.transform.position += step;
+                    foot.transform.rotation = Quaternion.Slerp(foot.transform.rotation, Quaternion.LookRotation(dir, Vector3.up), 1f - Mathf.Exp(-9f * dt));
+                    if (humanoid != null) humanoid.SetLocomotion(spd, true, 0f, dir);
+                    yield return null;
+                }
+            }
+
+            if (humanoid != null) humanoid.SetLocomotion(0f, true, 0f);
+            float turnElapsed = 0f;
+            while (turnElapsed < 0.45f && Quaternion.Angle(foot.transform.rotation, kibleRot) > 2.5f)
+            {
+                float dt = Time.deltaTime;
+                turnElapsed += dt;
+                foot.transform.rotation = Quaternion.Slerp(foot.transform.rotation, kibleRot, 1f - Mathf.Exp(-10f * dt));
+                yield return null;
+            }
+            foot.TeleportTo(standWorld, kibleRot);
 
             if (humanoid != null)
             {
@@ -193,6 +230,10 @@ namespace OurWorld.World
             mode.RaiseStatusMessage("Semiallâhu limen hamideh · Rabbenâ leke'l-hamd...");
             yield return new WaitForSeconds(1.2f);
 
+            // 4b. Smooth knee-first descent before prostration (prevents stiff dive straight from standing to carpet)
+            if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
+            yield return new WaitForSeconds(0.42f);
+
             // 5. First Secde (7-point prostration: forehead, palms, knees & toes on carpet)
             if (humanoid != null) humanoid.SetPrayerPose(3, 0f);
             mode.RaiseStatusMessage("Secde · Sübhâne Rabbiye'l-a'lâ...");
@@ -221,6 +262,12 @@ namespace OurWorld.World
             if (humanoid != null) humanoid.SetPrayerPose(4, -64f);
             mode.RaiseStatusMessage("Esselâmü aleyküm ve rahmetullah (Sola selam)...");
             yield return new WaitForSeconds(1.2f);
+
+            // Return head forward and stand up calmly before giving movement back
+            if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
+            yield return new WaitForSeconds(0.28f);
+            if (humanoid != null) humanoid.SetPrayerPose(6, 0f);
+            yield return new WaitForSeconds(0.48f);
 
             // Complete cleanly & restore full Energy
             if (humanoid != null) humanoid.SetPrayerPose(0, 0f);

@@ -31,6 +31,17 @@ namespace OurWorld.Core
         private AudioClip _goalpostClangClip;
         private AudioClip _volleyBlockClip;
         private AudioClip _slideWhooshClip;
+        private AudioClip _gunPistolClip;
+        private AudioClip _gunSuppressedClip;
+        private AudioClip _gunShotgunClip;
+        private AudioClip _gunCarbineClip;
+        private AudioClip _gunSniperClip;
+        private AudioClip _steelPlateClip;
+        private AudioClip _clayShatterClip;
+        private AudioClip _paperHitClip;
+        private AudioClip _reloadClickClip;
+        private AudioClip _emptyClickClip;
+        private AudioClip _rangeBuzzerClip;
         private Coroutine _hitstopRoutine;
         private Material _burstMat;
         private float _lastHornTime = -99f;
@@ -80,6 +91,17 @@ namespace OurWorld.Core
             _goalpostClangClip = BuildGoalpostClangClip(sr);
             _volleyBlockClip = BuildVolleyBlockClip(sr);
             _slideWhooshClip = BuildSlideWhooshClip(sr);
+            _gunPistolClip = BuildGunshotClip(sr, 0.24f, 0.30f, 165f, 48f, 1.0f, 9101, "SFX_GunPistol");
+            _gunSuppressedClip = BuildSuppressedShotClip(sr);
+            _gunShotgunClip = BuildGunshotClip(sr, 0.44f, 0.45f, 120f, 34f, 1.35f, 9102, "SFX_GunShotgun");
+            _gunCarbineClip = BuildGunshotClip(sr, 0.22f, 0.24f, 220f, 62f, 0.95f, 9103, "SFX_GunCarbine");
+            _gunSniperClip = BuildGunshotClip(sr, 0.62f, 0.50f, 138f, 28f, 1.45f, 9104, "SFX_GunSniper");
+            _steelPlateClip = BuildSteelPlatePingClip(sr);
+            _clayShatterClip = BuildClayShatterClip(sr);
+            _paperHitClip = BuildPaperHitClip(sr);
+            _reloadClickClip = BuildReloadClickClip(sr);
+            _emptyClickClip = BuildEmptyClickClip(sr);
+            _rangeBuzzerClip = BuildRangeBuzzerClip(sr);
 
             Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
             if (urpLit == null) urpLit = Shader.Find("Sprites/Default");
@@ -108,6 +130,17 @@ namespace OurWorld.Core
             if (_goalpostClangClip != null) Destroy(_goalpostClangClip);
             if (_volleyBlockClip != null) Destroy(_volleyBlockClip);
             if (_slideWhooshClip != null) Destroy(_slideWhooshClip);
+            if (_gunPistolClip != null) Destroy(_gunPistolClip);
+            if (_gunSuppressedClip != null) Destroy(_gunSuppressedClip);
+            if (_gunShotgunClip != null) Destroy(_gunShotgunClip);
+            if (_gunCarbineClip != null) Destroy(_gunCarbineClip);
+            if (_gunSniperClip != null) Destroy(_gunSniperClip);
+            if (_steelPlateClip != null) Destroy(_steelPlateClip);
+            if (_clayShatterClip != null) Destroy(_clayShatterClip);
+            if (_paperHitClip != null) Destroy(_paperHitClip);
+            if (_reloadClickClip != null) Destroy(_reloadClickClip);
+            if (_emptyClickClip != null) Destroy(_emptyClickClip);
+            if (_rangeBuzzerClip != null) Destroy(_rangeBuzzerClip);
             if (_hitstopRoutine != null) Time.timeScale = 1f;
             if (_burstMat != null) Destroy(_burstMat);
             if (Instance == this) Instance = null;
@@ -217,6 +250,68 @@ namespace OurWorld.Core
         {
             GameFeelAudio inst = EnsureInstance();
             inst.PlayOneShotPitched(inst._slideWhooshClip, 0.34f, 0.92f, 1.08f);
+        }
+
+        public static void PlayGunshotPistol(bool suppressed = false)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(suppressed ? inst._gunSuppressedClip : inst._gunPistolClip, suppressed ? 0.36f : 0.56f, 0.96f, 1.05f);
+        }
+
+        public static void PlayGunshotShotgun()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._gunShotgunClip, 0.66f, 0.94f, 1.04f);
+        }
+
+        public static void PlayGunshotCarbine(bool muzzleBrake = false)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._gunCarbineClip, muzzleBrake ? 0.52f : 0.58f, 0.95f, 1.06f);
+        }
+
+        public static void PlayGunshotSniper()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._gunSniperClip, 0.70f, 0.96f, 1.03f);
+        }
+
+        public static void PlaySteelPlatePing(int combo = 1)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            float p = Mathf.Clamp(0.95f + (combo - 1) * 0.055f, 0.95f, 1.42f);
+            inst.PlayOneShotPitched(inst._steelPlateClip, 0.52f, p, p + 0.03f);
+        }
+
+        public static void PlayClayShatter()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._clayShatterClip, 0.46f, 0.92f, 1.12f);
+        }
+
+        public static void PlayBulletImpactPaper(bool bullseye = false)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._paperHitClip, 0.36f, 0.94f, 1.08f);
+            if (bullseye) inst.PlayOneShotPitched(inst._coinClip, 0.34f, 1.16f, 1.24f);
+        }
+
+        public static void PlayReloadClick(bool complete = false)
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._reloadClickClip, 0.42f, complete ? 1.12f : 0.88f, complete ? 1.18f : 0.94f);
+        }
+
+        public static void PlayEmptyClick()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._emptyClickClip, 0.38f, 0.97f, 1.04f);
+        }
+
+        public static void PlayRangeBuzzer()
+        {
+            GameFeelAudio inst = EnsureInstance();
+            inst.PlayOneShotPitched(inst._rangeBuzzerClip, 0.38f, 0.99f, 1.01f);
         }
 
         public static void TriggerHitstop(float unscaledSeconds = 0.042f)
@@ -691,6 +786,182 @@ namespace OurWorld.Core
             }
             ApplyFade(data, sr, 4f);
             AudioClip clip = AudioClip.Create("SFX_SlideWhoosh", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildGunshotClip(int sr, float duration, float tailMix, float punchStartHz, float punchEndHz, float gain, int seed, string clipName)
+        {
+            int len = Mathf.RoundToInt(sr * duration);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(seed);
+            float lp = 0f;
+            float tailLp = 0f;
+            double ph = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                // Crisp supersonic muzzle crack (first 12ms)
+                float crackEnv = Mathf.Exp(-t * 48f);
+                // Punchy chamber pressure thump
+                float freq = Mathf.Lerp(punchStartHz, punchEndHz, Mathf.Pow(t, 0.45f));
+                ph += (2.0 * Math.PI * freq) / sr;
+                float punch = (float)Math.Sin(ph) * Mathf.Exp(-t * 16f) * 0.72f;
+                // Mid blast body + outdoor range echo tail
+                lp += 0.24f * (white - lp);
+                tailLp += 0.06f * (white - tailLp);
+                float body = lp * Mathf.Exp(-t * 11f) * 0.78f;
+                float echo = tailLp * Mathf.Exp(-t * 4.2f) * tailMix;
+                float raw = (white * crackEnv * 0.95f + punch + body + echo) * gain;
+                data[i] = Mathf.Clamp((float)Math.Tanh(raw * 1.35f) * 0.92f, -0.96f, 0.96f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create(clipName, len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildSuppressedShotClip(int sr)
+        {
+            int len = Mathf.RoundToInt(sr * 0.14f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(9110);
+            float lp = 0f;
+            double ph = 0.0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.14f * (white - lp);
+                float freq = Mathf.Lerp(320f, 110f, t);
+                ph += (2.0 * Math.PI * freq) / sr;
+                float puff = (white - lp) * Mathf.Exp(-t * 28f) * 0.55f;
+                float bolt = (float)Math.Sin(ph) * Mathf.Exp(-t * 24f) * 0.45f;
+                data[i] = Mathf.Clamp((puff + bolt) * 0.82f, -0.9f, 0.9f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_GunSuppressed", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildSteelPlatePingClip(int sr)
+        {
+            // Bright metallic AR500 IPSC steel target "TINK!" ring
+            int len = Mathf.RoundToInt(sr * 0.48f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(9120);
+            double p1 = 0, p2 = 0, p3 = 0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                p1 += (2.0 * Math.PI * 1480.0) / sr;
+                p2 += (2.0 * Math.PI * 2890.0) / sr;
+                p3 += (2.0 * Math.PI * 4120.0) / sr;
+                float impact = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-t * 90f) * 0.55f;
+                float ring = ((float)Math.Sin(p1) * 0.48f + (float)Math.Sin(p2) * 0.34f + (float)Math.Sin(p3) * 0.18f) * Mathf.Exp(-t * 7.2f);
+                data[i] = Mathf.Clamp((impact + ring) * 0.85f, -0.95f, 0.95f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_SteelPlatePing", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildClayShatterClip(int sr)
+        {
+            int len = Mathf.RoundToInt(sr * 0.28f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(9130);
+            float lp = 0f;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.35f * (white - lp);
+                float crackle = ((i % 190) < 35 ? 1.3f : 0.6f) * (white - lp);
+                float env = Mathf.Exp(-t * 11f);
+                data[i] = Mathf.Clamp(crackle * env * 0.85f, -0.92f, 0.92f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_ClayShatter", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildPaperHitClip(int sr)
+        {
+            int len = Mathf.RoundToInt(sr * 0.09f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(9140);
+            float lp = 0f;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float white = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.25f * (white - lp);
+                data[i] = Mathf.Clamp(lp * Mathf.Exp(-t * 32f) * 0.9f, -0.9f, 0.9f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_PaperHit", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildReloadClickClip(int sr)
+        {
+            int len = Mathf.RoundToInt(sr * 0.14f);
+            float[] data = new float[len];
+            System.Random rng = new System.Random(9150);
+            double ph = 0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                float pulse1 = Mathf.Exp(-Mathf.Abs(t - 0.12f) * 90f);
+                float pulse2 = Mathf.Exp(-Mathf.Abs(t - 0.56f) * 75f);
+                ph += (2.0 * Math.PI * (t < 0.4f ? 1150.0 : 1680.0)) / sr;
+                float metallic = (float)Math.Sin(ph) * 0.5f + (float)(rng.NextDouble() * 2.0 - 1.0) * 0.35f;
+                data[i] = Mathf.Clamp(metallic * (pulse1 + pulse2) * 0.72f, -0.9f, 0.9f);
+            }
+            ApplyFade(data, sr, 2f);
+            AudioClip clip = AudioClip.Create("SFX_ReloadClick", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildEmptyClickClip(int sr)
+        {
+            int len = Mathf.RoundToInt(sr * 0.06f);
+            float[] data = new float[len];
+            double ph = 0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                ph += (2.0 * Math.PI * 2400.0) / sr;
+                data[i] = Mathf.Clamp((float)Math.Sin(ph) * Mathf.Exp(-t * 55f) * 0.55f, -0.8f, 0.8f);
+            }
+            ApplyFade(data, sr, 1f);
+            AudioClip clip = AudioClip.Create("SFX_EmptyClick", len, 1, sr, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip BuildRangeBuzzerClip(int sr)
+        {
+            int len = Mathf.RoundToInt(sr * 0.32f);
+            float[] data = new float[len];
+            double ph = 0;
+            for (int i = 0; i < len; i++)
+            {
+                float t = i / (float)len;
+                ph += (2.0 * Math.PI * 1920.0) / sr;
+                float sq = Math.Sin(ph) >= 0 ? 0.55f : -0.55f;
+                float env = t < 0.85f ? 1f : Mathf.InverseLerp(1f, 0.85f, t);
+                data[i] = (sq * 0.45f + (float)Math.Sin(ph) * 0.45f) * env * 0.52f;
+            }
+            ApplyFade(data, sr, 4f);
+            AudioClip clip = AudioClip.Create("SFX_RangeBuzzer", len, 1, sr, false);
             clip.SetData(data, 0);
             return clip;
         }

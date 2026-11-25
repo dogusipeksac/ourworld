@@ -91,11 +91,26 @@ namespace OurWorld.World
             float dx = playerPos.x - doorCenter.x;
             float dz = playerPos.z - doorCenter.z;
             float horizDistSq = dx * dx + dz * dz;
+            float effectiveAutoOpen = Mathf.Min(autoOpenDistance, 1.38f);
 
-            if (!_isOpen && horizDistSq <= autoOpenDistance * autoOpenDistance)
+            if (!_isOpen && horizDistSq <= effectiveAutoOpen * effectiveAutoOpen)
             {
                 _autoOpened = true;
-                SetOpenState(true, playerPos);
+                EnsureInitialized();
+                ProceduralHumanoid hum = mode.FootController != null ? mode.FootController.Humanoid : null;
+                Transform handle = FindDoorHandle(playerPos);
+                float reachTime = 0f;
+                if (hum != null && handle != null)
+                {
+                    Vector3 toHandle = Vector3.ProjectOnPlane(handle.position - playerPos, Vector3.up);
+                    if (toHandle.sqrMagnitude <= 1.25f * 1.25f &&
+                        (toHandle.sqrMagnitude < 0.01f || Vector3.Dot(hum.transform.forward, toHandle.normalized) > 0.12f))
+                    {
+                        reachTime = 0.16f;
+                        hum.PlayDoorReach(handle, Mathf.Max(0.05f, transitionSeconds) + reachTime, reachTime);
+                    }
+                }
+                SetOpenState(true, playerPos, reachTime);
             }
             else if (_isOpen && _autoOpened && horizDistSq >= autoCloseDistance * autoCloseDistance)
             {
@@ -104,22 +119,29 @@ namespace OurWorld.World
             }
         }
 
+        private Transform FindDoorHandle(Vector3 interactorWorldPos)
+        {
+            if (doorPivot == null) return null;
+            bool outerSide = Vector3.Dot(doorPivot.right, interactorWorldPos - doorPivot.position) >= 0f;
+            string primary = outerSide ? "HandleOuter" : "HandleInner";
+            string secondary = outerSide ? "HandleInner" : "HandleOuter";
+            Transform handle = doorPivot.Find(primary);
+            if (handle == null && doorPanel != null) handle = doorPanel.Find(primary);
+            if (handle == null) handle = doorPivot.Find(secondary);
+            if (handle == null && doorPanel != null) handle = doorPanel.Find(secondary);
+            return handle;
+        }
+
         public void Toggle(Vector3 interactorWorldPos, ProceduralHumanoid interactor = null)
         {
             _autoOpened = false;
             _manualCooldown = 2.0f;
             EnsureInitialized();
-            Transform handle = null;
-            if (doorPivot != null)
-            {
-                string handleName = Vector3.Dot(doorPivot.right, interactorWorldPos - doorPivot.position) >= 0f
-                    ? "HandleOuter" : "HandleInner";
-                handle = doorPivot.Find(handleName);
-            }
+            Transform handle = FindDoorHandle(interactorWorldPos);
             bool canReach = interactor != null && handle != null &&
-                Vector3.ProjectOnPlane(handle.position - interactorWorldPos, Vector3.up).sqrMagnitude < 0.68f * 0.68f;
-            float reachTime = canReach ? 0.16f : 0f;
-            if (canReach) interactor.PlayDoorReach(handle, Mathf.Max(0.05f, transitionSeconds) + reachTime);
+                Vector3.ProjectOnPlane(handle.position - interactorWorldPos, Vector3.up).sqrMagnitude < 1.18f * 1.18f;
+            float reachTime = canReach ? 0.20f : 0f;
+            if (canReach) interactor.PlayDoorReach(handle, Mathf.Max(0.05f, transitionSeconds) + reachTime, reachTime);
             SetOpenState(!_isOpen, interactorWorldPos, reachTime);
         }
 

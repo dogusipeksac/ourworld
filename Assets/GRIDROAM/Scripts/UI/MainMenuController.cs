@@ -335,6 +335,19 @@ namespace OurWorld.UI
                 ExitYaw = 180f,
                 PreviewCamPos = new Vector3(16.0f, 7.6f, -26.0f),
                 PreviewLookAt = new Vector3(16.0f, 1.2f, -40.0f)
+            },
+            new SportQuickOption
+            {
+                BadgeTr = "4 SİLAH · +120 ₺",
+                BadgeEn = "4 GUNS  · +120 ₺",
+                NameTr = "Atış Poligonu",
+                NameEn = "Shooting Range",
+                TagTr = "Tabanca · Pompalı · Karabin · Sniper\nHedef · IPSC · Trap · 100m",
+                TagEn = "Pistol · Shotgun · Carbine · Sniper\nBullseye · IPSC · Trap · 100m",
+                ExitPos = new Vector3(14.0f, 0.14f, -190.5f),
+                ExitYaw = 180f,
+                PreviewCamPos = new Vector3(2.0f, 5.4f, -178.0f),
+                PreviewLookAt = new Vector3(14.0f, 2.0f, -214.0f)
             }
         };
 
@@ -1178,6 +1191,12 @@ namespace OurWorld.UI
                     if (swimRace != null) mode.StartArenaSport(swimRace, sport.ExitPos, exitRot);
                     break;
                 }
+                case 5:
+                {
+                    LiveShootingRange range = ShootingRangeInstaller.ActiveRange ?? FindAnyObjectByType<LiveShootingRange>();
+                    if (range != null) mode.StartArenaSport(range, sport.ExitPos, exitRot);
+                    break;
+                }
             }
         }
 
@@ -1702,8 +1721,8 @@ namespace OurWorld.UI
             grt.offsetMax = new Vector2(-30f, -118f);
 
             GridLayoutGroup glg = gridGo.AddComponent<GridLayoutGroup>();
-            glg.cellSize = new Vector2(322f, 250f);
-            glg.spacing = new Vector2(20f, 20f);
+            glg.cellSize = new Vector2(322f, 168f);
+            glg.spacing = new Vector2(18f, 14f);
             glg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             glg.constraintCount = 2;
 
@@ -1724,18 +1743,18 @@ namespace OurWorld.UI
 
                 GameObject badgeGo = CreateRoundedPanel("RewardBadge", card.transform, _pillSprite,
                     new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                    new Vector2(20f, -20f), new Vector2(184f, 36f),
+                    new Vector2(16f, -14f), new Vector2(196f, 32f),
                     BadgeFoundBg, addBorder: false);
-                UnityEngine.UI.Text badgeLbl = CreateText("BadgeLabel", badgeGo.transform, opt.BadgeTr, 17, FontStyle.Bold, AccentMint, TextAnchor.MiddleCenter);
-                StretchFull(badgeLbl.rectTransform, 8f, 0f);
+                UnityEngine.UI.Text badgeLbl = CreateText("BadgeLabel", badgeGo.transform, opt.BadgeTr, 16, FontStyle.Bold, AccentMint, TextAnchor.MiddleCenter);
+                StretchFull(badgeLbl.rectTransform, 6f, 0f);
 
-                UnityEngine.UI.Text title = CreateText("Title", card.transform, opt.NameTr, 25, FontStyle.Bold, TextPrimary, TextAnchor.MiddleLeft);
-                PlaceTopLeft(title.rectTransform, 20f, -72f, 282f, 36f);
+                UnityEngine.UI.Text title = CreateText("Title", card.transform, opt.NameTr, 22, FontStyle.Bold, TextPrimary, TextAnchor.MiddleLeft);
+                PlaceTopLeft(title.rectTransform, 16f, -54f, 290f, 32f);
 
-                UnityEngine.UI.Text tag = CreateText("Tag", card.transform, opt.TagTr, 18, FontStyle.Normal, TextSecondary, TextAnchor.UpperLeft);
-                PlaceTopLeft(tag.rectTransform, 20f, -116f, 282f, 102f);
+                UnityEngine.UI.Text tag = CreateText("Tag", card.transform, opt.TagTr, 15, FontStyle.Normal, TextSecondary, TextAnchor.UpperLeft);
+                PlaceTopLeft(tag.rectTransform, 16f, -92f, 290f, 68f);
                 tag.horizontalOverflow = HorizontalWrapMode.Wrap;
-                tag.lineSpacing = 1.25f;
+                tag.lineSpacing = 1.20f;
 
                 _sportCardBgs.Add(bg);
                 _sportCardBorders.Add(border);

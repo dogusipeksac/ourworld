@@ -21,6 +21,11 @@ namespace OurWorld.World
         private Transform _brushL;
         private Transform _brushR;
         private Transform _brushTop;
+        private Vector3 _brushLBasePos;
+        private Vector3 _brushRBasePos;
+        private Vector3 _brushTopBasePos;
+        private float _currentSpinSpeed = 32f;
+        private float _brushEngageBlend;
 
         private bool _isWashing;
         private float _washTimer;
@@ -96,11 +101,28 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
-            // Gentle idle brush hum vs high-speed wash spin!
-            float spinSpeed = _isWashing ? 420f : 32f;
-            if (_brushL != null) _brushL.Rotate(0f, spinSpeed * dt, 0f, Space.Self);
-            if (_brushR != null) _brushR.Rotate(0f, -spinSpeed * dt, 0f, Space.Self);
-            if (_brushTop != null) _brushTop.Rotate(spinSpeed * 0.85f * dt, 0f, 0f, Space.Self);
+            // Smooth motor inertia spin-up/spin-down & gentle brush hug/roof-descent articulation
+            float targetSpin = _isWashing ? 420f : 32f;
+            _currentSpinSpeed = Mathf.Lerp(_currentSpinSpeed, targetSpin, 1f - Mathf.Exp(-3.2f * dt));
+            float targetEngage = (_isWashing && _washTimer >= 0.35f && _washTimer <= 3.75f) ? 1f : 0f;
+            _brushEngageBlend = Mathf.Lerp(_brushEngageBlend, targetEngage, 1f - Mathf.Exp(-3.8f * dt));
+
+            float sweep = Mathf.Sin(Time.time * 4.5f) * 0.015f * _brushEngageBlend;
+            if (_brushL != null)
+            {
+                _brushL.Rotate(0f, _currentSpinSpeed * dt, 0f, Space.Self);
+                _brushL.localPosition = _brushLBasePos + new Vector3(0.06f * _brushEngageBlend + sweep, 0f, 0f);
+            }
+            if (_brushR != null)
+            {
+                _brushR.Rotate(0f, -_currentSpinSpeed * dt, 0f, Space.Self);
+                _brushR.localPosition = _brushRBasePos + new Vector3(-0.06f * _brushEngageBlend - sweep, 0f, 0f);
+            }
+            if (_brushTop != null)
+            {
+                _brushTop.Rotate(_currentSpinSpeed * 0.85f * dt, 0f, 0f, Space.Self);
+                _brushTop.localPosition = _brushTopBasePos + new Vector3(0f, -0.52f * _brushEngageBlend + sweep * 0.6f, 0f);
+            }
 
             if (!_isWashing) return;
 
@@ -166,6 +188,9 @@ namespace OurWorld.World
                 _brushL = OurWorldModelLibrary.FindPart(gantry.transform, "BrushRollerL");
                 _brushR = OurWorldModelLibrary.FindPart(gantry.transform, "BrushRollerR");
                 _brushTop = OurWorldModelLibrary.FindPart(gantry.transform, "TopBrushRoller");
+                if (_brushL != null) _brushLBasePos = _brushL.localPosition;
+                if (_brushR != null) _brushRBasePos = _brushR.localPosition;
+                if (_brushTop != null) _brushTopBasePos = _brushTop.localPosition;
             }
 
             // Overhead readable sign facing South toward Selman/Lake Boulevard!

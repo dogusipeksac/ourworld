@@ -68,6 +68,10 @@ namespace OurWorld.Player
         private float _waterSurfaceY;
         private Vector3 _moveDirection = Vector3.forward;
         private bool _movementEnabled = true;
+        private float _lastGroundCheckY;
+        private bool _hasLastGroundY;
+        private float _groundSampleHoldTimer;
+        private float _slopeProbeTimer;
 
         public Transform VisualRoot => visualRoot;
         public ProceduralHumanoid Humanoid => humanoid;
@@ -199,11 +203,10 @@ namespace OurWorld.Player
                 return;
             }
 
-            // If carrying a physical street prop (Damacana / crate / cone), hurl it forward!
+            // If carrying a physical street prop (Damacana / crate / cone), hurl it forward with two-handed throw!
             if (CarryableProp.IsHoldingProp)
             {
-                _punchCooldown = 0.35f;
-                if (humanoid != null) humanoid.PlayCombatMove(1);
+                _punchCooldown = 0.48f;
                 CarryableProp.TryThrowHeldProp(transform.forward);
                 mode.RaiseStatusMessage("Eşyayı fırlattın!");
                 return;
@@ -525,11 +528,11 @@ namespace OurWorld.Player
 
             transform.position = landPos;
             _controller.enabled = true;
-            humanoid?.PlayLanding();
             _isVaulting = false;
             _vaultRoutine = null;
 
-            HandleLanded();
+            if (humanoid != null) humanoid.PlayLanding();
+            else HandleLanded();
         }
 
         private void EnsureFootstepAudio()
@@ -750,6 +753,9 @@ namespace OurWorld.Player
             _verticalVelocity = 0f;
             _currentSpeed = 0f;
             _moveDirection = rotation * Vector3.forward;
+            _lastGroundCheckY = position.y;
+            _hasLastGroundY = true;
+            _groundSampleHoldTimer = 0f;
             _controller.enabled = wasEnabled;
         }
 
@@ -931,19 +937,63 @@ namespace OurWorld.Player
 
             if (humanoid != null)
             {
-                InteractableTrigger lookTrig = PlayerModeController.Instance != null
-                    ? PlayerModeController.Instance.ClosestInteractableWithin4m
-                    : null;
-                if (lookTrig != null)
+                if (StreetCatController.ActivePet != null)
                 {
-                    humanoid.SetLookAtPoint(true, lookTrig.transform.position + Vector3.up * 1.2f);
+                    humanoid.SetLookAtPoint(true, StreetCatController.ActivePet.transform.position + Vector3.up * 0.28f);
                 }
                 else
                 {
-                    humanoid.SetLookAtPoint(false, Vector3.zero);
+                    InteractableTrigger lookTrig = PlayerModeController.Instance != null
+                        ? PlayerModeController.Instance.ClosestInteractableWithin4m
+                        : null;
+                    if (lookTrig != null)
+                    {
+                        float lookY = (lookTrig.Kind == InteractableKind.StreetCat || lookTrig.Kind == InteractableKind.CarryableProp)
+                            ? 0.32f
+                            : 1.2f;
+                        humanoid.SetLookAtPoint(true, lookTrig.transform.position + Vector3.up * lookY);
+                    }
+                    else
+                    {
+                        humanoid.SetLookAtPoint(false, Vector3.zero);
+                    }
                 }
 
-                humanoid.SetLocomotion(actualSpeed, _controller.isGrounded, _verticalVelocity, travel.normalized, sampleGround: true);
+                if (!_hasLastGroundY)
+                {
+                    _lastGroundCheckY = transform.position.y;
+                    _hasLastGroundY = true;
+                }
+                if (_controller.isGrounded && Mathf.Abs(transform.position.y - _lastGroundCheckY) > 0.003f)
+                {
+                    _groundSampleHoldTimer = 0.85f;
+                }
+                _lastGroundCheckY = transform.position.y;
+                if (_groundSampleHoldTimer > 0f)
+                {
+                    _groundSampleHoldTimer = Mathf.Max(0f, _groundSampleHoldTimer - dt);
+                }
+                if (_controller.isGrounded && actualSpeed > 0.08f && _groundSampleHoldTimer <= 0f)
+                {
+                    _slopeProbeTimer -= dt;
+                    if (_slopeProbeTimer <= 0f)
+                    {
+                        _slopeProbeTimer = 0.14f;
+                        Vector3 probeDir = travel.sqrMagnitude > 0.0001f ? travel.normalized : transform.forward;
+                        Vector3 probeOrigin = transform.position + probeDir * 0.38f + Vector3.up * 0.38f;
+                        if (Physics.Raycast(probeOrigin, Vector3.down, out RaycastHit stepHit, 0.80f,
+                                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                            stepHit.collider.transform.root != transform.root &&
+                            (Mathf.Abs(stepHit.point.y - transform.position.y) > 0.02f || stepHit.normal.y < 0.985f))
+                        {
+                            _groundSampleHoldTimer = 0.85f;
+                        }
+                    }
+                }
+
+                bool sampleGround = _controller.isGrounded &&
+                                    (_groundSampleHoldTimer > 0f || humanoid.HasUnevenGroundSample);
+                humanoid.SetLocomotion(actualSpeed, _controller.isGrounded, _verticalVelocity, travel.normalized, sampleGround: sampleGround);
             }
         }
     }
