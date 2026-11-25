@@ -65,8 +65,16 @@ namespace OurWorld.World
             }
         }
 
+        private readonly System.Collections.Generic.List<Material> _runtimeMats =
+            new System.Collections.Generic.List<Material>(16);
+
         private void OnDestroy()
         {
+            for (int i = 0; i < _runtimeMats.Count; i++)
+            {
+                if (_runtimeMats[i] != null) Destroy(_runtimeMats[i]);
+            }
+            _runtimeMats.Clear();
             if (Instance == this) Instance = null;
         }
 
@@ -168,7 +176,7 @@ namespace OurWorld.World
 
         private void BuildCarWashStation()
         {
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Material padMat = MakeMat(lit, "MAT_WashPad", new Color(0.38f, 0.42f, 0.46f), 0.38f);
             Material grateMat = MakeMat(lit, "MAT_WashGrate", new Color(0.16f, 0.22f, 0.26f), 0.45f);
             Material tealMat = MakeMat(lit, "MAT_WashTeal", new Color(0.10f, 0.66f, 0.64f), 0.30f);
@@ -243,9 +251,10 @@ namespace OurWorld.World
             return go;
         }
 
-        private static Material MakeMat(Shader sh, string name, Color c, float smooth)
+        private Material MakeMat(Shader sh, string name, Color c, float smooth)
         {
             Material m = new Material(sh) { name = name };
+            _runtimeMats.Add(m);
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
             if (m.HasProperty("_Color")) m.SetColor("_Color", c);
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);

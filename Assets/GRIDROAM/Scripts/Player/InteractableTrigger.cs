@@ -54,6 +54,7 @@ namespace OurWorld.Player
         [SerializeField] private string promptLocalizationKey = "ui.btn.talk";
         [SerializeField] private float interactionRadius = 3.2f;
         [SerializeField] private string customPromptText = string.Empty;
+        private string _customPromptEn = string.Empty;
 
         public InteractableKind Kind => kind;
         public string InteractableId => interactableId;
@@ -71,19 +72,28 @@ namespace OurWorld.Player
         public void SetCustomPrompt(string text)
         {
             customPromptText = text ?? string.Empty;
+            _customPromptEn = string.Empty;
+        }
+
+        public void SetCustomPrompt(string textTr, string textEn)
+        {
+            customPromptText = textTr ?? string.Empty;
+            _customPromptEn = textEn ?? string.Empty;
         }
 
         public string GetLocalizedPrompt()
         {
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             if (kind == InteractableKind.ShopCounter && PlayerShoppingCart.HasActiveItems)
             {
-                return $"Kasada Öde · {PlayerShoppingCart.ActiveSummary}";
+                string prefix = isEn ? "Pay at Checkout" : "Kasada Öde";
+                return $"{prefix} · {PlayerShoppingCart.ActiveSummary}";
             }
             if (!string.IsNullOrEmpty(customPromptText))
             {
-                return customPromptText;
+                return (isEn && !string.IsNullOrEmpty(_customPromptEn)) ? _customPromptEn : customPromptText;
             }
-            return LocalizationService.Tr(promptLocalizationKey, "Etkileş");
+            return LocalizationService.Tr(promptLocalizationKey, isEn ? "Interact" : "Etkileş");
         }
 
 #if UNITY_EDITOR

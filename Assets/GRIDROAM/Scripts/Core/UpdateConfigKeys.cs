@@ -39,7 +39,7 @@ namespace OurWorld.Core
         public const string MaintMessageEn = "maintenance_message_en";
 
         public const string DefaultAndroidStoreUrl = "https://play.google.com/store/apps/details?id=com.dogusipeksac.ourworld";
-        public const string DefaultIosStoreUrl = "https://apps.apple.com/search?term=OurWorld";
+        public const string DefaultIosStoreUrl = "https://apps.apple.com/app/id6838324963";
     }
 
     public sealed class UpdateInfo

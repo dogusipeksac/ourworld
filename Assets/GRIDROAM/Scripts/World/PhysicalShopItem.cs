@@ -13,6 +13,7 @@ namespace OurWorld.World
     public class PhysicalShopItem : MonoBehaviour
     {
         private string _itemName = "Ürün";
+        private string _itemNameEn = "Item";
         private int _price = 10;
         private ShopItemEffect _effect = ShopItemEffect.Energy;
         private float _effectParam = 20f;
@@ -20,6 +21,45 @@ namespace OurWorld.World
         private ShopPropVisual _visual = ShopPropVisual.WaterBottle;
         private int _jacketColorIndex;
         private bool _requiresCheckout;
+        private bool _lastTagWasEn;
+
+        private static readonly System.Collections.Generic.Dictionary<string, string> EnItemNames =
+            new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.Ordinal)
+            {
+                { "Soğuk Su", "Cold Water" },
+                { "Yayık Ayran", "Churned Ayran" },
+                { "Enerji İçeceği", "Energy Drink" },
+                { "Külah Dondurma", "Ice Cream Cone" },
+                { "Soğuk Gazoz", "Chilled Soda" },
+                { "Taze Portakal", "Fresh Orange" },
+                { "Aydos Elması", "Aydos Apple" },
+                { "Vitamin Sepeti", "Vitamin Basket" },
+                { "Ezine Peynir & Zeytin", "Ezine Cheese & Olives" },
+                { "Sucuklu Tost", "Sucuk Toast" },
+                { "Taze Somun Ekmek", "Fresh Bread Loaf" },
+                { "Kaşarlı Tost", "Cheese Toast" },
+                { "Sıcak Simit", "Warm Simit" },
+                { "Kahvaltı Paketi", "Breakfast Pack" },
+                { "İnce Belli Çay", "Turkish Tea" },
+                { "Türk Kahvesi", "Turkish Coffee" },
+                { "Acil Yakıt Bidonu", "Emergency Fuel Can" },
+                { "Turbo Motor Kiti", "Turbo Engine Kit" },
+                { "Usta İkramı Çay", "Master's Tea" },
+                { "Yürüyüş Ayakkabısı", "Walking Shoes" },
+                { "Koşu Ayakkabısı", "Running Shoes" },
+                { "Zeytin İş Parkası", "Olive Work Parka" },
+                { "Bordo Deri Ceket", "Burgundy Leather Jacket" },
+                { "Zeytin Parka", "Olive Parka" },
+                { "Antrasit Mont", "Charcoal Jacket" },
+                { "Lacivert Ceket", "Navy Jacket" },
+                { "Tamirci Kahvesi", "Mechanic's Coffee" },
+                { "Sıcak Yemek", "Hot Meal" }
+            };
+
+        private static bool IsEn =>
+            LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+        private string LocalizedName => IsEn ? _itemNameEn : _itemName;
 
         private GameObject _visualRoot;
         private GameObject _priceTagObj;
@@ -42,6 +82,7 @@ namespace OurWorld.World
             float visualScale = 1.05f)
         {
             _itemName = itemName;
+            _itemNameEn = EnItemNames.TryGetValue(itemName ?? string.Empty, out string mappedEn) ? mappedEn : itemName;
             _price = price;
             _effect = effect;
             _effectParam = effectParam;
@@ -60,9 +101,10 @@ namespace OurWorld.World
             {
                 _trigger = gameObject.AddComponent<InteractableTrigger>();
             }
-            string verb = requiresCheckout ? "Eline Al" : "Satın Al";
+            string verbTr = requiresCheckout ? "Eline Al" : "Satın Al";
+            string verbEn = requiresCheckout ? "Pick Up" : "Buy";
             _trigger.Configure(InteractableKind.ShopItem, $"shopitem_{itemName}".ToLowerInvariant(), "ui.btn.shop", interactionRadius);
-            _trigger.SetCustomPrompt($"{verb}: {itemName} · {price} ₺");
+            _trigger.SetCustomPrompt($"{verbTr}: {_itemName} · {price} ₺", $"{verbEn}: {_itemNameEn} · {price} ₺");
         }
 
         private void BuildWorldPriceTag()
@@ -71,8 +113,9 @@ namespace OurWorld.World
             _priceTagObj.transform.SetParent(transform, false);
             _priceTagObj.transform.localPosition = new Vector3(0f, 0.36f, 0f);
 
+            _lastTagWasEn = IsEn;
             _priceTagText = _priceTagObj.AddComponent<TextMesh>();
-            _priceTagText.text = $"{_itemName}\n{_price} ₺";
+            _priceTagText.text = $"{LocalizedName}\n{_price} ₺";
             _priceTagText.fontSize = 44;
             _priceTagText.characterSize = 0.0115f;
             _priceTagText.anchor = TextAnchor.LowerCenter;
@@ -135,6 +178,12 @@ namespace OurWorld.World
             }
             if (_priceTagText != null && showTag)
             {
+                bool isEnNow = IsEn;
+                if (isEnNow != _lastTagWasEn)
+                {
+                    _lastTagWasEn = isEnNow;
+                    _priceTagText.text = $"{LocalizedName}\n{_price} ₺";
+                }
                 _priceTagText.color = isTargeted
                     ? new Color(1.0f, 0.88f, 0.24f)
                     : new Color(0.95f, 0.96f, 0.98f);
@@ -147,15 +196,17 @@ namespace OurWorld.World
             if (SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
 
             SaveData data = SaveManager.Instance.Data;
+            bool isEn = IsEn;
+            string dispName = LocalizedName;
 
             if (_effect == ShopItemEffect.RunningShoes && data.hasRunningShoes)
             {
-                mode.RaiseStatusMessage("Koşu ayakkabısına zaten sahipsin!");
+                mode.RaiseStatusMessage(isEn ? "You already own Running Shoes!" : "Koşu ayakkabısına zaten sahipsin!");
                 return;
             }
             if (_effect == ShopItemEffect.TurboKit && data.hasTurboKit)
             {
-                mode.RaiseStatusMessage("Turbo Motor Kiti aracında zaten takılı!");
+                mode.RaiseStatusMessage(isEn ? "Turbo Engine Kit is already installed on your car!" : "Turbo Motor Kiti aracında zaten takılı!");
                 return;
             }
 
@@ -167,7 +218,7 @@ namespace OurWorld.World
 
                 ShopCartItem entry = new ShopCartItem
                 {
-                    Name = _itemName,
+                    Name = dispName,
                     Price = _price,
                     Effect = _effect,
                     EffectParam = _effectParam,
@@ -183,14 +234,16 @@ namespace OurWorld.World
                         GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.12f, new Color(0.45f, 0.88f, 0.98f), count: 7, spread: 0.22f);
                         StartCoroutine(RestockRoutine(10f));
                     }
-                }, startStatus: $"Raftan {_itemName} alınıyor...");
+                }, startStatus: isEn ? $"Picking up {dispName}..." : $"Raftan {dispName} alınıyor...");
                 return;
             }
 
             // FLOW 2: Direct over-the-counter / street stall purchase — reach, pay & use immediately!
             if (data.money < _price)
             {
-                mode.RaiseStatusMessage($"Yetersiz bakiye! ({_itemName}: {_price} ₺ · Bakiye: {data.money} ₺)");
+                mode.RaiseStatusMessage(isEn
+                    ? $"Not enough cash! ({dispName}: {_price} ₺ · Balance: {data.money} ₺)"
+                    : $"Yetersiz bakiye! ({dispName}: {_price} ₺ · Bakiye: {data.money} ₺)");
                 return;
             }
 
@@ -199,19 +252,19 @@ namespace OurWorld.World
             {
                 if (!SaveManager.Instance.TrySpend(_price))
                 {
-                    mode.RaiseStatusMessage("Yetersiz bakiye!");
+                    mode.RaiseStatusMessage(isEn ? "Not enough cash!" : "Yetersiz bakiye!");
                     return;
                 }
                 GameFeelAudio.PlayCoinChime();
                 GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.2f, new Color(0.98f, 0.84f, 0.28f), count: 10, spread: 0.35f);
-                mode.RaiseStatusMessage($"{_itemName} alındı (-{_price} ₺) · Afiyet olsun!");
+                mode.RaiseStatusMessage(isEn ? $"Bought {dispName} (-{_price} ₺) · Enjoy!" : $"{dispName} alındı (-{_price} ₺) · Afiyet olsun!");
                 StartCoroutine(RestockRoutine(8f));
 
                 PlayerConsumeAnimator.PlayPurchase(
                     mode.FootController,
                     "direct_counter",
                     _consumeKind,
-                    _itemName,
+                    dispName,
                     _effectParam,
                     explicitTarget: transform);
                 return;
@@ -226,13 +279,13 @@ namespace OurWorld.World
             {
                 if (SaveManager.Instance == null || !SaveManager.Instance.TrySpend(_price))
                 {
-                    mode.RaiseStatusMessage("Yetersiz bakiye!");
+                    mode.RaiseStatusMessage(isEn ? "Not enough cash!" : "Yetersiz bakiye!");
                     return;
                 }
 
                 ShopCartItem entry = new ShopCartItem
                 {
-                    Name = _itemName,
+                    Name = dispName,
                     Price = _price,
                     Effect = _effect,
                     EffectParam = _effectParam,
@@ -249,26 +302,34 @@ namespace OurWorld.World
                 switch (_effect)
                 {
                     case ShopItemEffect.RunningShoes:
-                        mode.RaiseStatusMessage($"Koşu Ayakkabısı giyildi (-{_price} ₺) · Koşma hızın kalıcı olarak +%22 arttı!");
+                        mode.RaiseStatusMessage(isEn
+                            ? $"Equipped Running Shoes (-{_price} ₺) · Sprint speed permanently +22%!"
+                            : $"Koşu Ayakkabısı giyildi (-{_price} ₺) · Koşma hızın kalıcı olarak +%22 arttı!");
                         break;
                     case ShopItemEffect.TurboKit:
-                        mode.RaiseStatusMessage($"Turbo Motor Kiti alındı (-{_price} ₺) · Araç gücü kalıcı olarak +%28 arttı!");
+                        mode.RaiseStatusMessage(isEn
+                            ? $"Installed Turbo Engine Kit (-{_price} ₺) · Car power permanently +28%!"
+                            : $"Turbo Motor Kiti alındı (-{_price} ₺) · Araç gücü kalıcı olarak +%28 arttı!");
                         break;
                     case ShopItemEffect.JacketColor:
-                        mode.RaiseStatusMessage($"{_itemName} üzerine giyildi (-{_price} ₺) · Harika görünüyor!");
+                        mode.RaiseStatusMessage(isEn
+                            ? $"Put on {dispName} (-{_price} ₺) · Looking sharp!"
+                            : $"{dispName} üzerine giyildi (-{_price} ₺) · Harika görünüyor!");
                         break;
                     case ShopItemEffect.FuelCan:
-                        mode.RaiseStatusMessage($"Acil Yakıt Bidonu alındı (-{_price} ₺) · Aracının deposu %100 doldu!");
+                        mode.RaiseStatusMessage(isEn
+                            ? $"Bought Emergency Fuel Can (-{_price} ₺) · Fuel tank refilled to 100%!"
+                            : $"Acil Yakıt Bidonu alındı (-{_price} ₺) · Aracının deposu %100 doldu!");
                         break;
                     default:
                         if (_effectParam > 0f && PlayerNeedsController.Instance != null)
                         {
                             PlayerNeedsController.Instance.RestoreEnergy(_effectParam);
                         }
-                        mode.RaiseStatusMessage($"{_itemName} alındı (-{_price} ₺)!");
+                        mode.RaiseStatusMessage(isEn ? $"Bought {dispName} (-{_price} ₺)!" : $"{dispName} alındı (-{_price} ₺)!");
                         break;
                 }
-            }, startStatus: $"{_itemName} alınıyor ({_price} ₺)...");
+            }, startStatus: isEn ? $"Buying {dispName} ({_price} ₺)..." : $"{dispName} alınıyor ({_price} ₺)...");
         }
 
         private IEnumerator RestockRoutine(float delaySeconds)

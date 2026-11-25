@@ -22,6 +22,8 @@ namespace OurWorld.UI
         private static readonly Color MissionTint = new Color(0.92f, 0.74f, 0.34f, 1f);
         private static readonly Color AccentTealTint = new Color(0.31f, 0.70f, 0.66f, 1f);
 
+        private Camera _cachedMainCam;
+
         public void Configure(GameObject root, RectTransform arrow, Text distLabel)
         {
             container = root;
@@ -66,7 +68,8 @@ namespace OurWorld.UI
         private void LateUpdate()
         {
             PlayerModeController player = PlayerModeController.Instance;
-            Camera mainCam = Camera.main;
+            if (_cachedMainCam == null) _cachedMainCam = Camera.main;
+            Camera mainCam = _cachedMainCam;
 
             if (player == null || mainCam == null || !TryGetActiveNavigationTarget(out Vector3 targetWorldPos, out bool isAccent))
             {

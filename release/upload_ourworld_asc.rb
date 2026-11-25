@@ -109,12 +109,12 @@ if app_info
     "tr" => {
       name: "Bizim Dünyamız · Açık Dünya",
       subtitle: "Sür, Spor Yap, Mahalleni Yaşa",
-      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
     },
     "en-US" => {
       name: "Our World · Living Open World",
       subtitle: "Drive, Play Sports & Roam 3D!",
-      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
     }
   }
 
@@ -152,8 +152,8 @@ desc_tr = <<~TEXT.strip
   • Tarım, Hayvancılık & Köy Pazarı: 16 bostan tarlasında ayçiçeği, domates, biber ve çilek yetiştir; inek sağ, koyun kırp, kümesten yumurta topla ve Köy Pazarı'nda sat.
   • No:73 Oto Tamir, Modifiye & Oto Yıkama: Müşteri araçlarını hidrolik lifte kaldırıp lastik, motor ve kaporta tamiratı yap; kendi aracına metalik boya, jant, rüzgarlık, tavan bagajı ve performans yükseltmeleri tak.
   • Gölet Balıkçılığı & Ev Dekorasyonu: Sultanbeyli Göleti iskelesinden 5 farklı balık türü yakala; No:48 evini koltuk takımı, akvaryum ve bahçe mangalıyla yenile.
-  • 5 Bölümlük 20 Hikâye Görevi + 4 Oynanabilir Spor: 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol ve 2v2 Voleybol maçlarına dilediğin an gir; Taksi, Pizza, Temizlik ve Ev Boyama yan işleriyle kazan.
-  • Akıllı Komşular & Işıklı Geceler: Konuşan komşular, gerçekçi iskeletli hayvan ve etkileşim animasyonları, araba/bisiklet/motosiklet sürüşü ve akşam 18:30'dan itibaren yanan sokak lambaları.
+  • 6 Bölümlük 26 Hikâye Görevi + 5 Oynanabilir Spor + Atış Poligonu: 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol, 2v2 Voleybol, 50m Yüzme & Tramplen Dalışı ve 4 modlu Aydos Atış Poligonu; Taksi, Pizza, Temizlik ve Ev Boyama yan işleriyle kazan.
+  • 10 Farklı Sesli Türkçe Seslendirme & Akıllı Komşular: Yaşa ve cinsiyete göre seslendirilmiş konuşan komşular, gerçekçi animasyonlar, araba/bisiklet/motosiklet sürüşü ve akşam 18:30'dan itibaren yanan sokak lambaları.
   • Birlikte Büyüyen Dünya: Oyun içi Öneri sekmesinden fikrini yaz, sıradaki güncellemeleri birlikte şekillendirelim!
 TEXT
 
@@ -167,7 +167,7 @@ desc_en = <<~TEXT.strip
   • Farming, Livestock & Village Market: Grow sunflowers, tomatoes, peppers, and strawberries across 16 beds; milk cows, shear sheep, collect eggs, and sell fresh harvest at the village stand.
   • No:73 Auto Garage, Tuning & Car Wash: Raise customer cars on a hydraulic lift for 3-step repairs, customize your own car with metallic paints, rims, spoilers, roof racks & performance upgrades, and visit the drive-through car wash.
   • Lake Fishing & Home Decor: Cast off Sultanbeyli Lake Pier to catch 5 fish species, upgrade your home with luxury furniture & aquarium, and grill on your backyard mangal.
-  • 5-Chapter Story (20 Missions) + 4 Playable Sports: Jump anytime into 1v1 Clay Tennis, 3v3 Football, 2v2 Basketball, and 2v2 Volleyball, plus Taxi, Pizza, Cleanup & Painting jobs.
+  • 6-Chapter Story (26 Missions) + 5 Playable Sports + Shooting Range: Jump anytime into 1v1 Clay Tennis, 3v3 Football, 2v2 Basketball, 2v2 Volleyball, 50m Swimming & Acrobatic Diving, and 4-mode Aydos Shooting Range, plus Taxi, Pizza, Cleanup & Painting jobs.
   • Smart Talking NPCs & Realistic Animations: Expressive skeletal animal animations, two-hand IK interactions, multi-vehicle driving, and glowing streetlamps & headlights after dusk.
   • Shaped by Players: Share your ideas via the in-game Suggestions tab to help guide every update!
 TEXT
@@ -266,13 +266,13 @@ beta_locs = {
     description: "Bizim Dünyamız (Our World) TestFlight test sürümü: 20 hikâye görevi, 4 oynanabilir spor (Tenis, Futbol, Basketbol, Voleybol), akıllı konuşan mahalle NPC'leri, canlı menü, çoklu araç sürüşü ve akşam sokak aydınlatması.",
     feedbackEmail: beta_email,
     marketingUrl: "https://dogusipeksac.com",
-    privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+    privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
   },
   "en-US" => {
     description: "Our World TestFlight beta: 20 story missions, 4 playable sports (Tennis, Football, Basketball, Volleyball), smart talking NPCs, living open-world menu, multi-vehicle driving, and glowing evening street lights.",
     feedbackEmail: beta_email,
     marketingUrl: "https://dogusipeksac.com",
-    privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/"
+    privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
   }
 }
 beta_locs.each do |loc, attrs|

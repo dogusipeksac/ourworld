@@ -224,7 +224,7 @@ namespace OurWorld.Core
             {
                 activity?.Call("runOnUiThread", new AndroidJavaRunnable(() =>
                 {
-                    throw new AndroidJavaException("OurWorld Test Crash for Firebase Crashlytics verification");
+                    throw new Exception("OurWorld Test Crash for Firebase Crashlytics verification");
                 }));
             }
 #else

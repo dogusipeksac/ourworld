@@ -54,8 +54,8 @@ namespace OurWorld.UI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoAttach()
         {
-            if (FindFirstObjectByType<ResponsiveTabletLayout>() != null) return;
-            GameHUDController hud = FindFirstObjectByType<GameHUDController>();
+            if (FindAnyObjectByType<ResponsiveTabletLayout>() != null) return;
+            GameHUDController hud = FindAnyObjectByType<GameHUDController>();
             if (hud != null)
             {
                 hud.gameObject.AddComponent<ResponsiveTabletLayout>();
@@ -93,7 +93,7 @@ namespace OurWorld.UI
             if (_hudController == null)
             {
                 _hudController = GetComponent<GameHUDController>();
-                if (_hudController == null) _hudController = FindFirstObjectByType<GameHUDController>();
+                if (_hudController == null) _hudController = FindAnyObjectByType<GameHUDController>();
             }
 
             if (_hudScaler == null)

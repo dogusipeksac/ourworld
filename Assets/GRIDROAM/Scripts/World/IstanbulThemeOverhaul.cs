@@ -499,7 +499,7 @@ namespace OurWorld.World
 
                     InteractableTrigger trig = cart.AddComponent<InteractableTrigger>();
                     trig.Configure(InteractableKind.InspectObject, sc.id, "ui.btn.interact", 2.8f);
-                    trig.SetCustomPrompt("Sıcak Simit Al (10 ₺ · +28 Enerji)");
+                    trig.SetCustomPrompt("Sıcak Simit Al (10 ₺ · +28 Enerji)", "Buy Fresh Hot Simit (10 ₺ · +28 Energy)");
                 }
             }
 
@@ -532,7 +532,7 @@ namespace OurWorld.World
                     // Hot Turkish Tea interactable on the table
                     InteractableTrigger teaTrig = set.AddComponent<InteractableTrigger>();
                     teaTrig.Configure(InteractableKind.InspectObject, ts.id, "ui.btn.interact", 2.6f);
-                    teaTrig.SetCustomPrompt("Tavşan Kanı Çay İç (8 ₺ · +22 Enerji)");
+                    teaTrig.SetCustomPrompt("Tavşan Kanı Çay İç (8 ₺ · +22 Enerji)", "Drink Hot Turkish Tea (8 ₺ · +22 Energy)");
 
                     // Sitting slot on left chair
                     GameObject seatGo = new GameObject($"TeaChairSeat_{i}");
@@ -582,7 +582,7 @@ namespace OurWorld.World
 
                     InteractableTrigger trig = f.AddComponent<InteractableTrigger>();
                     trig.Configure(InteractableKind.InspectObject, $"istanbul_fountain_{i}", "ui.btn.interact", 3.0f);
-                    trig.SetCustomPrompt("Mahalle Çeşmesinden Su İç (+16 Enerji)");
+                    trig.SetCustomPrompt("Mahalle Çeşmesinden Su İç (+16 Enerji)", "Drink from Neighborhood Fountain (+16 Energy)");
                 }
             }
 

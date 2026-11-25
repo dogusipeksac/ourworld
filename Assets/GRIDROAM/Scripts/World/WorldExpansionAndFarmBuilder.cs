@@ -113,10 +113,18 @@ namespace OurWorld.World
             }
         }
 
+        private readonly System.Collections.Generic.List<Material> _runtimeMats =
+            new System.Collections.Generic.List<Material>(32);
+
         private void OnDestroy()
         {
             FarmEconomyManager.OnExtraAnimalPurchased -= HandleExtraAnimalPurchased;
             FarmEconomyManager.OnAutoSprinklerUnlocked -= HandleSprinklerUnlocked;
+            for (int i = 0; i < _runtimeMats.Count; i++)
+            {
+                if (_runtimeMats[i] != null) Destroy(_runtimeMats[i]);
+            }
+            _runtimeMats.Clear();
             if (Instance == this) Instance = null;
         }
 
@@ -360,7 +368,7 @@ namespace OurWorld.World
 
         private void BuildMaterials()
         {
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             _meadowMat = MakeMat(lit, "MAT_Exp_Meadow", new Color(0.24f, 0.45f, 0.19f), 0.10f);
             _hillNearMat = MakeMat(lit, "MAT_Exp_HillNear", new Color(0.20f, 0.40f, 0.18f), 0.08f);
             _hillFarMat = MakeMat(lit, "MAT_Exp_HillFar", new Color(0.17f, 0.34f, 0.22f), 0.06f);
@@ -636,7 +644,7 @@ namespace OurWorld.World
 
             InteractableTrigger trig = stand.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.FarmMarket, "aydos_farm_market", "ui.btn.talk", 3.4f);
-            trig.SetCustomPrompt("Ürünleri Sat · Köy Tezgâhı");
+            trig.SetCustomPrompt("Ürünleri Sat · Köy Tezgâhı", "Sell Crops · Village Market Stand");
 
             // Overhead glowing stand sign (faces courtyard cleanly!)
             GameObject signTxt = new GameObject("MarketSign");
@@ -660,7 +668,7 @@ namespace OurWorld.World
 
             CreateBox("PostL", board.transform, new Vector3(-1.1f, 1.15f, 0f), new Vector3(0.16f, 2.3f, 0.16f), _woodTimberMat, collider: true);
             CreateBox("PostR", board.transform, new Vector3( 1.1f, 1.15f, 0f), new Vector3(0.16f, 2.3f, 0.16f), _woodTimberMat, collider: true);
-            CreateBox("Panel", board.transform, new Vector3(0f, 1.55f, 0f), new Vector3(2.2f, 1.25f, 0.12f), new Material(_woodLightMat), collider: false);
+            CreateBox("Panel", board.transform, new Vector3(0f, 1.55f, 0f), new Vector3(2.2f, 1.25f, 0.12f), _woodLightMat, collider: false);
             CreateBox("Roof", board.transform, new Vector3(0f, 2.32f, 0f), new Vector3(2.7f, 0.18f, 0.72f), _roofTileMat, collider: false);
 
             GameObject txtObj = new GameObject("BoardText");
@@ -677,7 +685,7 @@ namespace OurWorld.World
 
             InteractableTrigger trig = board.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.FarmBoard, "aydos_farm_board", "ui.btn.talk", 3.4f);
-            trig.SetCustomPrompt("Tohum & Çiftlik Yönetimi");
+            trig.SetCustomPrompt("Tohum & Çiftlik Yönetimi", "Seeds & Farm Management");
         }
 
         private void BuildChickenCoopAndPasture(Transform parent)
@@ -1003,7 +1011,7 @@ namespace OurWorld.World
                 return;
             }
 
-            Material tanMat = MakeMat(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"), "MAT_DogTan", new Color(0.84f, 0.74f, 0.56f), 0.18f);
+            Material tanMat = MakeMat(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"), "MAT_DogTan", new Color(0.84f, 0.74f, 0.56f), 0.18f);
             CreateBox("Body", _shepherdDog, new Vector3(0f, 0.52f, 0f), new Vector3(0.38f, 0.34f, 0.86f), tanMat, collider: false);
             CreateBox("Head", _shepherdDog, new Vector3(0f, 0.72f, 0.46f), new Vector3(0.28f, 0.26f, 0.32f), tanMat, collider: false);
             CreateBox("Snout", _shepherdDog, new Vector3(0f, 0.66f, 0.66f), new Vector3(0.16f, 0.14f, 0.16f), _darkMetalMat, collider: false);
@@ -1311,7 +1319,7 @@ namespace OurWorld.World
             s.SetParent(parent, false);
             s.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
             CreateCylinder("Post", s, new Vector3(0f, 1.05f, 0f), new Vector3(0.14f, 1.05f, 0.14f), postMat, collider: false);
-            Material bm = MakeMat(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"), "MAT_SignBoard", boardCol, 0.25f);
+            Material bm = MakeMat(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"), "MAT_SignBoard", boardCol, 0.25f);
             CreateBox("Board", s, new Vector3(0f, 2.0f, 0f), new Vector3(2.8f, 0.65f, 0.10f), bm, collider: false);
             GameObject to = new GameObject("Label");
             to.transform.SetParent(s, false);
@@ -1361,9 +1369,10 @@ namespace OurWorld.World
             return go;
         }
 
-        private static Material MakeMat(Shader sh, string name, Color col, float smoothness)
+        private Material MakeMat(Shader sh, string name, Color col, float smoothness)
         {
             Material m = new Material(sh) { name = name };
+            _runtimeMats.Add(m);
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", col);
             if (m.HasProperty("_Color")) m.SetColor("_Color", col);
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smoothness);

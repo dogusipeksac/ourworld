@@ -143,7 +143,9 @@ namespace OurWorld.World
             raceTrigGo.transform.localPosition = new Vector3(-7.6f, 1.45f, 3.6f);
             InteractableTrigger raceTrig = raceTrigGo.AddComponent<InteractableTrigger>();
             raceTrig.Configure(InteractableKind.SportsArena, "sport_swim_race", "ui.btn.interact", 3.4f);
-            raceTrig.SetCustomPrompt("50m Yüzme Yarışı Başlat (3 Kulvar · +95 ₺)");
+            raceTrig.SetCustomPrompt(
+                "50m Yüzme Yarışı Başlat (3 Kulvar · +95 ₺)",
+                "Start 50m Swim Race (3 Lanes · +95 ₺)");
 
             // Blender 5.3.0 Olympic Springboard Diving Stand on South-West deck edge facing +X into pool!
             GameObject diveRoot = new GameObject("Hamidiye_DivingBoardArena");
@@ -162,7 +164,9 @@ namespace OurWorld.World
             diveTrigGo.transform.localPosition = new Vector3(0f, 0.6f, -1.1f);
             InteractableTrigger diveTrig = diveTrigGo.AddComponent<InteractableTrigger>();
             diveTrig.Configure(InteractableKind.SportsArena, "sport_diving_board", "ui.btn.interact", 2.9f);
-            diveTrig.SetCustomPrompt("Tramplenden Akrobatik Dalış Yap! (Jüri Puanlı)");
+            diveTrig.SetCustomPrompt(
+                "Tramplenden Akrobatik Dalış Yap! (Jüri Puanlı)",
+                "Acrobatic Springboard Dive! (Judged Score)");
         }
 
         private void BuildLakeSwimmableZoneAndPearls()
@@ -206,7 +210,7 @@ namespace OurWorld.World
 
                 InteractableTrigger trig = pearl.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, $"sunken_pearl_{i}", "ui.btn.interact", 2.6f);
-                trig.SetCustomPrompt("Parlayan Sualtı İncisini Topla (+35 ₺)");
+                trig.SetCustomPrompt("Parlayan Sualtı İncisini Topla (+35 ₺)", "Collect Glowing Underwater Pearl (+35 ₺)");
                 _pearls.Add(pearl);
             }
         }
@@ -221,8 +225,11 @@ namespace OurWorld.World
             GameFeelAudio.PlayCoinChime();
             GameFeelAudio.PlayWaterSplash();
             GameFeelAudio.SpawnBurst(trig.transform.position + Vector3.up * 0.25f, new Color(0.55f, 0.96f, 1.0f), count: 14, spread: 0.55f);
-            NeighborhoodReputation.AddReputation(12, "Sualtı İncisi Bulundu! (+35 ₺)");
-            PlayerModeController.Instance?.RaiseStatusMessage("Parlayan sualtı incisi toplandı! (+35 ₺ · +12 İtibar)");
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+            NeighborhoodReputation.AddReputation(12, isEn ? "Underwater Pearl Found! (+35 ₺)" : "Sualtı İncisi Bulundu! (+35 ₺)");
+            PlayerModeController.Instance?.RaiseStatusMessage(isEn
+                ? "Collected a glowing underwater pearl! (+35 ₺ · +12 Rep)"
+                : "Parlayan sualtı incisi toplandı! (+35 ₺ · +12 İtibar)");
         }
     }
 
@@ -284,7 +291,17 @@ namespace OurWorld.World
         public bool HasSecondaryAction => _player != null && (_phase == RacePhase.Swimming || _phase == RacePhase.FlipWindow);
         public bool AcceptsPrimaryAction => _player != null;
 
-        private string GetLeagueLabel() => _leagueTier switch { 0 => "Acemi Lig", 1 => "Mahalle Ligi", _ => "Şampiyonlar Ligi" };
+        private static bool IsEn =>
+            LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+        private static string L(string tr, string en) => IsEn ? en : tr;
+
+        private string GetLeagueLabel() => _leagueTier switch
+        {
+            0 => L("Acemi Lig", "Rookie League"),
+            1 => L("Mahalle Ligi", "District League"),
+            _ => L("Şampiyonlar Ligi", "Champions League")
+        };
 
         private void SetCallout(string text, Color color, float duration)
         {
@@ -313,7 +330,7 @@ namespace OurWorld.World
 
             ResetRace();
             GameFeelAudio.PlayRefereeWhistle(doubleBlast: false);
-            SetCallout($"{GetLeagueLabel()} · 50m Yüzme Yarışı! Hazırlan!", new Color(0.28f, 0.94f, 0.84f), 1.6f);
+            SetCallout(L($"{GetLeagueLabel()} · 50m Yüzme Yarışı! Hazırlan!", $"{GetLeagueLabel()} · 50m Swim Race! Get Ready!"), new Color(0.28f, 0.94f, 0.84f), 1.6f);
         }
 
         private void EnsureRivals(ProceduralHumanoid template)
@@ -431,14 +448,14 @@ namespace OurWorld.World
         {
             return _phase switch
             {
-                RacePhase.ReadyBlock => "DALIŞ ÇIKIŞI!",
-                RacePhase.FlipWindow => "TAKLALI DÖN!",
-                RacePhase.Finished => "Tekrar Yarış",
-                _ => "KULAÇ!"
+                RacePhase.ReadyBlock => L("DALIŞ ÇIKIŞI!", "DIVE START!"),
+                RacePhase.FlipWindow => L("TAKLALI DÖN!", "FLIP TURN!"),
+                RacePhase.Finished => L("Tekrar Yarış", "Race Again"),
+                _ => L("KULAÇ!", "STROKE!")
             };
         }
 
-        public string SecondaryButtonLabel() => _breaststroke ? "Serbest Stil" : "Kurbağalama";
+        public string SecondaryButtonLabel() => _breaststroke ? L("Serbest Stil", "Freestyle") : L("Kurbağalama", "Breaststroke");
 
         private float GetPlayerDistanceMeters()
         {
@@ -451,19 +468,20 @@ namespace OurWorld.World
         public string HudText()
         {
             float meters = GetPlayerDistanceMeters();
-            string style = _breaststroke ? "Kurbağalama" : "Serbest";
+            string style = _breaststroke ? L("Kurbağalama", "Breaststroke") : L("Serbest", "Freestyle");
+            string unit = L("sn", "s");
             string status = _phase switch
             {
-                RacePhase.ReadyBlock => "Çıkış barı ALTIN bölgedeyken VUR -> Patlayıcı Dalış Çıkışı!",
-                RacePhase.DivingIn => "SUYA DALDIK! Ritim kulaçlarına hazırlan!",
-                RacePhase.FlipWindow => "DUVARA GELDİN! ŞİMDİ VUR -> Dönüş Taklası Hızlanması!",
+                RacePhase.ReadyBlock => L("Çıkış barı ALTIN bölgedeyken VUR -> Patlayıcı Dalış Çıkışı!", "Tap HIT in the GOLD zone -> Explosive Dive Start!"),
+                RacePhase.DivingIn => L("SUYA DALDIK! Ritim kulaçlarına hazırlan!", "SPLASH IN! Get ready for rhythm strokes!"),
+                RacePhase.FlipWindow => L("DUVARA GELDİN! ŞİMDİ VUR -> Dönüş Taklası Hızlanması!", "AT THE WALL! TAP NOW -> Flip Turn Boost!"),
                 RacePhase.Finished => _playerFinishRank == 1
-                    ? $"1. OLDUN! Süre: {_raceTimer:F2} sn — Tekrar için Vur!"
-                    : $"{_playerFinishRank}. Sırada Bitirdin ({_raceTimer:F2} sn) — Rövanş için Vur!",
-                _ => $"Stil: {style} · Ritim altın bölgedeyken KULAÇ vur! (Seri x{_strokeCombo})"
+                    ? L($"1. OLDUN! Süre: {_raceTimer:F2} sn — Tekrar için Vur!", $"1ST PLACE! Time: {_raceTimer:F2}s — Tap Hit to Race Again!")
+                    : L($"{_playerFinishRank}. Sırada Bitirdin ({_raceTimer:F2} sn) — Rövanş için Vur!", $"Finished #{_playerFinishRank} ({_raceTimer:F2}s) — Tap Hit for Rematch!"),
+                _ => L($"Stil: {style} · Ritim altın bölgedeyken KULAÇ vur! (Seri x{_strokeCombo})", $"Style: {style} · Tap STROKE in the gold zone! (Combo x{_strokeCombo})")
             };
 
-            return $"50m Yüzme Yarışı [{GetLeagueLabel()}]  ·  {meters:F1}m / 50m  ·  {_raceTimer:F2} sn\n{status}";
+            return $"{L("50m Yüzme Yarışı", "50m Swim Race")} [{GetLeagueLabel()}]  ·  {meters:F1}m / 50m  ·  {_raceTimer:F2} {unit}\n{status}";
         }
 
         public SportHudMeterState GetHudMeterState()
@@ -482,7 +500,7 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = _rhythmCursor;
                 state.PrimaryColor = sweet ? new Color(1.0f, 0.84f, 0.20f) : new Color(0.24f, 0.90f, 0.84f);
-                state.PrimaryLabel = sweet ? "ALTIN ÇIKIŞ! ŞİMDİ VUR!" : "ÇIKIŞ TEPKİSİ";
+                state.PrimaryLabel = sweet ? L("ALTIN ÇIKIŞ! ŞİMDİ VUR!", "GOLD START! TAP NOW!") : L("ÇIKIŞ TEPKİSİ", "START REACTION");
                 state.ShowSweetSpot = true;
                 state.SweetSpotMin01 = 0.62f;
                 state.SweetSpotMax01 = 0.88f;
@@ -492,7 +510,7 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = 0.82f;
                 state.PrimaryColor = new Color(1.0f, 0.84f, 0.20f);
-                state.PrimaryLabel = "DÖNÜŞ TAKLASI! ŞİMDİ VUR!";
+                state.PrimaryLabel = L("DÖNÜŞ TAKLASI! ŞİMDİ VUR!", "FLIP TURN! TAP NOW!");
                 state.ShowSweetSpot = true;
                 state.SweetSpotMin01 = 0.65f;
                 state.SweetSpotMax01 = 0.95f;
@@ -503,7 +521,7 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = _rhythmCursor;
                 state.PrimaryColor = sweet ? new Color(1.0f, 0.84f, 0.20f) : new Color(0.24f, 0.88f, 0.96f);
-                state.PrimaryLabel = sweet ? "ALTIN KULAÇ!" : "KULAÇ RİTMİ";
+                state.PrimaryLabel = sweet ? L("ALTIN KULAÇ!", "GOLD STROKE!") : L("KULAÇ RİTMİ", "STROKE RHYTHM");
                 state.ShowSweetSpot = true;
                 state.SweetSpotMin01 = 0.66f;
                 state.SweetSpotMax01 = 0.92f;
@@ -541,11 +559,11 @@ namespace OurWorld.World
                 {
                     GameFeelAudio.TriggerHitstop(0.032f);
                     _cameraRig?.AddShake(0.12f, 0.16f);
-                    SetCallout("ALTIN DALIŞ ÇIKIŞI! (+Hız Patlaması)", new Color(1.0f, 0.86f, 0.22f), 1.4f);
+                    SetCallout(L("ALTIN DALIŞ ÇIKIŞI! (+Hız Patlaması)", "GOLDEN DIVE START! (+Speed Burst)"), new Color(1.0f, 0.86f, 0.22f), 1.4f);
                 }
                 else
                 {
-                    SetCallout("TEMİZ ÇIKIŞ!", new Color(0.32f, 0.92f, 0.86f), 1.1f);
+                    SetCallout(L("TEMİZ ÇIKIŞ!", "CLEAN START!"), new Color(0.32f, 0.92f, 0.86f), 1.1f);
                 }
                 HudRevision++;
                 return;
@@ -560,7 +578,7 @@ namespace OurWorld.World
                 GameFeelAudio.PlayWaterSplash();
                 GameFeelAudio.SpawnBurst(_player.transform.position + Vector3.up * 0.5f, new Color(0.74f, 0.98f, 1.0f), count: 14, spread: 0.65f);
                 _cameraRig?.AddShake(0.11f, 0.14f);
-                SetCallout("MÜKEMMEL DÖNÜŞ TAKLASI! (+Turbo İtme)", new Color(1.0f, 0.86f, 0.22f), 1.35f);
+                SetCallout(L("MÜKEMMEL DÖNÜŞ TAKLASI! (+Turbo İtme)", "PERFECT FLIP TURN! (+Turbo Push)"), new Color(1.0f, 0.86f, 0.22f), 1.35f);
                 ExecuteLapTurn();
                 return;
             }
@@ -579,7 +597,7 @@ namespace OurWorld.World
                     GameFeelAudio.SpawnBurst(_player.transform.position + Vector3.up * 0.65f, new Color(0.72f, 0.96f, 1.0f), count: 8, spread: 0.45f);
                     if (_strokeCombo >= 2)
                     {
-                        SetCallout($"ALTIN KULAÇ SERİSİ x{_strokeCombo}!", new Color(1.0f, 0.86f, 0.24f), 0.95f);
+                        SetCallout(L($"ALTIN KULAÇ SERİSİ x{_strokeCombo}!", $"GOLD STROKE COMBO x{_strokeCombo}!"), new Color(1.0f, 0.86f, 0.24f), 0.95f);
                     }
                     _rhythmCursor = 0.15f;
                     _rhythmDir = 1f;
@@ -600,7 +618,9 @@ namespace OurWorld.World
         {
             if (_player == null || (_phase != RacePhase.Swimming && _phase != RacePhase.FlipWindow)) return;
             _breaststroke = !_breaststroke;
-            SetCallout(_breaststroke ? "KURBAĞALAMA (Enerji Koruma)" : "SERBEST STİL (Maksimum Hız)", new Color(0.32f, 0.92f, 0.96f), 1.1f);
+            SetCallout(_breaststroke
+                ? L("KURBAĞALAMA (Enerji Koruma)", "BREASTSTROKE (Save Stamina)")
+                : L("SERBEST STİL (Maksimum Hız)", "FREESTYLE (Max Speed)"), new Color(0.32f, 0.92f, 0.96f), 1.1f);
             HudRevision++;
         }
 
@@ -646,12 +666,12 @@ namespace OurWorld.World
                     }
                     SaveManager.Instance.Save();
                 }
-                NeighborhoodReputation.AddReputation(35, $"50m Yüzme Yarışı Şampiyonluğu! ({_raceTimer:F2} sn · +{reward} ₺)");
-                SetCallout($"ALTIN MADALYA! ({_raceTimer:F2} sn · +{reward} ₺)", new Color(1.0f, 0.86f, 0.22f), 2.8f);
+                NeighborhoodReputation.AddReputation(35, L($"50m Yüzme Yarışı Şampiyonluğu! ({_raceTimer:F2} sn · +{reward} ₺)", $"50m Swim Race Victory! ({_raceTimer:F2}s · +{reward} ₺)"));
+                SetCallout(L($"ALTIN MADALYA! ({_raceTimer:F2} sn · +{reward} ₺)", $"GOLD MEDAL! ({_raceTimer:F2}s · +{reward} ₺)"), new Color(1.0f, 0.86f, 0.22f), 2.8f);
             }
             else
             {
-                SetCallout($"{_playerFinishRank}. SIRA ({_raceTimer:F2} sn)", new Color(0.42f, 0.82f, 1.0f), 2.4f);
+                SetCallout(L($"{_playerFinishRank}. SIRA ({_raceTimer:F2} sn)", $"RANK #{_playerFinishRank} ({_raceTimer:F2}s)"), new Color(0.42f, 0.82f, 1.0f), 2.4f);
             }
 
             SportMatchEvents.NotifyMatchFinished("sport_swim_race", won);
@@ -861,7 +881,7 @@ namespace OurWorld.World
             _twistsDone = 0;
             _currentTwistDeg = 0f;
             _juryScore = 0f;
-            _calloutText = "TRAMPLEN DALIŞI · Altın bölgede zıpla!";
+            _calloutText = L("TRAMPLEN DALIŞI · Altın bölgede zıpla!", "SPRINGBOARD DIVE · Jump in the gold zone!");
             _calloutColor = new Color(0.28f, 0.94f, 0.86f);
             _calloutTimer = 1.8f;
 
@@ -889,29 +909,34 @@ namespace OurWorld.World
             _player = null;
         }
 
+        private static bool IsEn =>
+            LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+        private static string L(string tr, string en) => IsEn ? en : tr;
+
         public string ControlsHintKey() => "sports.swim.controls";
 
         public string PrimaryButtonLabel()
         {
             return _stage switch
             {
-                DiveStage.ChargeSpring => "SIÇRA!",
-                DiveStage.Airborne => "TAKLA!",
-                _ => "Tekrar Atla"
+                DiveStage.ChargeSpring => L("SIÇRA!", "JUMP!"),
+                DiveStage.Airborne => L("TAKLA!", "FLIP!"),
+                _ => L("Tekrar Atla", "Dive Again")
             };
         }
 
-        public string SecondaryButtonLabel() => "BURGU!";
+        public string SecondaryButtonLabel() => L("BURGU!", "TWIST!");
 
         public string HudText()
         {
             string status = _stage switch
             {
-                DiveStage.ChargeSpring => "Yay barı ALTIN bölgedeyken SIÇRA! (Yüksek atlayış = Çok takla)",
-                DiveStage.Airborne => $"HAVADASIN! Takla: {_flipsDone} · Burgu: {_twistsDone} — Suya girmeden kombinasyon yap!",
-                _ => $"JÜRİ PUANI: {_juryScore:F1} / 10.0  ·  Tekrar atlamak için Vur!"
+                DiveStage.ChargeSpring => L("Yay barı ALTIN bölgedeyken SIÇRA! (Yüksek atlayış = Çok takla)", "Tap JUMP in the GOLD spring zone! (Higher jump = More flips)"),
+                DiveStage.Airborne => L($"HAVADASIN! Takla: {_flipsDone} · Burgu: {_twistsDone} — Suya girmeden kombinasyon yap!", $"AIRBORNE! Flips: {_flipsDone} · Twists: {_twistsDone} — Combo before splash!"),
+                _ => L($"JÜRİ PUANI: {_juryScore:F1} / 10.0  ·  Tekrar atlamak için Vur!", $"JUDGES SCORE: {_juryScore:F1} / 10.0  ·  Tap Hit to Dive Again!")
             };
-            return $"Tramplen Akrobatik Dalış  ·  {_flipsDone} Takla · {_twistsDone} Burgu\n{status}";
+            return $"{L("Tramplen Akrobatik Dalış", "Acrobatic Springboard Diving")}  ·  {_flipsDone} {L("Takla", "Flips")} · {_twistsDone} {L("Burgu", "Twists")}\n{status}";
         }
 
         public SportHudMeterState GetHudMeterState()
@@ -929,7 +954,7 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = _springCharge;
                 state.PrimaryColor = sweet ? new Color(1.0f, 0.84f, 0.20f) : new Color(0.24f, 0.90f, 0.86f);
-                state.PrimaryLabel = sweet ? "ALTIN SIÇRAMA!" : "TRAMPLEN YAY GÜCÜ";
+                state.PrimaryLabel = sweet ? L("ALTIN SIÇRAMA!", "GOLD LAUNCH!") : L("TRAMPLEN YAY GÜCÜ", "SPRINGBOARD POWER");
                 state.ShowSweetSpot = true;
                 state.SweetSpotMin01 = 0.64f;
                 state.SweetSpotMax01 = 0.90f;
@@ -940,7 +965,7 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = 1f - u;
                 state.PrimaryColor = new Color(0.32f, 0.86f, 1.0f);
-                state.PrimaryLabel = "HAVADA KOMBİNASYON SÜRESİ";
+                state.PrimaryLabel = L("HAVADA KOMBİNASYON SÜRESİ", "AIR COMBO WINDOW");
                 state.ShowSweetSpot = false;
             }
 
@@ -967,7 +992,9 @@ namespace OurWorld.World
                 _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f);
                 _player.Humanoid?.PlaySportAnim(SportAnimKind.SwimDiveStart, 0.55f);
                 GameFeelAudio.PlaySlideWhoosh();
-                _calloutText = golden ? "ALTIN SIÇRAMA! Havada Takla & Burgu bas!" : "ATLADIN! Havada Takla bas!";
+                _calloutText = golden
+                    ? L("ALTIN SIÇRAMA! Havada Takla & Burgu bas!", "GOLD LAUNCH! Tap Flip & Twist mid-air!")
+                    : L("ATLADIN! Havada Takla bas!", "LAUNCHED! Tap Flip mid-air!");
                 _calloutColor = golden ? new Color(1.0f, 0.86f, 0.22f) : new Color(0.32f, 0.92f, 0.86f);
                 _calloutTimer = 1.3f;
                 HudRevision++;
@@ -979,7 +1006,7 @@ namespace OurWorld.World
                 _flipsDone++;
                 _player.Humanoid?.PlaySportAnim(SportAnimKind.SwimFlipTurn, 0.42f);
                 GameFeelAudio.PlaySlideWhoosh();
-                _calloutText = $"{_flipsDone}x TAKLA!";
+                _calloutText = L($"{_flipsDone}x TAKLA!", $"{_flipsDone}x FLIP!");
                 _calloutColor = new Color(1.0f, 0.86f, 0.24f);
                 _calloutTimer = 0.9f;
                 HudRevision++;
@@ -994,7 +1021,7 @@ namespace OurWorld.World
             _twistsDone++;
             _player.Humanoid?.PlaySportAnim(SportAnimKind.SwimDiveStart, 0.36f);
             GameFeelAudio.PlayUiClick();
-            _calloutText = $"{_flipsDone}x TAKLA + {_twistsDone}x BURGU!";
+            _calloutText = L($"{_flipsDone}x TAKLA + {_twistsDone}x BURGU!", $"{_flipsDone}x FLIP + {_twistsDone}x TWIST!");
             _calloutColor = new Color(0.36f, 0.96f, 0.86f);
             _calloutTimer = 0.9f;
             HudRevision++;
@@ -1060,14 +1087,14 @@ namespace OurWorld.World
             if (_juryScore >= 8.5f)
             {
                 GameFeelAudio.PlayCrowdCheer(bigCheer: true);
-                NeighborhoodReputation.AddReputation(18, $"Müthiş Tramplen Dalışı ({_juryScore:F1}/10 · +{cash} ₺)");
+                NeighborhoodReputation.AddReputation(18, L($"Müthiş Tramplen Dalışı ({_juryScore:F1}/10 · +{cash} ₺)", $"Awesome Springboard Dive ({_juryScore:F1}/10 · +{cash} ₺)"));
             }
             else
             {
                 GameFeelAudio.PlayCoinChime();
             }
 
-            _calloutText = $"JÜRİ PUANI: {_juryScore:F1} / 10.0  (+{cash} ₺)";
+            _calloutText = L($"JÜRİ PUANI: {_juryScore:F1} / 10.0  (+{cash} ₺)", $"JUDGES SCORE: {_juryScore:F1} / 10.0  (+{cash} ₺)");
             _calloutColor = _juryScore >= 8.5f ? new Color(1.0f, 0.86f, 0.22f) : new Color(0.32f, 0.94f, 0.86f);
             _calloutTimer = 3.2f;
             SportMatchEvents.NotifyMatchFinished("sport_diving_board", _juryScore >= 7.5f);

@@ -29,6 +29,7 @@ namespace OurWorld.World
         private Material _rainMat;
         private AudioSource _rainAudioSource;
         private AudioClip _rainClip;
+        private Camera _cachedMainCam;
         private float _stateTimer = 210f; // Start with 3.5 minutes of calm, quiet sunny weather
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -65,7 +66,8 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
-            Camera cam = Camera.main;
+            if (_cachedMainCam == null) _cachedMainCam = Camera.main;
+            Camera cam = _cachedMainCam;
             if (cam != null && _rainPs != null)
             {
                 Vector3 target = cam.transform.position + cam.transform.forward * 7f + Vector3.up * 11f;

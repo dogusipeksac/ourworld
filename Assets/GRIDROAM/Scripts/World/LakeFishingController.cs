@@ -120,8 +120,11 @@ namespace OurWorld.World
             }
         }
 
+        private Material _bobberMat;
+
         private void OnDestroy()
         {
+            if (_bobberMat != null) Destroy(_bobberMat);
             if (Instance == this) Instance = null;
         }
 
@@ -729,8 +732,9 @@ namespace OurWorld.World
             _bobberObj.transform.SetParent(transform, false);
             _bobberObj.transform.localScale = new Vector3(0.24f, 0.30f, 0.24f);
             Destroy(_bobberObj.GetComponent<Collider>());
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Material bm = new Material(lit);
+            _bobberMat = bm;
             if (bm.HasProperty("_BaseColor")) bm.SetColor("_BaseColor", new Color(0.95f, 0.18f, 0.16f));
             _bobberObj.GetComponent<MeshRenderer>().sharedMaterial = bm;
             _bobberObj.SetActive(false);

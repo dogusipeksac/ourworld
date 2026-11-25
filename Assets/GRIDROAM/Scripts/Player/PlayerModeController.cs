@@ -28,7 +28,7 @@ namespace OurWorld.Player
     /// multi-car driving, doors, sitting on furniture/benches, house painting, side jobs,
     /// shops, beds, fuel pumps, vending machines, modal input locks, and save/load state restoration.
     /// </summary>
-    public class PlayerModeController : MonoBehaviour
+    public partial class PlayerModeController : MonoBehaviour
     {
         public static PlayerModeController Instance { get; private set; }
 
@@ -186,7 +186,9 @@ namespace OurWorld.Player
                 if (IsPlayerHomeBed(trig))
                 {
                     trig.enabled = true;
-                    trig.SetCustomPrompt("Kendi Yatağında Uyu (Evim · No:48)");
+                    trig.SetCustomPrompt(
+                        "Kendi Yatağında Uyu (Evim · No:48)",
+                        "Sleep in Your Bed (Home · No:48)");
                 }
                 else
                 {
@@ -387,20 +389,25 @@ namespace OurWorld.Player
 
         private int _fastTravelIndex;
 
-        private static readonly (string label, Vector3 pos, float yaw)[] FastTravelSpots =
+        private static bool IsEn =>
+            LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+        private static string L(string tr, string en) => IsEn ? en : tr;
+
+        private static readonly (string labelTr, string labelEn, Vector3 pos, float yaw)[] FastTravelSpots =
         {
-            ("No:48 Selman Sokağı · Benim Evim",    new Vector3( -62.0f, 0.12f,    4.5f),   0f),
-            ("Aydos Yeşil Vadi · Çiftlik & Bostan", new Vector3( 136.0f, 0.12f,    0.0f),  90f),
-            ("Sultanbeyli Göleti & Balıkçılık",     new Vector3(-164.0f, 0.12f,    0.0f), -90f),
-            ("Aydos Tazyikli Oto Yıkama",           new Vector3( 124.0f, 0.12f,   -4.5f), 180f),
-            ("No:73 Oto Tamir & Modifiye",          new Vector3(  32.0f, 0.12f,    4.2f),   0f),
-            ("Hamidiye Halı Saha · Futbol",         new Vector3( -14.0f, 0.12f,  -29.0f), 180f),
-            ("Hamidiye Basketbol & Voleybol",       new Vector3(  49.0f, 0.12f,  -31.0f), 180f),
-            ("No:58 Selman Bakkal & ATM",           new Vector3(   6.5f, 0.12f,    4.5f),   0f),
-            ("Hz. Osman Camii Avlusu",              new Vector3(  82.0f, 0.12f,  -24.0f), 180f),
-            ("Fatih Bulvarı · Saat Kulesi",         new Vector3(   0.0f, 0.18f,  134.0f),   0f),
-            ("Petrol Yolu Caddesi",                 new Vector3( -18.0f, 0.12f,  -78.0f),  90f),
-            ("Aziziye Cd. · İlkokul",               new Vector3( -16.0f, 0.12f, -114.0f), 180f)
+            ("No:48 Selman Sokağı · Benim Evim",    "No:48 Selman St · My Home",         new Vector3( -62.0f, 0.12f,    4.5f),   0f),
+            ("Aydos Yeşil Vadi · Çiftlik & Bostan", "Aydos Green Valley · Farm",         new Vector3( 136.0f, 0.12f,    0.0f),  90f),
+            ("Sultanbeyli Göleti & Balıkçılık",     "Sultanbeyli Lake & Fishing",        new Vector3(-164.0f, 0.12f,    0.0f), -90f),
+            ("Aydos Tazyikli Oto Yıkama",           "Aydos Pressure Car Wash",           new Vector3( 124.0f, 0.12f,   -4.5f), 180f),
+            ("No:73 Oto Tamir & Modifiye",          "No:73 Auto Garage & Tuning",        new Vector3(  32.0f, 0.12f,    4.2f),   0f),
+            ("Hamidiye Halı Saha · Futbol",         "Hamidiye Football Pitch",           new Vector3( -14.0f, 0.12f,  -29.0f), 180f),
+            ("Hamidiye Basketbol & Voleybol",       "Hamidiye Basketball & Volleyball",  new Vector3(  49.0f, 0.12f,  -31.0f), 180f),
+            ("No:58 Selman Bakkal & ATM",           "No:58 Selman Market & ATM",         new Vector3(   6.5f, 0.12f,    4.5f),   0f),
+            ("Hz. Osman Camii Avlusu",              "Hz. Osman Mosque Courtyard",        new Vector3(  82.0f, 0.12f,  -24.0f), 180f),
+            ("Fatih Bulvarı · Saat Kulesi",         "Fatih Blvd · Clock Tower Plaza",    new Vector3(   0.0f, 0.18f,  134.0f),   0f),
+            ("Petrol Yolu Caddesi",                 "Petrol Yolu Avenue",                new Vector3( -18.0f, 0.12f,  -78.0f),  90f),
+            ("Aziziye Cd. · İlkokul",               "Aziziye Ave · Primary School",      new Vector3( -16.0f, 0.12f, -114.0f), 180f)
         };
 
         private void Update()
@@ -410,17 +417,17 @@ namespace OurWorld.Player
                 float h = DayNightCycle.Instance.CurrentHour;
                 float nextHour;
                 string label;
-                if (h < 11.5f) { nextHour = 13.0f; label = "Öğle (13:00 · Güneşli İstanbul)"; }
-                else if (h < 17.5f) { nextHour = 18.75f; label = "Gün Batımı (18:45 · Altın Saat)"; }
-                else if (h < 20.5f) { nextHour = 21.5f; label = "İstanbul Gecesi (21:30 · Sokak Lambaları)"; }
-                else { nextHour = 9.0f; label = "Sabah (09:00 · Taze Sultanbeyli Sabahı)"; }
+                if (h < 11.5f) { nextHour = 13.0f; label = L("Öğle (13:00 · Güneşli İstanbul)", "Noon (13:00 · Sunny Istanbul)"); }
+                else if (h < 17.5f) { nextHour = 18.75f; label = L("Gün Batımı (18:45 · Altın Saat)", "Sunset (18:45 · Golden Hour)"); }
+                else if (h < 20.5f) { nextHour = 21.5f; label = L("İstanbul Gecesi (21:30 · Sokak Lambaları)", "Istanbul Night (21:30 · Streetlamps)"); }
+                else { nextHour = 9.0f; label = L("Sabah (09:00 · Taze Sultanbeyli Sabahı)", "Morning (09:00 · Fresh Morning)"); }
 
                 DayNightCycle.Instance.SetTimeOfDay(nextHour);
                 GameFeelAudio.PlayUiClick();
-                RaiseStatusMessage($"Saat değiştirildi: {label}");
+                RaiseStatusMessage(L($"Saat değiştirildi: {label}", $"Time set to: {label}"));
             }
 
-            // Quick Fast-Travel (G key on foot) between Selman Sokağı's 5 iconic spots!
+            // Quick Fast-Travel (G key on foot) between Selman Sokağı's iconic spots!
             if (!IsModalLocked && CurrentMode == ControlMode.OnFoot && !MosquePrayerInteractable.IsPlayerPraying &&
                 footController != null && Keyboard.current != null && Keyboard.current.gKey.wasPressedThisFrame)
             {
@@ -431,7 +438,7 @@ namespace OurWorld.Player
                 footController.TeleportTo(spot.pos, Quaternion.Euler(0f, spot.yaw, 0f));
                 GameFeelAudio.PlayUiClick();
                 GameFeelAudio.SpawnBurst(spot.pos + Vector3.up * 1.1f, new Color(0.32f, 0.84f, 0.80f), count: 10, spread: 0.55f);
-                RaiseStatusMessage($"Hızlı Geçiş: {spot.label}");
+                RaiseStatusMessage(L($"Hızlı Geçiş: {spot.labelTr}", $"Fast Travel: {spot.labelEn}"));
             }
 
             if (CurrentMode == ControlMode.Seated)
@@ -601,426 +608,6 @@ namespace OurWorld.Player
             if (_nearestInteractable == next) return;
             _nearestInteractable = next;
             OnInteractableChanged?.Invoke(_nearestInteractable);
-        }
-
-        private void HandleInteractPressed()
-        {
-            if (IsModalLocked || Time.frameCount == _dialogueClosedFrame || _isSeatTransitioning)
-            {
-                return;
-            }
-
-            if (CurrentMode == ControlMode.Seated)
-            {
-                _interactConsumedFrame = Time.frameCount;
-                TryStandUp();
-                return;
-            }
-
-            if (CurrentMode == ControlMode.Tennis)
-            {
-                _interactConsumedFrame = Time.frameCount;
-                ExitTennis();
-                return;
-            }
-
-            if (CurrentMode == ControlMode.ArenaSport)
-            {
-                _interactConsumedFrame = Time.frameCount;
-                ExitArenaSport();
-                return;
-            }
-
-            if (MosquePrayerInteractable.IsPlayerPraying)
-            {
-                _interactConsumedFrame = Time.frameCount;
-                MosquePrayerInteractable.CancelActivePrayerIfAny();
-                return;
-            }
-
-            if (CurrentMode == ControlMode.OnFoot && CarryableProp.CurrentlyHeld != null)
-            {
-                _interactConsumedFrame = Time.frameCount;
-                CarryableProp.CurrentlyHeld.ToggleCarry(this);
-                return;
-            }
-
-            if (CurrentMode == ControlMode.OnFoot && StreetCatController.ActivePet != null)
-            {
-                StreetCatController.CancelActivePet();
-                return;
-            }
-
-            if (CurrentMode == ControlMode.Driving)
-            {
-                if (_nearestInteractable == null) return;
-
-                if (_nearestInteractable.Kind == InteractableKind.FuelPump)
-                {
-                    _interactConsumedFrame = Time.frameCount;
-                    if (PlayerNeedsController.Instance != null)
-                    {
-                        PlayerNeedsController.Instance.TryRefuelVehicle(_currentVehicle);
-                    }
-                    return;
-                }
-
-                if (_nearestInteractable.Kind == InteractableKind.JobBoard)
-                {
-                    _interactConsumedFrame = Time.frameCount;
-                    JobBoardPoint board = _nearestInteractable.GetComponentInParent<JobBoardPoint>();
-                    if (board != null && JobManager.Instance != null)
-                    {
-                        JobManager.Instance.InteractWithJobBoard(board);
-                    }
-                    return;
-                }
-
-                if (_nearestInteractable.Kind == InteractableKind.CarWashStation)
-                {
-                    _interactConsumedFrame = Time.frameCount;
-                    if (CarWashStationController.Instance != null)
-                    {
-                        CarWashStationController.Instance.StartWash(this);
-                    }
-                    return;
-                }
-
-                if (_nearestInteractable.Kind == InteractableKind.GarageModBoard)
-                {
-                    _interactConsumedFrame = Time.frameCount;
-                    AutoGaragePanelController.EnsureInstance().Open(initialTab: 1);
-                    return;
-                }
-
-                return;
-            }
-
-            if (CurrentMode != ControlMode.OnFoot || _nearestInteractable == null)
-            {
-                return;
-            }
-
-            _interactConsumedFrame = Time.frameCount;
-
-            switch (_nearestInteractable.Kind)
-            {
-                case InteractableKind.Bicycle:
-                case InteractableKind.Motorcycle:
-                {
-                    BicycleController bicycle = _nearestInteractable.GetComponentInParent<BicycleController>();
-                    if (bicycle == null || footController == null) return;
-                    _currentBicycle = bicycle;
-                    bicycle.Mount(footController);
-                    SetSportMode(ControlMode.Cycling, bicycle.transform);
-                    return;
-                }
-
-                case InteractableKind.Tennis:
-                {
-                    TennisCourt court = _nearestInteractable.GetComponentInParent<TennisCourt>();
-                    if (court == null || footController == null) return;
-                    StartTennisMatch(court);
-                    return;
-                }
-
-                case InteractableKind.SportsArena:
-                {
-                    IPlayableSportArena arena = _nearestInteractable.GetComponentInParent<IPlayableSportArena>();
-                    if (arena == null || footController == null) return;
-                    StartArenaSport(arena);
-                    return;
-                }
-
-                case InteractableKind.PlayerVehicle:
-                case InteractableKind.TownVehicle:
-                {
-                    SedanVehicleController vehicle = _nearestInteractable.GetComponentInParent<SedanVehicleController>();
-                    if (vehicle == null && _nearestInteractable.Kind == InteractableKind.TownVehicle && AmbientTrafficManager.Instance != null)
-                    {
-                        vehicle = AmbientTrafficManager.Instance.TryHijackTrafficCar(_nearestInteractable.gameObject);
-                    }
-                    if (vehicle == null && _nearestInteractable.Kind == InteractableKind.PlayerVehicle)
-                    {
-                        vehicle = playerSedan;
-                    }
-                    TryEnterVehicle(vehicle);
-                    return;
-                }
-
-                case InteractableKind.Door:
-                {
-                    DoorInteractable door = _nearestInteractable.GetComponentInParent<DoorInteractable>();
-                    if (door != null)
-                    {
-                        door.Toggle(ActiveWorldPosition, footController != null ? footController.Humanoid : null);
-                    }
-                    return;
-                }
-
-                case InteractableKind.Seat:
-                {
-                    SeatInteractable seat = _nearestInteractable.GetComponentInParent<SeatInteractable>();
-                    if (seat != null && !seat.IsOccupied)
-                    {
-                        TrySitOnSeat(seat);
-                    }
-                    return;
-                }
-
-                case InteractableKind.PaintableHouse:
-                {
-                    PaintableHouse house = _nearestInteractable.GetComponentInParent<PaintableHouse>();
-                    if (house != null && PaintPalettePanel.Instance != null)
-                    {
-                        PaintPalettePanel.Instance.Open(house);
-                    }
-                    return;
-                }
-
-                case InteractableKind.JobBoard:
-                {
-                    JobBoardPoint board = _nearestInteractable.GetComponentInParent<JobBoardPoint>();
-                    if (board != null && JobManager.Instance != null)
-                    {
-                        JobManager.Instance.InteractWithJobBoard(board);
-                    }
-                    return;
-                }
-
-                case InteractableKind.ShopItem:
-                {
-                    PhysicalShopItem shopItem = _nearestInteractable.GetComponentInParent<PhysicalShopItem>();
-                    if (shopItem != null)
-                    {
-                        shopItem.Use(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.ShopCounter:
-                {
-                    if (PlayerShoppingCart.HasActiveItems)
-                    {
-                        PlayerShoppingCart cart = PlayerShoppingCart.GetOrCreate(this);
-                        if (cart != null)
-                        {
-                            cart.Checkout(this, _nearestInteractable.transform);
-                        }
-                    }
-                    else if (FarmEconomyManager.GetTotalProduceCount() > 0)
-                    {
-                        FarmEconomyManager.SellAllProduce(_nearestInteractable.transform.position);
-                    }
-                    else
-                    {
-                        GameFeelAudio.PlayUiClick();
-                        RaiseStatusMessage("Raflardan almak istediğin ürüne yaklaşıp eline al, ya da çiftlik/bostan mahsullerini getirip kasada sat!");
-                    }
-                    return;
-                }
-
-                case InteractableKind.Bed:
-                {
-                    if (!IsPlayerHomeBed(_nearestInteractable))
-                    {
-                        RaiseStatusMessage("Burası komşunun evi! Sadece No:48 Selman Sokağı'ndaki kendi evinde uyuyabilirsin.");
-                        return;
-                    }
-                    if (PlayerNeedsController.Instance != null)
-                    {
-                        PlayerNeedsController.Instance.TrySleepInBed(_nearestInteractable.transform);
-                    }
-                    return;
-                }
-
-                case InteractableKind.VendingMachine:
-                {
-                    if (PlayerNeedsController.Instance != null)
-                    {
-                        PlayerNeedsController.Instance.TryBuyVendingDrink();
-                    }
-                    return;
-                }
-
-                case InteractableKind.TownCitizen:
-                {
-                    TownPedestrian citizen = _nearestInteractable.GetComponentInParent<TownPedestrian>();
-                    if (citizen != null)
-                    {
-                        if (footController != null && footController.Humanoid != null)
-                        {
-                            footController.Humanoid.PlayWave();
-                        }
-                        citizen.TalkToPlayer(ActiveWorldPosition);
-                    }
-                    return;
-                }
-
-                case InteractableKind.HomeAppliance:
-                {
-                    HomeApplianceInteractable appliance = _nearestInteractable.GetComponentInParent<HomeApplianceInteractable>();
-                    if (appliance != null)
-                    {
-                        appliance.Use(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.MosquePrayer:
-                {
-                    MosquePrayerInteractable prayer = _nearestInteractable.GetComponentInParent<MosquePrayerInteractable>();
-                    if (prayer != null)
-                    {
-                        prayer.Interact(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.StreetCat:
-                {
-                    StreetCatController cat = _nearestInteractable.GetComponentInParent<StreetCatController>();
-                    if (cat != null)
-                    {
-                        cat.Pet(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.Football:
-                {
-                    StreetFootball ball = _nearestInteractable.GetComponentInParent<StreetFootball>();
-                    if (ball != null)
-                    {
-                        ball.KickFromPlayer(this, 1.05f);
-                    }
-                    return;
-                }
-
-                case InteractableKind.CarryableProp:
-                {
-                    CarryableProp prop = _nearestInteractable.GetComponentInParent<CarryableProp>();
-                    if (prop != null)
-                    {
-                        prop.ToggleCarry(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.AtmTerminal:
-                {
-                    AtmTerminalInteractable atm = _nearestInteractable.GetComponentInParent<AtmTerminalInteractable>();
-                    if (atm != null)
-                    {
-                        atm.Use(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.FarmPlot:
-                {
-                    FarmPlotInteractable plot = _nearestInteractable.GetComponentInParent<FarmPlotInteractable>();
-                    if (plot != null)
-                    {
-                        plot.Interact(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.FarmAnimal:
-                {
-                    FarmAnimalController animal = _nearestInteractable.GetComponentInParent<FarmAnimalController>();
-                    if (animal != null)
-                    {
-                        animal.Interact(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.FarmMarket:
-                {
-                    if (FarmEconomyManager.GetTotalProduceCount() > 0)
-                    {
-                        FarmEconomyManager.SellAllProduce(_nearestInteractable.transform.position);
-                    }
-                    else
-                    {
-                        FarmPanelController.EnsureInstance().Open();
-                    }
-                    return;
-                }
-
-                case InteractableKind.FarmBoard:
-                {
-                    FarmPanelController.EnsureInstance().Open();
-                    return;
-                }
-
-                case InteractableKind.GarageRepairBay:
-                {
-                    AutoGaragePanelController.EnsureInstance().Open(initialTab: 0);
-                    return;
-                }
-
-                case InteractableKind.GarageModBoard:
-                {
-                    AutoGaragePanelController.EnsureInstance().Open(initialTab: 1);
-                    return;
-                }
-
-                case InteractableKind.FishingPier:
-                {
-                    if (LakeFishingController.Instance != null)
-                    {
-                        LakeFishingController.Instance.BeginFishing(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.CarWashStation:
-                {
-                    if (CarWashStationController.Instance != null)
-                    {
-                        CarWashStationController.Instance.StartWash(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.HomeDecorBoard:
-                {
-                    HomeDecorPanelController.EnsureInstance().Open();
-                    return;
-                }
-
-                case InteractableKind.HomeMangal:
-                {
-                    if (HomeDecorManager.Instance != null)
-                    {
-                        HomeDecorManager.Instance.InteractWithBackyardMangal(this);
-                    }
-                    return;
-                }
-
-                case InteractableKind.InspectObject:
-                {
-                    InteractableTrigger inspected = _nearestInteractable;
-                    PlayerActionAnimator.Play(this, inspected.transform, PlayerActionKind.InspectReach, onClimax: () =>
-                    {
-                        if (inspected == null) return;
-                        if (!string.IsNullOrEmpty(inspected.InteractableId) &&
-                            inspected.InteractableId.StartsWith("mailbox", StringComparison.OrdinalIgnoreCase))
-                        {
-                            RaiseStatusMessage(LocalizationService.Tr("ui.mailbox.inspect", "Hamidiye Mahallesi Postası — Kutuda birkaç kartpostal var."));
-                        }
-                        OnInteracted?.Invoke(inspected);
-                    });
-                    return;
-                }
-
-                default:
-                    OnInteracted?.Invoke(_nearestInteractable);
-                    break;
-            }
         }
 
         private void HandleExitVehiclePressed()
@@ -1273,7 +860,7 @@ namespace OurWorld.Player
 
             if (activeVeh.SpeedKmh > vehicleExitMaxSpeedKmh)
             {
-                RaiseStatusMessage("Araçtan inmek için önce yavaşla!");
+                RaiseStatusMessage(L("Araçtan inmek için önce yavaşla!", "Slow down before exiting the vehicle!"));
                 return;
             }
 

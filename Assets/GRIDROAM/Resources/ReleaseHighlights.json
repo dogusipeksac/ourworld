@@ -1,44 +1,52 @@
 {
   "version": "1.0.0",
-  "buildCode": 1,
-  "headerTr": "YENİ SÜRÜMDE EKLENDİ · v1.0.0",
-  "headerEn": "NEW IN THIS UPDATE · v1.0.0",
+  "buildCode": 8,
+  "headerTr": "YENİ SÜRÜM · v1.0.0",
+  "headerEn": "WHAT'S NEW · v1.0.0",
   "items": [
     {
-      "id": "hamidiye_8_avenues",
+      "id": "story_32_and_voices",
       "category": "world",
       "requestedBy": "OurWorld Topluluğu",
-      "titleTr": "8 Ana Cadde & Saat Kulesi Meydanı",
-      "titleEn": "8 Main Avenues & Clock Tower Plaza",
-      "descriptionTr": "Fatih Bulvarı, Atatürk Cd., Petrol Yolu, Aziziye, Eyyubi, Mürşit, Seyyid Kutup ve Zübeyde Hanım caddeleri gerçek sokak görünümüyle oyuna eklendi!",
-      "descriptionEn": "8 real-inspired avenues including Fatih Boulevard's iconic Clock Tower Plaza, commercial strips, and live GPS street announcements are now open to explore!"
+      "titleTr": "6 Bölümlük Hikâye & Çoklu Seslendirme",
+      "titleEn": "6-Chapter Story & Multi-Voice Audio",
+      "descriptionTr": "8 ana cadde, Saat Kulesi Meydanı, Aydos Çiftliği ve Sultanbeyli Göleti'nde 32 hikâye görevi seni bekliyor. Komşular, esnaflar ve anonslar yaşa uygun 10 Türkçe ve 6 İngilizce sesle konuşuyor.",
+      "descriptionEn": "Explore 8 connected avenues, Clock Tower Plaza, Aydos Farm, and Sultanbeyli Lake across 32 story missions with 10 Turkish and 6 English character voices.",
+      "tagsTr": [ "32 Hikâye Görevi", "10 TR & 6 EN Ses", "8 Cadde & Gölet" ],
+      "tagsEn": [ "32 Story Missions", "10 TR & 6 EN Voices", "8 Avenues & Lake" ]
     },
     {
-      "id": "mosque_interiors_life",
+      "id": "farm_garage_fishing",
       "category": "mechanic",
-      "requestedBy": "İlk Test Oyuncuları",
-      "titleTr": "Girilebilir Hz. Osman Camii, Sokak Futbolu & Kediler",
-      "titleEn": "Walk-In Landmarks, Street Football & Cats",
-      "descriptionTr": "Evlere, dükkânlara ve Hz. Osman Camii'ne yürüyerek gir; mahalle sahasında gol at, İstanbul sokak kedilerini sev ve gün/gece ışıklarını keşfet!",
-      "descriptionEn": "Walk straight into homes, shops & landmarks, score goals on the street pitch, pet friendly street cats, and cruise under glowing night streetlamps!"
+      "requestedBy": "Yaşam Simülasyonu Severler",
+      "titleTr": "Aydos Çiftliği, Oto Tamir & Balıkçılık",
+      "titleEn": "Aydos Farm, Auto Garage & Lake Fishing",
+      "descriptionTr": "16 tarlada ürün yetiştir, hayvanlarla ilgilen; No:73 Oto Tamir'de araçları lifte kaldırıp modifiye et ve Sultanbeyli Göleti'nde 5 farklı balık yakala.",
+      "descriptionEn": "Grow crops across 16 beds, tend livestock, repair and tune cars on a hydraulic lift at No:73 Garage, and catch 5 fish species off the lake pier.",
+      "tagsTr": [ "16 Bostan & Hayvan", "No:73 Oto Modifiye", "5 Gölet Balığı" ],
+      "tagsEn": [ "16 Beds & Livestock", "No:73 Car Tuning", "5 Lake Fish" ]
     },
     {
-      "id": "cars_drift_radio",
-      "category": "vehicle",
-      "requestedBy": "Sürüş Tutkunları",
-      "titleTr": "Drift ile Nitro, Türkçe Radyo & Araç Hasarı",
-      "titleEn": "Drift-to-Nitro, Car Radio & Crash Physics",
-      "descriptionTr": "İstediğin araca bin, drift yaparak nitro doldur, korna çal, farları yak ve 3 kanallı araç radyosunu dinleyerek sokakları turla!",
-      "descriptionEn": "Hop into any parked car, drift to charge your nitro boost, honk the horn, toggle headlights, and switch between 3 car radio stations!"
+      "id": "sports_5_and_shooting",
+      "category": "sports",
+      "requestedBy": "Spor & Aksiyon Tutkunları",
+      "titleTr": "5 Oynanabilir Spor & Aydos Poligonu",
+      "titleEn": "5 Playable Sports & Aydos Shooting Range",
+      "descriptionTr": "Tenis, 3v3 Futbol, 2v2 Basketbol, 2v2 Voleybol ve 50m Yüzme + Dalışa istediğin an katıl. Aydos Atış Poligonu'nda 4 silah ve 4 modda rekor kır.",
+      "descriptionEn": "Jump anytime into Tennis, 3v3 Football, 2v2 Basketball, 2v2 Volleyball, and Swimming & Diving—plus 4 weapons and 4 modes at Aydos Shooting Range.",
+      "tagsTr": [ "5 Canlı Spor Arenası", "4 Silah · 4 Poligon Modu", "3D Yükseltmeler" ],
+      "tagsEn": [ "5 Live Sports Arenas", "4 Weapons · 4 Modes", "3D Upgrades" ]
     },
     {
       "id": "your_name_next",
       "category": "community",
-      "requestedBy": "Sıradaki İsim SEN Olabilirsin!",
-      "titleTr": "İsteğini Yaz, Yeni Sürümde İsmin Burada Görünsün!",
-      "titleEn": "Suggest a Feature, See Your Name Here Next!",
-      "descriptionTr": "Telefonundaki Öneri sekmesinden oyunda görmek istediğin özelliği ve takma adını yaz. Eklediğimiz her özellikte isteyen oyuncunun adı burada yer alacak!",
-      "descriptionEn": "Open the Phone's Ideas tab and share what you want built next. Every shipped community idea credits the player who requested it right on this screen!"
+      "requestedBy": "Sıradaki İsim SEN Olabilirsin",
+      "titleTr": "Fikrini Paylaş, Yeni Sürümde İsmin Yer Alsın!",
+      "titleEn": "Share Your Idea, Get Credited Next Update!",
+      "descriptionTr": "Telefonundaki Öneri sekmesinden oyunda görmek istediğin özelliği ve takma adını yaz. Eklediğimiz her özellikte isteyen oyuncunun adı burada görünür.",
+      "descriptionEn": "Open the Ideas tab in your Phone and tell us what you want built next. Every shipped community feature credits the player right on this screen.",
+      "tagsTr": [ "Canlı Topluluk Panosu", "Doğrudan Geliştiriciye", "İsminle Öne Çık" ],
+      "tagsEn": [ "Live Community Board", "Direct to Developer", "Featured Credit" ]
     }
   ]
 }

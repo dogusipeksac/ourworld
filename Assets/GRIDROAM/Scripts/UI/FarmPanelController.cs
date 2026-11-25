@@ -132,6 +132,7 @@ namespace OurWorld.UI
             _canvasObj.AddComponent<GraphicRaycaster>();
 
             // Full-screen dim scrim
+            OurWorldUiKit.EnsureInitialized();
             _panelRoot = new GameObject("FarmModalRoot", typeof(RectTransform), typeof(Image));
             _panelRoot.transform.SetParent(_canvasObj.transform, false);
             RectTransform rootRt = (RectTransform)_panelRoot.transform;
@@ -139,24 +140,38 @@ namespace OurWorld.UI
             rootRt.anchorMax = Vector2.one;
             rootRt.offsetMin = Vector2.zero;
             rootRt.offsetMax = Vector2.zero;
-            _panelRoot.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.68f);
+            _panelRoot.GetComponent<Image>().color = OurWorldUiKit.Scrim;
 
-            // Centered spacious mobile card
+            // Centered spacious rounded card
             GameObject card = CreateRect("Card", _panelRoot.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(1280f, 820f), BgDark);
-            Outline cardOut = card.AddComponent<Outline>();
-            cardOut.effectColor = new Color(0.20f, 0.80f, 0.72f, 0.55f);
-            cardOut.effectDistance = new Vector2(2f, -2f);
+                Vector2.zero, new Vector2(1280f, 820f), OurWorldUiKit.CardBg, OurWorldUiKit.CardSprite);
+            OurWorldUiKit.AddCardDropShadow(card.transform, spread: 28f, offsetY: -12f, alpha: 0.60f);
+            OurWorldUiKit.AddSoftTopGlow(card.transform, AccentTeal, heightPx: 140f, alpha: 0.14f);
+            OurWorldUiKit.AddHairlineBorder(card.transform, OurWorldUiKit.CardOutlineSprite, new Color(AccentTeal.r, AccentTeal.g, AccentTeal.b, 0.34f));
 
-            // Top bar: Title + Money + Close X
+            // Top bar: Title + Wallet Pill + Circular Close X
             _titleText = CreateText("Title", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(36f, -28f), new Vector2(760f, 54f), 34, FontStyle.Bold, TextLight, TextAnchor.MiddleLeft);
-            _moneyText = CreateText("Money", card.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-126f, -28f), new Vector2(280f, 54f), 30, FontStyle.Bold, AccentGold, TextAnchor.MiddleRight);
+                new Vector2(36f, -24f), new Vector2(760f, 52f), 32, FontStyle.Bold, TextLight, TextAnchor.MiddleLeft);
 
-            Button closeBtn = CreateButton("BtnClose", card.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-32f, -24f), new Vector2(68f, 60f), new Color(0.76f, 0.24f, 0.24f, 0.95f), "X", 28, out _);
-            closeBtn.onClick.AddListener(Close);
+            GameObject moneyPill = CreateRect("MoneyPill", card.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
+                new Vector2(-98f, -26f), new Vector2(190f, 44f), new Color(AccentGold.r, AccentGold.g, AccentGold.b, 0.14f), OurWorldUiKit.PillSprite);
+            OurWorldUiKit.AddHairlineBorder(moneyPill.transform, OurWorldUiKit.PillOutlineSprite, new Color(AccentGold.r, AccentGold.g, AccentGold.b, 0.36f));
+            _moneyText = OurWorldUiKit.CreateStretchText("Money", moneyPill.transform, "₺ 0", 24, FontStyle.Bold, AccentGold, TextAnchor.MiddleCenter);
+
+            Button closeBtn = OurWorldUiKit.CreateCircularIconButton(
+                "BtnClose", card.transform, OurWorldUiKit.IconClose,
+                diameter: 46f, iconSize: 18f,
+                bgColor: new Color(0.14f, 0.19f, 0.27f, 0.94f),
+                iconColor: OurWorldUiKit.TextSecondary,
+                borderColor: OurWorldUiKit.BorderSubtle,
+                onClick: Close);
+            RectTransform closeRt = (RectTransform)closeBtn.transform;
+            closeRt.anchorMin = closeRt.anchorMax = new Vector2(1f, 1f);
+            closeRt.pivot = new Vector2(1f, 1f);
+            closeRt.anchoredPosition = new Vector2(-32f, -24f);
+
+            OurWorldUiKit.AddDividerLine(card.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(36f, -88f), new Vector2(-36f, -86.5f));
 
             // --- SECTION 1: SEED SELECTOR ---
             _seedHeaderText = CreateText("SeedHeader", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
@@ -185,7 +200,8 @@ namespace OurWorld.UI
                 new Vector2(36f, -296f), new Vector2(1200f, 36f), 22, FontStyle.Bold, AccentGold, TextAnchor.MiddleLeft);
 
             GameObject invBox = CreateRect("InvBox", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(36f, -340f), new Vector2(850f, 152f), CardBg);
+                new Vector2(36f, -340f), new Vector2(850f, 152f), OurWorldUiKit.SurfaceBg, OurWorldUiKit.SubCardSprite);
+            OurWorldUiKit.AddHairlineBorder(invBox.transform, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
             _invSummaryText = CreateText("InvSummary", invBox.transform, Vector2.zero, Vector2.one,
                 Vector2.zero, Vector2.zero, 21, FontStyle.Normal, TextLight, TextAnchor.MiddleLeft);
             RectTransform irt = _invSummaryText.rectTransform;
@@ -323,7 +339,7 @@ namespace OurWorld.UI
             }
         }
 
-        private GameObject CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size, Color col)
+        private GameObject CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size, Color col, Sprite sprite = null)
         {
             GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
             go.transform.SetParent(parent, false);
@@ -333,7 +349,9 @@ namespace OurWorld.UI
             rt.pivot = new Vector2(anchorMin.x, anchorMax.y);
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
-            go.GetComponent<Image>().color = col;
+            Image img = go.GetComponent<Image>();
+            if (sprite != null) OurWorldUiKit.ApplyRounded(img, sprite, col);
+            else img.color = col;
             return go;
         }
 
@@ -359,12 +377,13 @@ namespace OurWorld.UI
 
         private Button CreateButton(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size, Color col, string labelText, int fontSize, out Text outText)
         {
-            GameObject go = CreateRect(name, parent, anchorMin, anchorMax, pos, size, col);
-            Outline o = go.AddComponent<Outline>();
-            o.effectColor = new Color(1f, 1f, 1f, 0.16f);
-            o.effectDistance = new Vector2(1.5f, -1.5f);
+            GameObject go = CreateRect(name, parent, anchorMin, anchorMax, pos, size, col, OurWorldUiKit.SubCardSprite);
+            OurWorldUiKit.AddHairlineBorder(go.transform, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
+            Image bg = go.GetComponent<Image>();
             Button btn = go.AddComponent<Button>();
-            btn.targetGraphic = go.GetComponent<Image>();
+            btn.targetGraphic = bg;
+            UiButtonFeedback fb = go.AddComponent<UiButtonFeedback>();
+            fb.Configure(btn, bg);
 
             GameObject lblObj = new GameObject("Label", typeof(RectTransform), typeof(Text));
             lblObj.transform.SetParent(go.transform, false);
@@ -379,6 +398,7 @@ namespace OurWorld.UI
             txt.fontStyle = FontStyle.Bold;
             txt.color = TextLight;
             txt.alignment = TextAnchor.MiddleCenter;
+            txt.lineSpacing = 1.18f;
             txt.text = labelText;
             txt.raycastTarget = false;
             outText = txt;

@@ -121,12 +121,20 @@ namespace OurWorld.Missions
             }
         }
 
+        private readonly System.Collections.Generic.List<Material> _runtimeMats =
+            new System.Collections.Generic.List<Material>(8);
+
         private void OnDestroy()
         {
             if (_subscribed && PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.OnInteracted -= HandleInteracted;
             }
+            for (int i = 0; i < _runtimeMats.Count; i++)
+            {
+                if (_runtimeMats[i] != null) Destroy(_runtimeMats[i]);
+            }
+            _runtimeMats.Clear();
         }
 
         private void Update()
@@ -261,8 +269,9 @@ namespace OurWorld.Missions
             visual.transform.localScale = boxScale;
             Destroy(visual.GetComponent<Collider>());
 
-            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Material mat = new Material(sh);
+            _runtimeMats.Add(mat);
             if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", accentColor);
             if (mat.HasProperty("_EmissionColor"))
             {
@@ -314,10 +323,11 @@ namespace OurWorld.Missions
             bulb.transform.localScale = Vector3.one * 0.24f;
             Destroy(bulb.GetComponent<Collider>());
 
-            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             if (sh != null)
             {
                 Material m = new Material(sh);
+                _runtimeMats.Add(m);
                 Color warm = new Color(1.0f, 0.78f, 0.26f);
                 if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", warm);
                 if (m.HasProperty("_EmissionColor"))

@@ -19,12 +19,21 @@ namespace OurWorld.Input
         [SerializeField] private float keyLookSpeed = 110f;
 
         private const string PrefSensitivityKey = "ow_cam_sens";
+        private const string PrefInvertYKey = "ow_cam_invert_y";
         public float SensitivityMultiplier { get; private set; } = 1f;
+        public bool InvertY { get; private set; }
 
         public void SetSensitivityMultiplier(float multiplier)
         {
             SensitivityMultiplier = Mathf.Clamp(multiplier, 0.5f, 1.8f);
             PlayerPrefs.SetFloat(PrefSensitivityKey, SensitivityMultiplier);
+            PlayerPrefs.Save();
+        }
+
+        public void SetInvertY(bool invert)
+        {
+            InvertY = invert;
+            PlayerPrefs.SetInt(PrefInvertYKey, invert ? 1 : 0);
             PlayerPrefs.Save();
         }
 
@@ -87,6 +96,7 @@ namespace OurWorld.Input
 
             Instance = this;
             SensitivityMultiplier = Mathf.Clamp(PlayerPrefs.GetFloat(PrefSensitivityKey, 1f), 0.5f, 1.8f);
+            InvertY = PlayerPrefs.GetInt(PrefInvertYKey, 0) != 0;
         }
 
         private static bool IsTypingInUiField()
@@ -185,6 +195,10 @@ namespace OurWorld.Input
                 }
             }
 
+            if (InvertY)
+            {
+                look.y = -look.y;
+            }
             LookDelta = look;
             IsLookingManually = manualLook;
 

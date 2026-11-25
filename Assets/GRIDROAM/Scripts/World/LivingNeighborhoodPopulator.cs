@@ -586,7 +586,7 @@ namespace OurWorld.World
                 string id = $"living_dog_{i}";
                 InteractableTrigger trig = dog.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.6f);
-                trig.SetCustomPrompt($"{d.name} Köpeğini Sev (+15 Enerji · Dost Ol)");
+                trig.SetCustomPrompt($"{d.name} Köpeğini Sev (+15 Enerji · Dost Ol)", $"Pet {d.name} the Dog (+15 Energy · Befriend)");
 
                 _animals.Add(new LivingAnimal
                 {
@@ -656,7 +656,7 @@ namespace OurWorld.World
                 string id = $"living_goat_{i}";
                 InteractableTrigger trig = goat.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.8f);
-                trig.SetCustomPrompt($"{goatNames[i]} Keçisini Sev & Peynir Al (+45 ₺)");
+                trig.SetCustomPrompt($"{goatNames[i]} Keçisini Sev & Peynir Al (+45 ₺)", $"Pet {goatNames[i]} the Goat & Collect Cheese (+45 ₺)");
 
                 _animals.Add(new LivingAnimal
                 {

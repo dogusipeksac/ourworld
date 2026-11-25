@@ -49,6 +49,7 @@ namespace OurWorld.Player
         private static AudioClip _sharedSplashClip;
 
         private CharacterController _controller;
+        private float _nextCamRigLookupTime;
         private ThirdPersonCameraRig _cameraRig;
         private AudioSource _footstepAudio;
         private float _verticalVelocity;
@@ -777,8 +778,9 @@ namespace OurWorld.Player
                 return;
             }
 
-            if (_cameraRig == null)
+            if (_cameraRig == null && Time.time >= _nextCamRigLookupTime)
             {
+                _nextCamRigLookupTime = Time.time + 1f;
                 _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
             }
 

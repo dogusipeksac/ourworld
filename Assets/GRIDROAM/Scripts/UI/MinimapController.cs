@@ -29,6 +29,8 @@ namespace OurWorld.UI
         private static readonly Color MissionDotColor = new Color(0.94f, 0.75f, 0.32f, 0.96f);
         private static readonly Color AccentDotColor = new Color(0.31f, 0.70f, 0.66f, 0.96f);
 
+        private Camera _cachedMainCam;
+
         public void Configure(
             RectTransform rotator,
             RawImage rawImg,
@@ -53,7 +55,8 @@ namespace OurWorld.UI
         private void LateUpdate()
         {
             PlayerModeController mode = PlayerModeController.Instance;
-            Camera mainCam = Camera.main;
+            if (_cachedMainCam == null) _cachedMainCam = Camera.main;
+            Camera mainCam = _cachedMainCam;
             if (mode == null || mapRawImage == null || mapRotator == null)
             {
                 return;

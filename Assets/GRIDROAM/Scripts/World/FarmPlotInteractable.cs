@@ -497,7 +497,7 @@ namespace OurWorld.World
         private static void EnsureSharedPlantMaterials()
         {
             if (_stemMat != null) return;
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Shader unlit = Shader.Find("Universal Render Pipeline/Unlit") ?? lit;
 
             _stemMat = MakeMat(lit, "MAT_Farm_Stem", new Color(0.18f, 0.54f, 0.20f), 0.18f);

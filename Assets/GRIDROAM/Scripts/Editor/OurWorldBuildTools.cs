@@ -120,6 +120,76 @@ namespace OurWorld.Editor
             EditorUtility.DisplayDialog("OurWorld — Store Readiness", summary, "Tamam");
         }
 
+        [MenuItem("OurWorld/Build/Apply Branded iOS Launch Screen")]
+        public static void ApplyIosLaunchScreenSettings()
+        {
+            const string launchPath = "Assets/GRIDROAM/Art/UI/OurWorld_LaunchScreen.png";
+            AssetDatabase.ImportAsset(launchPath, ImportAssetOptions.ForceUpdate);
+
+            TextureImporter ti = AssetImporter.GetAtPath(launchPath) as TextureImporter;
+            if (ti != null)
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.mipmapEnabled = false;
+                ti.maxTextureSize = 2048;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                ti.SaveAndReimport();
+            }
+
+            Texture2D launchTex = AssetDatabase.LoadAssetAtPath<Texture2D>(launchPath);
+            if (launchTex == null)
+            {
+                Debug.LogError($"[OurWorldBuildTools] Launch screen texture missing at {launchPath}");
+                return;
+            }
+
+            UnityEngine.Object[] psAssets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
+            if (psAssets == null || psAssets.Length == 0)
+            {
+                Debug.LogError("[OurWorldBuildTools] Could not load ProjectSettings.asset");
+                return;
+            }
+
+            SerializedObject so = new SerializedObject(psAssets[0]);
+            Color bg = new Color(15f / 255f, 20f / 255f, 25f / 255f, 1f); // #0F1419
+
+            void SetInt(string prop, int val)
+            {
+                SerializedProperty p = so.FindProperty(prop);
+                if (p != null) p.intValue = val;
+            }
+            void SetFloat(string prop, float val)
+            {
+                SerializedProperty p = so.FindProperty(prop);
+                if (p != null) p.floatValue = val;
+            }
+            void SetObj(string prop, UnityEngine.Object val)
+            {
+                SerializedProperty p = so.FindProperty(prop);
+                if (p != null) p.objectReferenceValue = val;
+            }
+            void SetCol(string prop, Color val)
+            {
+                SerializedProperty p = so.FindProperty(prop);
+                if (p != null) p.colorValue = val;
+            }
+
+            // 1 = Image and Background (Relative Size) — scales cleanly across all iPhone & iPad landscape ratios
+            SetInt("iOSLaunchScreenType", 1);
+            SetObj("iOSLaunchScreenLandscape", launchTex);
+            SetCol("iOSLaunchScreenBackgroundColor", bg);
+            SetFloat("iOSLaunchScreenFillPct", 100f);
+
+            SetInt("iOSLaunchScreeniPadType", 1);
+            SetObj("iOSLaunchScreeniPadImage", launchTex);
+            SetCol("iOSLaunchScreeniPadBackgroundColor", bg);
+            SetFloat("iOSLaunchScreeniPadFillPct", 100f);
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssets();
+            Debug.Log("[OurWorldBuildTools] Applied branded iOS Launch Screen (iPhone Landscape + iPad) to ProjectSettings.");
+        }
+
         [MenuItem("OurWorld/Build/Android - Build Test APK (Development)", priority = 20)]
         public static void BuildAndroidTestApk()
         {
@@ -182,6 +252,74 @@ namespace OurWorld.Editor
             };
 
             ExecuteBuild(options, "Android Google Play AAB");
+        }
+
+        public static void BuildAndroidPlayAabBatchmode()
+        {
+            OurWorldPrototypeSetup.ConfigureCrossPlatformMobileSettings();
+            string[] scenes = GetEnabledScenes();
+            if (scenes.Length == 0)
+            {
+                Debug.LogError("[OurWorld Build] No enabled scenes found for Android AAB build.");
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            string ksPath = System.Environment.GetEnvironmentVariable("OURWORLD_ANDROID_KEYSTORE");
+            string ksPass = System.Environment.GetEnvironmentVariable("OURWORLD_ANDROID_STOREPASS");
+            string keyAlias = System.Environment.GetEnvironmentVariable("OURWORLD_ANDROID_ALIAS");
+            string keyPass = System.Environment.GetEnvironmentVariable("OURWORLD_ANDROID_KEYPASS");
+
+            bool prevUseCustom = PlayerSettings.Android.useCustomKeystore;
+            string prevKsName = PlayerSettings.Android.keystoreName;
+            string prevAlias = PlayerSettings.Android.keyaliasName;
+
+            if (!string.IsNullOrEmpty(ksPath) && File.Exists(ksPath) && !string.IsNullOrEmpty(ksPass) && !string.IsNullOrEmpty(keyAlias))
+            {
+                PlayerSettings.Android.useCustomKeystore = true;
+                PlayerSettings.Android.keystoreName = ksPath;
+                PlayerSettings.Android.keystorePass = ksPass;
+                PlayerSettings.Android.keyaliasName = keyAlias;
+                PlayerSettings.Android.keyaliasPass = !string.IsNullOrEmpty(keyPass) ? keyPass : ksPass;
+                Debug.Log($"[OurWorld Build] Android upload keystore configured: {ksPath} (alias: {keyAlias})");
+            }
+            else
+            {
+                Debug.LogWarning("[OurWorld Build] OURWORLD_ANDROID_KEYSTORE env vars not set; building unsigned/debug-signed AAB.");
+            }
+
+            Directory.CreateDirectory(AndroidBuildDir);
+            EditorUserBuildSettings.buildAppBundle = true;
+            EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
+
+            string outputPath = Path.Combine(AndroidBuildDir, "OurWorld_GooglePlay.aab");
+            BuildPlayerOptions options = new BuildPlayerOptions
+            {
+                scenes = scenes,
+                locationPathName = outputPath,
+                target = BuildTarget.Android,
+                options = BuildOptions.None
+            };
+
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            BuildSummary summary = report.summary;
+
+            // Keep secrets out of ProjectSettings.asset after headless build
+            PlayerSettings.Android.keystorePass = string.Empty;
+            PlayerSettings.Android.keyaliasPass = string.Empty;
+            PlayerSettings.Android.useCustomKeystore = prevUseCustom;
+            PlayerSettings.Android.keystoreName = prevKsName;
+            PlayerSettings.Android.keyaliasName = prevAlias;
+
+            if (summary.result == BuildResult.Succeeded)
+            {
+                Debug.Log($"[OurWorld Build] Android Google Play AAB succeeded: {summary.outputPath} ({summary.totalSize / (1024f * 1024f):0.0} MB)");
+            }
+            else
+            {
+                Debug.LogError($"[OurWorld Build] Android Google Play AAB finished with result: {summary.result} (errors={summary.totalErrors})");
+                EditorApplication.Exit(1);
+            }
         }
 
         [MenuItem("OurWorld/Build/iOS - Export Xcode Project", priority = 22)]
@@ -278,7 +416,7 @@ namespace OurWorld.Editor
 #if UNITY_EDITOR_OSX
     /// <summary>
     /// Automatically configures exported iOS Xcode Info.plist, GoogleService-Info.plist,
-    /// Firebase Crashlytics SPM dependencies (FirebaseCore, FirebaseCrashlytics, FirebaseAnalytics),
+    /// Firebase Crashlytics SPM dependencies (FirebaseCore, FirebaseCrashlytics — no Analytics/ADID),
     /// -ObjC linker flags, DWARF with dSYM, and the Crashlytics dSYM upload Run Script phase.
     /// </summary>
     public class OurWorldIosPostprocess : IPostprocessBuildWithReport
@@ -360,7 +498,7 @@ namespace OurWorld.Editor
                 pbx.WriteToFile(pbxPath);
             }
 
-            // Wire FirebaseCore + FirebaseCrashlytics + FirebaseAnalytics via Swift Package Manager helper if available
+            // Wire FirebaseCore + FirebaseCrashlytics via Swift Package Manager helper if available
             // (GoogleService-Info.plist is already added cleanly to mainTarget above via PBXProject.AddFile)
             TryAttachFirebaseSpm(report.summary.outputPath, null);
 
@@ -380,7 +518,7 @@ namespace OurWorld.Editor
             }
 
             string plistArg = !string.IsNullOrEmpty(plistPath) ? $" --plist \"{plistPath}\"" : string.Empty;
-            string args = $"run --package-path \"{spmToolDir}\" xcode_spm_setup \"{xcodeProj}\" {FirebaseIosSdkUrl} {FirebaseIosSdkVersion}{plistArg} FirebaseCore FirebaseCrashlytics FirebaseAnalytics";
+            string args = $"run --package-path \"{spmToolDir}\" xcode_spm_setup \"{xcodeProj}\" {FirebaseIosSdkUrl} {FirebaseIosSdkVersion}{plistArg} FirebaseCore FirebaseCrashlytics";
 
             try
             {

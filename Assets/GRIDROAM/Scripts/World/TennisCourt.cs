@@ -100,6 +100,7 @@ namespace OurWorld.World
         private AudioClip _bounceSound;
         private PlayerFootController _player;
         private ThirdPersonCameraRig _cameraRig;
+        private Camera _cachedMainCam;
 
         // Pro Tennis visual helpers (runtime trail + glowing opponent court aim target)
         private TrailRenderer _ballTrail;
@@ -272,13 +273,18 @@ namespace OurWorld.World
             _ballTrail.endColor = new Color(c.r, c.g, c.b, 0f);
         }
 
+        private static bool IsEn =>
+            LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+        private static string L(string tr, string en) => IsEn ? en : tr;
+
         private string GetLeagueLabel()
         {
             return _leagueTier switch
             {
-                0 => "Acemi Lig",
-                1 => "Mahalle Ligi",
-                _ => "Şampiyonlar Ligi"
+                0 => L("Acemi Lig", "Rookie League"),
+                1 => L("Mahalle Ligi", "District League"),
+                _ => L("Şampiyonlar Ligi", "Champions League")
             };
         }
 
@@ -330,7 +336,7 @@ namespace OurWorld.World
 
             ResetPoint();
             GameFeelAudio.PlayRefereeWhistle(doubleBlast: false);
-            SetCallout($"{GetLeagueLabel()} · Tenis Maçı Başladı!", new Color(0.28f, 0.94f, 0.80f), 1.6f);
+            SetCallout(L($"{GetLeagueLabel()} · Tenis Maçı Başladı!", $"{GetLeagueLabel()} · Tennis Match Started!"), new Color(0.28f, 0.94f, 0.80f), 1.6f);
             enabled = true;
         }
 
@@ -418,73 +424,84 @@ namespace OurWorld.World
 
         public string HudText()
         {
-            string title = LocalizationService.Tr("sports.tennis.title", "Tenis Kortu");
-            string rallyInfo = _returns > 0 ? $" · Ralli {_returns}" : string.Empty;
+            string title = LocalizationService.Tr("sports.tennis.title", L("Tenis Kortu", "Tennis Court"));
+            string rallyInfo = _returns > 0 ? L($" · Ralli {_returns}", $" · Rally {_returns}") : string.Empty;
             string status;
 
             if (_phase == Phase.MatchOver)
             {
                 status = _lastPointWon
-                    ? $"OYUN SENİN! ({_acesCount} Ace · {_winnersCount} Winner) — Tekrar için Vur"
-                    : "Maç Bitti — Rövanş için Vur!";
+                    ? L($"OYUN SENİN! ({_acesCount} Ace · {_winnersCount} Winner) — Tekrar için Vur",
+                        $"GAME WON! ({_acesCount} Ace · {_winnersCount} Winner) — Tap Hit to Rematch")
+                    : L("Maç Bitti — Rövanş için Vur!", "Match Over — Tap Hit for Rematch!");
             }
             else if (_phase == Phase.Point)
             {
-                status = _lastPointWon ? "SAYI SENİN! Yeni servis hazırlanıyor..." : "Rakip sayı aldı · Odaklan!";
+                status = _lastPointWon
+                    ? L("SAYI SENİN! Yeni servis hazırlanıyor...", "POINT WON! Preparing next serve...")
+                    : L("Rakip sayı aldı · Odaklan!", "Opponent scored · Stay focused!");
             }
             else if (_isChargingServe)
             {
-                status = "Servis Gücünü Ayarla · Altın bölgede bırak -> 185 km/s ACE!";
+                status = L("Servis Gücünü Ayarla · Altın bölgede bırak -> 185 km/s ACE!",
+                           "Charge Serve · Release in GOLD zone -> 185 km/h ACE!");
             }
             else if (_phase == Phase.Serve)
             {
-                status = "Servis (Basılı Tut) · Yön tuşuyla köşe seç!";
+                status = L("Servis (Basılı Tut) · Yön tuşuyla köşe seç!", "Serve (Hold) · Aim corners with joystick!");
             }
             else if (_isChargingSecondary)
             {
-                status = "Kısa bırak: Drop Shot (Kısa Top) · Basılı tut: Taktik Lob!";
+                status = L("Kısa bırak: Drop Shot (Kısa Top) · Basılı tut: Taktik Lob!",
+                           "Tap: Drop Shot · Hold: Tactical Lob!");
             }
             else if (_phase == Phase.ToPlayer)
             {
                 bool atNet = _playerZ > -5.5f;
                 if (_returnQueued)
                 {
-                    status = _preciseReturn ? "MÜKEMMEL ZAMANLAMA KİLİTLENDİ!" : "Vuruş hazır · Yön tuşuyla açı ver!";
+                    status = _preciseReturn
+                        ? L("MÜKEMMEL ZAMANLAMA KİLİTLENDİ!", "PERFECT TIMING LOCKED!")
+                        : L("Vuruş hazır · Yön tuşuyla açı ver!", "Shot ready · Angle with joystick!");
                 }
                 else if (atNet)
                 {
-                    status = "FİLE ÖNÜNDESİN! Vur: File Volesi · İkinci Tuş: Kısa Top!";
+                    status = L("FİLE ÖNÜNDESİN! Vur: File Volesi · İkinci Tuş: Kısa Top!",
+                               "AT THE NET! Hit: Net Volley · Secondary: Drop Shot!");
                 }
                 else if (_ready)
                 {
-                    status = "ŞİMDİ VUR! (Vur: Topspin · İkinci Tuş: Drop Shot / Lob)";
+                    status = L("ŞİMDİ VUR! (Vur: Topspin · İkinci Tuş: Drop Shot / Lob)",
+                               "HIT NOW! (Primary: Topspin · Secondary: Drop Shot / Lob)");
                 }
                 else
                 {
-                    status = "Topa yaklaş · İleri koşup File Volesi yapabilirsin!";
+                    status = L("Topa yaklaş · İleri koşup File Volesi yapabilirsin!",
+                               "Move to the ball · Rush the net for a Volley!");
                 }
             }
             else
             {
-                status = "Top rakipte · Merkezde pozisyon al veya fileye çık!";
+                status = L("Top rakipte · Merkezde pozisyon al veya fileye çık!",
+                           "Opponent's ball · Hold center or rush the net!");
             }
 
-            return $"{title} [{GetLeagueLabel()}]  ·  Sen {FormatTennisScore()} Rakip{rallyInfo}\n{status}";
+            return $"{title} [{GetLeagueLabel()}]  ·  {L("Sen", "You")} {FormatTennisScore()} {L("Rakip", "Rival")}{rallyInfo}\n{status}";
         }
 
         public string PrimaryButtonLabel()
         {
-            if (_phase == Phase.MatchOver) return LocalizationService.Tr("sports.btn.rematch", "Tekrar");
-            if (_isChargingServe) return "BIRAK!";
-            if (_phase == Phase.Serve) return "Servis (Tut)";
-            if (_phase == Phase.ToPlayer && _playerZ > -5.5f) return "Vole!";
-            if (_phase == Phase.ToPlayer && _ready) return "TOPSPİN!";
-            return "Vur";
+            if (_phase == Phase.MatchOver) return LocalizationService.Tr("sports.btn.rematch", L("Tekrar", "Rematch"));
+            if (_isChargingServe) return L("BIRAK!", "RELEASE!");
+            if (_phase == Phase.Serve) return L("Servis (Tut)", "Serve (Hold)");
+            if (_phase == Phase.ToPlayer && _playerZ > -5.5f) return L("Vole!", "Volley!");
+            if (_phase == Phase.ToPlayer && _ready) return L("TOPSPİN!", "TOPSPIN!");
+            return L("Vur", "Hit");
         }
 
         public string SecondaryButtonLabel()
         {
-            if (_isChargingSecondary) return _secondaryCharge >= 0.42f ? "LOB!" : "Kısa Top";
+            if (_isChargingSecondary) return _secondaryCharge >= 0.42f ? "LOB!" : L("Kısa Top", "Drop Shot");
             return "Drop / Lob";
         }
 
@@ -507,7 +524,7 @@ namespace OurWorld.World
                 state.PrimaryColor = over
                     ? new Color(0.96f, 0.30f, 0.24f)
                     : (sweet ? new Color(1.0f, 0.84f, 0.20f) : new Color(0.24f, 0.92f, 0.78f));
-                state.PrimaryLabel = over ? "FİLE HATASI RİSKİ!" : (sweet ? "ALTIN ACE SERVİS!" : "SERVİS GÜCÜ");
+                state.PrimaryLabel = over ? L("FİLE HATASI RİSKİ!", "NET FAULT RISK!") : (sweet ? L("ALTIN ACE SERVİS!", "GOLDEN ACE SERVE!") : L("SERVİS GÜCÜ", "SERVE POWER"));
                 state.ShowSweetSpot = true;
                 state.SweetSpotMin01 = 0.56f;
                 state.SweetSpotMax01 = 0.86f;
@@ -518,7 +535,7 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = _secondaryCharge;
                 state.PrimaryColor = lob ? new Color(0.32f, 0.82f, 1.0f) : new Color(0.26f, 0.94f, 0.72f);
-                state.PrimaryLabel = lob ? "TAKTİK LOB!" : "KISA TOP (DROP SHOT)";
+                state.PrimaryLabel = lob ? L("TAKTİK LOB!", "TACTICAL LOB!") : L("KISA TOP (DROP SHOT)", "DROP SHOT");
                 state.ShowSweetSpot = false;
             }
             else if (_player != null && _phase == Phase.ToPlayer)
@@ -530,7 +547,7 @@ namespace OurWorld.World
                 state.PrimaryColor = _returnQueued
                     ? new Color(1.0f, 0.86f, 0.24f)
                     : (inGold ? new Color(1.0f, 0.84f, 0.20f) : new Color(0.24f, 0.92f, 0.72f));
-                state.PrimaryLabel = _playerZ > -5.5f ? "FİLE VOLESİ ZAMANI" : "TOPSPİN ZAMANLAMA";
+                state.PrimaryLabel = _playerZ > -5.5f ? L("FİLE VOLESİ ZAMANI", "NET VOLLEY TIMING") : L("TOPSPİN ZAMANLAMA", "TOPSPIN TIMING");
                 state.ShowSweetSpot = true;
                 state.SweetSpotMin01 = 0.70f;
                 state.SweetSpotMax01 = 0.94f;
@@ -667,7 +684,7 @@ namespace OurWorld.World
             GameFeelAudio.SpawnBurst(transform.TransformPoint(contact), new Color(0.28f, 0.96f, 0.84f), count: 12, spread: 0.42f);
             GameFeelAudio.TriggerHitstop(0.036f);
             _cameraRig?.AddShake(0.12f, 0.16f);
-            SetCallout($"FİLE VOLESİ! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", new Color(0.28f, 0.96f, 0.84f), 1.35f);
+            SetCallout(L($"FİLE VOLESİ! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", $"NET VOLLEY! ({Mathf.RoundToInt(_lastShotKmh)} km/h)"), new Color(0.28f, 0.96f, 0.84f), 1.35f);
             StartFlight(true, contact, targetX, targetZ: 6.8f, firstLeg: 0.58f, extraArc: 0f);
             _returns++;
         }
@@ -688,7 +705,8 @@ namespace OurWorld.World
 
             if (IsAmbientMatch)
             {
-                Camera cam = Camera.main;
+                if (_cachedMainCam == null) _cachedMainCam = Camera.main;
+                Camera cam = _cachedMainCam;
                 if (cam != null && (cam.transform.position - transform.position).sqrMagnitude > AmbientActiveRangeSq)
                 {
                     return;
@@ -940,7 +958,7 @@ namespace OurWorld.World
             if (isOvercharged && Random.value < 0.52f)
             {
                 // Fault into the net!
-                SetCallout("FİLE HATASI! (Gücü altın bölgede bırak)", new Color(0.96f, 0.36f, 0.30f), 1.4f);
+                SetCallout(L("FİLE HATASI! (Gücü altın bölgede bırak)", "NET FAULT! (Release in the gold zone)"), new Color(0.96f, 0.36f, 0.30f), 1.4f);
                 GameFeelAudio.PlayRefereeWhistle(doubleBlast: false);
                 StartFlight(true, _serveContact, _queuedAim * 1.4f, targetZ: 0.1f, firstLeg: 0.42f, extraArc: 0f);
                 AwardPoint(playerWon: false);
@@ -965,13 +983,13 @@ namespace OurWorld.World
                 GameFeelAudio.SpawnBurst(transform.TransformPoint(_serveContact), new Color(1.0f, 0.86f, 0.24f), count: 14, spread: 0.48f);
                 GameFeelAudio.TriggerHitstop(0.038f);
                 _cameraRig?.AddShake(0.14f, 0.18f);
-                SetCallout($"ALTIN SERVİS! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", new Color(1.0f, 0.86f, 0.24f), 1.35f);
+                SetCallout(L($"ALTIN SERVİS! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", $"GOLDEN SERVE! ({Mathf.RoundToInt(_lastShotKmh)} km/h)"), new Color(1.0f, 0.86f, 0.24f), 1.35f);
             }
             else
             {
                 SetTrailColor(new Color(0.32f, 0.94f, 0.80f, 0.72f));
                 if (_ballTrail != null) _ballTrail.emitting = true;
-                SetCallout($"SERVİS ({Mathf.RoundToInt(_lastShotKmh)} km/s)", new Color(0.34f, 0.94f, 0.82f), 1.0f);
+                SetCallout(L($"SERVİS ({Mathf.RoundToInt(_lastShotKmh)} km/s)", $"SERVE ({Mathf.RoundToInt(_lastShotKmh)} km/h)"), new Color(0.34f, 0.94f, 0.82f), 1.0f);
             }
 
             StartFlight(true, _serveContact, targetX, targetZ: 9.8f, firstLeg: firstLeg, extraArc: 0f);
@@ -1077,17 +1095,17 @@ namespace OurWorld.World
                 if (_returns <= 1 && _lastShotKind == ShotKind.GoldenServe)
                 {
                     _acesCount++;
-                    SetCallout($"ACE SERVİS SAYISI! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", new Color(1.0f, 0.86f, 0.22f), 1.65f);
+                    SetCallout(L($"ACE SERVİS SAYISI! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", $"ACE SERVE! ({Mathf.RoundToInt(_lastShotKmh)} km/h)"), new Color(1.0f, 0.86f, 0.22f), 1.65f);
                 }
                 else
                 {
                     _winnersCount++;
                     string winType = _lastShotKind switch
                     {
-                        ShotKind.DropShot => "KISA TOP WINNER!",
-                        ShotKind.Lob => "MUHTEŞEM LOB WINNER!",
-                        ShotKind.Volley => "FİLE VOLESİ WINNER!",
-                        _ => $"KÖŞEYE WINNER! ({Mathf.RoundToInt(_lastShotKmh)} km/s)"
+                        ShotKind.DropShot => L("KISA TOP WINNER!", "DROP SHOT WINNER!"),
+                        ShotKind.Lob => L("MUHTEŞEM LOB WINNER!", "AMAZING LOB WINNER!"),
+                        ShotKind.Volley => L("FİLE VOLESİ WINNER!", "NET VOLLEY WINNER!"),
+                        _ => L($"KÖŞEYE WINNER! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", $"CORNER WINNER! ({Mathf.RoundToInt(_lastShotKmh)} km/h)")
                     };
                     SetCallout(winType, new Color(0.28f, 0.96f, 0.82f), 1.55f);
                 }
@@ -1157,7 +1175,7 @@ namespace OurWorld.World
                 _lastShotKmh = Random.Range(48f, 64f);
                 SetTrailColor(new Color(0.36f, 0.96f, 0.84f, 0.85f));
                 GameFeelAudio.SpawnBurst(transform.TransformPoint(contact), new Color(0.36f, 0.96f, 0.84f), count: 8, spread: 0.32f);
-                SetCallout("KISA TOP (DROP SHOT)!", new Color(0.36f, 0.96f, 0.84f), 1.25f);
+                SetCallout(L("KISA TOP (DROP SHOT)!", "DROP SHOT!"), new Color(0.36f, 0.96f, 0.84f), 1.25f);
             }
             else if (kind == ShotKind.Lob)
             {
@@ -1167,7 +1185,7 @@ namespace OurWorld.World
                 extraArc = 3.85f;
                 _lastShotKmh = Random.Range(68f, 84f);
                 SetTrailColor(new Color(0.38f, 0.82f, 1.0f, 0.85f));
-                SetCallout("TAKTİK LOB!", new Color(0.38f, 0.84f, 1.0f), 1.25f);
+                SetCallout(L("TAKTİK LOB!", "TACTICAL LOB!"), new Color(0.38f, 0.84f, 1.0f), 1.25f);
             }
             else
             {
@@ -1178,7 +1196,7 @@ namespace OurWorld.World
                     GameFeelAudio.SpawnBurst(transform.TransformPoint(contact), new Color(1.0f, 0.85f, 0.24f), count: 12, spread: 0.42f);
                     GameFeelAudio.TriggerHitstop(0.032f);
                     _cameraRig?.AddShake(0.11f, 0.14f);
-                    SetCallout($"MÜKEMMEL TOPSPİN! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", new Color(1.0f, 0.86f, 0.24f), 1.25f);
+                    SetCallout(L($"MÜKEMMEL TOPSPİN! ({Mathf.RoundToInt(_lastShotKmh)} km/s)", $"PERFECT TOPSPIN! ({Mathf.RoundToInt(_lastShotKmh)} km/h)"), new Color(1.0f, 0.86f, 0.24f), 1.25f);
                 }
                 else
                 {
@@ -1196,7 +1214,8 @@ namespace OurWorld.World
             if (_ballSound == null || clip == null) return;
             if (IsAmbientMatch)
             {
-                Camera cam = Camera.main;
+                if (_cachedMainCam == null) _cachedMainCam = Camera.main;
+                Camera cam = _cachedMainCam;
                 if (cam == null || (cam.transform.position - transform.position).sqrMagnitude > 22f * 22f) return;
             }
             _ballSound.PlayOneShot(clip, volume);

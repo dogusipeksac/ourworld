@@ -236,12 +236,12 @@ namespace OurWorld.Core
             if (onFinished == null) return;
             if (!IsConfigured)
             {
-                onFinished(new List<CommunityMessage>(), "Firebase ayarlı değil.");
+                onFinished(new List<CommunityMessage>(), LocalizationService.Tr("feedback.err.unconfigured", "Firebase ayarlı değil."));
                 return;
             }
             if (Application.internetReachability == NetworkReachability.NotReachable)
             {
-                onFinished(new List<CommunityMessage>(), "İnternet bağlantısı yok.");
+                onFinished(new List<CommunityMessage>(), LocalizationService.Tr("feedback.err.offline", "İnternet bağlantısı yok."));
                 return;
             }
 
@@ -253,7 +253,7 @@ namespace OurWorld.Core
             yield return EnsureAuth();
             if (string.IsNullOrEmpty(_idToken))
             {
-                onFinished(new List<CommunityMessage>(), "Bağlantı doğrulanamadı (Firebase Anonymous Auth kontrol edin).");
+                onFinished(new List<CommunityMessage>(), LocalizationService.Tr("feedback.err.auth", "Bağlantı doğrulanamadı. Lütfen internetinizi kontrol edip tekrar deneyin."));
                 yield break;
             }
 
@@ -273,7 +273,7 @@ namespace OurWorld.Core
                     {
                         _idToken = null;
                     }
-                    onFinished(new List<CommunityMessage>(), $"Mesajlar alınamadı ({req.responseCode}).");
+                    onFinished(new List<CommunityMessage>(), string.Format(LocalizationService.Tr("feedback.err.fetch", "Mesajlar alınamadı ({0})."), req.responseCode));
                     yield break;
                 }
 
@@ -295,7 +295,7 @@ namespace OurWorld.Core
         private static string NormalizeSenderName(string senderName)
         {
             string s = (senderName ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(s)) return "Oyuncu";
+            if (string.IsNullOrEmpty(s)) return LocalizationService.Tr("feedback.default_sender", "Oyuncu");
             if (s.Length > MaxSenderNameLength) s = s.Substring(0, MaxSenderNameLength);
             return s;
         }

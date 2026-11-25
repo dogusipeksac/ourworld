@@ -67,7 +67,7 @@ namespace OurWorld.World
 
         private void Start()
         {
-            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             _goldMat = new Material(sh);
             if (_goldMat.HasProperty("_BaseColor")) _goldMat.SetColor("_BaseColor", new Color(1.0f, 0.80f, 0.22f));
             if (_goldMat.HasProperty("_Metallic")) _goldMat.SetFloat("_Metallic", 0.82f);

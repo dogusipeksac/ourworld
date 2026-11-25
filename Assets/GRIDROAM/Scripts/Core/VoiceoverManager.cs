@@ -65,6 +65,7 @@ namespace OurWorld.Core
         private AudioSource _worldSource;
         private Transform _worldEmitter;
         private Transform _worldSpeakerTarget;
+        private Camera _cachedMainCam;
 
         private readonly Dictionary<string, AmbientEntry> _ambientByText = new Dictionary<string, AmbientEntry>(StringComparer.Ordinal);
         private readonly Dictionary<string, AudioClip> _clipCache = new Dictionary<string, AudioClip>(MaxCachedClips + 2, StringComparer.Ordinal);
@@ -234,7 +235,8 @@ namespace OurWorld.Core
             if (MissionManager.Instance != null && MissionManager.Instance.IsDialoguePlaying) return;
             if (_dialogueSource != null && _dialogueSource.isPlaying) return;
 
-            Camera cam = Camera.main;
+            if (_cachedMainCam == null) _cachedMainCam = Camera.main;
+            Camera cam = _cachedMainCam;
             Vector3 listenerPos = cam != null
                 ? cam.transform.position
                 : (OurWorld.Player.PlayerModeController.Instance != null
@@ -329,7 +331,7 @@ namespace OurWorld.Core
                 }
 
                 // Deterministic gender/age variety for unnamed crowd/spectator NPCs so each individual stays consistent
-                int hash = Mathf.Abs(speaker.GetInstanceID());
+                int hash = speaker.GetHashCode() & 0x7FFFFFFF;
                 return (hash % 2 == 0) ? SpeakerVoiceBand.YoungFemale : SpeakerVoiceBand.YoungMale;
             }
 

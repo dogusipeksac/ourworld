@@ -256,7 +256,7 @@ namespace OurWorld.World
 
             // Use URP/Lit for emissive bulbs and poles (always included in scene builds -> 100% iOS shader-strip-proof!)
             Shader litShader = Shader.Find("Universal Render Pipeline/Lit")
-                ?? Shader.Find("Standard")
+                ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit")
                 ?? Shader.Find("Sprites/Default");
             if (litShader == null) return;
 

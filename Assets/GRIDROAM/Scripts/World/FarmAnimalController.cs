@@ -767,14 +767,27 @@ namespace OurWorld.World
             }
         }
 
+        private readonly System.Collections.Generic.List<Material> _runtimeMats =
+            new System.Collections.Generic.List<Material>(8);
+
+        private void OnDestroy()
+        {
+            for (int i = 0; i < _runtimeMats.Count; i++)
+            {
+                if (_runtimeMats[i] != null) Destroy(_runtimeMats[i]);
+            }
+            _runtimeMats.Clear();
+        }
+
         private void BuildProceduralAnimalMesh(FarmAnimalKind kind, int seed)
         {
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Shader unlit = Shader.Find("Universal Render Pipeline/Unlit") ?? lit;
 
             Material Make(Color c, float smooth = 0.22f)
             {
                 Material m = new Material(lit);
+                _runtimeMats.Add(m);
                 if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
                 if (m.HasProperty("_Color")) m.SetColor("_Color", c);
                 if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smooth);
@@ -782,6 +795,7 @@ namespace OurWorld.World
             }
 
             Material glowMat = new Material(unlit);
+            _runtimeMats.Add(glowMat);
             Color glowCol = kind == FarmAnimalKind.Cow ? new Color(0.96f, 0.98f, 1.0f) : new Color(1.0f, 0.90f, 0.42f);
             if (glowMat.HasProperty("_BaseColor")) glowMat.SetColor("_BaseColor", glowCol);
             if (glowMat.HasProperty("_Color")) glowMat.SetColor("_Color", glowCol);

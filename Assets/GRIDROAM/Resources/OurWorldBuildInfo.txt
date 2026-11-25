@@ -1,2 +1,2 @@
 android=1
-ios=7
+ios=8

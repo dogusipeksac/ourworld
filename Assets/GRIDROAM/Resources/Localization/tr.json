@@ -2640,6 +2640,54 @@
     {
       "key": "sports.shooting.controls",
       "value": "Sürükle/Fare: Nişan Al · Sol Tık/F: Ateş Et · Sağ Tık/Boşluk: Nişan/Dürbün · R: Şarjör · 1-4: Silah · Shift: Nefes Tut · E: Çıkış"
+    },
+    {
+      "key": "sports.tennis.title",
+      "value": "HAMİDİYE TENİS KORTU"
+    },
+    {
+      "key": "ui.menu.set_voice",
+      "value": "Seslendirme"
+    },
+    {
+      "key": "ui.menu.set_invert_y",
+      "value": "Kamera Y Ekseni"
+    },
+    {
+      "key": "ui.menu.normal",
+      "value": "Normal"
+    },
+    {
+      "key": "ui.menu.inverted",
+      "value": "Ters"
+    },
+    {
+      "key": "ui.menu.set_subtitles",
+      "value": "Altyazı Boyutu"
+    },
+    {
+      "key": "ui.menu.large",
+      "value": "Büyük"
+    },
+    {
+      "key": "feedback.err.unconfigured",
+      "value": "Firebase ayarlı değil."
+    },
+    {
+      "key": "feedback.err.offline",
+      "value": "İnternet bağlantısı yok."
+    },
+    {
+      "key": "feedback.err.auth",
+      "value": "Bağlantı doğrulanamadı. Lütfen internetinizi kontrol edip tekrar deneyin."
+    },
+    {
+      "key": "feedback.err.fetch",
+      "value": "Mesajlar alınamadı ({0})."
+    },
+    {
+      "key": "feedback.default_sender",
+      "value": "Oyuncu"
     }
   ]
 }

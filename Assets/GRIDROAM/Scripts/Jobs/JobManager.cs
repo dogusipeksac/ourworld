@@ -230,8 +230,11 @@ namespace OurWorld.Jobs
             }
         }
 
+        private Material _taxiPassengerMat;
+
         private void OnDestroy()
         {
+            if (_taxiPassengerMat != null) Destroy(_taxiPassengerMat);
             if (_allVehicles != null)
             {
                 for (int i = 0; i < _allVehicles.Length; i++)
@@ -611,8 +614,9 @@ namespace OurWorld.Jobs
             taxiPassengerObject = new GameObject("TaxiPassenger_Runtime");
             taxiPassengerObject.transform.SetParent(transform, false);
             Shader lit = Shader.Find("Universal Render Pipeline/Lit");
-            if (lit == null) lit = Shader.Find("Standard");
+            if (lit == null) lit = Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Material mat = new Material(lit);
+            _taxiPassengerMat = mat;
             taxiPassengerHumanoid = ProceduralHumanoid.Build(taxiPassengerObject.transform, mat, mat, mat, mat, mat, 1.75f);
         }
 

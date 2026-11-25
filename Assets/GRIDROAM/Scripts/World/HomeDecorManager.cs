@@ -140,8 +140,16 @@ namespace OurWorld.World
             }
         }
 
+        private readonly System.Collections.Generic.List<Material> _runtimeMats =
+            new System.Collections.Generic.List<Material>(8);
+
         private void OnDestroy()
         {
+            for (int i = 0; i < _runtimeMats.Count; i++)
+            {
+                if (_runtimeMats[i] != null) Destroy(_runtimeMats[i]);
+            }
+            _runtimeMats.Clear();
             if (Instance == this) Instance = null;
         }
 
@@ -311,10 +319,12 @@ namespace OurWorld.World
                     new Vector3(-58.8f, 0f, 6.2f),
                     new Vector3(-51.6f, 0f, 6.2f)
                 };
-                Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
                 Material postMat = new Material(lit);
+                _runtimeMats.Add(postMat);
                 if (postMat.HasProperty("_BaseColor")) postMat.SetColor("_BaseColor", new Color(0.20f, 0.18f, 0.17f));
                 Material bulbMat = new Material(lit);
+                _runtimeMats.Add(bulbMat);
                 if (bulbMat.HasProperty("_BaseColor")) bulbMat.SetColor("_BaseColor", new Color(1.0f, 0.90f, 0.65f));
 
                 for (int i = 0; i < posts.Length; i++)
@@ -359,10 +369,12 @@ namespace OurWorld.World
 
         private void BuildDecorCatalogStand()
         {
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             Material woodMat = new Material(lit);
+            _runtimeMats.Add(woodMat);
             if (woodMat.HasProperty("_BaseColor")) woodMat.SetColor("_BaseColor", new Color(0.42f, 0.26f, 0.14f));
             Material boardMat = new Material(lit);
+            _runtimeMats.Add(boardMat);
             if (boardMat.HasProperty("_BaseColor")) boardMat.SetColor("_BaseColor", new Color(0.12f, 0.46f, 0.48f));
 
             GameObject stand = new GameObject("No48_HomeDecorCatalogBoard");

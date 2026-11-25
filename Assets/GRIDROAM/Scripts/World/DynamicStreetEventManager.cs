@@ -52,7 +52,7 @@ namespace OurWorld.World
 
         private void Awake()
         {
-            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             _ringMat = new Material(sh);
             if (_ringMat.HasProperty("_BaseColor")) _ringMat.SetColor("_BaseColor", new Color(0.22f, 0.90f, 0.85f));
             if (_ringMat.HasProperty("_EmissionColor"))

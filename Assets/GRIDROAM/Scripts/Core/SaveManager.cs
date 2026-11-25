@@ -155,6 +155,14 @@ namespace OurWorld.Core
             {
                 Data.collectedMemoryIds = new List<string>();
             }
+            if (Data.farmPlots == null)
+            {
+                Data.farmPlots = new List<FarmPlotSaveEntry>();
+            }
+            if (Data.bestFishName == null)
+            {
+                Data.bestFishName = string.Empty;
+            }
 
             // Forward-compatibility guard: never auto-reset saves written by a newer schema version!
             if (Data.schemaVersion > CurrentSchemaVersion)

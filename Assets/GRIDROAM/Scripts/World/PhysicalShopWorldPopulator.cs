@@ -17,7 +17,7 @@ namespace OurWorld.World
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoBootstrap()
         {
-            if (FindFirstObjectByType<PhysicalShopWorldPopulator>() != null) return;
+            if (FindAnyObjectByType<PhysicalShopWorldPopulator>() != null) return;
             GameObject host = new GameObject("PhysicalShopWorldPopulator");
             host.AddComponent<PhysicalShopWorldPopulator>();
         }
@@ -114,7 +114,9 @@ namespace OurWorld.World
                 InteractableTrigger kasaTrig = bakkalKasa.GetComponent<InteractableTrigger>();
                 if (kasaTrig != null)
                 {
-                    kasaTrig.SetCustomPrompt("Kasa Bandı (Önce raftan ürün al)");
+                    kasaTrig.SetCustomPrompt(
+                        "Kasa Bandı (Önce raftan ürün al)",
+                        "Checkout Belt (Pick items from shelves first)");
                 }
             }
 

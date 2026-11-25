@@ -17,6 +17,7 @@ namespace OurWorld.World
 
         private BoxCollider _zoneBox;
         private ThirdPersonCameraRig _cameraRig;
+        private float _nextCamRigLookupTime;
         private bool _playerInside;
 
         public bool IsPlayerInside => _playerInside;
@@ -103,8 +104,9 @@ namespace OurWorld.World
                 _playerInside = insideNow;
                 SetLightsEnabled(_playerInside);
 
-                if (_cameraRig == null)
+                if (_cameraRig == null && Time.time >= _nextCamRigLookupTime)
                 {
+                    _nextCamRigLookupTime = Time.time + 1f;
                     _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
                 }
                 if (_cameraRig != null)

@@ -17,6 +17,8 @@ namespace OurWorld.Core
         public string titleEn;
         public string descriptionTr;
         public string descriptionEn;
+        public string[] tagsTr;
+        public string[] tagsEn;
         public bool fromLiveFirestore;
 
         public string GetTitle(bool isTr) =>
@@ -28,6 +30,14 @@ namespace OurWorld.Core
             isTr
                 ? (!string.IsNullOrWhiteSpace(descriptionTr) ? descriptionTr : descriptionEn)
                 : (!string.IsNullOrWhiteSpace(descriptionEn) ? descriptionEn : descriptionTr);
+
+        public string[] GetTags(bool isTr)
+        {
+            string[] preferred = isTr ? tagsTr : tagsEn;
+            if (preferred != null && preferred.Length > 0) return preferred;
+            string[] fallback = isTr ? tagsEn : tagsTr;
+            return fallback != null && fallback.Length > 0 ? fallback : Array.Empty<string>();
+        }
     }
 
     [Serializable]

@@ -51,6 +51,7 @@ namespace OurWorld.Player
     public static class ShopPropFactory
     {
         private static Shader _cachedShader;
+        private static readonly Dictionary<int, Material> MaterialCache = new Dictionary<int, Material>(32);
 
         public static GameObject BuildProp(
             Transform parent,
@@ -61,7 +62,7 @@ namespace OurWorld.Player
         {
             if (_cachedShader == null)
             {
-                _cachedShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                _cachedShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             }
 
             GameObject root = new GameObject($"ShopProp_{visual}");
@@ -208,11 +209,21 @@ namespace OurWorld.Player
 
         private static Material Mat(Color col, float smoothness, float metallic)
         {
+            Color32 c32 = col;
+            int key = (c32.r << 24) ^ (c32.g << 16) ^ (c32.b << 8) ^ c32.a
+                      ^ (Mathf.RoundToInt(smoothness * 100f) * 397)
+                      ^ (Mathf.RoundToInt(metallic * 100f) * 7919);
+            if (MaterialCache.TryGetValue(key, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+
             Material m = new Material(_cachedShader);
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", col);
             if (m.HasProperty("_Color")) m.SetColor("_Color", col);
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", smoothness);
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", metallic);
+            MaterialCache[key] = m;
             return m;
         }
     }

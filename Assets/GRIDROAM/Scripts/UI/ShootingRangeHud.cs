@@ -16,6 +16,9 @@ namespace OurWorld.UI
     /// </summary>
     public sealed class ShootingRangeHud : MonoBehaviour
     {
+        public static ShootingRangeHud Instance { get; private set; }
+        public bool IsArmoryOpen => _armoryRoot != null && _armoryRoot.activeSelf;
+
         private LiveShootingRange _range;
         private Canvas _canvas;
         private Font _font;
@@ -62,6 +65,17 @@ namespace OurWorld.UI
 
         // Armory & Upgrades Drawer
         private GameObject _armoryRoot;
+        private static bool IsEn =>
+            LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+        private static string L(string tr, string en) => IsEn ? en : tr;
+
+        private Text _modeBtnLabels0;
+        private Text _armoryOpenLabel;
+        private Text _pullClayLabel;
+        private Text _reloadBtnLabel;
+        private Text _armoryTitleText;
+        private Text _armoryCloseText;
         private Text _armoryWalletText;
         private Transform _armoryListContent;
         private readonly List<GameObject> _armoryRows = new List<GameObject>(24);
@@ -70,12 +84,23 @@ namespace OurWorld.UI
 
         public void Attach(LiveShootingRange range)
         {
+            Instance = this;
             _range = range;
             if (_canvas == null)
             {
                 BuildCanvasUi();
             }
             RefreshUiState(force: true);
+        }
+
+        public void CloseArmory()
+        {
+            if (_armoryRoot != null && _armoryRoot.activeSelf)
+            {
+                _armoryRoot.SetActive(false);
+                if (_range != null) _range.IsArmoryOpen = false;
+                GameFeelAudio.PlayUiClick();
+            }
         }
 
         public void SetVisible(bool visible)
@@ -150,6 +175,7 @@ namespace OurWorld.UI
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             if (_scopeMaskTex != null) Destroy(_scopeMaskTex);
             if (_targetCardTex != null) Destroy(_targetCardTex);
             if (_canvas != null) Destroy(_canvas.gameObject);
@@ -191,11 +217,11 @@ namespace OurWorld.UI
             {
                 bool has8x = ShootingRangeStore.IsWeaponOwned(ShootingWeaponId.Sniper100m) &&
                              ShootingRangeStore.IsUpgradeOwned(ShootingUpgradeId.SniperScope8x);
-                string windArrow = _range.WindSpeedMs >= 0f ? "→ DOĞU" : "← BATI";
-                string breathTag = _range.IsHoldingBreath ? "NEFES TUTULUYOR" : "SHIFT / NEFES";
+                string windArrow = _range.WindSpeedMs >= 0f ? L("→ DOĞU", "→ EAST") : L("← BATI", "← WEST");
+                string breathTag = _range.IsHoldingBreath ? L("NEFES TUTULUYOR", "HOLDING BREATH") : L("SHIFT / NEFES", "SHIFT / BREATH");
                 _scopeTelemetryText.text =
-                    $"ZOOM: {(has8x ? "8.0x" : "4.0x")}   |   MESAFE: {_range.CurrentTargetDistanceMeters:F1}m\n" +
-                    $"RÜZGAR: {Mathf.Abs(_range.WindSpeedMs):F1} m/s {windArrow}   |   {breathTag}";
+                    $"ZOOM: {(has8x ? "8.0x" : "4.0x")}   |   {L("MESAFE", "DIST")}: {_range.CurrentTargetDistanceMeters:F1}m\n" +
+                    $"{L("RÜZGAR", "WIND")}: {Mathf.Abs(_range.WindSpeedMs):F1} m/s {windArrow}   |   {breathTag}";
                 if (_scopeBreathFill != null)
                 {
                     _scopeBreathFill.fillAmount = _range.BreathFill01;
@@ -262,19 +288,24 @@ namespace OurWorld.UI
                     bool owned = ShootingRangeStore.IsWeaponOwned((ShootingWeaponId)i);
                     string shortName = i switch
                     {
-                        0 => "1 · Tabanca",
-                        1 => "2 · Pompalı",
-                        2 => "3 · Karabin",
+                        0 => L("1 · Tabanca", "1 · Pistol"),
+                        1 => L("2 · Pompalı", "2 · Shotgun"),
+                        2 => L("3 · Karabin", "3 · Carbine"),
                         _ => "4 · Sniper"
                     };
                     _weaponBtnLabels[i].text = owned ? shortName : $"{shortName} ★";
                 }
             }
 
+            if (_modeBtnLabels0 != null) _modeBtnLabels0.text = L("Hedef", "Target");
+            if (_armoryOpenLabel != null) _armoryOpenLabel.text = L("CEPHANELİK", "ARMORY");
+            if (_pullClayLabel != null) _pullClayLabel.text = L("PLAK FIRLAT (C)", "PULL CLAY (C)");
+            if (_reloadBtnLabel != null) _reloadBtnLabel.text = L("ŞARJÖR (R)", "RELOAD (R)");
+
             if (_ammoBigText != null)
             {
                 _ammoBigText.text = _range.IsReloading
-                    ? "DOLUYOR..."
+                    ? L("DOLUYOR...", "RELOADING...")
                     : $"{_range.CurrentAmmo} / {_range.CurrentMaxAmmo}";
                 _ammoBigText.color = _range.CurrentAmmo <= 2
                     ? new Color(1.0f, 0.42f, 0.34f)
@@ -284,9 +315,11 @@ namespace OurWorld.UI
             if (_weaponSubText != null)
             {
                 bool owns = ShootingRangeStore.IsWeaponOwned(_range.CurrentWeapon);
+                WeaponSpec spec = _range.GetCurrentSpec();
+                string wName = IsEn ? spec.NameEn : spec.NameTr;
                 _weaponSubText.text = owns
-                    ? $"{_range.GetCurrentSpec().NameTr} · Kişisel (+%30 Ödül)"
-                    : $"{_range.GetCurrentSpec().NameTr} · Kulüp Deneme Silahı";
+                    ? $"{wName} · {L("Kişisel (+%30 Ödül)", "Owned (+30% Bonus)")}"
+                    : $"{wName} · {L("Kulüp Deneme Silahı", "Club Rental Gun")}";
             }
 
             if (_pullClayBtnGo != null)
@@ -543,29 +576,32 @@ namespace OurWorld.UI
                     modeNames[i], 19, new Color(0.08f, 0.12f, 0.18f, 0.88f), Color.white,
                     () => { if (_range != null) { _range.IsArmoryOpen = false; _armoryRoot?.SetActive(false); _range.SelectMode((ShootingModeId)idx); } });
                 _modeBtnBgs[i] = btn.GetComponent<Image>();
+                if (i == 0) _modeBtnLabels0 = btn.GetComponentInChildren<Text>();
             }
 
             // Armory & Upgrades button right beside the 4 mode pills!
-            MakeButton("ArmoryOpenBtn", strip.transform,
+            Button armBtn = MakeButton("ArmoryOpenBtn", strip.transform,
                 new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
                 new Vector2(442f, 0f), new Vector2(128f, 52f),
-                "CEPHANELİK", 17, new Color(0.18f, 0.58f, 0.34f, 0.95f), Color.white,
+                L("CEPHANELİK", "ARMORY"), 17, new Color(0.18f, 0.58f, 0.34f, 0.95f), Color.white,
                 ToggleArmoryDrawer);
+            _armoryOpenLabel = armBtn.GetComponentInChildren<Text>();
 
             // Contextual "ÇEK!" Clay Launcher button (visible in Trap mode)
             Button pullBtn = MakeButton("TrapPullBtn", parent,
                 new Vector2(0f, 1f), new Vector2(0f, 1f),
                 new Vector2(118f, -242f), new Vector2(190f, 56f),
-                "PLAK FIRLAT (C)", 20, new Color(0.92f, 0.42f, 0.10f, 0.96f), Color.white,
+                L("PLAK FIRLAT (C)", "PULL CLAY (C)"), 20, new Color(0.92f, 0.42f, 0.10f, 0.96f), Color.white,
                 () => _range?.LaunchClayPigeon());
             _pullClayBtnGo = pullBtn.gameObject;
+            _pullClayLabel = pullBtn.GetComponentInChildren<Text>();
             _pullClayBtnGo.SetActive(false);
 
             // Contextual Hold Breath button (visible when ADS with Sniper/Carbine)
             Button breathBtn = MakeButton("HoldBreathBtn", parent,
                 new Vector2(0f, 1f), new Vector2(0f, 1f),
                 new Vector2(288f, -242f), new Vector2(180f, 54f),
-                "NEFES TUT", 19, new Color(0.10f, 0.24f, 0.36f, 0.90f), Color.white,
+                L("NEFES TUT", "HOLD BREATH"), 19, new Color(0.10f, 0.24f, 0.36f, 0.90f), Color.white,
                 () => _range?.ToggleBreathHold());
             _breathBtnGo = breathBtn.gameObject;
             _breathBtnBg = breathBtn.GetComponent<Image>();
@@ -582,7 +618,7 @@ namespace OurWorld.UI
                 new Color(0.05f, 0.08f, 0.13f, 0.84f), raycast: false);
 
             // Top row inside bar: Weapon title & big ammo count + Reload button
-            _weaponSubText = MakeText("WeaponSubText", bar.transform, "9mm Tabanca · Kişisel", 18, TextAnchor.MiddleLeft, new Color(0.76f, 0.88f, 0.98f));
+            _weaponSubText = MakeText("WeaponSubText", bar.transform, L("9mm Tabanca · Kişisel", "9mm Sport Pistol · Owned"), 18, TextAnchor.MiddleLeft, new Color(0.76f, 0.88f, 0.98f));
             RectTransform wrt = _weaponSubText.GetComponent<RectTransform>();
             wrt.anchorMin = new Vector2(0f, 0.56f);
             wrt.anchorMax = new Vector2(0.56f, 0.96f);
@@ -596,11 +632,12 @@ namespace OurWorld.UI
             art.offsetMin = Vector2.zero;
             art.offsetMax = new Vector2(-10f, 0f);
 
-            MakeButton("ReloadBtn", bar.transform,
+            Button relBtn = MakeButton("ReloadBtn", bar.transform,
                 new Vector2(1f, 0.76f), new Vector2(1f, 0.76f),
                 new Vector2(-68f, 0f), new Vector2(120f, 40f),
-                "ŞARJÖR (R)", 16, new Color(0.24f, 0.34f, 0.46f, 0.95f), Color.white,
+                L("ŞARJÖR (R)", "RELOAD (R)"), 16, new Color(0.24f, 0.34f, 0.46f, 0.95f), Color.white,
                 () => _range?.StartReload());
+            _reloadBtnLabel = relBtn.GetComponentInChildren<Text>();
 
             // Bottom row: 4 Weapon quick-switch pills
             for (int i = 0; i < 4; i++)
@@ -619,34 +656,40 @@ namespace OurWorld.UI
 
         private void BuildArmoryDrawer(Transform parent)
         {
+            OurWorldUiKit.EnsureInitialized();
             _armoryRoot = MakePanel("ArmoryModalBackdrop", parent,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
-                new Color(0.02f, 0.04f, 0.07f, 0.78f), raycast: true);
+                OurWorldUiKit.Scrim, raycast: true);
 
             GameObject card = MakePanel("ArmoryCard", _armoryRoot.transform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 new Vector2(-470f, -380f), new Vector2(470f, 380f),
-                new Color(0.08f, 0.11f, 0.17f, 0.97f), raycast: true);
+                OurWorldUiKit.CardBg, raycast: true);
+            OurWorldUiKit.ApplyRounded(card.GetComponent<Image>(), OurWorldUiKit.CardSprite, OurWorldUiKit.CardBg);
+            OurWorldUiKit.AddCardDropShadow(card.transform, spread: 28f, offsetY: -12f, alpha: 0.60f);
+            OurWorldUiKit.AddSoftTopGlow(card.transform, OurWorldUiKit.AccentGold, heightPx: 140f, alpha: 0.14f);
+            OurWorldUiKit.AddHairlineBorder(card.transform, OurWorldUiKit.CardOutlineSprite, new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.32f));
 
-            Text title = MakeText("ArmoryTitle", card.transform, "AYDOS CEPHANELİK & 3D SİLAH YÜKSELTME", 26, TextAnchor.MiddleLeft, new Color(1.0f, 0.86f, 0.34f));
-            RectTransform trt = title.GetComponent<RectTransform>();
+            _armoryTitleText = MakeText("ArmoryTitle", card.transform, L("AYDOS CEPHANELİK & 3D SİLAH YÜKSELTME", "AYDOS ARMORY & 3D WEAPON UPGRADES"), 26, TextAnchor.MiddleLeft, new Color(1.0f, 0.86f, 0.34f));
+            RectTransform trt = _armoryTitleText.GetComponent<RectTransform>();
             trt.anchorMin = new Vector2(0f, 1f);
             trt.anchorMax = new Vector2(0.72f, 1f);
             trt.offsetMin = new Vector2(26f, -68f);
             trt.offsetMax = new Vector2(0f, -12f);
 
-            _armoryWalletText = MakeText("ArmoryWallet", card.transform, "Bakiye: 0 ₺", 24, TextAnchor.MiddleRight, new Color(0.42f, 0.96f, 0.58f));
+            _armoryWalletText = MakeText("ArmoryWallet", card.transform, L("Bakiye: 0 ₺", "Balance: 0 ₺"), 24, TextAnchor.MiddleRight, new Color(0.42f, 0.96f, 0.58f));
             RectTransform wr = _armoryWalletText.GetComponent<RectTransform>();
             wr.anchorMin = new Vector2(0.65f, 1f);
             wr.anchorMax = new Vector2(0.88f, 1f);
             wr.offsetMin = new Vector2(0f, -68f);
             wr.offsetMax = new Vector2(-10f, -12f);
 
-            MakeButton("CloseArmoryBtn", card.transform,
+            Button closeArmoryBtn = MakeButton("CloseArmoryBtn", card.transform,
                 new Vector2(1f, 1f), new Vector2(1f, 1f),
                 new Vector2(-54f, -40f), new Vector2(82f, 44f),
                 "KAPAT", 18, new Color(0.78f, 0.20f, 0.18f, 0.96f), Color.white,
                 ToggleArmoryDrawer);
+            _armoryCloseText = closeArmoryBtn.GetComponentInChildren<Text>();
 
             // ScrollRect for weapons + 3D attachments
             GameObject scrollGo = new GameObject("ArmoryScroll");
@@ -712,24 +755,43 @@ namespace OurWorld.UI
             }
             _armoryRows.Clear();
 
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             int money = SaveManager.Instance != null ? SaveManager.Instance.Data.money : 0;
-            if (_armoryWalletText != null) _armoryWalletText.text = $"Bakiye: {money} ₺";
+            if (_armoryTitleText != null)
+            {
+                _armoryTitleText.text = isEn ? "AYDOS ARMORY & 3D WEAPON UPGRADES" : "AYDOS CEPHANELİK & 3D SİLAH YÜKSELTME";
+            }
+            if (_armoryCloseText != null)
+            {
+                _armoryCloseText.text = isEn ? "CLOSE" : "KAPAT";
+            }
+            if (_armoryWalletText != null)
+            {
+                _armoryWalletText.text = isEn ? $"Balance: {money} ₺" : $"Bakiye: {money} ₺";
+            }
 
             // Section 1: 4 Firearms
-            AddArmoryHeader("SİLAHLAR (Satın Al -> 3D Eklentiler Açılır + %30 Ödül Bonusu)");
+            AddArmoryHeader(isEn
+                ? "FIREARMS (Unlock 3D Attachments + 30% Reward Bonus)"
+                : "SİLAHLAR (Satın Al -> 3D Eklentiler Açılır + %30 Ödül Bonusu)");
             for (int i = 0; i < LiveShootingRange.Weapons.Length; i++)
             {
                 WeaponSpec w = LiveShootingRange.Weapons[i];
                 bool owned = ShootingRangeStore.IsWeaponOwned(w.Id);
                 bool equipped = _range.CurrentWeapon == w.Id;
-                string sub = $"Şarjör: {w.BaseMag} · {(w.IsFullAuto ? "Seri Atış" : (w.UsesFullScreenScope ? "Dürbünlü" : "Yarı-Oto"))}";
-                string btnLabel = owned ? (equipped ? "KUŞANILDI" : "KUŞAN") : $"SATIN AL ({w.BuyCost} ₺)";
+                string modeTag = w.IsFullAuto
+                    ? (isEn ? "Full-Auto" : "Seri Atış")
+                    : (w.UsesFullScreenScope ? (isEn ? "Scoped" : "Dürbünlü") : (isEn ? "Semi-Auto" : "Yarı-Oto"));
+                string sub = isEn ? $"Mag: {w.BaseMag} · {modeTag}" : $"Şarjör: {w.BaseMag} · {modeTag}";
+                string btnLabel = owned
+                    ? (equipped ? (isEn ? "EQUIPPED" : "KUŞANILDI") : (isEn ? "EQUIP" : "KUŞAN"))
+                    : (isEn ? $"BUY ({w.BuyCost} ₺)" : $"SATIN AL ({w.BuyCost} ₺)");
                 Color btnCol = owned
                     ? (equipped ? new Color(0.18f, 0.62f, 0.36f, 0.95f) : new Color(0.18f, 0.46f, 0.78f, 0.95f))
                     : new Color(0.86f, 0.56f, 0.10f, 0.95f);
 
                 ShootingWeaponId capturedId = w.Id;
-                AddArmoryRow(w.NameTr, sub, btnLabel, btnCol, () =>
+                AddArmoryRow(isEn ? w.NameEn : w.NameTr, sub, btnLabel, btnCol, () =>
                 {
                     if (ShootingRangeStore.IsWeaponOwned(capturedId)) _range.EquipWeapon(capturedId);
                     else _range.TryBuyWeapon(capturedId);
@@ -738,7 +800,10 @@ namespace OurWorld.UI
             }
 
             // Section 2: 11 Visible 3D Attachments for Active Weapon (and all others)
-            AddArmoryHeader($"3D EKLENTİLER · ({_range.GetCurrentSpec().NameTr} öncelikli)");
+            WeaponSpec curSpec = _range.GetCurrentSpec();
+            AddArmoryHeader(isEn
+                ? $"3D ATTACHMENTS · ({curSpec.NameEn} first)"
+                : $"3D EKLENTİLER · ({curSpec.NameTr} öncelikli)");
             for (int pass = 0; pass < 2; pass++)
             {
                 for (int i = 0; i < LiveShootingRange.Upgrades.Length; i++)
@@ -749,15 +814,18 @@ namespace OurWorld.UI
 
                     bool wOwned = ShootingRangeStore.IsWeaponOwned(u.Weapon);
                     bool uOwned = ShootingRangeStore.IsUpgradeOwned(u.Id);
-                    string weaponName = LiveShootingRange.Weapons[(int)u.Weapon].NameTr;
-                    string title = $"{u.NameTr}  [{weaponName}]";
-                    string btnLabel = uOwned ? "TAKILI ✓" : (wOwned ? $"AL ({u.Cost} ₺)" : "SİLAH KİLİTLİ");
+                    WeaponSpec ws = LiveShootingRange.Weapons[(int)u.Weapon];
+                    string weaponName = isEn ? ws.NameEn : ws.NameTr;
+                    string title = $"{(isEn ? u.NameEn : u.NameTr)}  [{weaponName}]";
+                    string btnLabel = uOwned
+                        ? (isEn ? "EQUIPPED ✓" : "TAKILI ✓")
+                        : (wOwned ? (isEn ? $"BUY ({u.Cost} ₺)" : $"AL ({u.Cost} ₺)") : (isEn ? "LOCKED" : "SİLAH KİLİTLİ"));
                     Color btnCol = uOwned
                         ? new Color(0.18f, 0.62f, 0.36f, 0.92f)
                         : (wOwned ? new Color(0.18f, 0.50f, 0.84f, 0.95f) : new Color(0.28f, 0.30f, 0.34f, 0.85f));
 
                     ShootingUpgradeId capU = u.Id;
-                    AddArmoryRow(title, u.EffectTr, btnLabel, btnCol, () =>
+                    AddArmoryRow(title, isEn ? u.EffectEn : u.EffectTr, btnLabel, btnCol, () =>
                     {
                         if (!ShootingRangeStore.IsUpgradeOwned(capU))
                         {
@@ -865,6 +933,7 @@ namespace OurWorld.UI
 
         private Button MakeButton(string name, Transform parent, Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 size, string label, int fontSize, Color bgCol, Color txtCol, UnityEngine.Events.UnityAction onClick)
         {
+            OurWorldUiKit.EnsureInitialized();
             GameObject go = new GameObject(name);
             go.transform.SetParent(parent, false);
             RectTransform rt = go.AddComponent<RectTransform>();
@@ -873,9 +942,12 @@ namespace OurWorld.UI
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
             Image img = go.AddComponent<Image>();
-            img.color = bgCol;
+            OurWorldUiKit.ApplyRounded(img, OurWorldUiKit.SubCardSprite, bgCol);
+            OurWorldUiKit.AddHairlineBorder(go.transform, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
             Button btn = go.AddComponent<Button>();
             btn.targetGraphic = img;
+            UiButtonFeedback fb = go.AddComponent<UiButtonFeedback>();
+            fb.Configure(btn, img);
             btn.onClick.AddListener(onClick);
             MakeText("Label", go.transform, label, fontSize, TextAnchor.MiddleCenter, txtCol);
             return btn;

@@ -400,7 +400,7 @@ namespace OurWorld.World
             mainTrig.transform.localPosition = new Vector3(0f, 0.2f, 1.5f);
             InteractableTrigger trig1 = mainTrig.AddComponent<InteractableTrigger>();
             trig1.Configure(InteractableKind.SportsArena, "sport_shooting_range", "ui.btn.interact", 4.6f);
-            trig1.SetCustomPrompt("Aydos Atış Poligonu'na Gir (4 Silah · 4 Mod)");
+            trig1.SetCustomPrompt("Aydos Atış Poligonu'na Gir (4 Silah · 4 Mod)", "Enter Aydos Shooting Range (4 Weapons · 4 Modes)");
 
             // Secondary Entry Trigger right beside Instructor Usta Haluk at the Armory Desk
             GameObject armoryTrig = new GameObject("ShootingRange_ArmoryTrigger");
@@ -408,7 +408,7 @@ namespace OurWorld.World
             armoryTrig.transform.localPosition = new Vector3(-9.5f, 0.2f, 0.4f);
             InteractableTrigger trig2 = armoryTrig.AddComponent<InteractableTrigger>();
             trig2.Configure(InteractableKind.SportsArena, "sport_shooting_range", "ui.btn.interact", 3.6f);
-            trig2.SetCustomPrompt("Usta Haluk · Poligon & Cephanelik");
+            trig2.SetCustomPrompt("Usta Haluk · Poligon & Cephanelik", "Master Haluk · Range & Armory");
 
             // WorldAnchor so Story Missions / GPS Radar can point straight to Aydos Atış Poligonu!
             GameObject anchorGo = new GameObject("Anchor_ShootingRange");
@@ -748,6 +748,11 @@ namespace OurWorld.World
         public float WindSpeedMs => _windSpeedMs;
         public int CurrentScore => _score;
         public int CurrentCombo => _combo;
+
+        private static bool IsEn => LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+        private static string L(string tr, string en) => IsEn ? en : tr;
+        private static string WeaponName(WeaponSpec spec) => IsEn ? spec.NameEn : spec.NameTr;
+        private static string UpgradeName(UpgradeSpec spec) => IsEn ? spec.NameEn : spec.NameTr;
         public bool IsRoundFinished => _roundFinished;
         public float CurrentTargetDistanceMeters => GetTargetDistanceForHud();
 
@@ -997,8 +1002,8 @@ namespace OurWorld.World
             {
                 GameFeelAudio.PlayReloadClick(complete: true);
                 bool owned = ShootingRangeStore.IsWeaponOwned(id);
-                string tag = owned ? "Kişisel Silah" : "Kulüp Deneme Silahı";
-                SetCallout($"{spec.NameTr} · {tag}", new Color(0.46f, 0.90f, 1.0f), 1.4f);
+                string tag = owned ? L("Kişisel Silah", "Personal Weapon") : L("Kulüp Deneme Silahı", "Club Rental Weapon");
+                SetCallout($"{WeaponName(spec)} · {tag}", new Color(0.46f, 0.90f, 1.0f), 1.4f);
             }
             HudRevision++;
         }
@@ -1139,7 +1144,7 @@ namespace OurWorld.World
                     _roundTimer = 0f;
                     // Align dead-center with over-the-shoulder aim line (-0.50m world X when facing South!)
                     SpawnClassicBullseyeTarget(new Vector3(-3.50f, 0.02f, -24.5f), 1.0f);
-                    SetCallout("KLASİK HEDEF · 10 Atış · 10X Bullseye Avı!", new Color(0.45f, 0.94f, 0.88f), 2.0f);
+                    SetCallout(L("KLASİK HEDEF · 10 Atış · 10X Bullseye Avı!", "CLASSIC BULLSEYE · 10 Shots · Hunt the 10X Ring!"), new Color(0.45f, 0.94f, 0.88f), 2.0f);
                     VoiceoverManager.PlayCallout("range_start_classic", 0.3f);
                     break;
 
@@ -1149,7 +1154,7 @@ namespace OurWorld.World
                     _roundTimer = 60.0f;
                     SpawnIpscSteelCourse();
                     GameFeelAudio.PlayRangeBuzzer();
-                    SetCallout("IPSC ÇELİK PLAKA · 60 sn · KIRMIZIYA ATEŞ ETME!", new Color(1.0f, 0.82f, 0.24f), 2.2f);
+                    SetCallout(L("IPSC ÇELİK PLAKA · 60 sn · KIRMIZIYA ATEŞ ETME!", "IPSC STEEL PLATES · 60s · DON'T SHOOT RED!"), new Color(1.0f, 0.82f, 0.24f), 2.2f);
                     VoiceoverManager.PlayCallout("range_start_ipsc", 0.3f);
                     break;
 
@@ -1157,7 +1162,7 @@ namespace OurWorld.World
                     _totalRoundShots = 12;
                     _shotsLeft = 12;
                     _roundTimer = 0f;
-                    SetCallout("TRAP / SKEET · 12 Kil Plak · 'ÇEK!' veya Otomatik Fırlatma!", new Color(1.0f, 0.58f, 0.20f), 2.2f);
+                    SetCallout(L("TRAP / SKEET · 12 Kil Plak · 'ÇEK!' veya Otomatik Fırlatma!", "TRAP / SKEET · 12 Clay Pigeons · Tap 'PULL!' or Auto-Launch!"), new Color(1.0f, 0.58f, 0.20f), 2.2f);
                     VoiceoverManager.PlayCallout("range_start_trap", 0.3f);
                     break;
 
@@ -1167,7 +1172,8 @@ namespace OurWorld.World
                     _roundTimer = 0f;
                     // Large high-visibility precision target at 96m aligned straight with Bay 4 center scope axis!
                     SpawnClassicBullseyeTarget(new Vector3(9.0f, 0.02f, -99.0f), 1.85f);
-                    SetCallout($"100m KESKİN NİŞANCI · Rüzgâr {Mathf.Abs(_windSpeedMs):F1} m/s {(_windSpeedMs >= 0 ? "→ DOĞU" : "← BATI")}", new Color(0.76f, 0.90f, 1.0f), 2.5f);
+                    string windDirLabel = _windSpeedMs >= 0 ? L("→ DOĞU", "→ EAST") : L("← BATI", "← WEST");
+                    SetCallout(L($"100m KESKİN NİŞANCI · Rüzgâr {Mathf.Abs(_windSpeedMs):F1} m/s {windDirLabel}", $"100m SNIPER · Wind {Mathf.Abs(_windSpeedMs):F1} m/s {windDirLabel}"), new Color(0.76f, 0.90f, 1.0f), 2.5f);
                     VoiceoverManager.PlayCallout("range_start_sniper", 0.3f);
                     break;
             }
@@ -1335,7 +1341,7 @@ namespace OurWorld.World
             });
 
             GameFeelAudio.PlaySlideWhoosh();
-            SetCallout($"ÇEK! Plak #{_claysLaunched}/{_totalRoundShots} Havada!", new Color(1.0f, 0.65f, 0.18f), 1.0f);
+            SetCallout(L($"ÇEK! Plak #{_claysLaunched}/{_totalRoundShots} Havada!", $"PULL! Clay #{_claysLaunched}/{_totalRoundShots} Airborne!"), new Color(1.0f, 0.65f, 0.18f), 1.0f);
             HudRevision++;
         }
 
@@ -1405,7 +1411,7 @@ namespace OurWorld.World
             _reloadTimer = dur;
             UpdateCameraProfile();
             GameFeelAudio.PlayReloadClick(complete: false);
-            SetCallout("ŞARJÖR DEĞİŞTİRİLİYOR...", new Color(0.82f, 0.90f, 1.0f), dur);
+            SetCallout(L("ŞARJÖR DEĞİŞTİRİLİYOR...", "RELOADING..."), new Color(0.82f, 0.90f, 1.0f), dur);
             HudRevision++;
         }
 
@@ -1418,12 +1424,12 @@ namespace OurWorld.World
                 ShootingRangeStore.SetWeaponOwned(id);
                 GameFeelAudio.PlayMilestoneFanfare();
                 EquipWeapon(id, quiet: true);
-                SetCallout($"{Weapons[(int)id].NameTr} SATIN ALINDI! (+%30 Ödül & Eklentiler Açık)", new Color(0.35f, 0.96f, 0.54f), 2.2f);
+                SetCallout(L($"{WeaponName(Weapons[(int)id])} SATIN ALINDI! (+%30 Ödül & Eklentiler Açık)", $"{WeaponName(Weapons[(int)id])} PURCHASED! (+30% Bonus & Upgrades Unlocked)"), new Color(0.35f, 0.96f, 0.54f), 2.2f);
                 HudRevision++;
                 return true;
             }
             GameFeelAudio.PlayEmptyClick();
-            SetCallout($"Yetersiz Bakiye! ({cost} ₺ gerekli)", new Color(1.0f, 0.42f, 0.36f), 1.6f);
+            SetCallout(L($"Yetersiz Bakiye! ({cost} ₺ gerekli)", $"Insufficient Funds! ({cost} ₺ needed)"), new Color(1.0f, 0.42f, 0.36f), 1.6f);
             return false;
         }
 
@@ -1432,7 +1438,7 @@ namespace OurWorld.World
             UpgradeSpec spec = Upgrades[(int)upgId];
             if (!ShootingRangeStore.IsWeaponOwned(spec.Weapon))
             {
-                SetCallout("Önce bu silahı satın almalısın!", new Color(1.0f, 0.68f, 0.25f), 1.6f);
+                SetCallout(L("Önce bu silahı satın almalısın!", "You need to buy this weapon first!"), new Color(1.0f, 0.68f, 0.25f), 1.6f);
                 return false;
             }
             if (ShootingRangeStore.IsUpgradeOwned(upgId)) return true;
@@ -1444,12 +1450,12 @@ namespace OurWorld.World
                 {
                     RefreshWeaponAttachmentVisuals();
                 }
-                SetCallout($"{spec.NameTr} Takıldı!", new Color(0.35f, 0.96f, 0.54f), 1.8f);
+                SetCallout(L($"{UpgradeName(spec)} Takıldı!", $"{UpgradeName(spec)} Installed!"), new Color(0.35f, 0.96f, 0.54f), 1.8f);
                 HudRevision++;
                 return true;
             }
             GameFeelAudio.PlayEmptyClick();
-            SetCallout($"Yetersiz Bakiye! ({spec.Cost} ₺ gerekli)", new Color(1.0f, 0.42f, 0.36f), 1.6f);
+            SetCallout(L($"Yetersiz Bakiye! ({spec.Cost} ₺ gerekli)", $"Insufficient Funds! ({spec.Cost} ₺ needed)"), new Color(1.0f, 0.42f, 0.36f), 1.6f);
             return false;
         }
 
@@ -1580,7 +1586,7 @@ namespace OurWorld.World
                 if (!anyHitThisShot)
                 {
                     _combo = 0;
-                    _hud?.ShowPopup("ISKA!", new Color(0.85f, 0.45f, 0.42f));
+                    _hud?.ShowPopup(L("ISKA!", "MISS!"), new Color(0.85f, 0.45f, 0.42f));
                 }
                 if (_shotsLeft <= 0)
                 {
@@ -1629,7 +1635,7 @@ namespace OurWorld.World
                 // Plot exact normalized impact dot on HUD Zoomed Target Card (-1..+1 where 1 = outer ring 0.35m)
                 _hud?.AddTargetCardDot(new Vector2(dx / 0.35f, dy / 0.35f), isBullseye);
                 _hud?.TriggerHitmarker(isBullseye ? 2 : 1);
-                _hud?.ShowPopup(pts == 11 ? "10X TAM İSABET! (+11)" : $"+{pts} PUAN", isBullseye ? new Color(1.0f, 0.86f, 0.20f) : Color.white);
+                _hud?.ShowPopup(pts == 11 ? L("10X TAM İSABET! (+11)", "10X BULLSEYE! (+11)") : L($"+{pts} PUAN", $"+{pts} PTS"), isBullseye ? new Color(1.0f, 0.86f, 0.20f) : Color.white);
                 GameFeelAudio.PlayBulletImpactPaper(isBullseye);
                 GameFeelAudio.SpawnBurst(hit.point, isBullseye ? new Color(1.0f, 0.85f, 0.22f) : Color.white, isBullseye ? 10 : 5, 0.28f);
                 if (pts == 11)
@@ -1654,7 +1660,7 @@ namespace OurWorld.World
                         _score = Mathf.Max(0, _score - 15);
                         _combo = 0;
                         _hud?.TriggerHitmarker(3);
-                        _hud?.ShowPopup("KIRMIZI HEDEF! -15", new Color(1.0f, 0.24f, 0.20f));
+                        _hud?.ShowPopup(L("KIRMIZI HEDEF! -15", "NO-SHOOT TARGET! -15"), new Color(1.0f, 0.24f, 0.20f));
                         GameFeelAudio.PlayRangeBuzzer();
                         GameFeelAudio.SpawnBurst(hit.point, new Color(1.0f, 0.20f, 0.16f), 10, 0.45f);
                         return true;
@@ -1669,7 +1675,7 @@ namespace OurWorld.World
                     shotPoints += pts;
 
                     _hud?.TriggerHitmarker(mult >= 3 ? 2 : 1);
-                    _hud?.ShowPopup(mult > 1 ? $"ÇELİK! x{mult} (+{pts})" : $"ÇELİK! (+{pts})", mult >= 3 ? new Color(1.0f, 0.86f, 0.20f) : new Color(0.45f, 0.96f, 0.86f));
+                    _hud?.ShowPopup(mult > 1 ? L($"ÇELİK! x{mult} (+{pts})", $"STEEL! x{mult} (+{pts})") : L($"ÇELİK! (+{pts})", $"STEEL! (+{pts})"), mult >= 3 ? new Color(1.0f, 0.86f, 0.20f) : new Color(0.45f, 0.96f, 0.86f));
                     GameFeelAudio.PlaySteelPlatePing(_combo);
                     GameFeelAudio.SpawnBurst(hit.point, new Color(1.0f, 0.84f, 0.30f), 12, 0.48f);
 
@@ -1697,7 +1703,7 @@ namespace OurWorld.World
                     shotPoints += pts;
 
                     _hud?.TriggerHitmarker(2);
-                    _hud?.ShowPopup(_combo >= 3 ? $"PLAK PARÇALANDI! x{_combo} (+{pts})" : $"PLAK PARÇALANDI! (+{pts})", new Color(1.0f, 0.64f, 0.18f));
+                    _hud?.ShowPopup(_combo >= 3 ? L($"PLAK PARÇALANDI! x{_combo} (+{pts})", $"CLAY SHATTERED! x{_combo} (+{pts})") : L($"PLAK PARÇALANDI! (+{pts})", $"CLAY SHATTERED! (+{pts})"), new Color(1.0f, 0.64f, 0.18f));
                     GameFeelAudio.PlayClayShatter();
                     GameFeelAudio.SpawnBurst(pos, new Color(1.0f, 0.44f, 0.08f), 16, 0.85f);
                     GameFeelAudio.TriggerHitstop(0.022f);
@@ -1724,7 +1730,7 @@ namespace OurWorld.World
             _ipscWave++;
             _score += 50;
             GameFeelAudio.PlayMilestoneFanfare();
-            SetCallout($"DALGA {_ipscWave - 1} TEMİZLENDİ! +50 BONUS · Yeni Hedefler Yükseliyor!", new Color(0.38f, 0.96f, 0.56f), 1.8f);
+            SetCallout(L($"DALGA {_ipscWave - 1} TEMİZLENDİ! +50 BONUS · Yeni Hedefler Yükseliyor!", $"WAVE {_ipscWave - 1} CLEARED! +50 BONUS · Resetting Targets!"), new Color(0.38f, 0.96f, 0.56f), 1.8f);
             for (int i = 0; i < _steelUnits.Count; i++)
             {
                 _steelUnits[i].IsKnocked = false;
@@ -1752,10 +1758,10 @@ namespace OurWorld.World
             string medal;
             int cash;
             bool won;
-            if (_score >= gold)        { medal = "ALTIN MADALYA"; cash = 120; won = true; }
-            else if (_score >= silver) { medal = "GÜMÜŞ MADALYA"; cash = 80;  won = true; }
-            else if (_score >= bronze) { medal = "BRONZ MADALYA"; cash = 50;  won = true; }
-            else                       { medal = "ANTRENMAN TAMAM"; cash = 20; won = false; }
+            if (_score >= gold)        { medal = L("ALTIN MADALYA", "GOLD MEDAL"); cash = 120; won = true; }
+            else if (_score >= silver) { medal = L("GÜMÜŞ MADALYA", "SILVER MEDAL"); cash = 80;  won = true; }
+            else if (_score >= bronze) { medal = L("BRONZ MADALYA", "BRONZE MEDAL"); cash = 50;  won = true; }
+            else                       { medal = L("ANTRENMAN TAMAM", "TRAINING COMPLETE"); cash = 20; won = false; }
 
             if (ShootingRangeStore.IsWeaponOwned(_currentWeapon))
             {
@@ -1778,8 +1784,8 @@ namespace OurWorld.World
                 VoiceoverManager.PlayCallout("range_done", 0.2f);
             }
 
-            string rec = isNewRecord ? " · YENİ REKOR!" : "";
-            SetCallout($"{medal}! Skor: {_score}{rec} · +{cash} ₺", won ? new Color(1.0f, 0.85f, 0.22f) : new Color(0.75f, 0.86f, 0.96f), 4.5f);
+            string rec = isNewRecord ? L(" · YENİ REKOR!", " · NEW RECORD!") : "";
+            SetCallout(L($"{medal}! Skor: {_score}{rec} · +{cash} ₺", $"{medal}! Score: {_score}{rec} · +{cash} ₺"), won ? new Color(1.0f, 0.85f, 0.22f) : new Color(0.75f, 0.86f, 0.96f), 4.5f);
             HudRevision++;
         }
 
@@ -2046,7 +2052,7 @@ namespace OurWorld.World
                         Destroy(c.Go);
                         _activeClays.RemoveAt(i);
                         _combo = 0;
-                        _hud?.ShowPopup("PLAK KAÇTI!", new Color(0.88f, 0.45f, 0.36f));
+                        _hud?.ShowPopup(L("PLAK KAÇTI!", "CLAY MISSED!"), new Color(0.88f, 0.45f, 0.36f));
                         if (_claysLaunched >= _totalRoundShots && _activeClays.Count == 0 && !_roundFinished)
                         {
                             FinishCurrentRound();
@@ -2265,15 +2271,15 @@ namespace OurWorld.World
         // =====================================================================
         public string PrimaryButtonLabel()
         {
-            if (_roundFinished) return "Tekrar Oyna";
-            if (_isReloading) return "Doluyor...";
-            return "ATEŞ ET!";
+            if (_roundFinished) return L("Tekrar Oyna", "Play Again");
+            if (_isReloading) return L("Doluyor...", "Reloading...");
+            return L("ATEŞ ET!", "FIRE!");
         }
 
         public string SecondaryButtonLabel()
         {
-            if (GetCurrentSpec().UsesFullScreenScope) return _isAds ? "Dürbün Kapat" : "DÜRBÜN";
-            return _isAds ? "Normal Bakış" : "NİŞAN AL";
+            if (GetCurrentSpec().UsesFullScreenScope) return _isAds ? L("Dürbün Kapat", "Exit Scope") : L("DÜRBÜN", "SCOPE");
+            return _isAds ? L("Normal Bakış", "Hip View") : L("NİŞAN AL", "AIM");
         }
 
         public string ControlsHintKey() => "sports.shooting.controls";
@@ -2282,15 +2288,15 @@ namespace OurWorld.World
         {
             string modeName = _currentMode switch
             {
-                ShootingModeId.ClassicBullseye => $"Klasik Hedef · Kalan: {_shotsLeft}/{_totalRoundShots}",
-                ShootingModeId.IpscSteel       => $"IPSC Çelik · {_roundTimer:F1} sn · Dalga {_ipscWave}",
-                ShootingModeId.TrapClay        => $"Trap Kil Plak · Plak {_claysLaunched}/{_totalRoundShots}",
-                _                              => $"100m Sniper · Kalan: {_shotsLeft}/{_totalRoundShots} · Rüzgâr {Mathf.Abs(_windSpeedMs):F1}m/s {(_windSpeedMs >= 0 ? "→" : "←")}"
+                ShootingModeId.ClassicBullseye => L($"Klasik Hedef · Kalan: {_shotsLeft}/{_totalRoundShots}", $"Classic Bullseye · Left: {_shotsLeft}/{_totalRoundShots}"),
+                ShootingModeId.IpscSteel       => L($"IPSC Çelik · {_roundTimer:F1} sn · Dalga {_ipscWave}", $"IPSC Steel · {_roundTimer:F1}s · Wave {_ipscWave}"),
+                ShootingModeId.TrapClay        => L($"Trap Kil Plak · Plak {_claysLaunched}/{_totalRoundShots}", $"Trap Clay · Clay {_claysLaunched}/{_totalRoundShots}"),
+                _                              => L($"100m Sniper · Kalan: {_shotsLeft}/{_totalRoundShots} · Rüzgâr {Mathf.Abs(_windSpeedMs):F1}m/s {(_windSpeedMs >= 0 ? "→" : "←")}", $"100m Sniper · Left: {_shotsLeft}/{_totalRoundShots} · Wind {Mathf.Abs(_windSpeedMs):F1}m/s {(_windSpeedMs >= 0 ? "→" : "←")}")
             };
             string status = _roundFinished
-                ? "Tur Tamamlandı! Tekrar oynamak için ATEŞ ET'e bas veya mod değiştir."
-                : $"{GetCurrentSpec().NameTr}  ·  Mermi: {CurrentAmmo}/{CurrentMaxAmmo}  ·  Rekor: {ShootingRangeStore.GetBestScore(_currentMode)}";
-            return $"Aydos Atış Poligonu  ·  {modeName}  ·  Skor: {_score}\n{status}";
+                ? L("Tur Tamamlandı! Tekrar oynamak için ATEŞ ET'e bas veya mod değiştir.", "Round Complete! Tap FIRE to play again or switch mode.")
+                : L($"{WeaponName(GetCurrentSpec())}  ·  Mermi: {CurrentAmmo}/{CurrentMaxAmmo}  ·  Rekor: {ShootingRangeStore.GetBestScore(_currentMode)}", $"{WeaponName(GetCurrentSpec())}  ·  Ammo: {CurrentAmmo}/{CurrentMaxAmmo}  ·  Best: {ShootingRangeStore.GetBestScore(_currentMode)}");
+            return L($"Aydos Atış Poligonu  ·  {modeName}  ·  Skor: {_score}\n{status}", $"Aydos Shooting Range  ·  {modeName}  ·  Score: {_score}\n{status}");
         }
 
         public SportHudMeterState GetHudMeterState()
@@ -2308,14 +2314,14 @@ namespace OurWorld.World
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = Mathf.Clamp01(1f - (_reloadTimer / _reloadDuration));
                 state.PrimaryColor = new Color(0.40f, 0.86f, 1.0f);
-                state.PrimaryLabel = "ŞARJÖR DEĞİŞTİRİLİYOR...";
+                state.PrimaryLabel = L("ŞARJÖR DEĞİŞTİRİLİYOR...", "RELOADING...");
             }
             else if (_currentMode == ShootingModeId.IpscSteel && !_roundFinished)
             {
                 state.ShowPrimaryBar = true;
                 state.PrimaryFill01 = Mathf.Clamp01(_roundTimer / 60f);
                 state.PrimaryColor = _roundTimer < 12f ? new Color(1.0f, 0.32f, 0.24f) : new Color(1.0f, 0.82f, 0.24f);
-                state.PrimaryLabel = _combo >= 2 ? $"SÜRE · SERİ x{_combo}" : "IPSC SÜRESİ";
+                state.PrimaryLabel = _combo >= 2 ? L($"SÜRE · SERİ x{_combo}", $"TIME · STREAK x{_combo}") : L("IPSC SÜRESİ", "IPSC TIMER");
             }
             return state;
         }

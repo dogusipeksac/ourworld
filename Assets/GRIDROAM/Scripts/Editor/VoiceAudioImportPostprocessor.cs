@@ -29,7 +29,7 @@ namespace OurWorld.Editor
             {
                 loadType = AudioClipLoadType.CompressedInMemory,
                 compressionFormat = AudioCompressionFormat.Vorbis,
-                quality = 0.48f,
+                quality = 0.36f,
                 sampleRateSetting = AudioSampleRateSetting.PreserveSampleRate,
                 preloadAudioData = false
             };

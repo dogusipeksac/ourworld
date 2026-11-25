@@ -1,0 +1,557 @@
+{
+  "language": "en",
+  "ambientEntries": [
+    {
+      "text": "Taze çıtır simit var, sıcak sıcak!",
+      "clipId": "amb_vendor_ahmet_1"
+    },
+    {
+      "text": "Fresh crispy simit right here, hot and warm!",
+      "clipId": "amb_vendor_ahmet_1"
+    },
+    {
+      "text": "Sabah simidi 10 TL, susamlı çıtır!",
+      "clipId": "amb_vendor_ahmet_2"
+    },
+    {
+      "text": "Morning sesame simit, ten lira, fresh and crispy!",
+      "clipId": "amb_vendor_ahmet_2"
+    },
+    {
+      "text": "Maç arası sıcak simit al, enerjin dolsun!",
+      "clipId": "amb_vendor_kemal_1"
+    },
+    {
+      "text": "Grab a hot simit between matches to recharge!",
+      "clipId": "amb_vendor_kemal_1"
+    },
+    {
+      "text": "Halı sahada gol atan simidi kapar!",
+      "clipId": "amb_vendor_kemal_2"
+    },
+    {
+      "text": "Score a goal on the pitch and grab a simit!",
+      "clipId": "amb_vendor_kemal_2"
+    },
+    {
+      "text": "Tavşan kanı ince belli çaylar taze!",
+      "clipId": "amb_vendor_riza_1"
+    },
+    {
+      "text": "Freshly brewed Turkish tea, piping hot!",
+      "clipId": "amb_vendor_riza_1"
+    },
+    {
+      "text": "Buyur otur komşu, çayın hemen geliyor!",
+      "clipId": "amb_vendor_riza_2"
+    },
+    {
+      "text": "Have a seat neighbor, your tea is coming right up!",
+      "clipId": "amb_vendor_riza_2"
+    },
+    {
+      "text": "Gölet manzarasında sıcak simit gibisi yok!",
+      "clipId": "amb_vendor_lake_1"
+    },
+    {
+      "text": "Nothing beats warm simit by the lakeside view!",
+      "clipId": "amb_vendor_lake_1"
+    },
+    {
+      "text": "Kuğular da simit kokusuna geliyor!",
+      "clipId": "amb_vendor_lake_2"
+    },
+    {
+      "text": "Even the swans are swimming over for the simit!",
+      "clipId": "amb_vendor_lake_2"
+    },
+    {
+      "text": "Günaydın Deniz! Tezgahta sıcacık simitler hazır, 1984 hatıraları da aklımda!",
+      "clipId": "amb_ch6_ahmet"
+    },
+    {
+      "text": "Good morning Deniz! Warm simits are ready at the stall, and those 1984 memories are fresh in my mind!",
+      "clipId": "amb_ch6_ahmet"
+    },
+    {
+      "text": "Hoş geldin evladım, çınar altında tavşan kanı çayımız her daim taze!",
+      "clipId": "amb_ch6_riza"
+    },
+    {
+      "text": "Welcome my friend, our fresh tea under the plane tree is always ready!",
+      "clipId": "amb_ch6_riza"
+    },
+    {
+      "text": "Kuğular bugün bir başka zarif yüzüyor Deniz. Göletin suları eski hatıralarla dolu...",
+      "clipId": "amb_ch6_tarik"
+    },
+    {
+      "text": "The swans look especially graceful today, Deniz. This lake holds so many old memories.",
+      "clipId": "amb_ch6_tarik"
+    },
+    {
+      "text": "Havuzda 50m yarışa ya da tramplen dalışına hazırsan başlangıç bloğu seni bekliyor!",
+      "clipId": "amb_ch6_selin"
+    },
+    {
+      "text": "If you are ready for the fifty meter swim race or the diving board, the starting block is waiting!",
+      "clipId": "amb_ch6_selin"
+    },
+    {
+      "text": "Aydos Çiftliği bereket saçıyor! Yeni keçilerimiz Akkız ve Kınalı seni görünce sevindi.",
+      "clipId": "amb_ch6_irfan"
+    },
+    {
+      "text": "Aydos Farm is thriving! Our new goats are happy to see you.",
+      "clipId": "amb_ch6_irfan"
+    },
+    {
+      "text": "Günaydın komşu, hava bugün harika!",
+      "clipId": "amb_greet_1_f",
+      "femaleClipId": "amb_greet_1_f",
+      "elderFemaleClipId": "amb_greet_1_f",
+      "maleClipId": "amb_greet_1_m",
+      "elderMaleClipId": "amb_greet_1_m"
+    },
+    {
+      "text": "Good morning neighbor, the weather is wonderful today!",
+      "clipId": "amb_greet_1_f",
+      "femaleClipId": "amb_greet_1_f",
+      "elderFemaleClipId": "amb_greet_1_f",
+      "maleClipId": "amb_greet_1_m",
+      "elderMaleClipId": "amb_greet_1_m"
+    },
+    {
+      "text": "Çay bahçesinde taze dem var, uğra mutlaka!",
+      "clipId": "amb_greet_2_f",
+      "femaleClipId": "amb_greet_2_f",
+      "elderFemaleClipId": "amb_greet_2_f",
+      "maleClipId": "amb_greet_2_m",
+      "elderMaleClipId": "amb_greet_2_m"
+    },
+    {
+      "text": "Fresh tea is brewing at the tea garden, stop by!",
+      "clipId": "amb_greet_2_f",
+      "femaleClipId": "amb_greet_2_f",
+      "elderFemaleClipId": "amb_greet_2_f",
+      "maleClipId": "amb_greet_2_m",
+      "elderMaleClipId": "amb_greet_2_m"
+    },
+    {
+      "text": "Mahallemiz her geçen gün daha da güzelleşiyor.",
+      "clipId": "amb_greet_3_f",
+      "femaleClipId": "amb_greet_3_f",
+      "elderFemaleClipId": "amb_greet_3_f",
+      "maleClipId": "amb_greet_3_m",
+      "elderMaleClipId": "amb_greet_3_m"
+    },
+    {
+      "text": "Our neighborhood looks livelier every single day.",
+      "clipId": "amb_greet_3_f",
+      "femaleClipId": "amb_greet_3_f",
+      "elderFemaleClipId": "amb_greet_3_f",
+      "maleClipId": "amb_greet_3_m",
+      "elderMaleClipId": "amb_greet_3_m"
+    },
+    {
+      "text": "Selman Sokağı'nda simit kokusu harika!",
+      "clipId": "amb_greet_4_f",
+      "femaleClipId": "amb_greet_4_f",
+      "elderFemaleClipId": "amb_greet_4_f",
+      "maleClipId": "amb_greet_4_m",
+      "elderMaleClipId": "amb_greet_4_m"
+    },
+    {
+      "text": "The fresh simit aroma on Selman Street smells amazing!",
+      "clipId": "amb_greet_4_f",
+      "femaleClipId": "amb_greet_4_f",
+      "elderFemaleClipId": "amb_greet_4_f",
+      "maleClipId": "amb_greet_4_m",
+      "elderMaleClipId": "amb_greet_4_m"
+    },
+    {
+      "text": "Gölet kenarında yürüyüş yaptın mı bugün?",
+      "clipId": "amb_greet_5_f",
+      "femaleClipId": "amb_greet_5_f",
+      "elderFemaleClipId": "amb_greet_5_f",
+      "maleClipId": "amb_greet_5_m",
+      "elderMaleClipId": "amb_greet_5_m"
+    },
+    {
+      "text": "Have you walked by the lake today?",
+      "clipId": "amb_greet_5_f",
+      "femaleClipId": "amb_greet_5_f",
+      "elderFemaleClipId": "amb_greet_5_f",
+      "maleClipId": "amb_greet_5_m",
+      "elderMaleClipId": "amb_greet_5_m"
+    },
+    {
+      "text": "Aydos Çiftliği'nin taze sütü efsane olmuş!",
+      "clipId": "amb_greet_6_f",
+      "femaleClipId": "amb_greet_6_f",
+      "elderFemaleClipId": "amb_greet_6_f",
+      "maleClipId": "amb_greet_6_m",
+      "elderMaleClipId": "amb_greet_6_m"
+    },
+    {
+      "text": "The fresh milk from Aydos Farm is amazing!",
+      "clipId": "amb_greet_6_f",
+      "femaleClipId": "amb_greet_6_f",
+      "elderFemaleClipId": "amb_greet_6_f",
+      "maleClipId": "amb_greet_6_m",
+      "elderMaleClipId": "amb_greet_6_m"
+    },
+    {
+      "text": "Spor sahaları bugün çok canlı, maç var!",
+      "clipId": "amb_greet_7_f",
+      "femaleClipId": "amb_greet_7_f",
+      "elderFemaleClipId": "amb_greet_7_f",
+      "maleClipId": "amb_greet_7_m",
+      "elderMaleClipId": "amb_greet_7_m"
+    },
+    {
+      "text": "The sports courts are packed today, game on!",
+      "clipId": "amb_greet_7_f",
+      "femaleClipId": "amb_greet_7_f",
+      "elderFemaleClipId": "amb_greet_7_f",
+      "maleClipId": "amb_greet_7_m",
+      "elderMaleClipId": "amb_greet_7_m"
+    },
+    {
+      "text": "Deniz! Buraya gel, seni bekliyordum!",
+      "clipId": "amb_story_beckon_f",
+      "femaleClipId": "amb_story_beckon_f",
+      "elderFemaleClipId": "amb_story_beckon_f",
+      "maleClipId": "amb_story_beckon_m",
+      "elderMaleClipId": "amb_story_beckon_m"
+    },
+    {
+      "text": "Deniz! Come over here, I was waiting for you!",
+      "clipId": "amb_story_beckon_f",
+      "femaleClipId": "amb_story_beckon_f",
+      "elderFemaleClipId": "amb_story_beckon_f",
+      "maleClipId": "amb_story_beckon_m",
+      "elderMaleClipId": "amb_story_beckon_m"
+    },
+    {
+      "text": "Günaydın Deniz, hayırlı sabahlar!",
+      "clipId": "amb_story_morning_f",
+      "femaleClipId": "amb_story_morning_f",
+      "elderFemaleClipId": "amb_story_morning_f",
+      "maleClipId": "amb_story_morning_m",
+      "elderMaleClipId": "amb_story_morning_m"
+    },
+    {
+      "text": "Good morning Deniz, have a great start to the day!",
+      "clipId": "amb_story_morning_f",
+      "femaleClipId": "amb_story_morning_f",
+      "elderFemaleClipId": "amb_story_morning_f",
+      "maleClipId": "amb_story_morning_m",
+      "elderMaleClipId": "amb_story_morning_m"
+    },
+    {
+      "text": "Selam Deniz, mahallede her şey yolunda mı?",
+      "clipId": "amb_story_day_f",
+      "femaleClipId": "amb_story_day_f",
+      "elderFemaleClipId": "amb_story_day_f",
+      "maleClipId": "amb_story_day_m",
+      "elderMaleClipId": "amb_story_day_m"
+    },
+    {
+      "text": "Hey Deniz, how are things going around the neighborhood?",
+      "clipId": "amb_story_day_f",
+      "femaleClipId": "amb_story_day_f",
+      "elderFemaleClipId": "amb_story_day_f",
+      "maleClipId": "amb_story_day_m",
+      "elderMaleClipId": "amb_story_day_m"
+    },
+    {
+      "text": "İyi akşamlar Deniz, gün batımı harika!",
+      "clipId": "amb_story_evening_f",
+      "femaleClipId": "amb_story_evening_f",
+      "elderFemaleClipId": "amb_story_evening_f",
+      "maleClipId": "amb_story_evening_m",
+      "elderMaleClipId": "amb_story_evening_m"
+    },
+    {
+      "text": "Good evening Deniz, what a gorgeous sunset!",
+      "clipId": "amb_story_evening_f",
+      "femaleClipId": "amb_story_evening_f",
+      "elderFemaleClipId": "amb_story_evening_f",
+      "maleClipId": "amb_story_evening_m",
+      "elderMaleClipId": "amb_story_evening_m"
+    },
+    {
+      "text": "İyi geceler Deniz, geç saate kalmışsın!",
+      "clipId": "amb_story_night_f",
+      "femaleClipId": "amb_story_night_f",
+      "elderFemaleClipId": "amb_story_night_f",
+      "maleClipId": "amb_story_night_m",
+      "elderMaleClipId": "amb_story_night_m"
+    },
+    {
+      "text": "Good night Deniz, you are out late tonight!",
+      "clipId": "amb_story_night_f",
+      "femaleClipId": "amb_story_night_f",
+      "elderFemaleClipId": "amb_story_night_f",
+      "maleClipId": "amb_story_night_m",
+      "elderMaleClipId": "amb_story_night_m"
+    },
+    {
+      "text": "Selam efsane! Hamidiye seninle gurur duyuyor!",
+      "clipId": "amb_pass_legend_f",
+      "femaleClipId": "amb_pass_legend_f",
+      "elderFemaleClipId": "amb_pass_legend_f",
+      "maleClipId": "amb_pass_legend_m",
+      "elderMaleClipId": "amb_pass_legend_m"
+    },
+    {
+      "text": "Hey legend! The whole neighborhood is proud of you!",
+      "clipId": "amb_pass_legend_f",
+      "femaleClipId": "amb_pass_legend_f",
+      "elderFemaleClipId": "amb_pass_legend_f",
+      "maleClipId": "amb_pass_legend_m",
+      "elderMaleClipId": "amb_pass_legend_m"
+    },
+    {
+      "text": "Selam Deniz, kolay gelsin komşu!",
+      "clipId": "amb_pass_known_f",
+      "femaleClipId": "amb_pass_known_f",
+      "elderFemaleClipId": "amb_pass_known_f",
+      "maleClipId": "amb_pass_known_m",
+      "elderMaleClipId": "amb_pass_known_m"
+    },
+    {
+      "text": "Hey Deniz, keep up the great work neighbor!",
+      "clipId": "amb_pass_known_f",
+      "femaleClipId": "amb_pass_known_f",
+      "elderFemaleClipId": "amb_pass_known_f",
+      "maleClipId": "amb_pass_known_m",
+      "elderMaleClipId": "amb_pass_known_m"
+    },
+    {
+      "text": "Günaydın komşu!",
+      "clipId": "amb_pass_morning_f",
+      "femaleClipId": "amb_pass_morning_f",
+      "elderFemaleClipId": "amb_pass_morning_f",
+      "maleClipId": "amb_pass_morning_m",
+      "elderMaleClipId": "amb_pass_morning_m"
+    },
+    {
+      "text": "Good morning, neighbor!",
+      "clipId": "amb_pass_morning_f",
+      "femaleClipId": "amb_pass_morning_f",
+      "elderFemaleClipId": "amb_pass_morning_f",
+      "maleClipId": "amb_pass_morning_m",
+      "elderMaleClipId": "amb_pass_morning_m"
+    },
+    {
+      "text": "Hayırlı günler komşu!",
+      "clipId": "amb_pass_day_f",
+      "femaleClipId": "amb_pass_day_f",
+      "elderFemaleClipId": "amb_pass_day_f",
+      "maleClipId": "amb_pass_day_m",
+      "elderMaleClipId": "amb_pass_day_m"
+    },
+    {
+      "text": "Have a wonderful day, neighbor!",
+      "clipId": "amb_pass_day_f",
+      "femaleClipId": "amb_pass_day_f",
+      "elderFemaleClipId": "amb_pass_day_f",
+      "maleClipId": "amb_pass_day_m",
+      "elderMaleClipId": "amb_pass_day_m"
+    },
+    {
+      "text": "İyi akşamlar komşu!",
+      "clipId": "amb_pass_evening_f",
+      "femaleClipId": "amb_pass_evening_f",
+      "elderFemaleClipId": "amb_pass_evening_f",
+      "maleClipId": "amb_pass_evening_m",
+      "elderMaleClipId": "amb_pass_evening_m"
+    },
+    {
+      "text": "Good evening, neighbor!",
+      "clipId": "amb_pass_evening_f",
+      "femaleClipId": "amb_pass_evening_f",
+      "elderFemaleClipId": "amb_pass_evening_f",
+      "maleClipId": "amb_pass_evening_m",
+      "elderMaleClipId": "amb_pass_evening_m"
+    },
+    {
+      "text": "Haydi göster hünerini, tribün arkanda!",
+      "clipId": "amb_spec_1_f",
+      "femaleClipId": "amb_spec_1_f",
+      "elderFemaleClipId": "amb_spec_1_f",
+      "maleClipId": "amb_spec_1_m",
+      "elderMaleClipId": "amb_spec_1_m"
+    },
+    {
+      "text": "Show us what you have got, the crowd is behind you!",
+      "clipId": "amb_spec_1_f",
+      "femaleClipId": "amb_spec_1_f",
+      "elderFemaleClipId": "amb_spec_1_f",
+      "maleClipId": "amb_spec_1_m",
+      "elderMaleClipId": "amb_spec_1_m"
+    },
+    {
+      "text": "O ne falsolu vuruştu öyle, helal olsun!",
+      "clipId": "amb_spec_2_f",
+      "femaleClipId": "amb_spec_2_f",
+      "elderFemaleClipId": "amb_spec_2_f",
+      "maleClipId": "amb_spec_2_m",
+      "elderMaleClipId": "amb_spec_2_m"
+    },
+    {
+      "text": "What a curved shot, nicely done!",
+      "clipId": "amb_spec_2_f",
+      "femaleClipId": "amb_spec_2_f",
+      "elderFemaleClipId": "amb_spec_2_f",
+      "maleClipId": "amb_spec_2_m",
+      "elderMaleClipId": "amb_spec_2_m"
+    },
+    {
+      "text": "Mahalle şampiyonası çok çekişmeli geçiyor!",
+      "clipId": "amb_spec_3_f",
+      "femaleClipId": "amb_spec_3_f",
+      "elderFemaleClipId": "amb_spec_3_f",
+      "maleClipId": "amb_spec_3_m",
+      "elderMaleClipId": "amb_spec_3_m"
+    },
+    {
+      "text": "The neighborhood championship is heating up!",
+      "clipId": "amb_spec_3_f",
+      "femaleClipId": "amb_spec_3_f",
+      "elderFemaleClipId": "amb_spec_3_f",
+      "maleClipId": "amb_spec_3_m",
+      "elderMaleClipId": "amb_spec_3_m"
+    },
+    {
+      "text": "Harika oynuyorsun, skor tabelasını salladın!",
+      "clipId": "amb_spec_4_f",
+      "femaleClipId": "amb_spec_4_f",
+      "elderFemaleClipId": "amb_spec_4_f",
+      "maleClipId": "amb_spec_4_m",
+      "elderMaleClipId": "amb_spec_4_m"
+    },
+    {
+      "text": "Great play, you lit up the scoreboard!",
+      "clipId": "amb_spec_4_f",
+      "femaleClipId": "amb_spec_4_f",
+      "elderFemaleClipId": "amb_spec_4_f",
+      "maleClipId": "amb_spec_4_m",
+      "elderMaleClipId": "amb_spec_4_m"
+    },
+    {
+      "text": "Birazdan 50m yüzme yarışı başlayacak!",
+      "clipId": "amb_spec_5_f",
+      "femaleClipId": "amb_spec_5_f",
+      "elderFemaleClipId": "amb_spec_5_f",
+      "maleClipId": "amb_spec_5_m",
+      "elderMaleClipId": "amb_spec_5_m"
+    },
+    {
+      "text": "The fifty meter swim race is about to start!",
+      "clipId": "amb_spec_5_f",
+      "femaleClipId": "amb_spec_5_f",
+      "elderFemaleClipId": "amb_spec_5_f",
+      "maleClipId": "amb_spec_5_m",
+      "elderMaleClipId": "amb_spec_5_m"
+    },
+    {
+      "text": "Tamam tamam, geçiyoruz!",
+      "clipId": "amb_horn_1_f",
+      "femaleClipId": "amb_horn_1_f",
+      "elderFemaleClipId": "amb_horn_1_f",
+      "maleClipId": "amb_horn_1_m",
+      "elderMaleClipId": "amb_horn_1_m"
+    },
+    {
+      "text": "Alright, alright, moving right along!",
+      "clipId": "amb_horn_1_f",
+      "femaleClipId": "amb_horn_1_f",
+      "elderFemaleClipId": "amb_horn_1_f",
+      "maleClipId": "amb_horn_1_m",
+      "elderMaleClipId": "amb_horn_1_m"
+    },
+    {
+      "text": "Hey yavaş ol şoför!",
+      "clipId": "amb_horn_2_f",
+      "femaleClipId": "amb_horn_2_f",
+      "elderFemaleClipId": "amb_horn_2_f",
+      "maleClipId": "amb_horn_2_m",
+      "elderMaleClipId": "amb_horn_2_m"
+    },
+    {
+      "text": "Hey, slow down driver!",
+      "clipId": "amb_horn_2_f",
+      "femaleClipId": "amb_horn_2_f",
+      "elderFemaleClipId": "amb_horn_2_f",
+      "maleClipId": "amb_horn_2_m",
+      "elderMaleClipId": "amb_horn_2_m"
+    },
+    {
+      "text": "Eyvah yağmur bastırdı, şemsiye de yok!",
+      "clipId": "amb_rain_1_f",
+      "femaleClipId": "amb_rain_1_f",
+      "elderFemaleClipId": "amb_rain_1_f",
+      "maleClipId": "amb_rain_1_m",
+      "elderMaleClipId": "amb_rain_1_m"
+    },
+    {
+      "text": "Oh no, it started raining and I forgot my umbrella!",
+      "clipId": "amb_rain_1_f",
+      "femaleClipId": "amb_rain_1_f",
+      "elderFemaleClipId": "amb_rain_1_f",
+      "maleClipId": "amb_rain_1_m",
+      "elderMaleClipId": "amb_rain_1_m"
+    },
+    {
+      "text": "Pisi pisi, gel bakalım ne tatlısın sen!",
+      "clipId": "amb_cat_1_f",
+      "femaleClipId": "amb_cat_1_f",
+      "elderFemaleClipId": "amb_cat_1_f",
+      "maleClipId": "amb_cat_1_m",
+      "elderMaleClipId": "amb_cat_1_m"
+    },
+    {
+      "text": "Here kitty kitty, what a sweet little cat!",
+      "clipId": "amb_cat_1_f",
+      "femaleClipId": "amb_cat_1_f",
+      "elderFemaleClipId": "amb_cat_1_f",
+      "maleClipId": "amb_cat_1_m",
+      "elderMaleClipId": "amb_cat_1_m"
+    },
+    {
+      "text": "Helal olsun Deniz! Müthiş maç!",
+      "clipId": "amb_cheer_1_f",
+      "femaleClipId": "amb_cheer_1_f",
+      "elderFemaleClipId": "amb_cheer_1_f",
+      "maleClipId": "amb_cheer_1_m",
+      "elderMaleClipId": "amb_cheer_1_m"
+    },
+    {
+      "text": "Way to go Deniz! Amazing match!",
+      "clipId": "amb_cheer_1_f",
+      "femaleClipId": "amb_cheer_1_f",
+      "elderFemaleClipId": "amb_cheer_1_f",
+      "maleClipId": "amb_cheer_1_m",
+      "elderMaleClipId": "amb_cheer_1_m"
+    },
+    {
+      "text": "Önüne baksana!!",
+      "clipId": "amb_road_1_f",
+      "femaleClipId": "amb_road_1_f",
+      "elderFemaleClipId": "amb_road_1_f",
+      "maleClipId": "amb_road_1_m",
+      "elderMaleClipId": "amb_road_1_m"
+    },
+    {
+      "text": "Watch where you are going!",
+      "clipId": "amb_road_1_f",
+      "femaleClipId": "amb_road_1_f",
+      "elderFemaleClipId": "amb_road_1_f",
+      "maleClipId": "amb_road_1_m",
+      "elderMaleClipId": "amb_road_1_m"
+    }
+  ]
+}

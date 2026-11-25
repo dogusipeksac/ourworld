@@ -124,7 +124,53 @@ namespace OurWorld.UI
         private Text _jumpBtnLabel;
         private GameObject _jumpBtnObject;
 
+        private const string PrefLargeSubtitlesKey = "ow_subtitle_large";
+        private int _baseDialogueSpeakerSize;
+        private int _baseDialogueBodySize;
+        private int _baseToastSize;
+
+        public static bool LargeSubtitles
+        {
+            get => PlayerPrefs.GetInt(PrefLargeSubtitlesKey, 0) != 0;
+            private set
+            {
+                PlayerPrefs.SetInt(PrefLargeSubtitlesKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
         public bool IsTelemetryVisible => telemetryPanel != null && telemetryPanel.activeSelf;
+
+        public void SetLargeSubtitles(bool large)
+        {
+            LargeSubtitles = large;
+            ApplySubtitleSize();
+        }
+
+        public void ApplySubtitleSize()
+        {
+            bool large = LargeSubtitles;
+            if (dialogueSpeakerText != null)
+            {
+                if (_baseDialogueSpeakerSize <= 0) _baseDialogueSpeakerSize = Mathf.Max(18, dialogueSpeakerText.fontSize);
+                dialogueSpeakerText.fontSize = large ? Mathf.RoundToInt(_baseDialogueSpeakerSize * 1.22f) : _baseDialogueSpeakerSize;
+            }
+            if (dialogueBodyText != null)
+            {
+                if (_baseDialogueBodySize <= 0) _baseDialogueBodySize = Mathf.Max(18, dialogueBodyText.fontSize);
+                int target = large ? Mathf.RoundToInt(_baseDialogueBodySize * 1.26f) : _baseDialogueBodySize;
+                dialogueBodyText.fontSize = target;
+                dialogueBodyText.resizeTextForBestFit = true;
+                dialogueBodyText.resizeTextMinSize = Mathf.Max(14, _baseDialogueBodySize - 4);
+                dialogueBodyText.resizeTextMaxSize = target;
+            }
+            if (statusToastText != null)
+            {
+                if (_baseToastSize <= 0) _baseToastSize = Mathf.Max(16, statusToastText.fontSize);
+                int target = large ? Mathf.RoundToInt(_baseToastSize * 1.20f) : _baseToastSize;
+                statusToastText.fontSize = target;
+            }
+        }
 
         public void SetTelemetryVisible(bool visible)
         {
@@ -1374,6 +1420,7 @@ namespace OurWorld.UI
 
         private void HandleDialogueLineShown(string speaker, string body)
         {
+            ApplySubtitleSize();
             if (dialogueSpeakerText != null) dialogueSpeakerText.text = speaker;
             if (dialogueBodyText != null) dialogueBodyText.text = body;
             if (dialoguePanel != null && !dialoguePanel.activeSelf)

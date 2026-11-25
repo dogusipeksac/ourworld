@@ -57,8 +57,9 @@ namespace OurWorld.UI
             rt.offsetMax = new Vector2(-30f, -88f);
 
             FeedbackTabView view = root.AddComponent<FeedbackTabView>();
+            OurWorldUiKit.EnsureInitialized();
             view._font = font;
-            view._sprite = roundedSprite;
+            view._sprite = roundedSprite != null ? roundedSprite : OurWorldUiKit.SubCardSprite;
             view.Build();
             root.SetActive(false);
             return view;
@@ -152,7 +153,7 @@ namespace OurWorld.UI
             scrollRt.offsetMin = new Vector2(14f, 14f);
             scrollRt.offsetMax = new Vector2(-14f, -64f);
             Image scrollBg = scrollGo.GetComponent<Image>();
-            scrollBg.color = InputColor;
+            OurWorldUiKit.ApplyRounded(scrollBg, _sprite, InputColor);
             scrollGo.GetComponent<Mask>().showMaskGraphic = true;
 
             GameObject contentGo = new GameObject("FeedContent", typeof(RectTransform), typeof(ContentSizeFitter));
@@ -220,18 +221,19 @@ namespace OurWorld.UI
 
         private void RefreshFeed()
         {
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             if (_loadingFeed || _feedText == null) return;
             FeedbackService svc = FeedbackService.Instance;
             if (svc == null)
             {
-                _feedText.text = "  Mesaj servisi hazır değil.";
+                _feedText.text = isEn ? "  Message service is not ready yet." : "  Mesaj servisi hazır değil.";
                 return;
             }
 
             _loadingFeed = true;
             if (_refreshButton != null) _refreshButton.interactable = false;
             if (_refreshLabel != null) _refreshLabel.text = "...";
-            _feedText.text = "  Mesajlar yükleniyor…";
+            _feedText.text = isEn ? "  Loading community messages…" : "  Mesajlar yükleniyor…";
 
             svc.FetchRecentMessages(25, (messages, error) =>
             {
@@ -246,9 +248,10 @@ namespace OurWorld.UI
                     return;
                 }
 
+                bool enNow = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                 if (messages == null || messages.Count == 0)
                 {
-                    _feedText.text = "  Henüz mesaj yok. İlk fikri sen yaz!";
+                    _feedText.text = enNow ? "  No messages yet. Share the first idea!" : "  Henüz mesaj yok. İlk fikri sen yaz!";
                     return;
                 }
 
@@ -256,9 +259,10 @@ namespace OurWorld.UI
                 for (int i = 0; i < messages.Count; i++)
                 {
                     CommunityMessage m = messages[i];
-                    string tag = m.Category == "bug" ? "[HATA]" : (m.Category == "other" ? "[MESAJ]" : "[FİKİR]");
-                    string statusTag = m.Status == "done" ? "  <color=#6CE5B1>(Eklendi)</color>"
-                        : (m.Status == "planned" ? "  <color=#F2C94C>(Planlandı)</color>" : string.Empty);
+                    string tag = m.Category == "bug" ? (enNow ? "[BUG]" : "[HATA]")
+                        : (m.Category == "other" ? (enNow ? "[MSG]" : "[MESAJ]") : (enNow ? "[IDEA]" : "[FİKİR]"));
+                    string statusTag = m.Status == "done" ? (enNow ? "  <color=#6CE5B1>(Added)</color>" : "  <color=#6CE5B1>(Eklendi)</color>")
+                        : (m.Status == "planned" ? (enNow ? "  <color=#F2C94C>(Planned)</color>" : "  <color=#F2C94C>(Planlandı)</color>") : string.Empty);
 
                     sb.Append("<color=#5EB8B0><b>").Append(tag).Append(' ')
                       .Append(EscapeRich(m.SenderName)).Append("</b></color>")
@@ -357,6 +361,7 @@ namespace OurWorld.UI
             img.sprite = _sprite;
             img.type = _sprite != null ? Image.Type.Sliced : Image.Type.Simple;
             img.color = color;
+            OurWorldUiKit.AddHairlineBorder(go.transform, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
             return go;
         }
 

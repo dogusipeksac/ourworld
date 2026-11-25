@@ -2640,6 +2640,54 @@
     {
       "key": "sports.shooting.controls",
       "value": "Drag/Mouse: Aim · Left Click/F: Fire · Right Click/Space: ADS/Scope · R: Reload · 1-4: Weapon · Shift: Hold Breath · E: Exit"
+    },
+    {
+      "key": "sports.tennis.title",
+      "value": "HAMIDIYE TENNIS COURT"
+    },
+    {
+      "key": "ui.menu.set_voice",
+      "value": "Voiceover"
+    },
+    {
+      "key": "ui.menu.set_invert_y",
+      "value": "Camera Y Axis"
+    },
+    {
+      "key": "ui.menu.normal",
+      "value": "Normal"
+    },
+    {
+      "key": "ui.menu.inverted",
+      "value": "Inverted"
+    },
+    {
+      "key": "ui.menu.set_subtitles",
+      "value": "Subtitle Size"
+    },
+    {
+      "key": "ui.menu.large",
+      "value": "Large"
+    },
+    {
+      "key": "feedback.err.unconfigured",
+      "value": "Firebase is not configured."
+    },
+    {
+      "key": "feedback.err.offline",
+      "value": "No internet connection."
+    },
+    {
+      "key": "feedback.err.auth",
+      "value": "Could not verify connection. Please check your internet and try again."
+    },
+    {
+      "key": "feedback.err.fetch",
+      "value": "Could not load messages ({0})."
+    },
+    {
+      "key": "feedback.default_sender",
+      "value": "Player"
     }
   ]
 }

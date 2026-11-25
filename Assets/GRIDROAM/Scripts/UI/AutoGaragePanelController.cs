@@ -43,8 +43,13 @@ namespace OurWorld.UI
         private Text _repairActionLabel;
 
         // Mod Tab Widgets
+        private Text _paintHeaderText;
+        private Text _rimHeaderText;
+        private Text _kitHeaderText;
         private readonly Image[] _paintBtns = new Image[8];
+        private readonly Text[] _paintLabels = new Text[8];
         private readonly Image[] _rimBtns = new Image[4];
+        private readonly Text[] _rimLabels = new Text[4];
         private Text _spoilerBtnText;
         private Text _roofRackBtnText;
         private Text _headlightBtnText;
@@ -133,8 +138,10 @@ namespace OurWorld.UI
             _activeTab = tab;
             if (_repairTabRoot != null) _repairTabRoot.SetActive(tab == 0);
             if (_modTabRoot != null) _modTabRoot.SetActive(tab == 1);
-            if (_tabRepairBg != null) _tabRepairBg.color = tab == 0 ? AccentAmber : CardBg;
-            if (_tabModBg != null) _tabModBg.color = tab == 1 ? AccentTeal : CardBg;
+            if (_tabRepairBg != null) _tabRepairBg.color = tab == 0 ? AccentAmber : OurWorldUiKit.SurfaceBg;
+            if (_tabModBg != null) _tabModBg.color = tab == 1 ? AccentTeal : OurWorldUiKit.SurfaceBg;
+            if (_tabRepairLabel != null) _tabRepairLabel.color = tab == 0 ? OurWorldUiKit.InkDark : TextLight;
+            if (_tabModLabel != null) _tabModLabel.color = tab == 1 ? OurWorldUiKit.InkDark : TextLight;
             RefreshAll();
         }
 
@@ -156,6 +163,7 @@ namespace OurWorld.UI
             cs.matchWidthOrHeight = 0.5f;
             _canvasObj.AddComponent<GraphicRaycaster>();
 
+            OurWorldUiKit.EnsureInitialized();
             _panelRoot = new GameObject("GarageModalRoot", typeof(RectTransform), typeof(Image));
             _panelRoot.transform.SetParent(_canvasObj.transform, false);
             RectTransform rootRt = (RectTransform)_panelRoot.transform;
@@ -163,30 +171,42 @@ namespace OurWorld.UI
             rootRt.anchorMax = Vector2.one;
             rootRt.offsetMin = Vector2.zero;
             rootRt.offsetMax = Vector2.zero;
-            _panelRoot.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.08f, 0.64f);
+            _panelRoot.GetComponent<Image>().color = OurWorldUiKit.Scrim;
 
             GameObject card = CreateRect("Card", _panelRoot.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(1320f, 840f), BgDark);
-            Outline o = card.AddComponent<Outline>();
-            o.effectColor = new Color(0.96f, 0.72f, 0.22f, 0.55f);
-            o.effectDistance = new Vector2(2f, -2f);
+                Vector2.zero, new Vector2(1320f, 840f), OurWorldUiKit.CardBg, OurWorldUiKit.CardSprite);
+            OurWorldUiKit.AddCardDropShadow(card.transform, spread: 28f, offsetY: -12f, alpha: 0.60f);
+            OurWorldUiKit.AddSoftTopGlow(card.transform, AccentAmber, heightPx: 140f, alpha: 0.14f);
+            OurWorldUiKit.AddHairlineBorder(card.transform, OurWorldUiKit.CardOutlineSprite, new Color(AccentAmber.r, AccentAmber.g, AccentAmber.b, 0.34f));
 
             _titleText = CreateText("Title", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(36f, -26f), new Vector2(780f, 52f), 32, FontStyle.Bold, TextLight, TextAnchor.MiddleLeft);
-            _moneyText = CreateText("Money", card.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-126f, -26f), new Vector2(280f, 52f), 30, FontStyle.Bold, AccentAmber, TextAnchor.MiddleRight);
-            Button closeBtn = CreateButton("BtnClose", card.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-32f, -22f), new Vector2(68f, 60f), new Color(0.76f, 0.24f, 0.24f, 0.95f), "X", 28, out _);
-            closeBtn.onClick.AddListener(Close);
+                new Vector2(36f, -24f), new Vector2(780f, 52f), 31, FontStyle.Bold, TextLight, TextAnchor.MiddleLeft);
+
+            GameObject moneyPill = CreateRect("MoneyPill", card.transform, new Vector2(1f, 1f), new Vector2(1f, 1f),
+                new Vector2(-98f, -26f), new Vector2(190f, 44f), new Color(AccentAmber.r, AccentAmber.g, AccentAmber.b, 0.14f), OurWorldUiKit.PillSprite);
+            OurWorldUiKit.AddHairlineBorder(moneyPill.transform, OurWorldUiKit.PillOutlineSprite, new Color(AccentAmber.r, AccentAmber.g, AccentAmber.b, 0.36f));
+            _moneyText = OurWorldUiKit.CreateStretchText("Money", moneyPill.transform, "₺ 0", 24, FontStyle.Bold, AccentAmber, TextAnchor.MiddleCenter);
+
+            Button closeBtn = OurWorldUiKit.CreateCircularIconButton(
+                "BtnClose", card.transform, OurWorldUiKit.IconClose,
+                diameter: 46f, iconSize: 18f,
+                bgColor: new Color(0.14f, 0.19f, 0.27f, 0.94f),
+                iconColor: OurWorldUiKit.TextSecondary,
+                borderColor: OurWorldUiKit.BorderSubtle,
+                onClick: Close);
+            RectTransform closeRt = (RectTransform)closeBtn.transform;
+            closeRt.anchorMin = closeRt.anchorMax = new Vector2(1f, 1f);
+            closeRt.pivot = new Vector2(1f, 1f);
+            closeRt.anchoredPosition = new Vector2(-32f, -24f);
 
             // Top Tab Bar
             Button tab0 = CreateButton("TabRepair", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(36f, -96f), new Vector2(614f, 62f), AccentAmber, "", 23, out _tabRepairLabel);
+                new Vector2(36f, -94f), new Vector2(614f, 58f), AccentAmber, "", 22, out _tabRepairLabel);
             _tabRepairBg = tab0.GetComponent<Image>();
             tab0.onClick.AddListener(() => { GameFeelAudio.PlayUiClick(); SelectTab(0); });
 
             Button tab1 = CreateButton("TabMod", card.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(670f, -96f), new Vector2(614f, 62f), CardBg, "", 23, out _tabModLabel);
+                new Vector2(670f, -94f), new Vector2(614f, 58f), CardBg, "", 22, out _tabModLabel);
             _tabModBg = tab1.GetComponent<Image>();
             tab1.onClick.AddListener(() => { GameFeelAudio.PlayUiClick(); SelectTab(1); });
 
@@ -197,32 +217,36 @@ namespace OurWorld.UI
             rrt.anchorMin = Vector2.zero;
             rrt.anchorMax = Vector2.one;
             rrt.offsetMin = new Vector2(36f, 84f);
-            rrt.offsetMax = new Vector2(-36f, -176f);
+            rrt.offsetMax = new Vector2(-36f, -172f);
 
             GameObject infoBox = CreateRect("CustomerInfoBox", _repairTabRoot.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, 0f), new Vector2(0f, 198f), CardBg);
+                new Vector2(0f, 0f), new Vector2(0f, 198f), OurWorldUiKit.SurfaceBg, OurWorldUiKit.SubCardSprite);
+            OurWorldUiKit.AddHairlineBorder(infoBox.transform, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
             ((RectTransform)infoBox.transform).pivot = new Vector2(0.5f, 1f);
             _customerHeaderText = CreateText("CustHeader", infoBox.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -16f), new Vector2(-44f, 48f), 28, FontStyle.Bold, AccentAmber, TextAnchor.MiddleLeft);
+                new Vector2(0f, -16f), new Vector2(-44f, 48f), 27, FontStyle.Bold, AccentAmber, TextAnchor.MiddleLeft);
             ((RectTransform)_customerHeaderText.transform).pivot = new Vector2(0.5f, 1f);
             _complaintText = CreateText("CustComplaint", infoBox.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -72f), new Vector2(-44f, 108f), 23, FontStyle.Normal, TextLight, TextAnchor.UpperLeft);
             ((RectTransform)_complaintText.transform).pivot = new Vector2(0.5f, 1f);
             _complaintText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _complaintText.lineSpacing = 1.25f;
 
             _stepProgressText = CreateText("StepProgress", _repairTabRoot.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -222f), new Vector2(0f, 44f), 24, FontStyle.Bold, AccentTeal, TextAnchor.MiddleLeft);
             ((RectTransform)_stepProgressText.transform).pivot = new Vector2(0.5f, 1f);
 
             GameObject barBg = CreateRect("BarBg", _repairTabRoot.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -278f), new Vector2(0f, 38f), CardBg);
+                new Vector2(0f, -278f), new Vector2(0f, 34f), OurWorldUiKit.SurfaceBg, OurWorldUiKit.PillSprite);
+            OurWorldUiKit.AddHairlineBorder(barBg.transform, OurWorldUiKit.PillOutlineSprite, OurWorldUiKit.BorderSubtle);
             ((RectTransform)barBg.transform).pivot = new Vector2(0.5f, 1f);
             GameObject barFill = CreateRect("BarFill", barBg.transform, new Vector2(0f, 0f), new Vector2(0f, 1f),
-                Vector2.zero, Vector2.zero, AccentTeal);
+                Vector2.zero, Vector2.zero, AccentTeal, OurWorldUiKit.PillSprite);
             _progressFillImg = barFill.GetComponent<Image>();
 
             _repairActionBtn = CreateButton("BtnRepairStep", _repairTabRoot.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-                new Vector2(0f, 48f), new Vector2(780f, 146f), AccentAmber, "", 27, out _repairActionLabel);
+                new Vector2(0f, 48f), new Vector2(780f, 140f), AccentAmber, "", 27, out _repairActionLabel);
+            _repairActionLabel.color = OurWorldUiKit.InkDark;
             ((RectTransform)_repairActionBtn.transform).pivot = new Vector2(0.5f, 0f);
             _repairActionBtn.onClick.AddListener(HandleRepairStepClicked);
 
@@ -233,39 +257,38 @@ namespace OurWorld.UI
             mrt.anchorMin = Vector2.zero;
             mrt.anchorMax = Vector2.one;
             mrt.offsetMin = new Vector2(36f, 84f);
-            mrt.offsetMax = new Vector2(-36f, -176f);
+            mrt.offsetMax = new Vector2(-36f, -172f);
 
-            CreateText("PaintHeader", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(0f, -4f), new Vector2(1200f, 32f), 20, FontStyle.Bold, AccentAmber, TextAnchor.MiddleLeft).text =
-                "1. METALİK ARAÇ BOYASI (65 ₺)";
+            _paintHeaderText = CreateText("PaintHeader", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(0f, -4f), new Vector2(1200f, 32f), 20, FontStyle.Bold, AccentAmber, TextAnchor.MiddleLeft);
 
             for (int i = 0; i < 8; i++)
             {
                 int idx = i;
                 Color swCol = SedanVehicleController.TuningPaintColors[i];
                 Button pb = CreateButton($"Paint_{i}", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                    new Vector2(i * 157f, -42f), new Vector2(146f, 86f), swCol, PaintNamesTr[i], 18, out Text pLbl);
+                    new Vector2(i * 157f, -42f), new Vector2(146f, 84f), swCol, PaintNamesTr[i], 18, out Text pLbl);
                 pLbl.color = (i == 3 || i == 5) ? Color.black : Color.white;
                 _paintBtns[i] = pb.GetComponent<Image>();
+                _paintLabels[i] = pLbl;
                 pb.onClick.AddListener(() => BuyPaint(idx));
             }
 
-            CreateText("RimHeader", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(0f, -148f), new Vector2(1200f, 32f), 20, FontStyle.Bold, AccentTeal, TextAnchor.MiddleLeft).text =
-                "2. ALAŞIM JANT SETİ (55 ₺)";
+            _rimHeaderText = CreateText("RimHeader", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(0f, -148f), new Vector2(1200f, 32f), 20, FontStyle.Bold, AccentTeal, TextAnchor.MiddleLeft);
 
             for (int i = 0; i < 4; i++)
             {
                 int idx = i;
                 Button rb = CreateButton($"Rim_{i}", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                    new Vector2(i * 314f, -186f), new Vector2(300f, 76f), CardBg, RimNamesTr[i], 20, out _);
+                    new Vector2(i * 314f, -186f), new Vector2(300f, 74f), CardBg, RimNamesTr[i], 20, out Text rLbl);
                 _rimBtns[i] = rb.GetComponent<Image>();
+                _rimLabels[i] = rLbl;
                 rb.onClick.AddListener(() => BuyRim(idx));
             }
 
-            CreateText("KitHeader", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(0f, -284f), new Vector2(1200f, 32f), 20, FontStyle.Bold, AccentAmber, TextAnchor.MiddleLeft).text =
-                "3. AERO KİTLER, FAR & PERFORMANS YÜKSELTMELERİ";
+            _kitHeaderText = CreateText("KitHeader", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(0f, -284f), new Vector2(1200f, 32f), 20, FontStyle.Bold, AccentAmber, TextAnchor.MiddleLeft);
 
             Button bSpoil = CreateButton("BtnSpoiler", _modTabRoot.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
                 new Vector2(0f, -324f), new Vector2(404f, 118f), CardBg, "", 20, out _spoilerBtnText);
@@ -475,6 +498,21 @@ namespace OurWorld.UI
             }
 
             // Refresh Mod Tab
+            if (_paintHeaderText != null)
+                _paintHeaderText.text = en ? "1. METALLIC CAR PAINT (65 ₺)" : "1. METALİK ARAÇ BOYASI (65 ₺)";
+            if (_rimHeaderText != null)
+                _rimHeaderText.text = en ? "2. ALLOY RIM SET (55 ₺)" : "2. ALAŞIM JANT SETİ (55 ₺)";
+            if (_kitHeaderText != null)
+                _kitHeaderText.text = en ? "3. AERO KITS, HEADLIGHTS & PERFORMANCE UPGRADES" : "3. AERO KİTLER, FAR & PERFORMANS YÜKSELTMELERİ";
+            for (int i = 0; i < _paintLabels.Length; i++)
+            {
+                if (_paintLabels[i] != null) _paintLabels[i].text = en ? PaintNamesEn[i] : PaintNamesTr[i];
+            }
+            for (int i = 0; i < _rimLabels.Length; i++)
+            {
+                if (_rimLabels[i] != null) _rimLabels[i].text = en ? RimNamesEn[i] : RimNamesTr[i];
+            }
+
             if (d != null)
             {
                 for (int i = 0; i < _rimBtns.Length; i++)
@@ -502,7 +540,7 @@ namespace OurWorld.UI
             }
         }
 
-        private GameObject CreateRect(string name, Transform parent, Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 size, Color col)
+        private GameObject CreateRect(string name, Transform parent, Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 size, Color col, Sprite sprite = null)
         {
             GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
             go.transform.SetParent(parent, false);
@@ -512,7 +550,9 @@ namespace OurWorld.UI
             rt.pivot = new Vector2(aMin.x, aMax.y);
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
-            go.GetComponent<Image>().color = col;
+            Image img = go.GetComponent<Image>();
+            if (sprite != null) OurWorldUiKit.ApplyRounded(img, sprite, col);
+            else img.color = col;
             return go;
         }
 
@@ -538,12 +578,13 @@ namespace OurWorld.UI
 
         private Button CreateButton(string name, Transform parent, Vector2 aMin, Vector2 aMax, Vector2 pos, Vector2 size, Color col, string label, int fs, out Text outText)
         {
-            GameObject go = CreateRect(name, parent, aMin, aMax, pos, size, col);
-            Outline o = go.AddComponent<Outline>();
-            o.effectColor = new Color(1f, 1f, 1f, 0.16f);
-            o.effectDistance = new Vector2(1.5f, -1.5f);
+            GameObject go = CreateRect(name, parent, aMin, aMax, pos, size, col, OurWorldUiKit.SubCardSprite);
+            OurWorldUiKit.AddHairlineBorder(go.transform, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
+            Image bg = go.GetComponent<Image>();
             Button btn = go.AddComponent<Button>();
-            btn.targetGraphic = go.GetComponent<Image>();
+            btn.targetGraphic = bg;
+            UiButtonFeedback fb = go.AddComponent<UiButtonFeedback>();
+            fb.Configure(btn, bg);
 
             GameObject lo = new GameObject("Label", typeof(RectTransform), typeof(Text));
             lo.transform.SetParent(go.transform, false);
@@ -558,6 +599,7 @@ namespace OurWorld.UI
             txt.fontStyle = FontStyle.Bold;
             txt.color = TextLight;
             txt.alignment = TextAnchor.MiddleCenter;
+            txt.lineSpacing = 1.18f;
             txt.text = label;
             txt.raycastTarget = false;
             outText = txt;
