@@ -548,6 +548,9 @@ namespace OurWorld.World
             _interactionPauseTimer = Mathf.Max(_interactionPauseTimer, seconds);
             _isFleeingPlayer = false;
             _isApproachingFood = false;
+            // Stop dead: the player's work spot (flank / feeding point) is computed from the animal's pose at
+            // interaction start, so residual roaming momentum would slide the animal away from the hands/stool.
+            _currentMoveSpeed = 0f;
         }
 
         private Vector3 ClampInsidePasture(Vector3 worldPos)

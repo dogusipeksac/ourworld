@@ -34,6 +34,12 @@ namespace OurWorld.Player
         private float _sipTiltPhase;
         private float _putAwayProgress;
         private bool _holdingModalLock;
+        // Energy already paid for but not yet granted; flushed on explicit cancel so an interrupted
+        // drink/snack (another interaction cancelling it) never eats the player's purchase.
+        private float _pendingEnergy;
+        // Guards against a routine that finishes synchronously inside StartCoroutine leaving IsPlaying stuck.
+        private int _runSerial;
+        private int _completedRunSerial;
 
         private static readonly string[] DrinkPropNames = { "DrinkFridge", "Fridge", "Kitchen", "Vending", "CayOcagi_Fridge", "CayOcagi_Counter", "Shelf" };
         private static readonly string[] IceCreamPropNames = { "DondurmaDolabi", "DrinkFridge", "Shelf" };
@@ -78,16 +84,22 @@ namespace OurWorld.Player
 
         private void OnDisable()
         {
-            CancelActive();
+            CancelActiveInternal(grantPendingEnergy: false);
         }
 
         private void OnDestroy()
         {
-            CancelActive();
+            CancelActiveInternal(grantPendingEnergy: false);
             if (_activeInstance == this) _activeInstance = null;
         }
 
+        /// <summary>Stops the sequence, restores pose/locks and grants any energy that was paid for but not yet applied.</summary>
         public void CancelActive()
+        {
+            CancelActiveInternal(grantPendingEnergy: true);
+        }
+
+        private void CancelActiveInternal(bool grantPendingEnergy)
         {
             if (_activeRoutine != null)
             {
@@ -95,6 +107,13 @@ namespace OurWorld.Player
                 _activeRoutine = null;
             }
             CleanupVisualsAndLocks();
+
+            float energy = _pendingEnergy;
+            _pendingEnergy = 0f;
+            if (grantPendingEnergy && energy > 0f && PlayerNeedsController.Instance != null)
+            {
+                PlayerNeedsController.Instance.RestoreEnergy(energy);
+            }
         }
 
         private void StartSequence(PlayerFootController foot, string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore, Transform explicitTarget = null)
@@ -107,10 +126,15 @@ namespace OurWorld.Player
                 actionAnim.CancelActive();
             }
             CancelActive();
-            _activeRoutine = StartCoroutine(PurchaseAndConsumeRoutine(shopId ?? string.Empty, kind, itemLabel ?? string.Empty, energyToRestore, explicitTarget));
+            int serial = ++_runSerial;
+            Coroutine routine = StartCoroutine(PurchaseAndConsumeRoutine(serial, shopId ?? string.Empty, kind, itemLabel ?? string.Empty, energyToRestore, explicitTarget));
+            if (_completedRunSerial != serial && _runSerial == serial)
+            {
+                _activeRoutine = routine;
+            }
         }
 
-        private IEnumerator PurchaseAndConsumeRoutine(string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore, Transform explicitTarget)
+        private IEnumerator PurchaseAndConsumeRoutine(int serial, string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore, Transform explicitTarget)
         {
             ProceduralHumanoid hum = _foot != null ? _foot.Humanoid : null;
             PlayerModeController mode = PlayerModeController.Instance;
@@ -118,9 +142,12 @@ namespace OurWorld.Player
             {
                 if (energyToRestore > 0f && PlayerNeedsController.Instance != null)
                     PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
+                _completedRunSerial = serial;
                 _activeRoutine = null;
                 yield break;
             }
+
+            _pendingEnergy = Mathf.Max(0f, energyToRestore);
 
             // Lock player controls briefly during walk-to-shelf & grab (~1.1s total)
             mode.SetModalLock(this, true);
@@ -141,6 +168,7 @@ namespace OurWorld.Player
                 Vector3 standPos = new Vector3(shelfPos.x, _foot.transform.position.y, shelfPos.z) + standDir * 0.92f;
 
                 float walkElapsed = 0f;
+                float stuckTimer = 0f;
                 const float maxWalkTime = 1.35f;
                 while (walkElapsed < maxWalkTime)
                 {
@@ -157,11 +185,25 @@ namespace OurWorld.Player
                     _foot.transform.rotation = Quaternion.Slerp(_foot.transform.rotation, targetRot, 1f - Mathf.Exp(-10f * dt));
 
                     float moveSpeed = Mathf.Min(2.8f, dist * 4.5f);
+                    Vector3 prevPos = _foot.transform.position;
                     if (_cc != null && _cc.enabled)
                     {
                         _cc.Move((dir * moveSpeed + Vector3.down * 4f) * dt);
                     }
-                    hum.SetLocomotion(moveSpeed, true, 0f, dir);
+                    // Drive the gait from the distance actually covered so feet don't slide/moonwalk
+                    // when the CharacterController is blocked by the shelf, counter or another collider.
+                    Vector3 moved = Vector3.ProjectOnPlane(_foot.transform.position - prevPos, Vector3.up);
+                    float actualSpeed = dt > 0.0001f ? moved.magnitude / dt : 0f;
+                    hum.SetLocomotion(actualSpeed, true, 0f, dir);
+                    if (actualSpeed < 0.16f)
+                    {
+                        stuckTimer += dt;
+                        if (stuckTimer >= 0.18f) break;
+                    }
+                    else
+                    {
+                        stuckTimer = 0f;
+                    }
                     yield return null;
                 }
 
@@ -304,6 +346,7 @@ namespace OurWorld.Player
                 if (!midEnergyApplied && norm >= 0.45f)
                 {
                     midEnergyApplied = true;
+                    _pendingEnergy = 0f;
                     if (energyToRestore > 0f && PlayerNeedsController.Instance != null)
                     {
                         PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
@@ -325,11 +368,13 @@ namespace OurWorld.Player
             }
 
             // Guarantee energy is always restored even if interrupted early
+            _pendingEnergy = 0f;
             if (!midEnergyApplied && energyToRestore > 0f && PlayerNeedsController.Instance != null)
             {
                 PlayerNeedsController.Instance.RestoreEnergy(energyToRestore);
             }
 
+            _completedRunSerial = serial;
             CleanupVisualsAndLocks();
             _activeRoutine = null;
         }

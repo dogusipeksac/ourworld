@@ -59,6 +59,15 @@ namespace OurWorld.Player
         private Quaternion _heldPropLocalRot = Quaternion.identity;
         private Quaternion _heldLeftPropLocalRot = Quaternion.identity;
         private bool _holdingModalLock;
+        // Gameplay callbacks of the running action. Kept so an external cancel (another action/consume
+        // starting, explicit CancelActive) still applies the outcome exactly once instead of dropping it.
+        private Action _pendingClimax;
+        private Action _pendingFinished;
+        // Serial of the latest started run and of the latest run that reached its end. Lets StartAction detect a
+        // routine that completed synchronously inside StartCoroutine (e.g. Esc pressed on the start frame while
+        // already standing at the work spot) so IsPlaying never sticks at true and soft-locks IsBusyOn checks.
+        private int _runSerial;
+        private int _completedRunSerial;
 
         public bool IsPlaying => _activeRoutine != null;
         internal static bool IsAnyPlaying => _activeInstance != null && _activeInstance.IsPlaying;
@@ -111,16 +120,27 @@ namespace OurWorld.Player
 
         private void OnDisable()
         {
-            CancelActive();
+            // Teardown path (object disabled / scene unloading): release pose & locks, but don't run
+            // gameplay callbacks that may touch objects already being destroyed.
+            CancelActiveInternal(completeGameplay: false);
         }
 
         private void OnDestroy()
         {
-            CancelActive();
+            CancelActiveInternal(completeGameplay: false);
             if (_activeInstance == this) _activeInstance = null;
         }
 
+        /// <summary>
+        /// Stops the running action, restores pose/locks and applies its pending gameplay outcome
+        /// (climax + finished) exactly once so interrupted interactions never leave half-applied state.
+        /// </summary>
         public void CancelActive()
+        {
+            CancelActiveInternal(completeGameplay: true);
+        }
+
+        private void CancelActiveInternal(bool completeGameplay)
         {
             if (_activeRoutine != null)
             {
@@ -128,6 +148,14 @@ namespace OurWorld.Player
                 _activeRoutine = null;
             }
             CleanupVisualsAndLocks();
+
+            Action climax = _pendingClimax;
+            Action finished = _pendingFinished;
+            _pendingClimax = null;
+            _pendingFinished = null;
+            if (!completeGameplay) return;
+            climax?.Invoke();
+            finished?.Invoke();
         }
 
         private void StartAction(
@@ -143,10 +171,26 @@ namespace OurWorld.Player
             _foot = foot;
             if (_cc == null) _cc = foot.GetComponent<CharacterController>();
             CancelActive();
-            _activeRoutine = StartCoroutine(ActionRoutine(mode, target, kind, onClimax, onFinished, startStatus, onProgress));
+
+            bool climaxFired = false;
+            Action climaxOnce = () =>
+            {
+                if (climaxFired) return;
+                climaxFired = true;
+                onClimax?.Invoke();
+            };
+            _pendingClimax = climaxOnce;
+            _pendingFinished = onFinished;
+            int serial = ++_runSerial;
+            Coroutine routine = StartCoroutine(ActionRoutine(serial, mode, target, kind, climaxOnce, onFinished, startStatus, onProgress));
+            if (_completedRunSerial != serial && _runSerial == serial)
+            {
+                _activeRoutine = routine;
+            }
         }
 
         private IEnumerator ActionRoutine(
+            int serial,
             PlayerModeController mode,
             Transform target,
             PlayerActionKind kind,
@@ -158,10 +202,13 @@ namespace OurWorld.Player
             ProceduralHumanoid hum = _foot != null ? _foot.Humanoid : null;
             if (hum == null || mode == null || mode.CurrentMode != ControlMode.OnFoot)
             {
+                _completedRunSerial = serial;
+                _activeRoutine = null;
+                _pendingClimax = null;
+                _pendingFinished = null;
                 onProgress?.Invoke(1f);
                 onClimax?.Invoke();
                 onFinished?.Invoke();
-                _activeRoutine = null;
                 yield break;
             }
 
@@ -372,6 +419,9 @@ namespace OurWorld.Player
             }
 
             // Guarantee gameplay outcome always completes even if animation ended early
+            _completedRunSerial = serial;
+            _pendingClimax = null;
+            _pendingFinished = null;
             triggerClimax();
             CleanupVisualsAndLocks();
             _activeRoutine = null;

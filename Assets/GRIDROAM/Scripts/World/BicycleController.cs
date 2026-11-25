@@ -11,6 +11,8 @@ namespace OurWorld.World
         private const float WheelRadius = 0.34f;
         private const float TopSpeed = 7.8f;
         private const float CrankRadius = 0.15f;
+        // Wheel revolutions per crank revolution (chainring/sprocket). ~84 rpm cadence at top speed.
+        private const float PedalGearRatio = 2.6f;
 
         private CharacterController _body;
         private Transform _visual;
@@ -199,12 +201,15 @@ namespace OurWorld.World
             Vector3 travel = transform.position - before;
             travel.y = 0f;
             float tireRadius = IsMotorcycle ? 0.36f : WheelRadius;
-            _wheelAngle = Mathf.Repeat(_wheelAngle + travel.magnitude / tireRadius * Mathf.Rad2Deg, 360f);
+            float wheelDegrees = travel.magnitude / tireRadius * Mathf.Rad2Deg;
+            _wheelAngle = Mathf.Repeat(_wheelAngle + wheelDegrees, 360f);
             if (_crank != null)
             {
-                float targetCrankRate = (throttle > 0.02f && brake <= 0.01f)
-                    ? Mathf.Lerp(105f, 340f, _speed / TopSpeed) * throttle
-                    : 0f;
+                // Cranks are geared to the rear wheel: derive cadence from the distance actually travelled so
+                // pedals never spin while the bike is pinned against a wall, and always match the wheel speed.
+                // Coasting / braking freewheels (cranks stop) like a real bicycle.
+                bool pedaling = throttle > 0.02f && brake <= 0.01f;
+                float targetCrankRate = pedaling ? (wheelDegrees / dt) / PedalGearRatio : 0f;
                 _crankSpinRate = Mathf.Lerp(_crankSpinRate, targetCrankRate, 1f - Mathf.Exp(-7f * dt));
                 if (_crankSpinRate > 2f)
                 {

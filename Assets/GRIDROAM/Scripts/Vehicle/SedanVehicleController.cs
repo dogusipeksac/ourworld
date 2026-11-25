@@ -123,6 +123,7 @@ namespace OurWorld.Vehicle
         private Light _headlightBeam;
         private Quaternion _steeringWheelBaseRot = Quaternion.identity;
         private bool _steeringWheelCached;
+        private bool _wheelVisualsSynced;
 
         // Phase 2 Tuning & Car Wash state
         private float _tuningTurboMult = 1.0f;
@@ -1148,8 +1149,6 @@ namespace OurWorld.Vehicle
                 axle.rightWheel.brakeTorque = ComputeAbsBrakeTorque(axle.rightWheel, baseWheelBrake, applyAbs, isRear, ref maxRearSlip);
 
                 ApplyAntiRoll(axle.leftWheel, axle.rightWheel);
-                ApplyLocalPositionToVisuals(axle.leftWheel, axle.leftWheelVisual);
-                ApplyLocalPositionToVisuals(axle.rightWheel, axle.rightWheelVisual);
             }
 
             MaxRearSidewaysSlip = maxRearSlip;
@@ -1255,6 +1254,7 @@ namespace OurWorld.Vehicle
         private void LateUpdate()
         {
             UpdateLightVisuals();
+            SyncWheelVisuals();
 
             if (steeringWheelTransform != null && _steeringWheelCached)
             {
@@ -1408,6 +1408,24 @@ namespace OurWorld.Vehicle
             {
                 _rb.AddForceAtPosition(rightWheel.transform.up * antiRoll, rightWheel.transform.position);
             }
+        }
+
+        /// <summary>
+        /// Wheel meshes follow the WheelColliders every rendered frame. The body Rigidbody is interpolated, so
+        /// sampling GetWorldPose here (instead of in FixedUpdate) keeps tyres glued to the interpolated chassis
+        /// and removes the per-physics-step wheel jitter/stutter visible at speed and at high frame rates.
+        /// </summary>
+        private void SyncWheelVisuals()
+        {
+            if (axleInfos == null) return;
+            if (_rb != null && _rb.IsSleeping() && _wheelVisualsSynced) return;
+            for (int i = 0; i < axleInfos.Count; i++)
+            {
+                AxleInfo axle = axleInfos[i];
+                if (axle.leftWheel != null) ApplyLocalPositionToVisuals(axle.leftWheel, axle.leftWheelVisual);
+                if (axle.rightWheel != null) ApplyLocalPositionToVisuals(axle.rightWheel, axle.rightWheelVisual);
+            }
+            _wheelVisualsSynced = true;
         }
 
         private static void ApplyLocalPositionToVisuals(WheelCollider collider, Transform visualWheel)
