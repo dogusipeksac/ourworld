@@ -107,13 +107,18 @@ if app_info
 
   app_info_locs = {
     "tr" => {
-      name: "Bizim Dünyamız · Açık Dünya",
-      subtitle: "Sür, Spor Yap, Mahalleni Yaşa",
+      name: "Bizim Dünyamız: Açık Dünya",
+      subtitle: "Çiftlik, Araba, Spor & Poligon",
       privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
     },
     "en-US" => {
-      name: "Our World · Living Open World",
-      subtitle: "Drive, Play Sports & Roam 3D!",
+      name: "Our World: 3D Open World Life",
+      subtitle: "Farming, Driving, Sports & Sim",
+      privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
+    },
+    "en-GB" => {
+      name: "Our World: 3D Sandbox City",
+      subtitle: "Farm, Garage, Drift & 5 Sports",
       privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
     }
   }
@@ -135,6 +140,82 @@ if app_info
       check!("Create AppInfoLocalization (#{loc})", code, resp)
     end
   end
+
+  # 2b. Sync Age Rating Declaration accurately (target-only shooting range + stylized zero-blood melee)
+  _, ard_get = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appInfos/#{info_id}/ageRatingDeclaration")
+  ard_id = ard_get.dig("data", "id")
+  if ard_id
+    code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/ageRatingDeclarations/#{ard_id}", {
+      data: {
+        type: "ageRatingDeclarations",
+        id: ard_id,
+        attributes: {
+          advertising: false,
+          ageAssurance: false,
+          alcoholTobaccoOrDrugUseOrReferences: "NONE",
+          contests: "NONE",
+          datingAndRelationships: false,
+          gambling: false,
+          gamblingSimulated: "NONE",
+          gunsOrOtherWeapons: "INFREQUENT_OR_MILD",
+          healthOrWellnessTopics: false,
+          horrorOrFearThemes: "NONE",
+          lootBox: false,
+          matureOrSuggestiveThemes: "NONE",
+          medicalOrTreatmentInformation: "NONE",
+          messagingAndChat: false,
+          parentalControls: false,
+          profanityOrCrudeHumor: "NONE",
+          sexualContentGraphicAndNudity: "NONE",
+          sexualContentOrNudity: "NONE",
+          sharedLocation: false,
+          socialMedia: false,
+          unrestrictedWebAccess: false,
+          userGeneratedContent: false,
+          violenceCartoonOrFantasy: "INFREQUENT_OR_MILD",
+          violenceRealistic: "NONE",
+          violenceRealisticProlongedGraphicOrSadistic: "NONE",
+          ageRatingOverrideV2: "NONE",
+          koreaAgeRatingOverride: "NONE"
+        }
+      }
+    })
+    check!("Update AgeRatingDeclaration (Mild Target Weapons & Cartoon Action)", code, resp)
+  end
+end
+
+# 2c. Sync App Store Accessibility Nutrition Labels (iPhone & iPad — Dark Interface by default)
+_, acc_get = api_req("GET", "https://api.appstoreconnect.apple.com/v1/apps/#{APP_ID}/accessibilityDeclarations")
+acc_map = {}
+(acc_get["data"] || []).each { |a| acc_map[a.dig("attributes", "deviceFamily")] = a["id"] }
+acc_attrs = {
+  supportsVoiceover: false,
+  supportsVoiceControl: false,
+  supportsLargerText: false,
+  supportsSufficientContrast: false,
+  supportsDarkInterface: true,
+  supportsDifferentiateWithoutColorAlone: false,
+  supportsReducedMotion: false,
+  supportsCaptions: false,
+  supportsAudioDescriptions: false
+}
+%w[IPHONE IPAD].each do |family|
+  acc_id = acc_map[family]
+  if acc_id
+    code, resp = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/accessibilityDeclarations/#{acc_id}", {
+      data: { type: "accessibilityDeclarations", id: acc_id, attributes: acc_attrs }
+    })
+    check!("Update AccessibilityDeclaration (#{family})", code, resp)
+  else
+    code, resp = api_req("POST", "https://api.appstoreconnect.apple.com/v1/accessibilityDeclarations", {
+      data: {
+        type: "accessibilityDeclarations",
+        attributes: acc_attrs.merge(deviceFamily: family),
+        relationships: { app: { data: { type: "apps", id: APP_ID } } }
+      }
+    })
+    check!("Create AccessibilityDeclaration (#{family})", code, resp)
+  end
 end
 
 # 3. Update Version Localizations (tr + en-US)
@@ -143,47 +224,54 @@ vloc_map = {}
 (vlocs["data"] || []).each { |l| vloc_map[l.dig("attributes", "locale")] = l["id"] }
 
 desc_tr = <<~TEXT.strip
-  Bizim Dünyamız (Our World), oyuncuların fikirleriyle birlikte büyüyen, capcanlı bir 3D açık dünya yaşam, çiftlik, oto tamir, sürüş ve spor oyunudur!
+  Bizim Dünyamız (Our World), oyuncuların fikirleriyle birlikte büyüyen, capcanlı bir 3D açık dünya yaşam, çiftlik, oto tamir, sürüş, spor ve atış poligonu oyunudur!
 
-  Hamidiye Mahallesi'nin samimi sokaklarından Aydos Yeşil Vadi Çiftliği'ne ve Sultanbeyli Göleti'ne uzanan özgür dünyaya adım at. Yaya olarak mahalleni gez, tarlanı ekip biç, hayvanlarını besle, oto tamirhanende araçları lifte kaldırıp tamir et, gölette balık tut, evini dekore et ve 4 farklı sporda maça çık!
+  Hamidiye Mahallesi'nin samimi sokaklarından Aydos Yeşil Vadi Çiftliği'ne, Sultanbeyli Göleti'ne ve Aydos Atış Poligonu'na uzanan özgür dünyaya adım at. Yaya olarak mahalleni gez, tarlanı ekip biç, hayvanlarını besle, oto tamirhanende araçları lifte kaldırıp tamir et, gölette balık tut, evini dekore et ve 5 farklı sporda maça çık!
 
   ÖNE ÇIKAN ÖZELLİKLER:
   • Geniş Yaşayan 3D Açık Dünya: Selman Sokağı, Fatih Bulvarı Saat Kulesi, Aydos Çiftliği & Bostanı, Sultanbeyli Göleti, Hz. Osman Camii, Çay Bahçesi, Açık Yüzme Havuzu ve 8 ana cadde.
   • Tarım, Hayvancılık & Köy Pazarı: 16 bostan tarlasında ayçiçeği, domates, biber ve çilek yetiştir; inek sağ, koyun kırp, kümesten yumurta topla ve Köy Pazarı'nda sat.
-  • No:73 Oto Tamir, Modifiye & Oto Yıkama: Müşteri araçlarını hidrolik lifte kaldırıp lastik, motor ve kaporta tamiratı yap; kendi aracına metalik boya, jant, rüzgarlık, tavan bagajı ve performans yükseltmeleri tak.
+  • No:73 Oto Tamir, Modifiye & Oto Yıkama: Müşteri araçlarını hidrolik lifte kaldırıp lastik, motor ve kaporta tamiratı yap; kendi aracına metalik boya, jant, GT rüzgarlık, tavan bagajı, turbo ve nitro yükseltmeleri tak.
   • Gölet Balıkçılığı & Ev Dekorasyonu: Sultanbeyli Göleti iskelesinden 5 farklı balık türü yakala; No:48 evini koltuk takımı, akvaryum ve bahçe mangalıyla yenile.
-  • 6 Bölümlük 26 Hikâye Görevi + 5 Oynanabilir Spor + Atış Poligonu: 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol, 2v2 Voleybol, 50m Yüzme & Tramplen Dalışı ve 4 modlu Aydos Atış Poligonu; Taksi, Pizza, Temizlik ve Ev Boyama yan işleriyle kazan.
-  • 10 Farklı Sesli Türkçe Seslendirme & Akıllı Komşular: Yaşa ve cinsiyete göre seslendirilmiş konuşan komşular, gerçekçi animasyonlar, araba/bisiklet/motosiklet sürüşü ve akşam 18:30'dan itibaren yanan sokak lambaları.
-  • Birlikte Büyüyen Dünya: Oyun içi Öneri sekmesinden fikrini yaz, sıradaki güncellemeleri birlikte şekillendirelim!
+  • 6 Bölümlük 32 Hikâye Görevi + 5 Oynanabilir Spor + Atış Poligonu: 1v1 Tenis, 3v3 Halı Saha Futbolu, 2v2 Basketbol, 2v2 Voleybol, 50m Yüzme & Tramplen Dalışı ve 4 silahlı / 4 modlu Aydos Atış Poligonu; Taksi, Pizza, Temizlik ve Ev Boyama yan işleriyle kazan.
+  • 10 Türkçe & 6 İngilizce Seslendirme: Yaşa ve cinsiyete uygun konuşan komşular, gerçekçi animasyonlar, araba/bisiklet/motosiklet sürüşü ve akşam 18:30'dan itibaren yanan sokak lambaları.
+  • Reklamsız & Çevrimdışı Oynanabilir: İnternet bağlantısı gerekmeden dilediğin yerde oyna; oyun içi Öneri sekmesinden fikrini yaz, sıradaki güncellemeleri birlikte şekillendirelim!
 TEXT
 
 desc_en = <<~TEXT.strip
-  Our World is a vibrant, living 3D open-world life, farming, auto-repair, driving & sports game built to grow together with its community!
+  Our World is a vibrant, living 3D open-world life, farming, auto-repair, driving, sports, and shooting range game built to grow together with its community!
 
-  Explore a sprawling handcrafted neighborhood stretching from 8 bustling avenues to Aydos Green Valley Farm and Sultanbeyli Lake. Plant & harvest crops, raise cows, sheep, and chickens, repair & tune cars on a hydraulic garage lift, fish off the lakeside pier, decorate your home, and jump into 4 playable sports anytime!
+  Explore a sprawling handcrafted neighborhood stretching from 8 bustling avenues to Aydos Green Valley Farm, Sultanbeyli Lake, and Aydos Shooting Range. Plant & harvest crops, raise cows, sheep, and chickens, repair & tune cars on a hydraulic garage lift, fish off the lakeside pier, decorate your home, and jump into 5 playable sports anytime!
 
   KEY FEATURES:
-  • Living 3D Open World: Roam 8 connected avenues, Aydos Farm Valley, Sultanbeyli Lake & Pine Grove, Clock Tower Plaza, swimmable pool, and enterable interiors.
+  • Living 3D Open World: Roam 8 connected avenues, Aydos Farm Valley, Sultanbeyli Lake & Pine Grove, Clock Tower Plaza, swimmable pool, tea garden, and enterable interiors.
   • Farming, Livestock & Village Market: Grow sunflowers, tomatoes, peppers, and strawberries across 16 beds; milk cows, shear sheep, collect eggs, and sell fresh harvest at the village stand.
-  • No:73 Auto Garage, Tuning & Car Wash: Raise customer cars on a hydraulic lift for 3-step repairs, customize your own car with metallic paints, rims, spoilers, roof racks & performance upgrades, and visit the drive-through car wash.
-  • Lake Fishing & Home Decor: Cast off Sultanbeyli Lake Pier to catch 5 fish species, upgrade your home with luxury furniture & aquarium, and grill on your backyard mangal.
-  • 6-Chapter Story (26 Missions) + 5 Playable Sports + Shooting Range: Jump anytime into 1v1 Clay Tennis, 3v3 Football, 2v2 Basketball, 2v2 Volleyball, 50m Swimming & Acrobatic Diving, and 4-mode Aydos Shooting Range, plus Taxi, Pizza, Cleanup & Painting jobs.
-  • Smart Talking NPCs & Realistic Animations: Expressive skeletal animal animations, two-hand IK interactions, multi-vehicle driving, and glowing streetlamps & headlights after dusk.
-  • Shaped by Players: Share your ideas via the in-game Suggestions tab to help guide every update!
+  • No:73 Auto Garage, Tuning & Car Wash: Raise customer cars on a hydraulic lift for 3-step repairs, customize your car with metallic paints, rims, GT spoiler, roof rack, turbo & nitro upgrades, and visit the drive-through car wash.
+  • Lake Fishing & Home Decor: Cast off Sultanbeyli Lake Pier to catch 5 fish species, upgrade your No:48 home with luxury furniture & aquarium, and grill on your backyard mangal.
+  • 6-Chapter Story (32 Missions) + 5 Playable Sports + Shooting Range: Jump anytime into 1v1 Clay Tennis, 3v3 Football, 2v2 Basketball, 2v2 Volleyball, 50m Swimming & Acrobatic Diving, and 4-weapon / 4-mode Aydos Shooting Range, plus Taxi, Pizza, Cleanup & Painting jobs.
+  • Expressive Multi-Voice Audio (EN & TR): 6 English and 10 Turkish voices for talking neighbors & range callouts, lifelike animations, multi-vehicle driving, and glowing streetlamps & headlights after dusk.
+  • Ad-Free & Offline Playable: Enjoy the entire neighborhood offline with zero ads or paywalls, and share feature ideas via the in-game Suggestions tab!
 TEXT
 
 version_locs = {
   "tr" => {
-    promotionalText: "Aydos Çiftliği, tarım, hayvancılık, oto tamir & modifiye, gölet balıkçılığı, 20 görev ve 4 oynanabilir spor şimdi tek açık dünyada!",
+    promotionalText: "32 hikâye görevi, 10 Türkçe & 6 İngilizce seslendirme, Aydos Çiftliği, No:73 Oto Tamir, Gölet Balıkçılığı, 5 canlı spor ve Aydos Atış Poligonu tek açık dünyada!",
     description: desc_tr,
-    keywords: "araba,sürme,çiftlik,tamir,balık,simülasyon,tenis,futbol,basketbol,voleybol,3d,şehir,drift,offline",
+    keywords: "sürüş,tamir,balık,tenis,futbol,basketbol,voleybol,yüzme,simülasyon,şehir,mahalle,çevrimdışı,offline",
     supportUrl: "https://dogusipeksac.com",
     marketingUrl: "https://dogusipeksac.com"
   },
   "en-US" => {
-    promotionalText: "Farming, livestock, auto garage & tuning, lake fishing, home decor, 20 missions & 4 playable sports in one living 3D open world!",
+    promotionalText: "32 story missions, EN & TR voices, Aydos Farm, No:73 Auto Garage, Lake Fishing, 5 live sports & Aydos Shooting Range — all ad-free & offline in one living 3D world!",
     description: desc_en,
-    keywords: "sandbox,farming,garage,fishing,car,driving,life,sim,tennis,football,basketball,volleyball,offline",
+    keywords: "sandbox,garage,car,fishing,tennis,football,basketball,volleyball,swimming,shooting,town,city,offline",
+    supportUrl: "https://dogusipeksac.com",
+    marketingUrl: "https://dogusipeksac.com"
+  },
+  "en-GB" => {
+    promotionalText: "32 story missions, EN & TR voices, Aydos Farm, No:73 Auto Garage, Lake Fishing, 5 live sports & Aydos Shooting Range — all ad-free & offline in one living 3D world!",
+    description: desc_en,
+    keywords: "istanbul,motor,bisiklet,taksi,pizza,soccer,diving,range,target,crops,market,decor,story,rpg,quest",
     supportUrl: "https://dogusipeksac.com",
     marketingUrl: "https://dogusipeksac.com"
   }
@@ -211,14 +299,14 @@ end
 
 # 4. Update App Store Review Detail
 review_notes = <<~NOTES.strip
-  Our World (Bizim Dünyamız) is an offline-playable 3D open-world neighborhood life, driving, and sports game. No account, login, or in-app purchases are required.
+  Our World (Bizim Dünyamız) is an offline-playable, ad-free 3D open-world neighborhood life, farming, auto-repair, driving, and sports game. No account, login, or in-app purchases are required.
 
   How to review:
-  1. Launch the app. The living open-world Main Menu appears over a live 3D camera tour of the neighborhood — tap "Mahalleye Gir / Enter Neighborhood" (or pick any District / Sport directly).
+  1. Launch the app. The living open-world Main Menu opens over a live 3D camera tour of the neighborhood — tap "Mahalleye Gir / Enter Neighborhood" (or pick any District / Sport directly).
   2. Use the left virtual joystick to walk, drag the right side of the screen to orbit the camera, and tap Sprint/Jump/Interact buttons on the right.
-  3. Follow the 20-mission story tracker or explore freely: drive cars/bikes/motorcycles, jump anytime into playable Tennis, 3v3 Football, 2v2 Basketball, or 2v2 Volleyball, walk into shops to buy off shelves, swim in the pool, or talk to smart NPCs with floating speech bubbles.
-  4. Open Menu -> Settings & World to switch language (TR/EN), graphics tier, or Day/Evening/Night time (streetlamps, apartment lights, court floodlights, and headlights turn on automatically from 18:30).
-  5. No ads, no IAP, no chat, no demo account required. Firebase Crashlytics is used for crash diagnostics only.
+  3. Follow the 32-mission story tracker or explore freely: drive cars/bikes/motorcycles, farm & raise animals at Aydos Farm, repair & tune cars at No:73 Auto Garage, fish at Sultanbeyli Lake, jump anytime into playable Tennis, 3v3 Football, 2v2 Basketball, 2v2 Volleyball, 50m Swimming/Diving, or the 4-mode Aydos Shooting Range (sporting target/clay pigeon shooting only — weapons are strictly scoped to the range with zero NPC or animal targeting).
+  4. Open Menu -> Settings & World to switch language (Turkish with 10 voices / English with 6 voices), graphics tier, voiceover toggle, Invert Y, large subtitles, or Day/Evening/Night time.
+  5. No ads, no IAP, no user accounts, no direct user-to-user messaging. The optional Phone -> Ideas tab is a moderated developer feedback box. Firebase Crashlytics is used for crash diagnostics only (no Analytics / no IDFA / no tracking).
 NOTES
 
 _, rev_get = api_req("GET", "https://api.appstoreconnect.apple.com/v1/appStoreVersions/#{ver_id}/appStoreReviewDetail")
@@ -263,13 +351,13 @@ bloc_map = {}
 beta_email = ENV.fetch("ASC_REVIEW_EMAIL", "contact@dogusipeksac.com")
 beta_locs = {
   "tr" => {
-    description: "Bizim Dünyamız (Our World) TestFlight test sürümü: 20 hikâye görevi, 4 oynanabilir spor (Tenis, Futbol, Basketbol, Voleybol), akıllı konuşan mahalle NPC'leri, canlı menü, çoklu araç sürüşü ve akşam sokak aydınlatması.",
+    description: "Bizim Dünyamız (Our World) v1.0.0: 32 hikâye görevi, 10 Türkçe & 6 İngilizce seslendirme, Aydos Çiftliği, No:73 Oto Tamir, Gölet Balıkçılığı, 5 canlı spor, 4 modlu Aydos Atış Poligonu ve yenilenmiş arayüz.",
     feedbackEmail: beta_email,
     marketingUrl: "https://dogusipeksac.com",
     privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
   },
   "en-US" => {
-    description: "Our World TestFlight beta: 20 story missions, 4 playable sports (Tennis, Football, Basketball, Volleyball), smart talking NPCs, living open-world menu, multi-vehicle driving, and glowing evening street lights.",
+    description: "Our World v1.0.0: 32 story missions, 6 English & 10 Turkish voices, Aydos Farm, No:73 Auto Garage, Lake Fishing, 5 live sports, 4-mode Aydos Shooting Range, and redesigned modal UI.",
     feedbackEmail: beta_email,
     marketingUrl: "https://dogusipeksac.com",
     privacyPolicyUrl: "https://dogusipeksac.com/privacy-policy/ourworld/"
@@ -354,7 +442,8 @@ end
 unless SKIP_SCREENSHOTS
   {
     "tr" => SHOTS_ROOT,
-    "en-US" => File.join(SHOTS_ROOT, "en-US")
+    "en-US" => File.join(SHOTS_ROOT, "en-US"),
+    "en-GB" => File.join(SHOTS_ROOT, "en-US")
   }.each do |loc, dir_root|
     vloc_id = vloc_map[loc]
     next unless vloc_id
@@ -393,6 +482,32 @@ if ATTACH_BUILD
       data: { type: "builds", id: build_id }
     })
     check!("Attach build #{build_id} to version #{VERSION_STR}", code, resp)
+
+    # Also update TestFlight "What to Test" notes for this build (tr + en-US)
+    _, bbl = api_req("GET", "https://api.appstoreconnect.apple.com/v1/builds/#{build_id}/betaBuildLocalizations")
+    bbl_map = {}
+    (bbl["data"] || []).each { |l| bbl_map[l.dig("attributes", "locale")] = l["id"] }
+    what_to_test = {
+      "tr" => "Build #{BUILD_NUM || '8'}: Yenilenen Yenilikler/Çiftlik/Oto Tamir/Ev Dekorasyonu ekranları, 224 İngilizce + 306 Türkçe seslendirme, tüm spor ve poligonlarda tam TR/EN dil desteği ve performans/boyut optimizasyonları.",
+      "en-US" => "Build #{BUILD_NUM || '8'}: Redesigned What's New, Farm, Auto Garage & Home Decor UI, full English (6 voices) + Turkish (10 voices) audio, 100% bilingual sports & shooting range, and mobile performance optimizations."
+    }
+    what_to_test.each do |loc, text|
+      if bbl_map[loc]
+        c2, r2 = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/betaBuildLocalizations/#{bbl_map[loc]}", {
+          data: { type: "betaBuildLocalizations", id: bbl_map[loc], attributes: { whatsNew: text } }
+        })
+        check!("Update BetaBuildLocalization (#{loc})", c2, r2)
+      else
+        c2, r2 = api_req("POST", "https://api.appstoreconnect.apple.com/v1/betaBuildLocalizations", {
+          data: {
+            type: "betaBuildLocalizations",
+            attributes: { locale: loc, whatsNew: text },
+            relationships: { build: { data: { type: "builds", id: build_id } } }
+          }
+        })
+        check!("Create BetaBuildLocalization (#{loc})", c2, r2)
+      end
+    end
   else
     warn "Build not VALID yet — it is still processing in App Store Connect; attach once processing completes."
   end
