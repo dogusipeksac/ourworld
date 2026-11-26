@@ -70,7 +70,8 @@ namespace OurWorld.UI
             }
 
             bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            OurWorldUiKit.EnsureInitialized();
+            Font font = OurWorldUiKit.DefaultFont;
 
             _rootCanvas = new GameObject("StoryIntroCanvas");
             _rootCanvas.transform.SetParent(transform, false);
@@ -79,90 +80,115 @@ namespace OurWorld.UI
             canvas.sortingOrder = 185;
             CanvasScaler scaler = _rootCanvas.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280f, 720f);
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
             _rootCanvas.AddComponent<GraphicRaycaster>();
 
-            // Fullscreen warm dark scrim
-            GameObject scrim = new GameObject("Scrim");
+            // Fullscreen flagship scrim
+            GameObject scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
             scrim.transform.SetParent(_rootCanvas.transform, false);
-            Image scrimImg = scrim.AddComponent<Image>();
-            scrimImg.color = new Color(0.05f, 0.08f, 0.13f, 0.84f);
-            RectTransform srt = scrim.GetComponent<RectTransform>();
+            Image scrimImg = scrim.GetComponent<Image>();
+            scrimImg.color = OurWorldUiKit.Scrim;
+            RectTransform srt = (RectTransform)scrim.transform;
             srt.anchorMin = Vector2.zero;
             srt.anchorMax = Vector2.one;
             srt.offsetMin = Vector2.zero;
             srt.offsetMax = Vector2.zero;
 
-            // Center editorial story card
-            GameObject card = new GameObject("StoryCard");
+            // Flagship WhatsNew-style elevated rounded card
+            GameObject card = new GameObject("StoryCard", typeof(RectTransform), typeof(Image));
             card.transform.SetParent(scrim.transform, false);
-            Image cardImg = card.AddComponent<Image>();
-            cardImg.color = new Color(0.10f, 0.14f, 0.21f, 0.97f);
-            RectTransform crt = card.GetComponent<RectTransform>();
-            crt.anchorMin = new Vector2(0.5f, 0.5f);
-            crt.anchorMax = new Vector2(0.5f, 0.5f);
-            crt.sizeDelta = new Vector2(760f, 430f);
+            RectTransform crt = (RectTransform)card.transform;
+            crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f);
+            crt.sizeDelta = new Vector2(1020f, 620f);
+            OurWorldUiKit.ApplyRounded(card.GetComponent<Image>(), OurWorldUiKit.CardSprite, OurWorldUiKit.CardBg);
+            OurWorldUiKit.AddCardDropShadow(card.transform, spread: 30f, offsetY: -14f, alpha: 0.62f);
+            OurWorldUiKit.AddSoftTopGlow(card.transform, OurWorldUiKit.AccentGold, heightPx: 210f, alpha: 0.16f);
+            OurWorldUiKit.AddHairlineBorder(card.transform, OurWorldUiKit.CardOutlineSprite,
+                Color.Lerp(OurWorldUiKit.BorderSubtle, OurWorldUiKit.AccentGold, 0.24f));
 
-            // Warm amber top accent bar
-            GameObject accent = new GameObject("AccentBar");
-            accent.transform.SetParent(card.transform, false);
-            Image accentImg = accent.AddComponent<Image>();
-            accentImg.color = new Color(0.95f, 0.68f, 0.22f, 1f);
-            RectTransform art = accent.GetComponent<RectTransform>();
-            art.anchorMin = new Vector2(0f, 1f);
-            art.anchorMax = new Vector2(1f, 1f);
-            art.pivot = new Vector2(0.5f, 1f);
-            art.sizeDelta = new Vector2(0f, 6f);
+            // Top eyebrow capsule pill with live gold dot
+            GameObject pill = new GameObject("EyebrowPill", typeof(RectTransform), typeof(Image));
+            pill.transform.SetParent(card.transform, false);
+            RectTransform prt = (RectTransform)pill.transform;
+            prt.anchorMin = prt.anchorMax = new Vector2(0f, 1f);
+            prt.pivot = new Vector2(0f, 1f);
+            prt.anchoredPosition = new Vector2(40f, -28f);
+            prt.sizeDelta = new Vector2(490f, 40f);
+            OurWorldUiKit.ApplyRounded(pill.GetComponent<Image>(), OurWorldUiKit.PillSprite,
+                new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.12f));
+            OurWorldUiKit.AddHairlineBorder(pill.transform, OurWorldUiKit.PillOutlineSprite,
+                new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.36f));
 
-            AddText(card.transform, "Eyebrow", font, 16, FontStyle.Bold, new Color(0.95f, 0.72f, 0.28f),
-                isEn ? "OURWORLD  ·  ISTANBUL · HAMİDİYE NEIGHBORHOOD" : "OURWORLD  ·  İSTANBUL · HAMİDİYE MAHALLESİ",
-                new Vector2(40f, -26f), new Vector2(680f, 28f), TextAnchor.MiddleLeft);
+            GameObject dot = new GameObject("LiveDot", typeof(RectTransform), typeof(Image));
+            dot.transform.SetParent(pill.transform, false);
+            RectTransform drt = (RectTransform)dot.transform;
+            drt.anchorMin = drt.anchorMax = new Vector2(0f, 0.5f);
+            drt.pivot = new Vector2(0.5f, 0.5f);
+            drt.anchoredPosition = new Vector2(22f, 0f);
+            drt.sizeDelta = new Vector2(9f, 9f);
+            Image dotImg = dot.GetComponent<Image>();
+            dotImg.sprite = OurWorldUiKit.CircleSprite;
+            dotImg.color = OurWorldUiKit.AccentGold;
+            dotImg.raycastTarget = false;
 
-            AddText(card.transform, "Title", font, 32, FontStyle.Bold, Color.white,
+            Text eyebrowTxt = OurWorldUiKit.CreateStretchText("Eyebrow", pill.transform,
+                isEn ? "OURWORLD  ·  ISTANBUL · HAMİDİYE" : "OURWORLD  ·  İSTANBUL · HAMİDİYE MAHALLESİ",
+                16, FontStyle.Bold, OurWorldUiKit.AccentGold, TextAnchor.MiddleLeft, 38f, 0f);
+            eyebrowTxt.rectTransform.offsetMax = new Vector2(-14f, 0f);
+
+            // Top-right hero circular world medallion
+            GameObject medGo = new GameObject("HeroMedallion", typeof(RectTransform), typeof(Image));
+            medGo.transform.SetParent(card.transform, false);
+            RectTransform mrt = (RectTransform)medGo.transform;
+            mrt.anchorMin = mrt.anchorMax = new Vector2(1f, 1f);
+            mrt.pivot = new Vector2(1f, 1f);
+            mrt.anchoredPosition = new Vector2(-40f, -24f);
+            mrt.sizeDelta = new Vector2(68f, 68f);
+            Image medBg = medGo.GetComponent<Image>();
+            medBg.sprite = OurWorldUiKit.CircleSprite;
+            medBg.color = new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.14f);
+            medBg.raycastTarget = false;
+            OurWorldUiKit.AddHairlineBorder(medGo.transform, OurWorldUiKit.CircleOutlineSprite,
+                new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.48f));
+            OurWorldUiKit.AddIcon("WorldIcon", medGo.transform, OurWorldUiKit.IconWorld, 34f, OurWorldUiKit.AccentGold);
+
+            AddText(card.transform, "Title", font, 40, FontStyle.Bold, OurWorldUiKit.TextPrimary,
                 isEn ? "The Wind of Hamidiye" : "Hamidiye'nin Rüzgârı",
-                new Vector2(40f, -62f), new Vector2(680f, 46f), TextAnchor.MiddleLeft);
+                new Vector2(40f, -86f), new Vector2(820f, 54f), TextAnchor.MiddleLeft);
+
+            OurWorldUiKit.AddDividerLine(card.transform,
+                new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(40f, -152f), new Vector2(-40f, -150.5f),
+                OurWorldUiKit.Divider);
 
             string body = isEn
                 ? "After years away, you've returned to your grandfather's corner house on Selman Street.\n\n" +
-                  "Warm corner shops, stray cats, kids playing football, the swimming pool, tennis court, and Fatih Boulevard's Clock Tower still beat with life — yet a shadowy developer called Kaya Holding wants to buy up the old deeds.\n\n" +
-                  "Master Kemal is waiting outside Auto Repair No:73 with your grandfather's freshly tuned sedan. Explore all 8 avenues, uncover 12 Neighborhood Memories, and save Hamidiye together!"
+                  "Warm corner shops, stray cats, kids playing football, the swimming pool, tennis court, Fatih Boulevard's Clock Tower, Havadis Street's stone bakery, and Kadife Street's tea house beat with life — yet Kaya Holding wants to buy up the old deeds.\n\n" +
+                  "Master Kemal is waiting outside Auto Repair No:73 with your grandfather's freshly tuned sedan. Explore all 10 avenues and streets, chat with smart neighbors, and save Hamidiye together!"
                 : "Yıllar sonra dedenden kalan Selman Sokağı'ndaki bahçeli eve döndün.\n\n" +
-                  "Sıcak mahalle esnafı, sokak kedileri, tenis kortu, açık yüzme havuzu, Hz. Osman Camii ve Fatih Bulvarı Saat Kulesi hâlâ yaşam dolu — ancak Kaya Holding adlı bir şirket mahallenin eski tapularının peşinde.\n\n" +
-                  "Usta Kemal, No:73 Oto Tamir'in önünde dedenin bakımdan çıkan sedanıyla seni bekliyor. 8 caddeyi keşfet, 12 Hamidiye Hatırası'nı topla ve mahallemizi birlikte koru!";
+                  "Sıcak mahalle esnafı, sokak kedileri, tenis kortu, açık yüzme havuzu, Hz. Osman Camii, Fatih Bulvarı Saat Kulesi, Havadis Sokağı taş fırını ve Kadife Sokağı kıraathanesi yaşam dolu — ancak Kaya Holding mahallenin eski tapularının peşinde.\n\n" +
+                  "Usta Kemal, No:73 Oto Tamir'in önünde dedenin bakımdan çıkan sedanıyla seni bekliyor. Tüm caddeleri keşfet, zeki komşularla sohbet et ve mahallemizi birlikte koru!";
 
-            AddText(card.transform, "Body", font, 19, FontStyle.Normal, new Color(0.86f, 0.90f, 0.95f),
-                body, new Vector2(40f, -120f), new Vector2(680f, 215f), TextAnchor.UpperLeft);
+            AddText(card.transform, "Body", font, 23, FontStyle.Normal, OurWorldUiKit.TextSecondary,
+                body, new Vector2(40f, -172f), new Vector2(940f, 300f), TextAnchor.UpperLeft);
 
-            // Start button
-            GameObject btnGo = new GameObject("StartButton");
-            btnGo.transform.SetParent(card.transform, false);
-            Image btnImg = btnGo.AddComponent<Image>();
-            btnImg.color = new Color(0.16f, 0.64f, 0.56f, 1f);
-            Button btn = btnGo.AddComponent<Button>();
-            btn.targetGraphic = btnImg;
-            btn.onClick.AddListener(Dismiss);
-            RectTransform brt = btnGo.GetComponent<RectTransform>();
-            brt.anchorMin = new Vector2(0.5f, 0f);
-            brt.anchorMax = new Vector2(0.5f, 0f);
+            OurWorldUiKit.AddDividerLine(card.transform,
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(40f, 108f), new Vector2(-40f, 109.5f),
+                OurWorldUiKit.Divider);
+
+            // Flagship Turquoise Pill CTA Button with dark ink text
+            Button btn = OurWorldUiKit.CreatePillButton(
+                "StartButton", card.transform,
+                isEn ? "Step Into Hamidiye  →" : "Mahalleye Adım At  →",
+                22, OurWorldUiKit.AccentTeal, OurWorldUiKit.InkDark, Color.clear,
+                out _, onClick: Dismiss);
+            RectTransform brt = (RectTransform)btn.transform;
+            brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0f);
             brt.pivot = new Vector2(0.5f, 0f);
             brt.anchoredPosition = new Vector2(0f, 28f);
-            brt.sizeDelta = new Vector2(300f, 54f);
-
-            GameObject lblGo = new GameObject("Label");
-            lblGo.transform.SetParent(btnGo.transform, false);
-            Text lbl = lblGo.AddComponent<Text>();
-            lbl.font = font;
-            lbl.fontSize = 20;
-            lbl.fontStyle = FontStyle.Bold;
-            lbl.color = Color.white;
-            lbl.alignment = TextAnchor.MiddleCenter;
-            lbl.text = isEn ? "Step Into Hamidiye" : "Mahalleye Adım At";
-            RectTransform lrt = lblGo.GetComponent<RectTransform>();
-            lrt.anchorMin = Vector2.zero;
-            lrt.anchorMax = Vector2.one;
-            lrt.offsetMin = Vector2.zero;
-            lrt.offsetMax = Vector2.zero;
+            brt.sizeDelta = new Vector2(340f, 58f);
         }
 
         private void Dismiss()

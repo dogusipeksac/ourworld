@@ -70,11 +70,11 @@ namespace OurWorld.Missions
             // --- M15: Dedemin Kayıp Sandığı (Brass Clues + Time Capsule Chest) ---
             SpawnStoryProp("m15_clue_mosque", "m15_dedemin_sandigi", new Vector3(82.0f, 0.08f, -31.5f), new Color(0.95f, 0.78f, 0.24f), new Vector3(0.42f, 0.12f, 0.34f));
             SpawnStoryProp("m15_clue_park", "m15_dedemin_sandigi", new Vector3(-20.0f, 0.08f, 69.5f), new Color(0.95f, 0.78f, 0.24f), new Vector3(0.42f, 0.12f, 0.34f));
-            SpawnStoryProp("m15_clue_zubeyde", "m15_dedemin_sandigi", new Vector3(12.0f, 0.08f, -151.0f), new Color(0.95f, 0.78f, 0.24f), new Vector3(0.42f, 0.12f, 0.34f));
+            SpawnStoryProp("m15_clue_zubeyde", "m15_dedemin_sandigi", new Vector3(12.0f, 0.08f, -180.8f), new Color(0.95f, 0.78f, 0.24f), new Vector3(0.42f, 0.12f, 0.34f));
             SpawnStoryProp("m15_grandfather_chest", "m15_dedemin_sandigi", new Vector3(-63.8f, 0.10f, 6.2f), new Color(0.92f, 0.68f, 0.16f), new Vector3(0.72f, 0.44f, 0.46f));
 
-            // --- M17: Gece Yarısı Elektrik Kesintisi (Fuse Box, Generator Fuel, Relay Switch) ---
-            SpawnStoryProp("m17_fuse_box", "m17_gece_kesintisi", new Vector3(22.8f, 0.08f, 4.6f), new Color(0.98f, 0.56f, 0.14f), new Vector3(0.56f, 0.34f, 0.42f));
+            // --- M17: Gece Yarısı Elektrik Kesintisi (Fuse Box on Havadis Sk., Generator Fuel, Relay Switch) ---
+            SpawnStoryProp("m17_fuse_box", "m17_gece_kesintisi", new Vector3(32.0f, 0.08f, 180.8f), new Color(0.98f, 0.56f, 0.14f), new Vector3(0.56f, 0.34f, 0.42f));
             SpawnStoryProp("m17_gen_fuel", "m17_gece_kesintisi", new Vector3(-18.5f, 0.08f, -72.0f), new Color(0.92f, 0.22f, 0.18f), new Vector3(0.40f, 0.54f, 0.28f));
             SpawnStoryProp("m17_relay_panel", "m17_gece_kesintisi", new Vector3(32.0f, 0.08f, 90.0f), new Color(0.24f, 0.86f, 0.96f), new Vector3(0.52f, 0.68f, 0.26f));
 
@@ -83,8 +83,8 @@ namespace OurWorld.Missions
             SpawnStoryProp("m19_evidence_ataturk", "m19_son_hamle", new Vector3(-38.0f, 0.08f, 90.2f), new Color(0.88f, 0.22f, 0.36f), new Vector3(0.52f, 0.18f, 0.38f));
             SpawnStoryProp("m19_evidence_aziziye", "m19_son_hamle", new Vector3(-18.5f, 0.08f, -119.2f), new Color(0.88f, 0.22f, 0.36f), new Vector3(0.52f, 0.18f, 0.38f));
 
-            // --- M20: Bizim Dünyamız · Büyük Mahalle Mirası (Celebration Cake & Legacy Plaque) ---
-            SpawnStoryProp("m20_celebration_cake", "m20_bizim_dunyamiz_mirasi", new Vector3(9.5f, 0.08f, 5.2f), new Color(0.98f, 0.82f, 0.42f), new Vector3(0.58f, 0.36f, 0.58f));
+            // --- M20: Bizim Dünyamız · Büyük Mahalle Mirası (Celebration Cake from Havadis Taş Fırın & Legacy Plaque) ---
+            SpawnStoryProp("m20_celebration_cake", "m20_bizim_dunyamiz_mirasi", new Vector3(-20.0f, 0.08f, 191.0f), new Color(0.98f, 0.82f, 0.42f), new Vector3(0.58f, 0.36f, 0.58f));
             SpawnStoryProp("m20_legacy_plaque", "m20_bizim_dunyamiz_mirasi", new Vector3(-62.2f, 0.12f, 5.4f), new Color(1.0f, 0.86f, 0.28f), new Vector3(0.54f, 0.44f, 0.18f));
 
             // --- Sports Tournament & Pool Anchors (M16 & M20) ---
@@ -97,10 +97,10 @@ namespace OurWorld.Missions
             // --- M17 Trafo Delivery Zone ---
             SpawnZone("m17_trafo_zone", new Vector3(24.0f, 0.10f, 44.5f), 11f);
 
-            // --- M18 Eight-Avenue Grand Street Rally Checkpoints ---
-            SpawnZone("m18_cp1_fatih", new Vector3(0.0f, 0.18f, 142.0f), 16f);
+            // --- M18 Grand District Street Rally Checkpoints (spans Havadis Sk. North -> Eyyubi West -> Kadife Sk. South -> Udeh East!) ---
+            SpawnZone("m18_cp1_fatih", new Vector3(0.0f, 0.12f, 186.0f), 18f);
             SpawnZone("m18_cp2_eyyubi", new Vector3(-148.0f, 0.12f, -18.0f), 16f);
-            SpawnZone("m18_cp3_zubeyde", new Vector3(6.0f, 0.12f, -146.0f), 16f);
+            SpawnZone("m18_cp3_zubeyde", new Vector3(6.0f, 0.12f, -186.0f), 18f);
             SpawnZone("m18_cp4_udeh", new Vector3(99.0f, 0.12f, -30.0f), 16f);
             SpawnZone("m18_cp5_finish", new Vector3(22.0f, 0.12f, 0.0f), 14f);
 

@@ -51,6 +51,11 @@ namespace OurWorld.Editor
             BuildFullPrototype(showDialog: true);
         }
 
+        public static void BuildFullPrototypeBatchmode()
+        {
+            BuildFullPrototype(showDialog: false);
+        }
+
         public static void BuildFullPrototype(bool showDialog)
         {
             EnsureDirectories();
@@ -97,7 +102,7 @@ namespace OurWorld.Editor
 
             PlayerSettings.companyName = "Doğuş İpeksaç";
             PlayerSettings.productName = "Our World";
-            PlayerSettings.bundleVersion = "1.0.0";
+            PlayerSettings.bundleVersion = "1.0.10";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
@@ -2566,12 +2571,16 @@ namespace OurWorld.Editor
                 new Vector3( 97.5f, 0.05f,  -1.2f), // Abdülkadir Udeh corner
                 new Vector3( 97.5f, 0.05f,  46.0f), // North to Mürşit Cd.
                 new Vector3( 97.5f, 0.05f, 136.0f), // North to Fatih Bulvarı South Lane
-                new Vector3(  0.0f, 0.05f, 136.0f), // Fatih Bulvarı · Saat Kulesi
-                new Vector3(-86.5f, 0.05f, 136.0f), // West to Seyyid Kutup Cd.
+                new Vector3( 97.5f, 0.05f, 184.8f), // North to Havadis Sokağı!
+                new Vector3(  0.0f, 0.05f, 184.8f), // Havadis Sokağı · Taş Fırın
+                new Vector3(-86.5f, 0.05f, 184.8f), // West to Seyyid Kutup Cd. North
+                new Vector3(-86.5f, 0.05f, 136.0f), // South past Fatih Bulvarı
                 new Vector3(-86.5f, 0.05f,  46.0f), // South along Seyyid Kutup Cd.
                 new Vector3(-86.5f, 0.05f, -79.5f), // South to Petrol Yolu Cd.
-                new Vector3(  0.0f, 0.05f, -79.5f), // East along Petrol Yolu Cd.
-                new Vector3(100.5f, 0.05f, -79.5f), // East to Abdülkadir Udeh
+                new Vector3(-86.5f, 0.05f,-187.2f), // South to Kadife Sokağı!
+                new Vector3(  0.0f, 0.05f,-187.2f), // Kadife Sokağı · Kıraathane
+                new Vector3(100.5f, 0.05f,-187.2f), // East to Abdülkadir Udeh South
+                new Vector3(100.5f, 0.05f, -79.5f), // North past Petrol Yolu Cd.
                 new Vector3(100.5f, 0.05f,   1.2f), // North back to Selman Sk.
                 new Vector3(  0.0f, 0.05f,   1.2f), // Selman Sk. East -> West
                 new Vector3(-83.5f, 0.05f,   1.2f)

@@ -11,11 +11,11 @@ namespace OurWorld.UI
     /// </summary>
     public class MinimapController : MonoBehaviour
     {
-        public const float MapWorldMinX = -203f;
-        public const float MapWorldMaxX = 187f;
-        public const float MapWorldMinZ = -193f;
-        public const float MapWorldMaxZ = 197f;
-        public const float MapWorldSpan = 390f;
+        public const float MapWorldMinX = -235f;
+        public const float MapWorldMaxX = 225f;
+        public const float MapWorldMinZ = -228f;
+        public const float MapWorldMaxZ = 232f;
+        public const float MapWorldSpan = 460f;
 
         [SerializeField] private RectTransform mapRotator;
         [SerializeField] private RawImage mapRawImage;

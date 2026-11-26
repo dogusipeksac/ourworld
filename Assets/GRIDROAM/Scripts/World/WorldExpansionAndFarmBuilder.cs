@@ -102,6 +102,7 @@ namespace OurWorld.World
             BuildEastAydosFarmValley();
             BuildWestSultanbeyliLakeAndGrove();
             BeautifyHamidiyePlazasAndAvenues();
+            RedistributeClusteredSelmanCars();
 
             FarmEconomyManager.OnExtraAnimalPurchased += HandleExtraAnimalPurchased;
             FarmEconomyManager.OnAutoSprinklerUnlocked += HandleSprinklerUnlocked;
@@ -1367,6 +1368,40 @@ namespace OurWorld.World
             Destroy(go.GetComponent<Collider>());
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
             return go;
+        }
+
+        private void RedistributeClusteredSelmanCars()
+        {
+            // Move excess parked cars that were clustered right around No:48 / Selman St.
+            // out to outer exploration districts (Lake, Farm, Park, Aziziye) so PlayerSedan stays at home
+            // while players discover vehicles everywhere across the expanded map!
+            (string carName, Vector3 targetPos, float yaw)[] relocations =
+            {
+                ("Car_No50_RedVanHatch",      new Vector3(-156.5f, 0.25f,   5.2f), 180f), // Sultanbeyli Göleti İskelesi
+                ("Car_No52_WhiteDeliveryVan", new Vector3( 144.0f, 0.25f,  -4.4f),  90f), // Aydos Çiftliği Girişi
+                ("Car_No58_MPV",              new Vector3( -32.0f, 0.25f,  43.2f),  90f), // Hamidiye Parkı · Mürşit Cd.
+                ("Car_No48_DrivewayPickup",   new Vector3( -22.0f, 0.25f, -112.0f), 90f)  // Aziziye Cd. · İlkokul Önü
+            };
+
+            for (int i = 0; i < relocations.Length; i++)
+            {
+                var rel = relocations[i];
+                GameObject car = GameObject.Find(rel.carName);
+                if (car == null) continue;
+                // Only relocate if still sitting near Selman corridor (avoids overriding already-moved scene builds)
+                if (Mathf.Abs(car.transform.position.z) > 22f || Mathf.Abs(car.transform.position.x) > 100f) continue;
+
+                Quaternion rot = Quaternion.Euler(0f, rel.yaw, 0f);
+                Rigidbody rb = car.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                    rb.position = rel.targetPos;
+                    rb.rotation = rot;
+                }
+                car.transform.SetPositionAndRotation(rel.targetPos, rot);
+            }
         }
 
         private Material MakeMat(Shader sh, string name, Color col, float smoothness)

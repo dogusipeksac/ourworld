@@ -406,7 +406,7 @@ namespace OurWorld.Editor
                 CreateWorldSignText("NO: 48 · EVİM", house48.transform, new Vector3(4.65f, 1.48f, 3.85f),
                     Quaternion.Euler(0f, 180f, 0f), new Vector2(0.68f, 0.22f), Color.white);
 
-                FurnishSelmanHomeInterior(house48.transform, new Vector3(0.2f, 0.09f, -2.8f), SelmanFloorPlan.Flat_1_1, 8.2f, 6.6f, mats, isPlayerHome: true);
+                FurnishSelmanHomeInterior(house48.transform, new Vector3(0.2f, 0.09f, -2.8f), SelmanFloorPlan.Flat_1_1, 8.2f, 6.6f, doorX: -2.65f, mats, isPlayerHome: true);
                 AddSideWallWindowGrid(house48.transform, "No48_WinW", 4.60f, true, new[] { -1.7f, -4.5f }, new[] { 1.92f }, 1.25f, 1.30f, mats, warmLitIndex: 0);
                 AddSideWallWindowGrid(house48.transform, "No48_WinE", -4.20f, false, new[] { -2.2f, -4.8f }, new[] { 1.92f }, 1.25f, 1.30f, mats);
                 AttachSelmanPaintableAddress(house48, "selman_home_48", "Selman Sokağı No: 48", new Vector3(-68.0f, 0.12f, 4.9f));
@@ -437,7 +437,7 @@ namespace OurWorld.Editor
             if (backYel != null)
             {
                 AddHollowRoomColliders(backYel, -5.3f, 5.3f, -4.9f, 4.9f, 3.25f, 0.26f, doorX: 0f, doorW: 1.70f);
-                FurnishSelmanHomeInterior(backYel.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 9.8f, 9.0f, mats);
+                FurnishSelmanHomeInterior(backYel.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 9.8f, 9.0f, doorX: 0f, mats);
                 AddSideWallWindowGrid(backYel.transform, "BackYel_WinW_Gnd", 5.30f, true, new[] { -2.1f, 2.1f }, new[] { 1.95f }, 1.35f, 1.38f, mats);
                 MountBlenderBalcony(backYel.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "BackYel_BalcW_F2", new Vector3(5.30f, 3.32f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
                 MountBlenderBalcony(backYel.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "BackYel_BalcW_F3", new Vector3(5.30f, 6.32f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
@@ -452,7 +452,7 @@ namespace OurWorld.Editor
             if (backMod != null)
             {
                 AddHollowRoomColliders(backMod, -5.9f, 5.9f, -5.1f, 5.1f, 3.30f, 0.26f, doorX: 0f, doorW: 1.80f);
-                FurnishSelmanHomeInterior(backMod.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 10.8f, 9.4f, mats);
+                FurnishSelmanHomeInterior(backMod.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 10.8f, 9.4f, doorX: 0f, mats);
                 AddSideWallWindowGrid(backMod.transform, "BackMod_WinW_Gnd", 5.60f, true, new[] { -2.3f, 2.3f }, new[] { 2.0f }, 1.45f, 1.45f, mats);
                 MountBlenderBalcony(backMod.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "BackMod_CamBalcW_F2", new Vector3(5.60f, 3.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
                 MountBlenderBalcony(backMod.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "BackMod_CamBalcW_F3", new Vector3(5.60f, 6.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
@@ -467,7 +467,7 @@ namespace OurWorld.Editor
             if (no52 != null)
             {
                 AddHollowRoomColliders(no52, -4.6f, 4.6f, -6.8f, 0.80f, 3.50f, 0.24f, doorX: -2.8f, doorW: 1.55f);
-                FurnishSelmanHomeInterior(no52.transform, new Vector3(0.0f, 0.09f, -3.0f), SelmanFloorPlan.Flat_1_1, 8.6f, 7.0f, mats);
+                FurnishSelmanHomeInterior(no52.transform, new Vector3(0.0f, 0.09f, -3.0f), SelmanFloorPlan.Flat_1_1, 8.6f, 7.0f, doorX: -2.8f, mats);
                 // Crisp 3D Turkish PVC windows + Blender ClassicIron balcony on upper West side!
                 AddSideWallWindowGrid(no52.transform, "No52_WinW_Gnd", 4.60f, true, new[] { -1.6f, -4.7f }, new[] { 1.92f }, 1.32f, 1.34f, mats, warmLitIndex: 0);
                 MountBlenderBalcony(no52.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "No52_BalcW_Up", new Vector3(4.60f, 3.50f, -3.1f), Quaternion.Euler(0f, 90f, 0f), mats);
@@ -484,7 +484,7 @@ namespace OurWorld.Editor
             if (no54 != null)
             {
                 AddHollowRoomColliders(no54, -3.8f, 3.8f, -5.8f, 1.00f, 3.55f, 0.22f, doorX: -2.4f, doorW: 1.50f);
-                FurnishSelmanHomeInterior(no54.transform, new Vector3(0.0f, 0.09f, -2.4f), SelmanFloorPlan.Studio_1_0, 7.0f, 6.2f, mats);
+                FurnishSelmanHomeInterior(no54.transform, new Vector3(0.0f, 0.09f, -2.4f), SelmanFloorPlan.Studio_1_0, 7.0f, 6.2f, doorX: -2.4f, mats);
                 AddSideWallWindowGrid(no54.transform, "No54_WinW", 3.80f, true, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats, warmLitIndex: 0);
                 AddSideWallWindowGrid(no54.transform, "No54_WinE", -3.80f, false, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats);
                 AttachSelmanPaintableAddress(no54, "selman_home_54", "Selman Sokağı No: 54", new Vector3(-32.5f, 0.12f, 4.9f));
@@ -599,7 +599,7 @@ namespace OurWorld.Editor
                 CreateWorldSignText("SELMAN SK. 66", house66.transform, new Vector3(0.45f, 2.45f, 0.48f),
                     Quaternion.Euler(0f, 180f, 0f), new Vector2(0.46f, 0.16f), Color.white);
 
-                FurnishSelmanHomeInterior(house66.transform, new Vector3(1.0f, 0.09f, -2.8f), SelmanFloorPlan.Family_2_1, 6.0f, 6.0f, mats);
+                FurnishSelmanHomeInterior(house66.transform, new Vector3(1.0f, 0.09f, -2.8f), SelmanFloorPlan.Family_2_1, 6.0f, 6.0f, doorX: -0.75f, mats);
                 AddSideWallWindowGrid(house66.transform, "No66_WinW_Gnd", 4.20f, true, new[] { -1.5f, -4.3f }, new[] { 1.95f }, 1.35f, 1.32f, mats);
                 MountBlenderBalcony(house66.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "No66_BalcW_Up", new Vector3(4.20f, 3.46f, -2.8f), Quaternion.Euler(0f, 90f, 0f), mats);
                 MountBlenderBalcony(house66.transform, "Sultanbeyli_Balcony_MasonryCorner.fbx", "No66_BalcE_Up", new Vector3(-4.00f, 3.46f, -2.8f), Quaternion.Euler(0f, -90f, 0f), mats);
@@ -627,7 +627,7 @@ namespace OurWorld.Editor
             {
                 AddHollowRoomColliders(no81, -4.6f, 4.6f, -8.6f, -0.40f, 3.25f, 0.24f, doorX: 0f, doorW: 1.60f);
                 AddLocalBoxCollider(no81, new Vector3(-6.8f, 1.25f, -0.4f), new Vector3(3.8f, 2.5f, 5.4f));
-                FurnishSelmanHomeInterior(no81.transform, new Vector3(0f, 0.09f, -4.5f), SelmanFloorPlan.Family_2_1, 8.6f, 7.6f, mats);
+                FurnishSelmanHomeInterior(no81.transform, new Vector3(0f, 0.09f, -4.5f), SelmanFloorPlan.Family_2_1, 8.6f, 7.6f, doorX: 0f, mats);
                 AddSideWallWindowGrid(no81.transform, "No81_WinW_Gnd", 4.60f, true, new[] { -2.7f, -6.1f }, new[] { 1.85f }, 1.35f, 1.32f, mats);
                 MountBlenderBalcony(no81.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "No81_BalcW_Up", new Vector3(4.60f, 3.25f, -4.4f), Quaternion.Euler(0f, 90f, 0f), mats);
                 AddSideWallWindowGrid(no81.transform, "No81_WinE", -4.60f, false, new[] { -2.7f, -6.1f }, new[] { 1.85f, 4.75f }, 1.35f, 1.32f, mats);
@@ -675,7 +675,7 @@ namespace OurWorld.Editor
                 AddHollowRoomColliders(whiteVilla, -5.2f, 5.2f, -6.4f, 1.20f, 3.25f, 0.24f, doorX: 0f, doorW: 1.70f);
                 AddLocalBoxCollider(whiteVilla, new Vector3(3.8f, 0.92f, 4.1f), new Vector3(4.2f, 1.84f, 0.28f));
                 AddLocalBoxCollider(whiteVilla, new Vector3(-3.8f, 0.92f, 4.1f), new Vector3(4.2f, 1.84f, 0.28f));
-                FurnishSelmanHomeInterior(whiteVilla.transform, new Vector3(0f, 0.09f, -2.6f), SelmanFloorPlan.Grand_3_1, 9.8f, 7.2f, mats);
+                FurnishSelmanHomeInterior(whiteVilla.transform, new Vector3(0f, 0.09f, -2.6f), SelmanFloorPlan.Grand_3_1, 9.8f, 7.2f, doorX: 0f, mats);
                 AddSideWallWindowGrid(whiteVilla.transform, "WhiteVilla_WinW_Gnd", 5.20f, true, new[] { -1.2f, -4.2f }, new[] { 1.85f }, 1.35f, 1.35f, mats);
                 MountBlenderBalcony(whiteVilla.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "WhiteVilla_CamBalcW_Up", new Vector3(5.20f, 3.22f, -2.7f), Quaternion.Euler(0f, 90f, 0f), mats);
                 AddSideWallWindowGrid(whiteVilla.transform, "WhiteVilla_WinE", -5.20f, false, new[] { -1.2f, -4.2f }, new[] { 1.85f, 4.65f }, 1.35f, 1.35f, mats);
@@ -699,7 +699,7 @@ namespace OurWorld.Editor
             if (no46S != null)
             {
                 AddHollowRoomColliders(no46S, -4.5f, 4.5f, -6.5f, 0.80f, 3.10f, 0.24f, doorX: -1.6f, doorW: 1.50f);
-                FurnishSelmanHomeInterior(no46S.transform, new Vector3(0.0f, 0.09f, -2.85f), SelmanFloorPlan.Flat_1_1, 8.4f, 6.8f, mats);
+                FurnishSelmanHomeInterior(no46S.transform, new Vector3(0.0f, 0.09f, -2.85f), SelmanFloorPlan.Flat_1_1, 8.4f, 6.8f, doorX: -1.6f, mats);
                 AddSideWallWindowGrid(no46S.transform, "No46S_WinW", -4.50f, false, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
                 AddSideWallWindowGrid(no46S.transform, "No46S_WinE", 4.50f, true, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
             }
@@ -713,7 +713,7 @@ namespace OurWorld.Editor
             if (no50S != null)
             {
                 AddHollowRoomColliders(no50S, -3.8f, 3.8f, -5.8f, 1.00f, 3.55f, 0.22f, doorX: -2.4f, doorW: 1.50f);
-                FurnishSelmanHomeInterior(no50S.transform, new Vector3(0.0f, 0.09f, -2.4f), SelmanFloorPlan.Studio_1_0, 7.0f, 6.2f, mats);
+                FurnishSelmanHomeInterior(no50S.transform, new Vector3(0.0f, 0.09f, -2.4f), SelmanFloorPlan.Studio_1_0, 7.0f, 6.2f, doorX: -2.4f, mats);
                 AddSideWallWindowGrid(no50S.transform, "No50S_WinW", -3.80f, false, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats);
                 AddSideWallWindowGrid(no50S.transform, "No50S_WinE", 3.80f, true, new[] { -1.2f, -3.9f }, new[] { 2.70f }, 1.25f, 1.25f, mats);
             }
@@ -725,7 +725,7 @@ namespace OurWorld.Editor
             if (peachCorner != null)
             {
                 AddHollowRoomColliders(peachCorner, -4.7f, 4.7f, -6.1f, 1.10f, 3.65f, 0.24f, doorX: 0f, doorW: 1.60f);
-                FurnishSelmanHomeInterior(peachCorner.transform, new Vector3(0f, 0.09f, -2.5f), SelmanFloorPlan.Flat_1_1, 8.8f, 6.8f, mats);
+                FurnishSelmanHomeInterior(peachCorner.transform, new Vector3(0f, 0.09f, -2.5f), SelmanFloorPlan.Flat_1_1, 8.8f, 6.8f, doorX: 0f, mats);
                 AddSideWallWindowGrid(peachCorner.transform, "PeachCorner_WinW", -4.70f, false, new[] { -0.9f, -4.1f }, new[] { 2.02f }, 1.45f, 1.35f, mats, warmLitIndex: 0);
                 AddSideWallWindowGrid(peachCorner.transform, "PeachCorner_WinE", 4.70f, true, new[] { -0.9f, -4.1f }, new[] { 2.02f }, 1.45f, 1.35f, mats);
             }
@@ -735,7 +735,7 @@ namespace OurWorld.Editor
             if (gursuEast != null)
             {
                 AddHollowRoomColliders(gursuEast, -5.3f, 5.3f, -4.9f, 4.9f, 3.25f, 0.26f, doorX: 0f, doorW: 1.70f);
-                FurnishSelmanHomeInterior(gursuEast.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 9.8f, 9.0f, mats);
+                FurnishSelmanHomeInterior(gursuEast.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 9.8f, 9.0f, doorX: 0f, mats);
                 AddSideWallWindowGrid(gursuEast.transform, "GursuEast_WinW_Gnd", -5.30f, false, new[] { -2.1f, 2.1f }, new[] { 1.95f }, 1.45f, 1.40f, mats);
                 MountBlenderBalcony(gursuEast.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "GursuEast_CamBalcW_F2", new Vector3(-5.30f, 3.32f, 0.0f), Quaternion.Euler(0f, -90f, 0f), mats);
                 MountBlenderBalcony(gursuEast.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "GursuEast_CamBalcW_F3", new Vector3(-5.30f, 6.32f, 0.0f), Quaternion.Euler(0f, -90f, 0f), mats);
@@ -750,7 +750,7 @@ namespace OurWorld.Editor
             if (cicekciWest != null)
             {
                 AddHollowRoomColliders(cicekciWest, -5.9f, 5.9f, -5.1f, 5.1f, 3.30f, 0.26f, doorX: 0f, doorW: 1.80f);
-                FurnishSelmanHomeInterior(cicekciWest.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 10.8f, 9.4f, mats);
+                FurnishSelmanHomeInterior(cicekciWest.transform, new Vector3(0f, 0.09f, 0f), SelmanFloorPlan.Grand_3_1, 10.8f, 9.4f, doorX: 0f, mats);
                 AddSideWallWindowGrid(cicekciWest.transform, "CicekciWest_WinW", -5.60f, false, new[] { -2.2f, 2.2f }, new[] { 2.0f, 5.0f, 8.0f, 11.0f }, 1.45f, 1.45f, mats);
                 AddSideWallWindowGrid(cicekciWest.transform, "CicekciWest_WinE_Gnd", 5.60f, true, new[] { -2.2f, 2.2f }, new[] { 2.0f }, 1.45f, 1.45f, mats);
                 MountBlenderBalcony(cicekciWest.transform, "Sultanbeyli_Balcony_CamBalkon.fbx", "CicekciWest_CamBalcE_F2", new Vector3(5.60f, 3.40f, 0.0f), Quaternion.Euler(0f, 90f, 0f), mats);
@@ -766,7 +766,7 @@ namespace OurWorld.Editor
             if (cicekciEast != null)
             {
                 AddHollowRoomColliders(cicekciEast, -4.6f, 4.6f, -6.8f, 0.80f, 3.50f, 0.24f, doorX: -2.8f, doorW: 1.55f);
-                FurnishSelmanHomeInterior(cicekciEast.transform, new Vector3(0.0f, 0.09f, -3.0f), SelmanFloorPlan.Family_2_1, 8.6f, 7.0f, mats);
+                FurnishSelmanHomeInterior(cicekciEast.transform, new Vector3(0.0f, 0.09f, -3.0f), SelmanFloorPlan.Family_2_1, 8.6f, 7.0f, doorX: -2.8f, mats);
                 AddSideWallWindowGrid(cicekciEast.transform, "CicekciEast_WinW", -4.60f, false, new[] { -1.6f, -4.6f }, new[] { 1.92f, 4.82f }, 1.32f, 1.34f, mats, warmLitIndex: 1);
                 AddSideWallWindowGrid(cicekciEast.transform, "CicekciEast_WinE", 4.60f, true, new[] { -1.6f, -4.6f }, new[] { 1.92f, 4.82f }, 1.32f, 1.34f, mats);
                 AddTurkishWindowFrame(cicekciEast.transform, "CicekciEast_FrontUpL", new Vector3(2.8f, 4.85f, 0.885f), Quaternion.identity, 1.42f, 1.44f, mats);
@@ -787,7 +787,7 @@ namespace OurWorld.Editor
             {
                 // Hollow colliders for Cobalt-Blue Door Family House (2+1 Aile Evi!)
                 AddHollowRoomColliders(house66S, -2.2f, 5.6f, -6.0f, 0.80f, 3.15f, 0.22f, doorX: 0.55f, doorW: 1.55f);
-                FurnishSelmanHomeInterior(house66S.transform, new Vector3(1.7f, 0.09f, -2.6f), SelmanFloorPlan.Family_2_1, 7.2f, 6.2f, mats);
+                FurnishSelmanHomeInterior(house66S.transform, new Vector3(1.7f, 0.09f, -2.6f), SelmanFloorPlan.Family_2_1, 7.2f, 6.2f, doorX: 0.55f, mats);
                 AddSideWallWindowGrid(house66S.transform, "No66S_WinE", 5.60f, true, new[] { -1.4f, -4.2f }, new[] { 1.85f, 4.75f }, 1.35f, 1.30f, mats, warmLitIndex: 2);
                 MountBlenderBalcony(house66S.transform, "Sultanbeyli_Balcony_MasonryCorner.fbx", "No66S_BalcW_Up", new Vector3(-2.20f, 3.12f, -2.8f), Quaternion.Euler(0f, -90f, 0f), mats);
 
@@ -831,7 +831,7 @@ namespace OurWorld.Editor
                 // Split cream courtyard wall leaving open black double gate completely clear to walk through!
                 AddLocalBoxCollider(blue81, new Vector3(4.5f, 1.05f, 4.2f), new Vector3(3.4f, 2.1f, 0.30f));
                 AddLocalBoxCollider(blue81, new Vector3(-4.8f, 1.05f, 4.2f), new Vector3(4.2f, 2.1f, 0.30f));
-                FurnishSelmanHomeInterior(blue81.transform, new Vector3(0f, 0.09f, -3.2f), SelmanFloorPlan.Grand_3_1, 8.2f, 7.6f, mats);
+                FurnishSelmanHomeInterior(blue81.transform, new Vector3(0f, 0.09f, -3.2f), SelmanFloorPlan.Grand_3_1, 8.2f, 7.6f, doorX: 0f, mats);
                 AddSideWallWindowGrid(blue81.transform, "Blue81_WinW_Gnd", -4.40f, false, new[] { -1.5f, -4.9f }, new[] { 1.85f }, 1.35f, 1.35f, mats);
                 MountBlenderBalcony(blue81.transform, "Sultanbeyli_Balcony_ClassicIron.fbx", "Blue81_BalcW_Up", new Vector3(-4.40f, 3.25f, -3.2f), Quaternion.Euler(0f, -90f, 0f), mats);
                 AddSideWallWindowGrid(blue81.transform, "Blue81_WinE", 4.40f, true, new[] { -1.5f, -4.9f }, new[] { 1.85f, 4.75f }, 1.35f, 1.35f, mats);
@@ -847,7 +847,7 @@ namespace OurWorld.Editor
             if (seHouse != null)
             {
                 AddHollowRoomColliders(seHouse, -4.5f, 4.5f, -6.5f, 0.80f, 3.10f, 0.24f, doorX: -1.6f, doorW: 1.50f);
-                FurnishSelmanHomeInterior(seHouse.transform, new Vector3(0.0f, 0.09f, -2.85f), SelmanFloorPlan.Family_2_1, 8.4f, 6.8f, mats);
+                FurnishSelmanHomeInterior(seHouse.transform, new Vector3(0.0f, 0.09f, -2.85f), SelmanFloorPlan.Family_2_1, 8.4f, 6.8f, doorX: -1.6f, mats);
                 AddSideWallWindowGrid(seHouse.transform, "SEHouse_WinW", -4.50f, false, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
                 AddSideWallWindowGrid(seHouse.transform, "SEHouse_WinE", 4.50f, true, new[] { -1.6f, -4.5f }, new[] { 1.82f }, 1.25f, 1.25f, mats);
             }
@@ -1364,10 +1364,10 @@ namespace OurWorld.Editor
         }
 
         /// <summary>
-        /// Furnishes each Selman Sokağı home with an authentic distinct Turkish architectural floor plan
-        /// (1+0 Stüdyo, 1+1 Daire, 2+1 Aile Evi, or 3+1 Geniş Aile Dairesi) with real interior partition
-        /// walls, separate rooms, and usable interactive appliances (TV, Çaydanlık, Buzdolabı, Gardırop,
-        /// Bilgisayar, Çamaşır Makinesi, Lavabo, Oturulabilir L-Koltuk & Uyuma Yatağı)!
+        /// Furnishes each Selman / Havadis / Kadife home with an authentic distinct Turkish architectural floor plan
+        /// (1+0 Stüdyo, 1+1 Daire, 2+1 Aile Evi, or 3+1 Geniş Aile Dairesi) with a mandatory unobstructed
+        /// Entry Foyer (Antre) directly inside the front door (doorX) so NO wardrobe, cabinet, bathroom unit,
+        /// or partition wall EVER blocks the entrance!
         /// </summary>
         private static void FurnishSelmanHomeInterior(
             Transform host,
@@ -1375,6 +1375,7 @@ namespace OurWorld.Editor
             SelmanFloorPlan plan,
             float roomW,
             float roomD,
+            float doorX,
             MaterialSet mats,
             bool isPlayerHome = false)
         {
@@ -1382,100 +1383,141 @@ namespace OurWorld.Editor
             float hd = roomD * 0.5f;
             const float partH = 3.05f;
 
+            // Door-aware room orientation: keep a generous >= 2.2m open Entry Foyer (Antre) inside doorX!
+            float relDoorX = doorX - center.x;
+            bool isCenterDoor = Mathf.Abs(relDoorX) < 0.75f;
+            float openSign = relDoorX <= 0f ? -1f : 1f;
+            float farSign = -openSign;
+            float salonSide = isCenterDoor ? 1f : openSign;
+            float bedSide = -salonSide;
+            float faceInwardFromFar = farSign > 0f ? -90f : 90f;
+            float faceInwardFromSalon = salonSide > 0f ? -90f : 90f;
+            float faceInwardFromBed = bedSide > 0f ? -90f : 90f;
+
+            // Leave at least 2.25m of open Antre depth inside the front (+Z) wall so doors & hallways stay clear
+            const float foyerDepth = 2.25f;
+
             switch (plan)
             {
                 case SelmanFloorPlan.Studio_1_0:
                 {
-                    // 1+0 STÜDYO DAİRE: Open-plan cozy studio with Study PC Desk, Sofa, Tea Table, Kitchenette & Wardrobe!
+                    // 1+0 STÜDYO DAİRE: Open Entry Antre on door side; Sofa/Desk along back (-Z);
+                    // Kitchen & Wardrobe strictly along the OPPOSITE outer wall (farSign), never in front of the door!
                     CreateWorldSignText("1+0 STÜDYO DAİRE", host, center + new Vector3(0f, 2.55f, -hd + 0.16f),
                         Quaternion.Euler(0f, 180f, 0f), new Vector2(2.6f, 0.34f), new Color(0.22f, 0.24f, 0.28f, 1f));
 
-                    PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "Studio_Kilim", host, center + new Vector3(0.4f, 0f, 0.2f), Quaternion.identity, mats);
-                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "Studio_Sofa", host, center + new Vector3(0.7f, 0f, -hd + 1.15f), Quaternion.identity, mats, colliderSize: new Vector3(2.4f, 0.85f, 0.9f));
+                    PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "Studio_Kilim", host,
+                        center + new Vector3(farSign * 0.25f, 0f, -0.35f), Quaternion.identity, mats);
+
+                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "Studio_Sofa", host,
+                        center + new Vector3(farSign * (hw * 0.32f), 0f, -hd + 1.05f), Quaternion.identity, mats, colliderSize: new Vector3(2.4f, 0.85f, 0.9f));
                     AttachSofaSeat(sofa);
 
-                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Studio_TeaTable", host, center + new Vector3(0.6f, 0f, 0.2f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
+                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Studio_TeaTable", host,
+                        center + new Vector3(farSign * (hw * 0.32f), 0f, -hd + 2.25f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
                     AttachHomeAppliance(tea, HomeApplianceKind.TeaKettle, "Çaydanlık", "ui.btn.use_tea");
 
-                    GameObject desk = PlaceInteriorModel("Interior_StudyDesk.fbx", "Studio_StudyDesk", host, center + new Vector3(-hw + 1.05f, 0f, -hd + 1.05f), Quaternion.identity, mats, colliderSize: new Vector3(1.35f, 0.85f, 0.7f));
+                    GameObject desk = PlaceInteriorModel("Interior_StudyDesk.fbx", "Studio_StudyDesk", host,
+                        center + new Vector3(openSign * (hw - 1.15f), 0f, -hd + 1.05f), Quaternion.identity, mats, colliderSize: new Vector3(1.35f, 0.85f, 0.7f));
                     AttachHomeAppliance(desk, HomeApplianceKind.ComputerDesk, "Bilgisayar", "ui.btn.use_pc");
 
-                    GameObject kit = PlaceInteriorModel("Interior_TurkishKitchen.fbx", "Studio_Kitchen", host, center + new Vector3(-hw + 0.85f, 0f, 0.9f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(2.8f, 1.8f, 0.7f));
+                    GameObject kit = PlaceInteriorModel("Interior_TurkishKitchen.fbx", "Studio_Kitchen", host,
+                        center + new Vector3(farSign * (hw - 0.65f), 0f, -0.45f), Quaternion.Euler(0f, faceInwardFromFar, 0f), mats, colliderSize: new Vector3(2.6f, 1.8f, 0.7f));
                     AttachHomeAppliance(kit, HomeApplianceKind.Refrigerator, "Buzdolabı", "ui.btn.use_fridge");
 
-                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Studio_Wardrobe", host, center + new Vector3(hw - 0.65f, 0f, 0.6f), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
+                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Studio_Wardrobe", host,
+                        center + new Vector3(farSign * (hw - 0.62f), 0f, hd - 1.15f), Quaternion.Euler(0f, faceInwardFromFar, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
                     break;
                 }
 
                 case SelmanFloorPlan.Flat_1_1:
                 {
-                    // 1+1 DAİRE: Real interior partition wall splitting Salon+Mutfak (right/+X) from Ayrı Yatak Odası (left/-X)!
-                    float splitX = -hw * 0.14f;
-                    BuildInteriorPartitionWall(host, "Wall_1plus1_Split", center + new Vector3(splitX, 0f, 0f),
-                        roomD - 0.2f, partH, alongZ: true, doorGapCenterOffset: hd * 0.42f, doorGapWidth: 1.35f, mats.TownInteriorPaintCream);
+                    // 1+1 DAİRE: Full front Entry Antre (z > hd - 2.25m) clear of walls & cabinets!
+                    // Partition wall splits only the back rooms so opening the front door walks straight into an open foyer.
+                    float splitX = bedSide * (hw * 0.06f);
+                    float backPartLen = Mathf.Max(2.6f, roomD - foyerDepth - 0.15f);
+                    float partCenterZ = -hd + 0.12f + backPartLen * 0.5f;
+                    BuildInteriorPartitionWall(host, "Wall_1plus1_Split", center + new Vector3(splitX, 0f, partCenterZ),
+                        backPartLen, partH, alongZ: true, doorGapCenterOffset: backPartLen * 0.24f, doorGapWidth: 1.35f, mats.TownInteriorPaintCream);
 
-                    CreateWorldSignText("1+1 DAİRE", host, center + new Vector3(splitX + 0.12f, 2.55f, 0f),
-                        Quaternion.Euler(0f, -90f, 0f), new Vector2(1.8f, 0.30f), new Color(0.24f, 0.24f, 0.28f, 1f));
+                    CreateWorldSignText("1+1 DAİRE", host, center + new Vector3(splitX + salonSide * 0.12f, 2.55f, partCenterZ),
+                        Quaternion.Euler(0f, salonSide > 0f ? -90f : 90f, 0f), new Vector2(1.8f, 0.30f), new Color(0.24f, 0.24f, 0.28f, 1f));
 
-                    // Room 1 (+X side): Salon & Açık Mutfak
-                    float salonX = (splitX + hw) * 0.5f;
-                    PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "Flat11_Kilim", host, center + new Vector3(salonX, 0f, 0.1f), Quaternion.identity, mats);
-                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "Flat11_SofaL", host, center + new Vector3(salonX + 0.15f, 0f, -hd + 1.1f), Quaternion.identity, mats, colliderSize: new Vector3(2.4f, 0.85f, 0.9f));
+                    // Room 1 (salonSide): Salon & Open Entry
+                    float salonX = (splitX + salonSide * hw) * 0.5f;
+                    PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "Flat11_Kilim", host,
+                        center + new Vector3(salonX, 0f, -0.35f), Quaternion.identity, mats);
+                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "Flat11_SofaL", host,
+                        center + new Vector3(salonX, 0f, -hd + 1.05f), Quaternion.identity, mats, colliderSize: new Vector3(2.4f, 0.85f, 0.9f));
                     AttachSofaSeat(sofa);
 
-                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Flat11_TeaTable", host, center + new Vector3(salonX, 0f, -0.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
+                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Flat11_TeaTable", host,
+                        center + new Vector3(salonX, 0f, -hd + 2.25f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
                     AttachHomeAppliance(tea, HomeApplianceKind.TeaKettle, "Çaydanlık", "ui.btn.use_tea");
 
-                    GameObject tv = PlaceInteriorModel("Interior_TvUnitVitrin.fbx", "Flat11_TvUnit", host, center + new Vector3(salonX, 0f, hd - 0.65f), Quaternion.Euler(0f, 180f, 0f), mats, colliderSize: new Vector3(2.2f, 1.5f, 0.5f));
+                    GameObject tv = PlaceInteriorModel("Interior_TvUnitVitrin.fbx", "Flat11_TvUnit", host,
+                        center + new Vector3(salonSide * (hw - 0.60f), 0f, -hd + 2.20f), Quaternion.Euler(0f, faceInwardFromSalon, 0f), mats, colliderSize: new Vector3(2.1f, 1.5f, 0.5f));
                     AttachHomeAppliance(tv, HomeApplianceKind.Television, "Televizyon", "ui.btn.use_tv");
 
-                    GameObject kit = PlaceInteriorModel("Interior_TurkishKitchen.fbx", "Flat11_Kitchen", host, center + new Vector3(hw - 0.65f, 0f, 0.4f), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(2.6f, 1.8f, 0.7f));
+                    // Kitchen tucked on the OPPOSITE outer side wall (bedSide front-far corner, > 3.5m away from front door!)
+                    GameObject kit = PlaceInteriorModel("Interior_TurkishKitchen.fbx", "Flat11_Kitchen", host,
+                        center + new Vector3(bedSide * (hw - 0.65f), 0f, hd - 1.45f), Quaternion.Euler(0f, faceInwardFromBed, 0f), mats, colliderSize: new Vector3(2.5f, 1.8f, 0.7f));
                     AttachHomeAppliance(kit, HomeApplianceKind.Refrigerator, "Buzdolabı", "ui.btn.use_fridge");
 
-                    // Room 2 (-X side): Ayrı Yatak Odası
-                    float bedX = (-hw + splitX) * 0.5f;
-                    GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "Flat11_Bed", host, center + new Vector3(bedX, 0f, -hd + 1.45f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
+                    // Room 2 (bedSide back): Separate Bedroom with Wardrobe safely inside the back bedroom!
+                    float bedX = (splitX + bedSide * hw) * 0.5f;
+                    GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "Flat11_Bed", host,
+                        center + new Vector3(bedX, 0f, -hd + 1.40f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
                     AttachBedTrigger(bed, isPlayerHome);
 
-                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Flat11_Wardrobe", host, center + new Vector3(-hw + 0.65f, 0f, 0.5f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
+                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Flat11_Wardrobe", host,
+                        center + new Vector3(bedSide * (hw - 0.62f), 0f, -hd + 2.05f), Quaternion.Euler(0f, faceInwardFromBed, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
                     break;
                 }
 
                 case SelmanFloorPlan.Family_2_1:
                 {
-                    // 2+1 AİLE EVİ: Partitioned Salon+Yemek Odası (+X), Yatak Odası (-X Back) & Banyo/Çamaşır Köşesi (-X Front)!
-                    float splitX = -hw * 0.08f;
-                    BuildInteriorPartitionWall(host, "Wall_2plus1_Main", center + new Vector3(splitX, 0f, 0f),
-                        roomD - 0.2f, partH, alongZ: true, doorGapCenterOffset: 0.2f, doorGapWidth: 1.45f, mats.TownInteriorPaintWarm);
-                    BuildInteriorPartitionWall(host, "Wall_2plus1_Bath", center + new Vector3((-hw + splitX) * 0.5f, 0f, hd * 0.16f),
-                        (splitX - (-hw)) - 0.2f, partH, alongZ: false, doorGapCenterOffset: 0.65f, doorGapWidth: 1.15f, mats.TownInteriorPaintPearl);
+                    // 2+1 AİLE EVİ: Wide unobstructed Entry Antre at front (+Z); partitioned Salon (salonSide),
+                    // Yatak Odası (bedSide back), and Banyo/Çamaşır tucked cleanly against the FAR outer wall (bedSide front)!
+                    float splitX = bedSide * (hw * 0.04f);
+                    float backPartLen = Mathf.Max(2.6f, roomD - foyerDepth - 0.15f);
+                    float partCenterZ = -hd + 0.12f + backPartLen * 0.5f;
+                    BuildInteriorPartitionWall(host, "Wall_2plus1_Main", center + new Vector3(splitX, 0f, partCenterZ),
+                        backPartLen, partH, alongZ: true, doorGapCenterOffset: backPartLen * 0.22f, doorGapWidth: 1.35f, mats.TownInteriorPaintWarm);
 
-                    // Salon (+X)
-                    float salonX = (splitX + hw) * 0.5f;
-                    PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "Fam21_Kilim", host, center + new Vector3(salonX, 0f, -0.4f), Quaternion.identity, mats);
-                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "Fam21_SofaL", host, center + new Vector3(salonX, 0f, -hd + 1.05f), Quaternion.identity, mats, colliderSize: new Vector3(2.4f, 0.85f, 0.9f));
+                    // Salon (salonSide)
+                    float salonX = (splitX + salonSide * hw) * 0.5f;
+                    PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "Fam21_Kilim", host,
+                        center + new Vector3(salonX, 0f, -0.45f), Quaternion.identity, mats);
+                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "Fam21_SofaL", host,
+                        center + new Vector3(salonX, 0f, -hd + 1.02f), Quaternion.identity, mats, colliderSize: new Vector3(2.3f, 0.85f, 0.9f));
                     AttachSofaSeat(sofa);
 
-                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Fam21_TeaTable", host, center + new Vector3(salonX, 0f, -0.6f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
+                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "Fam21_TeaTable", host,
+                        center + new Vector3(salonX, 0f, -hd + 2.15f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
                     AttachHomeAppliance(tea, HomeApplianceKind.TeaKettle, "Çaydanlık", "ui.btn.use_tea");
 
-                    GameObject tv = PlaceInteriorModel("Interior_TvUnitVitrin.fbx", "Fam21_TvUnit", host, center + new Vector3(hw - 0.65f, 0f, -0.2f), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(2.2f, 1.5f, 0.5f));
+                    GameObject tv = PlaceInteriorModel("Interior_TvUnitVitrin.fbx", "Fam21_TvUnit", host,
+                        center + new Vector3(salonSide * (hw - 0.58f), 0f, -hd + 2.05f), Quaternion.Euler(0f, faceInwardFromSalon, 0f), mats, colliderSize: new Vector3(2.1f, 1.5f, 0.5f));
                     AttachHomeAppliance(tv, HomeApplianceKind.Television, "Televizyon", "ui.btn.use_tv");
 
-                    PlaceInteriorModel("Interior_DiningSet.fbx", "Fam21_Dining", host, center + new Vector3(salonX, 0f, hd - 1.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.6f, 0.8f, 1.0f));
-
-                    // Yatak Odası (-X Back)
-                    float westX = (-hw + splitX) * 0.5f;
-                    GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "Fam21_Bed", host, center + new Vector3(westX, 0f, -hd + 1.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
+                    // Yatak Odası (bedSide back)
+                    float bedX = roomW <= 6.8f
+                        ? (splitX + bedSide * 1.12f)
+                        : ((splitX + bedSide * hw) * 0.5f);
+                    GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "Fam21_Bed", host,
+                        center + new Vector3(bedX, 0f, -hd + 1.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.75f, 0.9f, 2.05f));
                     AttachBedTrigger(bed, isPlayerHome);
 
-                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Fam21_Wardrobe", host, center + new Vector3(-hw + 0.62f, 0f, -hd + 1.8f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
+                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "Fam21_Wardrobe", host,
+                        center + new Vector3(bedSide * (hw - 0.42f), 0f, -hd + 1.85f), Quaternion.Euler(0f, faceInwardFromBed, 0f), mats, colliderSize: new Vector3(1.65f, 2.0f, 0.56f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
 
-                    // Banyo & Çamaşır Odası (-X Front)
-                    GameObject bath = PlaceInteriorModel("Interior_BathroomSet.fbx", "Fam21_Bathroom", host, center + new Vector3(westX, 0f, hd - 0.72f), Quaternion.Euler(0f, 180f, 0f), mats, colliderSize: new Vector3(2.1f, 1.0f, 0.7f));
+                    // Banyo & Çamaşır Odası tucked cleanly against the FAR side outer wall (always >= 2.5m clear of doorX!)
+                    GameObject bath = PlaceInteriorModel("Interior_BathroomSet.fbx", "Fam21_Bathroom", host,
+                        center + new Vector3(bedSide * (hw - 0.62f), 0f, hd - 1.35f), Quaternion.Euler(0f, faceInwardFromBed, 0f), mats, colliderSize: new Vector3(2.0f, 1.0f, 0.7f));
                     AttachHomeAppliance(bath, HomeApplianceKind.WashingMachine, "Çamaşır Makinesi", "ui.btn.use_washer");
                     GameObject sinkTrig = new GameObject("Fam21_SinkInteract");
                     sinkTrig.transform.SetParent(bath.transform, false);
@@ -1486,50 +1528,63 @@ namespace OurWorld.Editor
 
                 case SelmanFloorPlan.Grand_3_1:
                 {
-                    // 3+1 GENİŞ AİLE DAİRESİ: Central Hallway splitting 4 distinct rooms!
-                    //   NE (+X, -Z): Geniş Salon + Yemek Masası + TV
-                    //   SE (+X, +Z): Tam Türk Mutfağı + Buzdolabı + Banyo/Çamaşır
+                    // 3+1 GENİŞ AİLE DAİRESİ: Wide 2.5m Central Hallway (Antre & Koridor) straight from the front door (x = 0)
+                    // with ZERO walls blocking the entrance, flanked by 4 clean distinct rooms:
+                    //   NE (+X, -Z): Geniş Salon + L-Koltuk + TV
+                    //   SE (+X, +Z): Tam Türk Mutfağı + Yemek Masası
                     //   NW (-X, -Z): Ebeveyn Yatak Odası (Yatak + Aynalı Gardırop)
-                    //   SW (-X, +Z): Genç / Çalışma Odası (Bilgisayar Masası + Kitaplık)
-                    BuildInteriorPartitionWall(host, "Wall_3plus1_CenterZ", center,
-                        roomD - 0.3f, partH, alongZ: true, doorGapCenterOffset: 0.0f, doorGapWidth: 1.80f, mats.TownInteriorPaintCream);
-                    BuildInteriorPartitionWall(host, "Wall_3plus1_WestSplit", center + new Vector3(-hw * 0.5f, 0f, 0f),
-                        hw - 0.25f, partH, alongZ: false, doorGapCenterOffset: hw * 0.24f, doorGapWidth: 1.25f, mats.TownInteriorPaintWarm);
-                    BuildInteriorPartitionWall(host, "Wall_3plus1_EastSplit", center + new Vector3(hw * 0.5f, 0f, 0f),
-                        hw - 0.25f, partH, alongZ: false, doorGapCenterOffset: -hw * 0.24f, doorGapWidth: 1.25f, mats.TownInteriorPaintWarm);
+                    //   SW (-X, +Z): Çalışma Odası + Banyo/Çamaşır (against far west outer wall!)
+                    const float hallHalfW = 1.25f;
+                    float wingW = Mathf.Max(1.8f, hw - hallHalfW - 0.12f);
+                    float westWingCenterX = -(hallHalfW + wingW * 0.5f);
+                    float eastWingCenterX = +(hallHalfW + wingW * 0.5f);
+
+                    // Horizontal dividers splitting ONLY the left and right wings (central hallway stays 100% open!)
+                    BuildInteriorPartitionWall(host, "Wall_3plus1_WestSplit", center + new Vector3(westWingCenterX, 0f, 0f),
+                        wingW, partH, alongZ: false, doorGapCenterOffset: wingW * 0.18f, doorGapWidth: 1.15f, mats.TownInteriorPaintWarm);
+                    BuildInteriorPartitionWall(host, "Wall_3plus1_EastSplit", center + new Vector3(eastWingCenterX, 0f, 0f),
+                        wingW, partH, alongZ: false, doorGapCenterOffset: -wingW * 0.18f, doorGapWidth: 1.15f, mats.TownInteriorPaintWarm);
+
+                    // Short rear corridor jamb walls flanking the back half only (front foyer z > 0 stays completely open!)
+                    float rearWingLen = Mathf.Max(2.0f, hd - 0.20f);
+                    float rearCenterZ = -hd + 0.12f + rearWingLen * 0.5f;
+                    BuildInteriorPartitionWall(host, "Wall_3plus1_HallWest", center + new Vector3(-hallHalfW, 0f, rearCenterZ),
+                        rearWingLen, partH, alongZ: true, doorGapCenterOffset: 0.25f, doorGapWidth: 1.45f, mats.TownInteriorPaintCream);
+                    BuildInteriorPartitionWall(host, "Wall_3plus1_HallEast", center + new Vector3(+hallHalfW, 0f, rearCenterZ),
+                        rearWingLen, partH, alongZ: true, doorGapCenterOffset: 0.25f, doorGapWidth: 1.45f, mats.TownInteriorPaintCream);
+
+                    float ex = (hallHalfW + hw) * 0.5f;
+                    float wx = -(hallHalfW + hw) * 0.5f;
+                    float bz = -hd * 0.52f;
+                    float fz = hd * 0.48f;
 
                     // Room 1 (+X, -Z): Geniş Salon
-                    float ex = hw * 0.52f;
-                    float wx = -hw * 0.52f;
-                    float bz = -hd * 0.52f;
-                    float fz = hd * 0.52f;
-
                     PlaceInteriorModel("Interior_TurkishRugKilim.fbx", "G31_Kilim", host, center + new Vector3(ex, 0f, bz), Quaternion.identity, mats);
-                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "G31_SofaL", host, center + new Vector3(ex, 0f, -hd + 0.95f), Quaternion.identity, mats, colliderSize: new Vector3(2.4f, 0.85f, 0.9f));
+                    GameObject sofa = PlaceInteriorModel("Interior_TurkishSofaL.fbx", "G31_SofaL", host, center + new Vector3(ex, 0f, -hd + 0.98f), Quaternion.identity, mats, colliderSize: new Vector3(2.3f, 0.85f, 0.9f));
                     AttachSofaSeat(sofa);
 
-                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "G31_TeaTable", host, center + new Vector3(ex, 0f, bz + 0.1f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
+                    GameObject tea = PlaceInteriorModel("Interior_TurkishTeaTable.fbx", "G31_TeaTable", host, center + new Vector3(ex, 0f, bz + 0.15f), Quaternion.identity, mats, colliderSize: new Vector3(1.1f, 0.55f, 0.65f));
                     AttachHomeAppliance(tea, HomeApplianceKind.TeaKettle, "Çaydanlık", "ui.btn.use_tea");
 
-                    GameObject tv = PlaceInteriorModel("Interior_TvUnitVitrin.fbx", "G31_TvUnit", host, center + new Vector3(hw - 0.65f, 0f, bz), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(2.2f, 1.5f, 0.5f));
+                    GameObject tv = PlaceInteriorModel("Interior_TvUnitVitrin.fbx", "G31_TvUnit", host, center + new Vector3(hw - 0.62f, 0f, bz), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(2.1f, 1.5f, 0.5f));
                     AttachHomeAppliance(tv, HomeApplianceKind.Television, "Televizyon", "ui.btn.use_tv");
 
-                    // Room 2 (+X, +Z): Mutfak + Yemek Masası
-                    GameObject kit = PlaceInteriorModel("Interior_TurkishKitchen.fbx", "G31_Kitchen", host, center + new Vector3(hw - 0.68f, 0f, fz), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(2.8f, 1.8f, 0.7f));
+                    // Room 2 (+X, +Z): Mutfak + Yemek Masası (strictly in East wing, >= 2.2m from center door!)
+                    GameObject kit = PlaceInteriorModel("Interior_TurkishKitchen.fbx", "G31_Kitchen", host, center + new Vector3(hw - 0.65f, 0f, fz), Quaternion.Euler(0f, -90f, 0f), mats, colliderSize: new Vector3(2.6f, 1.8f, 0.7f));
                     AttachHomeAppliance(kit, HomeApplianceKind.Refrigerator, "Buzdolabı", "ui.btn.use_fridge");
-                    PlaceInteriorModel("Interior_DiningSet.fbx", "G31_Dining", host, center + new Vector3(ex - 0.5f, 0f, fz + 0.2f), Quaternion.identity, mats, colliderSize: new Vector3(1.55f, 0.8f, 0.95f));
+                    PlaceInteriorModel("Interior_DiningSet.fbx", "G31_Dining", host, center + new Vector3(Mathf.Max(2.35f, ex - 0.30f), 0f, fz - 0.15f), Quaternion.identity, mats, colliderSize: new Vector3(1.5f, 0.8f, 0.95f));
 
                     // Room 3 (-X, -Z): Ebeveyn Yatak Odası
                     GameObject bed = PlaceInteriorModel("Interior_BedroomSet.fbx", "G31_MasterBed", host, center + new Vector3(wx, 0f, -hd + 1.35f), Quaternion.identity, mats, colliderSize: new Vector3(1.8f, 0.9f, 2.1f));
                     AttachBedTrigger(bed, isPlayerHome);
-                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "G31_Wardrobe", host, center + new Vector3(-hw + 0.65f, 0f, bz), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
+                    GameObject ward = PlaceInteriorModel("Interior_Wardrobe.fbx", "G31_Wardrobe", host, center + new Vector3(-hw + 0.62f, 0f, bz), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.7f, 2.0f, 0.6f));
                     AttachHomeAppliance(ward, HomeApplianceKind.Wardrobe, "Gardırop", "ui.btn.use_wardrobe");
 
-                    // Room 4 (-X, +Z): Çalışma Odası + Banyo/Çamaşır
-                    GameObject desk = PlaceInteriorModel("Interior_StudyDesk.fbx", "G31_StudyDesk", host, center + new Vector3(-hw + 1.15f, 0f, fz - 0.35f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(1.35f, 0.85f, 0.7f));
+                    // Room 4 (-X, +Z): Çalışma Odası + Banyo/Çamaşır (strictly against outer west wall!)
+                    GameObject desk = PlaceInteriorModel("Interior_StudyDesk.fbx", "G31_StudyDesk", host, center + new Vector3(Mathf.Min(-2.25f, wx + 0.35f), 0f, fz - 0.55f), Quaternion.identity, mats, colliderSize: new Vector3(1.35f, 0.85f, 0.7f));
                     AttachHomeAppliance(desk, HomeApplianceKind.ComputerDesk, "Bilgisayar", "ui.btn.use_pc");
 
-                    GameObject bath = PlaceInteriorModel("Interior_BathroomSet.fbx", "G31_Bathroom", host, center + new Vector3(wx + 0.3f, 0f, hd - 0.70f), Quaternion.Euler(0f, 180f, 0f), mats, colliderSize: new Vector3(2.1f, 1.0f, 0.7f));
+                    GameObject bath = PlaceInteriorModel("Interior_BathroomSet.fbx", "G31_Bathroom", host, center + new Vector3(-hw + 0.62f, 0f, hd - 1.30f), Quaternion.Euler(0f, 90f, 0f), mats, colliderSize: new Vector3(2.0f, 1.0f, 0.7f));
                     AttachHomeAppliance(bath, HomeApplianceKind.WashingMachine, "Çamaşır Makinesi", "ui.btn.use_washer");
                     GameObject sinkTrig = new GameObject("G31_SinkInteract");
                     sinkTrig.transform.SetParent(bath.transform, false);
@@ -1681,14 +1736,14 @@ namespace OurWorld.Editor
             GameObject carsRoot = new GameObject("Selman_PhotoMatched_DrivableCars");
             carsRoot.transform.SetParent(parent, false);
 
-            // Balanced 5 iconic cars on Selman Sokağı (8 more drivable cars are distributed across all 8 Hamidiye Avenues!)
+            // Spread drivable vehicles across outer exploration regions & eastern Selman instead of piling them near No:48!
             (GameObject prefab, Vector3 pos, float yaw, string label)[] spots =
             {
-                (prefabs.TownCarWhiteVan,          new Vector3(-44.0f, 0.25f,  2.4f),  90f, "Car_No52_WhiteDeliveryVan"),
-                (prefabs.TownCarRedHatchback,      new Vector3(-74.5f, 0.25f, -2.5f), 270f, "Car_No50_RedVanHatch"),
-                (prefabs.TownCarCharcoalSUV,       new Vector3(-2.5f,  0.25f,  2.4f),  90f, "Car_No58_MPV"),
-                (prefabs.TownCarBlueHatchback,     new Vector3(41.0f,  0.25f, -2.4f), 270f, "Car_No66S_HafsaHatchback"),
-                (prefabs.TownCarBlueSportsCoupe,   new Vector3(71.5f,  0.25f, -2.5f), 270f, "Car_No81S_DarkBlueSedan")
+                (prefabs.TownCarWhiteVan,          new Vector3(144.0f,  0.25f,  -4.4f),  90f, "Car_No52_WhiteDeliveryVan"),   // Aydos Çiftliği Girişi
+                (prefabs.TownCarRedHatchback,      new Vector3(-156.5f, 0.25f,   5.2f), 180f, "Car_No50_RedVanHatch"),        // Sultanbeyli Göleti İskelesi
+                (prefabs.TownCarCharcoalSUV,       new Vector3(-32.0f,  0.25f,  43.2f),  90f, "Car_No58_MPV"),                // Hamidiye Parkı · Mürşit Cd.
+                (prefabs.TownCarBlueHatchback,     new Vector3( 41.0f,  0.25f,  -2.4f), 270f, "Car_No66S_HafsaHatchback"),
+                (prefabs.TownCarBlueSportsCoupe,   new Vector3( 71.5f,  0.25f,  -2.5f), 270f, "Car_No81S_DarkBlueSedan")
             };
 
             for (int i = 0; i < spots.Length; i++)
@@ -2205,10 +2260,10 @@ namespace OurWorld.Editor
             GameObject boundRoot = new GameObject("Hamidiye_DistrictPerimeter");
             boundRoot.transform.SetParent(parent, false);
 
-            CreateStaticBlock("Bound_North", boundRoot.transform, new Vector3(-8f, 1.2f, 174f), new Vector3(390f, 2.4f, 0.8f), mats.TownHedge);
-            CreateStaticBlock("Bound_South", boundRoot.transform, new Vector3(-8f, 1.2f, -170f), new Vector3(390f, 2.4f, 0.8f), mats.TownHedge);
-            CreateStaticBlock("Bound_West", boundRoot.transform, new Vector3(-202f, 1.2f, 2f), new Vector3(0.8f, 2.4f, 346f), mats.TownHedge);
-            CreateStaticBlock("Bound_East", boundRoot.transform, new Vector3(186f, 1.2f, 2f), new Vector3(0.8f, 2.4f, 346f), mats.TownHedge);
+            CreateStaticBlock("Bound_North", boundRoot.transform, new Vector3(-8f, 1.2f, 220f), new Vector3(410f, 2.4f, 0.8f), mats.TownHedge);
+            CreateStaticBlock("Bound_South", boundRoot.transform, new Vector3(-8f, 1.2f, -218f), new Vector3(410f, 2.4f, 0.8f), mats.TownHedge);
+            CreateStaticBlock("Bound_West", boundRoot.transform, new Vector3(-206f, 1.2f, 1f), new Vector3(0.8f, 2.4f, 440f), mats.TownHedge);
+            CreateStaticBlock("Bound_East", boundRoot.transform, new Vector3(190f, 1.2f, 1f), new Vector3(0.8f, 2.4f, 440f), mats.TownHedge);
         }
 
         private static GameObject PlaceSelmanModel(

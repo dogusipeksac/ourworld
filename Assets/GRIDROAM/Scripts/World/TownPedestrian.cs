@@ -17,7 +17,8 @@ namespace OurWorld.World
         RainHurry = 4,
         ConfrontPlayer = 5,
         Fleeing = 6,
-        KnockedDown = 7
+        KnockedDown = 7,
+        FollowingPlayer = 8
     }
 
     /// <summary>
@@ -93,7 +94,9 @@ namespace OurWorld.World
             ("Hava bugün yürüyüş için harika değil mi?", "Valla öyle, bir de çay bahçesine uğrayalım.", "Great weather for a stroll, right?", "Totally, let's grab tea at the park!"),
             ("Saat Kulesi tarafı bugün bayağı kalabalık.", "Esnafın yüzü gülüyor, mahalle canlandı!", "Clock Tower Plaza is bustling today.", "The whole neighborhood feels alive!"),
             ("No:48'deki Deniz mahalleye çok sahip çıktı.", "Allah razı olsun, herkes ondan bahsediyor!", "Deniz from No:48 really stepped up for us.", "Everyone on the street is talking about it!"),
-            ("Akşam yemeğine ne pişirsek acaba?", "Bakkaldan taze sebze al, mis gibi olur.", "What should we cook for dinner tonight?", "Fresh veggies from Selman Market never fail.")
+            ("Akşam yemeğine ne pişirsek acaba?", "Bakkaldan taze sebze al, mis gibi olur.", "What should we cook for dinner tonight?", "Fresh veggies from Selman Market never fail."),
+            ("Havadis Sokağı'ndaki yeni taş fırını gördün mü?", "Evet, sıcak börek kokusu Fatih Bulvarı'na kadar geliyor!", "Seen the new stone bakery on Havadis Street?", "Yes, fresh pastry aroma reaches all the way to Fatih Blvd!"),
+            ("Kadife Sokağı'ndaki kıraathane çok güzel olmuş.", "Akşam Sadık Abi'nin çayına gidelim mutlaka!", "The tea house on Kadife Street looks so cozy.", "Let's grab tea at Sadık's place tonight!")
         };
 
         private static readonly Vector3[] SportArenaCenters =
@@ -148,7 +151,14 @@ namespace OurWorld.World
         private float _rainSpeechCooldown;
         private float _grudgeTimer;
         private int _timesTalked;
+        private int _friendshipPoints;
         private bool _giftedPlayer;
+
+        // Smart Companion Follow state ("Beraber Yürüyelim")
+        private float _followPlayerTimer;
+        private float _followCommentCooldown;
+        private string _lastFollowStreet = string.Empty;
+        private StreetNameTracker _cachedStreetTracker;
 
         // Neighbor-to-neighbor conversation state
         private TownPedestrian _chatPartner;
@@ -189,9 +199,101 @@ namespace OurWorld.World
 
         public CitizenBrainState CurrentBrainState => _brainState;
         public string CitizenName => citizenName;
+        public string CitizenRole => citizenRole;
+        public string VendorShopId => vendorShopId;
+        public bool HasGrudge => _grudgeTimer > 0f;
+        public bool IsFollowingPlayer => _followPlayerTimer > 0f;
+        public bool CanWalkWithPlayer => waypoints != null && waypoints.Length >= 2;
+        public int FriendshipPoints => _friendshipPoints;
+        public int FriendshipTier => _friendshipPoints >= 60 ? 3 : (_friendshipPoints >= 30 ? 2 : (_friendshipPoints >= 10 ? 1 : 0));
         public bool IsBusyOrPanicking =>
             _occupiedSeat != null || _knockdownTimer > 0f || _isAirborne || _fleeTimer > 0f ||
+            _followPlayerTimer > 0f ||
             _brainState == CitizenBrainState.ChattingWithNeighbor || _brainState == CitizenBrainState.ConfrontPlayer;
+
+        public void AddFriendship(int delta)
+        {
+            _friendshipPoints = Mathf.Clamp(_friendshipPoints + delta, 0, 100);
+        }
+
+        public void ClearGrudgeAndMakePeace()
+        {
+            _grudgeTimer = 0f;
+            _confrontTimer = 0f;
+            _fleeTimer = 0f;
+            _hitCount = 0;
+            _friendshipPoints = Mathf.Max(_friendshipPoints, 10);
+            if (_brainState == CitizenBrainState.ConfrontPlayer || _brainState == CitizenBrainState.Fleeing)
+            {
+                _brainState = CitizenBrainState.Patrol;
+            }
+            if (humanoid != null) humanoid.PlayWave();
+        }
+
+        public void StartFollowingPlayer(float duration = 45f)
+        {
+            if (!CanWalkWithPlayer) return;
+            EndNeighborChat();
+            ReleaseBenchIfSeated();
+            _watchTimer = 0f;
+            _confrontTimer = 0f;
+            _fleeTimer = 0f;
+            _idleTimer = 0f;
+            _followPlayerTimer = Mathf.Max(15f, duration);
+            _followCommentCooldown = 4.0f;
+            _brainState = CitizenBrainState.FollowingPlayer;
+            if (_cachedStreetTracker == null) _cachedStreetTracker = FindAnyObjectByType<StreetNameTracker>();
+            _lastFollowStreet = _cachedStreetTracker != null ? _cachedStreetTracker.CurrentStreetName : string.Empty;
+
+            if (humanoid != null) humanoid.PlayWave();
+            string msg = IsEnglish
+                ? "Awesome, let's stroll through Hamidiye together!"
+                : "Harika, hadi mahalleyi beraber turlayalım!";
+            NpcSpeechBubbleManager.Say(transform, citizenName, msg, 3.4f, NpcBubbleMood.Friendly);
+        }
+
+        public void StopFollowingPlayer(bool sayGoodbye = true)
+        {
+            if (_followPlayerTimer <= 0f) return;
+            _followPlayerTimer = 0f;
+            _brainState = CitizenBrainState.Patrol;
+            if (sayGoodbye)
+            {
+                if (humanoid != null) humanoid.PlayWave();
+                string msg = IsEnglish
+                    ? "Great walk! Catch you later, Deniz!"
+                    : "Çok keyifli yürüyüştü Deniz, görüşürüz!";
+                NpcSpeechBubbleManager.Say(transform, citizenName, msg, 3.2f, NpcBubbleMood.Friendly);
+            }
+        }
+
+        public void TriggerFriendlyEmote(bool celebrate = false)
+        {
+            if (humanoid == null) return;
+            humanoid.SetTalking(true, 3.2f);
+            if (celebrate) humanoid.PlaySportAnim(SportAnimKind.VictoryJump, 0.65f);
+            else humanoid.PlayWave();
+        }
+
+        public string GetSmartGreetingLine(bool isEn)
+        {
+            return BuildSmartContextualDialogue(isEn);
+        }
+
+        public string GetNextPersonalChatLine(bool isEn)
+        {
+            _timesTalked++;
+            if (isEn)
+            {
+                string line = DefaultChatLinesEn[_chatCursor % DefaultChatLinesEn.Length];
+                _chatCursor++;
+                return line;
+            }
+            string[] pool = (chatLines != null && chatLines.Length > 0) ? chatLines : DefaultChatLinesTr;
+            string trLine = pool[_chatCursor % pool.Length];
+            _chatCursor++;
+            return trLine;
+        }
 
         private static bool IsEnglish =>
             LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
@@ -220,32 +322,7 @@ namespace OurWorld.World
                 BeginSmoothFace(toPlayer);
             }
 
-            bool isEn = IsEnglish;
-            string speakerHeader = string.IsNullOrEmpty(citizenRole)
-                ? citizenName
-                : $"{citizenName} ({citizenRole})";
-
-            // Grudge memory: remembers recent assault!
-            if (_grudgeTimer > 0f)
-            {
-                if (humanoid != null) humanoid.PlayStartled(0.8f);
-                string grudgeLine = isEn
-                    ? "Stay away from me! I haven't forgotten what you just did."
-                    : "Benden uzak dur! Az önce yaptığını unutmadım.";
-                NpcSpeechBubbleManager.Say(transform, citizenName, grudgeLine, 3.6f, NpcBubbleMood.Alert);
-                if (PlayerModeController.Instance != null)
-                {
-                    PlayerModeController.Instance.RaiseStatusMessage($"{citizenName}: {grudgeLine}");
-                }
-                return;
-            }
-
-            if (humanoid != null)
-            {
-                humanoid.SetTalking(true, 3.8f);
-                humanoid.SetLookAtPoint(true, playerWorldPos + Vector3.up * 1.55f);
-            }
-
+            // Keep immediate shopping-cart checkout fast-path for vendors!
             if (!string.IsNullOrEmpty(vendorShopId) &&
                 PlayerShoppingCart.HasActiveItems &&
                 PlayerModeController.Instance != null)
@@ -258,38 +335,37 @@ namespace OurWorld.World
                 }
             }
 
+            if (humanoid != null)
+            {
+                humanoid.SetTalking(true, 3.8f);
+                humanoid.SetLookAtPoint(true, playerWorldPos + Vector3.up * 1.55f);
+            }
+
+            // Open the full interactive smart-choice panel when story dialogue isn't occupying the HUD!
+            if (MissionManager.Instance == null || !MissionManager.Instance.IsDialoguePlaying)
+            {
+                AddFriendship(_grudgeTimer > 0f ? 0 : 8);
+                SmartNpcInteractionPanel.EnsureInstance().OpenForTownPedestrian(this, playerWorldPos);
+                return;
+            }
+
+            // Fallback during active story dialogue: quick overhead bubble + status toast
+            bool isEn = IsEnglish;
+            if (_grudgeTimer > 0f)
+            {
+                if (humanoid != null) humanoid.PlayStartled(0.8f);
+                string grudgeLine = isEn
+                    ? "Stay away from me! I haven't forgotten what you just did."
+                    : "Benden uzak dur! Az önce yaptığını unutmadım.";
+                NpcSpeechBubbleManager.Say(transform, citizenName, grudgeLine, 3.6f, NpcBubbleMood.Alert);
+                PlayerModeController.Instance?.RaiseStatusMessage($"{citizenName}: {grudgeLine}");
+                return;
+            }
+
             _timesTalked++;
             string line = BuildSmartContextualDialogue(isEn);
-
-            // Friendly neighbor warm treat/tip on repeat rapport!
-            if (_timesTalked >= 2 && !_giftedPlayer && string.IsNullOrEmpty(vendorShopId) &&
-                (NeighborhoodReputation.CurrentRankIndex >= 1 || _timesTalked >= 3))
-            {
-                _giftedPlayer = true;
-                if (PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.Energy < 85f)
-                {
-                    PlayerNeedsController.Instance.RestoreEnergy(12f);
-                    line += isEn ? " Here, have a warm cup of tea! (+12 Energy)" : " Al bakalım, benden bir bardak sıcak çay! (+12 Enerji)";
-                }
-                else if (SaveManager.Instance != null)
-                {
-                    SaveManager.Instance.AddMoney(15);
-                    line += isEn ? " Found a lucky tip for our favorite neighbor! (+15 ₺)" : " Mahallemize emeğin büyük, al şu harçlığı! (+15 ₺)";
-                }
-                GameFeelAudio.PlayCoinChime();
-                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.5f, new Color(0.28f, 0.92f, 0.80f), count: 8, spread: 0.45f);
-            }
-
             NpcSpeechBubbleManager.Say(transform, citizenName, line, 4.0f, NpcBubbleMood.Friendly);
-
-            if (MissionManager.Instance != null && !MissionManager.Instance.IsDialoguePlaying)
-            {
-                MissionManager.Instance.ShowQuickNpcDialogue(speakerHeader, line);
-            }
-            else if (PlayerModeController.Instance != null)
-            {
-                PlayerModeController.Instance.RaiseStatusMessage($"{citizenName}: {line}");
-            }
+            PlayerModeController.Instance?.RaiseStatusMessage($"{citizenName}: {line}");
         }
 
         private string BuildSmartContextualDialogue(bool isEn)
@@ -969,6 +1045,13 @@ namespace OurWorld.World
                 return;
             }
 
+            // 9b. Smart Companion Walk-Along ("Beraber Yürüyelim")!
+            if (_followPlayerTimer > 0f)
+            {
+                UpdateFollowingPlayer(dt);
+                return;
+            }
+
             // Periodic Smart Brain Evaluation (staggered, distance-culled within 48 m)
             _brainThinkTimer -= dt;
             if (_brainThinkTimer <= 0f)
@@ -1595,6 +1678,90 @@ namespace OurWorld.World
             {
                 ClearDualHandPose();
                 _brainState = CitizenBrainState.Patrol;
+            }
+        }
+
+        private void UpdateFollowingPlayer(float dt)
+        {
+            _brainState = CitizenBrainState.FollowingPlayer;
+            _followPlayerTimer -= dt;
+            if (_followCommentCooldown > 0f) _followCommentCooldown -= dt;
+
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode == null || mode.IsDriving || _followPlayerTimer <= 0f || _grudgeTimer > 0f)
+            {
+                StopFollowingPlayer(sayGoodbye: _grudgeTimer <= 0f);
+                return;
+            }
+
+            bool isRaining = IsRaining();
+            UpdateRainShieldPose(dt, isRaining);
+
+            Vector3 pPos = mode.ActiveWorldPosition;
+            Transform pTf = mode.FootController != null ? mode.FootController.transform : null;
+            Vector3 offset = pTf != null
+                ? (-pTf.forward * 1.45f + pTf.right * 1.35f)
+                : new Vector3(1.5f, 0f, -1.2f);
+            Vector3 desiredPos = pPos + offset;
+            desiredPos.y = transform.position.y;
+
+            Vector3 toGoal = desiredPos - transform.position;
+            toGoal.y = 0f;
+            float dist = toGoal.magnitude;
+
+            if (dist > 36f)
+            {
+                // Too far away — gracefully end companion walk
+                StopFollowingPlayer(sayGoodbye: false);
+                return;
+            }
+
+            float targetSpd = 0f;
+            Vector3 moveDir = transform.forward;
+            if (dist > 1.35f)
+            {
+                Vector3 dir = toGoal / dist;
+                Vector3 smartDir = ApplyPersonalSpaceAvoidance(dir);
+                Quaternion targetRot = Quaternion.LookRotation(smartDir, Vector3.up);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 1f - Mathf.Exp(-8.5f * dt));
+
+                targetSpd = dist > 5.0f ? 3.9f : Mathf.Lerp(1.45f, 3.1f, Mathf.InverseLerp(1.35f, 5.0f, dist));
+                moveDir = transform.forward;
+                MoveSafely(moveDir * (targetSpd * dt), ref moveDir, false);
+            }
+            else
+            {
+                // Face player politely when Deniz pauses
+                Vector3 toP = pPos - transform.position;
+                toP.y = 0f;
+                if (toP.sqrMagnitude > 0.04f)
+                {
+                    Quaternion lookRot = Quaternion.LookRotation(toP.normalized, Vector3.up);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, 1f - Mathf.Exp(-6.0f * dt));
+                }
+            }
+
+            _currentSpeed = Mathf.Lerp(_currentSpeed, targetSpd, 1f - Mathf.Exp(-10f * dt));
+            if (humanoid != null)
+            {
+                humanoid.SetLocomotion(_currentSpeed, grounded: true, verticalVelocity: 0f, moveDir);
+                humanoid.SetLookAtPoint(true, pPos + Vector3.up * 1.55f);
+            }
+
+            // Smart street-change commentary while walking together!
+            if (_followCommentCooldown <= 0f && _cachedStreetTracker != null)
+            {
+                string curStreet = _cachedStreetTracker.CurrentStreetName;
+                if (!string.IsNullOrEmpty(curStreet) &&
+                    !string.Equals(curStreet, _lastFollowStreet, System.StringComparison.Ordinal))
+                {
+                    _lastFollowStreet = curStreet;
+                    _followCommentCooldown = 9.0f;
+                    string comment = IsEnglish
+                        ? $"Nice! We just reached {curStreet}!"
+                        : $"Harika! {curStreet} tarafına geldik, burası çok canlı!";
+                    NpcSpeechBubbleManager.Say(transform, citizenName, comment, 3.4f, NpcBubbleMood.Friendly);
+                }
             }
         }
 

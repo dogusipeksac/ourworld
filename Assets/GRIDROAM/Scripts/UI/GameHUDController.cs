@@ -95,9 +95,9 @@ namespace OurWorld.UI
         [SerializeField] private GameObject telemetryPanel;
         [SerializeField] private Text telemetryText;
 
-        private static readonly Color OffWhiteColor = new Color(0.929f, 0.937f, 0.949f, 1f);
-        private static readonly Color AccentTealColor = new Color(0.310f, 0.702f, 0.663f, 1f);
-        private static readonly Color DangerRedColor = new Color(0.851f, 0.325f, 0.310f, 1f);
+        private static readonly Color OffWhiteColor = OurWorldUiKit.TextPrimary;
+        private static readonly Color AccentTealColor = OurWorldUiKit.AccentTeal;
+        private static readonly Color DangerRedColor = OurWorldUiKit.AccentCoral;
 
         private Coroutine _toastRoutine;
         private Coroutine _bannerRoutine;
@@ -1107,8 +1107,11 @@ namespace OurWorld.UI
                 frame.anchoredPosition = new Vector2(0f, -14f);
                 frame.sizeDelta = new Vector2(660f, 92f);
                 Image background = panel.GetComponent<Image>();
-                background.color = new Color(0.06f, 0.11f, 0.16f, 0.92f);
+                OurWorldUiKit.ApplyRounded(background, OurWorldUiKit.SubCardSprite, OurWorldUiKit.CardBg);
                 background.raycastTarget = false;
+                OurWorldUiKit.AddCardDropShadow(frame, spread: 18f, offsetY: -8f, alpha: 0.48f);
+                OurWorldUiKit.AddSoftTopGlow(frame, OurWorldUiKit.AccentTeal, heightPx: 54f, alpha: 0.14f);
+                OurWorldUiKit.AddHairlineBorder(frame, OurWorldUiKit.SubCardOutlineSprite, OurWorldUiKit.BorderSubtle);
 
                 GameObject label = new GameObject("Score and instructions", typeof(RectTransform), typeof(Text));
                 RectTransform textRect = (RectTransform)label.transform;
@@ -1230,8 +1233,10 @@ namespace OurWorld.UI
                 cRt.anchoredPosition = new Vector2(0f, -43f);
                 cRt.sizeDelta = new Vector2(440f, 34f);
                 _sportCalloutBg = _sportCalloutObj.GetComponent<Image>();
-                _sportCalloutBg.color = new Color(0.06f, 0.11f, 0.16f, 0.92f);
+                OurWorldUiKit.ApplyRounded(_sportCalloutBg, OurWorldUiKit.PillSprite, OurWorldUiKit.CardBg);
                 _sportCalloutBg.raycastTarget = false;
+                OurWorldUiKit.AddHairlineBorder(cRt, OurWorldUiKit.PillOutlineSprite,
+                    new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.40f));
 
                 GameObject cTxtGo = new GameObject("CalloutText", typeof(RectTransform), typeof(Text));
                 RectTransform cTxtRt = (RectTransform)cTxtGo.transform;

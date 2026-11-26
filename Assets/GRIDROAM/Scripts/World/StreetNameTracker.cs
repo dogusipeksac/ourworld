@@ -39,17 +39,19 @@ namespace OurWorld.World
             new StreetZone { DisplayNameTr = "Çiçekçi Sokağı",                      DisplayNameEn = "Çiçekçi Street",                      MinX = -17f, MaxX =  -4f, MinZ = -28f, MaxZ =  -7f, Priority = 2 },
             new StreetZone { DisplayNameTr = "Nutuk Sokağı",                        DisplayNameEn = "Nutuk Street",                        MinX =  53f, MaxX =  66f, MinZ =   7f, MaxZ =  40f, Priority = 2 },
 
-            // Hamidiye Mahallesi 8 Main Avenues
+            // Hamidiye Mahallesi Main Avenues & Expanded Google Maps Streets
+            new StreetZone { DisplayNameTr = "Havadis Sokağı · Taş Fırın & Mahalle", DisplayNameEn = "Havadis Street · Stone Bakery",         MinX = -175f, MaxX = 165f, MinZ = 175f, MaxZ = 206f, Priority = 2 },
+            new StreetZone { DisplayNameTr = "Kadife Sokağı · Kıraathane & Bahçe",   DisplayNameEn = "Kadife Street · Tea House & Garden",  MinX = -175f, MaxX = 165f, MinZ = -206f, MaxZ = -175f, Priority = 2 },
             new StreetZone { DisplayNameTr = "Fatih Bulvarı",                       DisplayNameEn = "Fatih Boulevard",                     MinX = -195f, MaxX = 180f, MinZ = 130f, MaxZ = 156f, Priority = 1 },
             new StreetZone { DisplayNameTr = "Atatürk Caddesi (TEM Yan Yolu)",      DisplayNameEn = "Atatürk Avenue (TEM Side Rd)",        MinX = -185f, MaxX = 175f, MinZ =  86f, MaxZ = 108f, Priority = 1 },
             new StreetZone { DisplayNameTr = "Mürşit Caddesi",                      DisplayNameEn = "Mürşit Avenue",                       MinX = -175f, MaxX = 165f, MinZ =  36f, MaxZ =  56f, Priority = 1 },
             new StreetZone { DisplayNameTr = "Petrol Yolu Caddesi",                 DisplayNameEn = "Petrol Yolu Avenue",                  MinX = -175f, MaxX = 165f, MinZ = -88f, MaxZ = -68f, Priority = 1 },
             new StreetZone { DisplayNameTr = "Aziziye Caddesi",                     DisplayNameEn = "Aziziye Avenue",                      MinX = -175f, MaxX = 165f, MinZ = -124f, MaxZ = -104f, Priority = 1 },
             new StreetZone { DisplayNameTr = "Zübeyde Hanım Caddesi",               DisplayNameEn = "Zübeyde Hanım Avenue",                MinX = -175f, MaxX = 165f, MinZ = -156f, MaxZ = -136f, Priority = 1 },
-            new StreetZone { DisplayNameTr = "Eyyubi Caddesi",                      DisplayNameEn = "Eyyubi Avenue",                       MinX = -158f, MaxX = -138f, MinZ = -156f, MaxZ = 156f, Priority = 1 },
-            new StreetZone { DisplayNameTr = "Seyyid Kutup Caddesi",                DisplayNameEn = "Seyyid Kutup Avenue",                 MinX =  -94f, MaxX =  -76f, MinZ = -156f, MaxZ = 156f, Priority = 1 },
+            new StreetZone { DisplayNameTr = "Eyyubi Caddesi",                      DisplayNameEn = "Eyyubi Avenue",                       MinX = -158f, MaxX = -138f, MinZ = -196f, MaxZ = 196f, Priority = 1 },
+            new StreetZone { DisplayNameTr = "Seyyid Kutup Caddesi",                DisplayNameEn = "Seyyid Kutup Avenue",                 MinX =  -94f, MaxX =  -76f, MinZ = -196f, MaxZ = 196f, Priority = 1 },
             new StreetZone { DisplayNameTr = "Aydos Tazyikli Oto Yıkama",           DisplayNameEn = "Aydos Pressure Car Wash",             MinX =  114f, MaxX =  134f, MinZ = -24f, MaxZ =  -4f, Priority = 7 },
-            new StreetZone { DisplayNameTr = "Abdülkadir Udeh Caddesi",             DisplayNameEn = "Abdülkadir Udeh Avenue",              MinX =   90f, MaxX =  108f, MinZ = -156f, MaxZ = 156f, Priority = 1 }
+            new StreetZone { DisplayNameTr = "Abdülkadir Udeh Caddesi",             DisplayNameEn = "Abdülkadir Udeh Avenue",              MinX =   90f, MaxX =  108f, MinZ = -196f, MaxZ = 196f, Priority = 1 }
         };
 
         private int _currentZoneIndex = -1;
@@ -69,6 +71,62 @@ namespace OurWorld.World
             if (mode == null || mode.IsModalLocked) return;
 
             Vector3 p = mode.ActiveWorldPosition;
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+
+            // Dynamic 5-level floor tracking inside Hamidiye Atlas AVM (X:-135..-97, Z:-68..-17)
+            if (p.x >= -135f && p.x <= -97f && p.z >= -68f && p.z <= -17f)
+            {
+                int floorIdx;
+                string mallDisplay;
+                if (p.z < -50.5f)
+                {
+                    floorIdx = 100;
+                    mallDisplay = isEn ? "Hamidiye Atlas Mall · Entrance Plaza" : "Hamidiye Atlas AVM · Giriş Meydanı";
+                }
+                else if (p.y >= 17.0f)
+                {
+                    floorIdx = 104;
+                    mallDisplay = isEn ? "Hamidiye Atlas Mall · Rooftop Terrace" : "Hamidiye Atlas AVM · Çatı Terası";
+                }
+                else if (p.y >= 12.4f)
+                {
+                    floorIdx = 103;
+                    mallDisplay = isEn ? "Hamidiye Atlas Mall · 3rd Floor (Cinema)" : "Hamidiye Atlas AVM · 3. Kat (Sinema)";
+                }
+                else if (p.y >= 7.8f)
+                {
+                    floorIdx = 102;
+                    mallDisplay = isEn ? "Hamidiye Atlas Mall · 2nd Floor (Food Court)" : "Hamidiye Atlas AVM · 2. Kat (Yemek)";
+                }
+                else if (p.y >= 3.2f)
+                {
+                    floorIdx = 101;
+                    mallDisplay = isEn ? "Hamidiye Atlas Mall · 1st Floor (Fashion)" : "Hamidiye Atlas AVM · 1. Kat (Moda)";
+                }
+                else
+                {
+                    floorIdx = 105;
+                    mallDisplay = isEn ? "Hamidiye Atlas Mall · Ground Atrium" : "Hamidiye Atlas AVM · Zemin Kat";
+                }
+
+                if (floorIdx == _currentZoneIndex)
+                {
+                    _currentStreet = mallDisplay;
+                    return;
+                }
+
+                bool wasEmptyMall = _currentZoneIndex < 0;
+                _currentZoneIndex = floorIdx;
+                _currentStreet = mallDisplay;
+                CrashlyticsService.SetKey("current_street", mallDisplay);
+                if (!wasEmptyMall && Time.time - _lastAnnounceTime >= 1.5f)
+                {
+                    _lastAnnounceTime = Time.time;
+                    mode.RaiseStatusMessage(mallDisplay);
+                }
+                return;
+            }
+
             int bestIndex = -1;
             int bestPriority = -1;
 
@@ -90,7 +148,6 @@ namespace OurWorld.World
                 return;
             }
 
-            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             StreetZone best = Zones[bestIndex];
             string display = isEn ? best.DisplayNameEn : best.DisplayNameTr;
 

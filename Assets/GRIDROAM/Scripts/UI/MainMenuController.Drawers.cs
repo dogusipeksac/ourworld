@@ -137,8 +137,8 @@ namespace OurWorld.UI
             grt.offsetMax = new Vector2(-30f, -112f);
 
             GridLayoutGroup glg = gridGo.AddComponent<GridLayoutGroup>();
-            glg.cellSize = new Vector2(322f, 128f);
-            glg.spacing = new Vector2(20f, 12f);
+            glg.cellSize = new Vector2(322f, 102f);
+            glg.spacing = new Vector2(20f, 9f);
             glg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             glg.constraintCount = 2;
 

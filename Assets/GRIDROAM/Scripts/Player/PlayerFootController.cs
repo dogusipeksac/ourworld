@@ -39,8 +39,15 @@ namespace OurWorld.Player
             new Color(0.16f, 0.27f, 0.42f, 1f), // 0: Klasik Lacivert
             new Color(0.48f, 0.12f, 0.16f, 1f), // 1: Bordo Deri
             new Color(0.24f, 0.36f, 0.20f, 1f), // 2: Zeytin Parka
-            new Color(0.14f, 0.15f, 0.18f, 1f)  // 3: Antrasit Sokak
+            new Color(0.14f, 0.15f, 0.18f, 1f), // 3: Antrasit Sokak
+            new Color(0.10f, 0.56f, 0.58f, 1f), // 4: İstanbul Turkuazı
+            new Color(0.78f, 0.54f, 0.14f, 1f), // 5: Safran Hardal
+            new Color(0.84f, 0.79f, 0.69f, 1f), // 6: Krem Keten
+            new Color(0.34f, 0.18f, 0.44f, 1f)  // 7: Mürdüm Kadife
         };
+
+        public static int JacketColorCount => JacketColors.Length;
+        public static Color GetJacketColor(int index) => JacketColors[Mathf.Clamp(index, 0, JacketColors.Length - 1)];
 
         private static AudioClip _sharedFootstepClip;
         private static AudioClip _sharedPunchHitClip;

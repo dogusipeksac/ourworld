@@ -61,17 +61,45 @@ namespace OurWorld.World
             Material green = MaterialFor(shader, "Tennis Ball Felt", new Color(0.68f, 0.78f, 0.22f), 0.18f);
             green.EnableKeyword("_EMISSION");
             green.SetColor("_EmissionColor", new Color(0.14f, 0.17f, 0.04f));
-            BuildBicycle(paintedSteel, rubber, cream, metal);
-            BuildMotorcycle(shader, rubber, cream, metal);
+            BuildBicycles(shader, paintedSteel, rubber, cream, metal);
+            BuildMotorcycles(shader, rubber, cream, metal);
             BuildCourt(playerModel, paintedSteel, rubber, cream, asphalt, clay, green);
             BuildCommunitySportsArenas(playerModel, shader, paintedSteel, rubber, cream, metal, asphalt, clay);
             BuildDuplexHomes(shader, cream, paintedSteel);
         }
 
-        private void BuildBicycle(Material frame, Material rubber, Material cream, Material metal)
+        private void BuildBicycles(Shader shader, Material defaultFrame, Material rubber, Material cream, Material metal)
         {
-            Transform bike = Child(transform, "Selman_CityBicycle", new Vector3(-65.3f, 0.067f, -5.52f));
-            bike.localRotation = Quaternion.Euler(0f, 90f, 0f);
+            // 7 rideable City Bicycles distributed across the entire expanded map so players discover bikes everywhere
+            // instead of clustering everything outside No:48!
+            (string objName, string triggerId, Vector3 pos, float yaw, Color color, bool useDefault)[] bikes =
+            {
+                ("Gursu_CityBicycle",   "selman_city_bicycle",  new Vector3(-28.5f, 0.067f, -23.4f),  90f, new Color(0.24f, 0.36f, 0.32f), true),
+                ("Park_CityBicycle",    "park_city_bicycle",    new Vector3(-20.0f, 0.067f,  63.4f),  90f, new Color(0.12f, 0.58f, 0.64f), false),
+                ("Fatih_CityBicycle",   "fatih_city_bicycle",   new Vector3( 18.0f, 0.067f, 132.4f), 270f, new Color(0.84f, 0.62f, 0.18f), false),
+                ("Havadis_CityBicycle", "havadis_city_bicycle", new Vector3(-32.0f, 0.067f, 180.6f),  90f, new Color(0.74f, 0.22f, 0.20f), false),
+                ("Kadife_CityBicycle",  "kadife_city_bicycle",  new Vector3( 24.0f, 0.067f,-180.6f), 270f, new Color(0.20f, 0.36f, 0.66f), false),
+                ("Lake_CityBicycle",    "lake_city_bicycle",    new Vector3(-164.0f,0.067f,  -7.2f),   0f, new Color(0.26f, 0.64f, 0.50f), false),
+                ("Farm_CityBicycle",    "farm_city_bicycle",    new Vector3( 146.5f,0.067f,   4.8f), 270f, new Color(0.78f, 0.38f, 0.18f), false)
+            };
+
+            for (int i = 0; i < bikes.Length; i++)
+            {
+                var b = bikes[i];
+                Material frameMat = b.useDefault
+                    ? defaultFrame
+                    : MaterialFor(shader, b.objName + " Frame", b.color, 0.45f);
+                BuildBicycleAt(b.objName, b.triggerId, b.pos, b.yaw, frameMat, rubber, cream, metal);
+            }
+        }
+
+        private void BuildBicycleAt(string objName, string triggerId, Vector3 worldPos, float yaw, Material frame, Material rubber, Material cream, Material metal)
+        {
+            Transform bike = Child(transform, objName, worldPos);
+            bike.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            if (Physics.Raycast(bike.position + Vector3.up, Vector3.down, out RaycastHit surface, 1.8f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                bike.position = surface.point + Vector3.up * 0.015f;
             Transform visual = Child(bike, "BicycleVisual", Vector3.zero);
             Vector3 frontAxle = new Vector3(0f, 0.34f, 0.57f);
             Vector3 rearAxle = new Vector3(0f, 0.34f, -0.55f);
@@ -137,7 +165,7 @@ namespace OurWorld.World
             BicycleController controller = bike.gameObject.AddComponent<BicycleController>();
             controller.Configure(visual, fork, frontWheel, rearWheel, crank);
             bike.gameObject.AddComponent<InteractableTrigger>()
-                .Configure(InteractableKind.Bicycle, "selman_city_bicycle", "ui.btn.ride_bike", 2.6f);
+                .Configure(InteractableKind.Bicycle, triggerId, "ui.btn.ride_bike", 2.6f);
         }
 
         private void BuildCourt(ProceduralHumanoid playerModel, Material steel, Material rubber, Material cream,

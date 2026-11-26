@@ -1223,7 +1223,7 @@
     },
     {
       "key": "m06.step1.objective",
-      "value": "Talk to Auntie Ayşe on the south sidewalk."
+      "value": "Talk to Aunt Ayşe on Mürşit Avenue."
     },
     {
       "key": "m06.step2.objective",
@@ -1327,7 +1327,7 @@
     },
     {
       "key": "m08.step3.objective",
-      "value": "Drive to the on-duty pharmacy in the east before time runs out."
+      "value": "Drive to the on-duty pharmacy on Petrol Yolu Avenue before time runs out."
     },
     {
       "key": "m08.step4.objective",
@@ -1375,7 +1375,7 @@
     },
     {
       "key": "m09.step2.objective",
-      "value": "Drive to the gas station in the west."
+      "value": "Drive west to 53 Eyyubi Avenue."
     },
     {
       "key": "m09.step3.objective",
@@ -1423,15 +1423,15 @@
     },
     {
       "key": "m10.step2.objective",
-      "value": "Pick up the tea box in front of the Tea House."
+      "value": "Pick up the tea box outside Kadife Street Tea House."
     },
     {
       "key": "m10.step3.objective",
-      "value": "Pick up the simit tray next to the market."
+      "value": "Pick up the simit tray outside Havadis Street Stone Bakery."
     },
     {
       "key": "m10.step4.objective",
-      "value": "Go to the festival area (Gürsu St. football pitch)."
+      "value": "Head to the festival plaza at Fatih Blvd Clock Tower."
     },
     {
       "key": "m10.step5.objective",
@@ -1567,7 +1567,7 @@
     },
     {
       "key": "m13.step1.objective",
-      "value": "Pick up the chilled treat crate outside Selman Market No:58."
+      "value": "Pick up the chilled treats crate outside Havadis Street Stone Bakery."
     },
     {
       "key": "m13.step2.objective",
@@ -1671,7 +1671,7 @@
     },
     {
       "key": "m15.step1.objective",
-      "value": "Talk to Auntie Ayşe on Selman Street to hear the first riddle."
+      "value": "Talk to Aunt Ayşe on Mürşit Avenue and hear the first riddle."
     },
     {
       "key": "m15.step2.objective",
@@ -1683,7 +1683,7 @@
     },
     {
       "key": "m15.step4.objective",
-      "value": "Riddle 3: Find the 3rd plaque by Zübeyde Hanım's blue pine houses."
+      "value": "Riddle 3: Find the 3rd brass clue plate on Kadife Street."
     },
     {
       "key": "m15.step5.objective",
@@ -1791,7 +1791,7 @@
     },
     {
       "key": "m17.step2.objective",
-      "value": "Grab the High-Voltage Fuse Box outside Auto Repair No:73 in time."
+      "value": "Grab the High-Voltage Fuse Box from Havadis Street before time runs out."
     },
     {
       "key": "m17.step3.objective",
@@ -1855,7 +1855,7 @@
     },
     {
       "key": "m18.step3.objective",
-      "value": "Gate 1: Blast through Fatih Blvd Clock Tower before time expires!"
+      "value": "Gate 1: Speed north through the Havadis Street checkpoint!"
     },
     {
       "key": "m18.step4.objective",
@@ -1863,7 +1863,7 @@
     },
     {
       "key": "m18.step5.objective",
-      "value": "Gate 3: Tear south along Zübeyde Hanım Pine Straight!"
+      "value": "Gate 3: Race south down the Kadife Street straight!"
     },
     {
       "key": "m18.step6.objective",
@@ -1963,7 +1963,7 @@
     },
     {
       "key": "m20.step3.objective",
-      "value": "Pick up the celebration cake outside Selman Market No:58."
+      "value": "Pick up the neighborhood celebration cake at Havadis Street Stone Bakery."
     },
     {
       "key": "m20.step4.objective",
@@ -2383,7 +2383,7 @@
     },
     {
       "key": "m21.s1.obj",
-      "value": "Talk to Simit Vendor Ahmet at the Town Square cart."
+      "value": "Talk to Simit Vendor Ahmet outside Havadis Street Bakery."
     },
     {
       "key": "m21.s2.obj",
@@ -2555,7 +2555,7 @@
     },
     {
       "key": "m25.s3.obj",
-      "value": "Pick up the Festival Simit Tray from Ahmet in Town Square."
+      "value": "Pick up the Festival Simit Tray from Ahmet on Havadis Street."
     },
     {
       "key": "m25.s4.obj",
@@ -2688,6 +2688,54 @@
     {
       "key": "feedback.default_sender",
       "value": "Player"
+    },
+    {
+      "key": "job.taxi.dest.fatih",
+      "value": "Fatih Blvd · Clock Tower"
+    },
+    {
+      "key": "job.taxi.dest.ataturk",
+      "value": "Atatürk Avenue"
+    },
+    {
+      "key": "job.taxi.dest.mursit",
+      "value": "Mürşit Avenue"
+    },
+    {
+      "key": "job.taxi.dest.eyyubi",
+      "value": "53 Eyyubi Neighborhood Market"
+    },
+    {
+      "key": "job.taxi.dest.petrolyolu",
+      "value": "Petrol Yolu Ave · Gas Station"
+    },
+    {
+      "key": "job.taxi.dest.aziziye",
+      "value": "Aziziye Ave · Primary School"
+    },
+    {
+      "key": "job.taxi.dest.zubeyde",
+      "value": "Zübeyde Hanım Avenue"
+    },
+    {
+      "key": "job.taxi.dest.havadis",
+      "value": "Havadis Street · Stone Bakery"
+    },
+    {
+      "key": "job.taxi.dest.kadife",
+      "value": "Kadife Street · Tea House"
+    },
+    {
+      "key": "job.taxi.dest.golet",
+      "value": "Sultanbeyli Lake Pier"
+    },
+    {
+      "key": "job.taxi.dest.ciftlik",
+      "value": "Aydos Green Valley · Farm"
+    },
+    {
+      "key": "job.taxi.dest.avm",
+      "value": "Hamidiye Atlas Mall"
     }
   ]
 }

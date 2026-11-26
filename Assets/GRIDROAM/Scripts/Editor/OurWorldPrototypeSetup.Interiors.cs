@@ -1231,7 +1231,7 @@ namespace OurWorld.Editor
                     PlaceYaw(180f), mats);
 
                 CreateBookcase("Office_Bookcase", furnRoot.transform,
-                    PlacePos(innerFrontX - 0.38f, floorTopY, innerNorthZ - 1.95f),
+                    PlacePos(innerFrontX - 0.38f, floorTopY, Mathf.Max(doorCenterZ + doorWidth * 0.5f + 1.25f, innerNorthZ - 1.65f)),
                     PlaceYaw(-90f), mats);
 
                 CreateHomeGymCorner("Fitness_GymZone", furnRoot.transform,

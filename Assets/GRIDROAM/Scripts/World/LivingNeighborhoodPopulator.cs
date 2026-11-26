@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using OurWorld.Core;
 using OurWorld.Player;
+using OurWorld.UI;
 using UnityEngine;
 
 namespace OurWorld.World
@@ -27,6 +28,7 @@ namespace OurWorld.World
 
         private sealed class LivingNpc
         {
+            public string InteractableId;
             public GameObject Root;
             public ProceduralHumanoid Humanoid;
             public NpcRole Role;
@@ -150,7 +152,9 @@ namespace OurWorld.World
             "Selman Sokağı'nda simit kokusu harika!",
             "Gölet kenarında yürüyüş yaptın mı bugün?",
             "Aydos Çiftliği'nin taze sütü efsane olmuş!",
-            "Spor sahaları bugün çok canlı, maç var!"
+            "Spor sahaları bugün çok canlı, maç var!",
+            "Havadis Sokağı'ndaki taş fırından sıcak börek kokusu geliyor!",
+            "Kadife Sokağı'ndaki kıraathanede akşam çayı bir başka güzel!"
         };
 
         private static readonly string[] SpectatorLines =
@@ -244,29 +248,40 @@ namespace OurWorld.World
 
             int idx = 0;
 
-            // A. 24 Strolling Sidewalk, Plaza, Sports & Lake Promenade NPCs!
+            // A. 38 Strolling Sidewalk, Avenue, Plaza, Sports, Park, Lake & Farm NPCs spread across ALL 10 streets!
             Vector3[][] strollRoutes =
             {
-                // Selman Sokağı North & South lively foot traffic
-                new[] { new Vector3(-42f, 0.06f, 8.2f), new Vector3(38f, 0.06f, 8.2f) },
-                new[] { new Vector3(35f, 0.06f, 7.6f), new Vector3(-36f, 0.06f, 7.6f) },
-                new[] { new Vector3(-48f, 0.06f, -7.8f), new Vector3(32f, 0.06f, -7.8f) },
+                // Selman Sokağı (balanced 2 local strollers instead of crowding No:48!)
+                new[] { new Vector3(-34f, 0.06f, 8.2f), new Vector3(38f, 0.06f, 8.2f) },
                 new[] { new Vector3(28f, 0.06f, -8.4f), new Vector3(-30f, 0.06f, -8.4f) },
-                new[] { new Vector3(-16f, 0.06f, 9.0f), new Vector3(22f, 0.06f, 9.0f), new Vector3(22f, 0.06f, 18.0f), new Vector3(-16f, 0.06f, 18.0f) },
-                new[] { new Vector3(18f, 0.06f, 14.5f), new Vector3(4f, 0.06f, 14.5f), new Vector3(4f, 0.06f, 22.0f), new Vector3(18f, 0.06f, 22.0f) },
+                // Fatih Bulvarı · Saat Kulesi Meydanı (North Main Boulevard)
+                new[] { new Vector3(-68f, 0.06f, 132.4f), new Vector3(58f, 0.06f, 132.4f) },
+                new[] { new Vector3(44f, 0.06f, 142.8f), new Vector3(-46f, 0.06f, 142.8f) },
+                // Atatürk Caddesi (Pine-lined Avenue)
+                new[] { new Vector3(-64f, 0.06f, 90.2f), new Vector3(62f, 0.06f, 90.2f) },
+                new[] { new Vector3(54f, 0.06f, 101.6f), new Vector3(-48f, 0.06f, 101.6f) },
+                // Mürşit Caddesi & Hamidiye Parkı Tea Garden Loop
+                new[] { new Vector3(-44f, 0.06f, 51.2f), new Vector3(52f, 0.06f, 51.2f) },
+                new[] { new Vector3(-30f, 0.06f, 62f), new Vector3(-8f, 0.06f, 62f), new Vector3(-8f, 0.06f, 76f), new Vector3(-30f, 0.06f, 76f) },
+                // Petrol Yolu Caddesi (South Commercial Strip)
+                new[] { new Vector3(-66f, 0.06f, -71.8f), new Vector3(64f, 0.06f, -71.8f) },
+                new[] { new Vector3(52f, 0.06f, -84.2f), new Vector3(-56f, 0.06f, -84.2f) },
+                // Aziziye Caddesi · İTO İlkokulu
+                new[] { new Vector3(-62f, 0.06f, -119.5f), new Vector3(56f, 0.06f, -119.5f) },
+                new[] { new Vector3(42f, 0.06f, -108.5f), new Vector3(-48f, 0.06f, -108.5f) },
+                // Zübeyde Hanım Caddesi (Pine Blue-Balcony Houses)
+                new[] { new Vector3(-58f, 0.06f, -151.2f), new Vector3(60f, 0.06f, -151.2f) },
+                new[] { new Vector3(46f, 0.06f, -140.5f), new Vector3(-44f, 0.06f, -140.5f) },
+                // 53 Eyyubi & Seyyid Kutup North-South Avenues
+                new[] { new Vector3(-153.2f, 0.06f, -78f), new Vector3(-153.2f, 0.06f, 68f) },
+                new[] { new Vector3(-90.2f, 0.06f, -64f), new Vector3(-90.2f, 0.06f, 84f) },
+                new[] { new Vector3(93.2f, 0.06f, -92f), new Vector3(93.2f, 0.06f, 64f) },
                 // Sports Complex lively walkway (Tennis -> Football -> Pool -> Basketball -> Volleyball)
                 new[] { new Vector3(-46f, 0.06f, -24.5f), new Vector3(62f, 0.06f, -24.5f) },
                 new[] { new Vector3(58f, 0.06f, -23.0f), new Vector3(-40f, 0.06f, -23.0f) },
-                new[] { new Vector3(-24f, 0.06f, -26.0f), new Vector3(12f, 0.06f, -26.0f), new Vector3(12f, 0.06f, -12.0f), new Vector3(-24f, 0.06f, -12.0f) },
-                new[] { new Vector3(28f, 0.06f, -25.0f), new Vector3(64f, 0.06f, -25.0f), new Vector3(64f, 0.06f, -16.0f), new Vector3(28f, 0.06f, -16.0f) },
                 // Mosque Courtyard & Fountain Plaza
                 new[] { new Vector3(44f, 0.06f, -14.0f), new Vector3(72f, 0.06f, -14.0f), new Vector3(72f, 0.06f, -24.0f), new Vector3(44f, 0.06f, -24.0f) },
                 new[] { new Vector3(50f, 0.06f, -18.0f), new Vector3(66f, 0.06f, -18.0f) },
-                // Park & Residential Streets
-                new[] { new Vector3(-22f, 0.06f, 26f), new Vector3(16f, 0.06f, 26f), new Vector3(16f, 0.06f, 44f), new Vector3(-22f, 0.06f, 44f) },
-                new[] { new Vector3(-60f, 0.06f, -4f), new Vector3(-60f, 0.06f, 28f) },
-                new[] { new Vector3(42f, 0.06f, 6f), new Vector3(42f, 0.06f, 38f) },
-                new[] { new Vector3(-12f, 0.06f, -58f), new Vector3(44f, 0.06f, -58f) },
                 // Lake Boulevard & Sultanbeyli Göleti Promenade (strollers + joggers!)
                 new[] { new Vector3(-118f, 0.06f, 5.2f), new Vector3(-164f, 0.06f, 5.2f) },
                 new[] { new Vector3(-165f, 0.06f, -16f), new Vector3(-165f, 0.06f, 16f) },
@@ -276,12 +291,21 @@ namespace OurWorld.World
                 new[] { new Vector3(118f, 0.06f, 4.2f), new Vector3(156f, 0.06f, 4.2f) },
                 new[] { new Vector3(154f, 0.06f, -6f), new Vector3(178f, 0.06f, -6f), new Vector3(178f, 0.06f, 10f), new Vector3(154f, 0.06f, 10f) },
                 new[] { new Vector3(162f, 0.06f, -12f), new Vector3(176f, 0.06f, -12f) },
-                new[] { new Vector3(-84f, 0.06f, 5.4f), new Vector3(-118f, 0.06f, 5.4f) }
+                // Havadis Sokağı (Z = +186) lively sidewalk strollers & joggers!
+                new[] { new Vector3(-72f, 0.06f, 180.5f), new Vector3(28f, 0.06f, 180.5f) },
+                new[] { new Vector3(68f, 0.06f, 191.5f), new Vector3(-42f, 0.06f, 191.5f) },
+                new[] { new Vector3(-120f, 0.06f, 180.5f), new Vector3(-44f, 0.06f, 180.5f) },
+                new[] { new Vector3(14f, 0.06f, 191.5f), new Vector3(92f, 0.06f, 191.5f) },
+                // Kadife Sokağı (Z = -186) lively sidewalk strollers & joggers!
+                new[] { new Vector3(-68f, 0.06f, -180.5f), new Vector3(34f, 0.06f, -180.5f) },
+                new[] { new Vector3(72f, 0.06f, -191.5f), new Vector3(-38f, 0.06f, -191.5f) },
+                new[] { new Vector3(-124f, 0.06f, -191.5f), new Vector3(-46f, 0.06f, -191.5f) },
+                new[] { new Vector3(18f, 0.06f, -180.5f), new Vector3(92f, 0.06f, -180.5f) }
             };
 
             for (int r = 0; r < strollRoutes.Length; r++)
             {
-                bool isJogger = (r == 6 || r == 17 || r == 18 || r == 20);
+                bool isJogger = (r == 2 || r == 7 || r == 14 || r == 17 || r == 22 || r == 25 || r == 29 || r == 33);
                 SpawnNpcInstance(
                     npcRoot, template, shirtMats[idx % shirtMats.Length],
                     NeighborNames[idx % NeighborNames.Length],
@@ -326,13 +350,15 @@ namespace OurWorld.World
                     SpectatorLines, idx++);
             }
 
-            // C. 4 Iconic Istanbul Street Vendors (Simitçi Ahmet, Çaycı Rıza, Spor Simitçisi, Gölet Simitçisi)
+            // C. 6 Iconic Istanbul Street Vendors spread across Saat Kulesi, Sports Complex, Park, Lake, Havadis & Kadife!
             (Vector3 pos, float yaw, string name, string[] lines)[] vendors =
             {
-                (new Vector3(7.9f, 0.06f, 13.8f), -90f, "Simitçi Ahmet", new[] { "Taze çıtır simit var, sıcak sıcak!", "Sabah simidi 10 TL, susamlı çıtır!" }),
+                (new Vector3(-12.0f, 0.16f, 134.5f), 180f, "Saat Kulesi Simitçisi", new[] { "Saat Kulesi meydanında taze çıtır simit var!", "Sabah simidi 10 TL, susamlı çıtır!" }),
                 (new Vector3(-24.3f, 0.06f, -21.8f), -60f, "Simitçi Kemal", new[] { "Maç arası sıcak simit al, enerjin dolsun!", "Halı sahada gol atan simidi kapar!" }),
-                (new Vector3(16.6f, 0.06f, 13.4f), 180f, "Çaycı Rıza", new[] { "Tavşan kanı ince belli çaylar taze!", "Buyur otur komşu, çayın hemen geliyor!" }),
-                (new Vector3(-164.0f, 0.06f, -5.2f), -90f, "Gölet Simitçisi", new[] { "Gölet manzarasında sıcak simit gibisi yok!", "Kuğular da simit kokusuna geliyor!" })
+                (new Vector3(-22.4f, 0.06f,  69.2f),  90f, "Park Çaycısı", new[] { "Hamidiye Parkı'nda tavşan kanı çaylar taze!", "Buyur otur komşu, çayın hemen geliyor!" }),
+                (new Vector3(-164.0f, 0.06f, -5.2f), -90f, "Gölet Simitçisi", new[] { "Gölet manzarasında sıcak simit gibisi yok!", "Kuğular da simit kokusuna geliyor!" }),
+                (new Vector3( 36.0f, 0.06f, -71.8f), 180f, "Petrol Yolu Kestanecisi", new[] { "Közde sıcak kestane, akşam serinliğinde birebir!", "Petrol Yolu'ndan geçerken uğra komşu!" }),
+                (new Vector3(-10.0f, 0.06f,-119.5f), 180f, "Okul Önü Simitçisi", new[] { "Teneffüs zili çaldı, taze açma ve simit hazır!", "Aziziye'nin en çıtır simidi burada!" })
             };
             for (int v = 0; v < vendors.Length; v++)
             {
@@ -340,19 +366,21 @@ namespace OurWorld.World
                 SpawnNpcInstance(npcRoot, template, shirtMats[idx % shirtMats.Length], vd.name, NpcRole.Vendor, new[] { vd.pos }, 0f, vd.yaw, vd.lines, idx++);
             }
 
-            // D. 10 Seated Tea Garden & Lakeside Park Guests chatting warmly!
+            // D. 12 Seated Tea Garden, Plaza, Lakeside, Farm, Havadis & Kadife Guests chatting warmly!
             (Vector3 pos, float yaw)[] teaGuests =
             {
-                (new Vector3(15.38f, 0.06f, 15.2f), -90f),
-                (new Vector3(19.48f, 0.06f, 15.5f), -90f),
-                (new Vector3(17.38f, 0.06f, 19.2f), -90f),
-                (new Vector3(-1.62f, 0.06f, -23.5f), -90f),
-                (new Vector3(3.08f,  0.06f, -23.5f), -90f),
-                (new Vector3(-163.6f, 0.06f, 7.2f), -90f),
-                (new Vector3(-163.6f, 0.06f, 11.4f), -90f),
-                (new Vector3(49.2f,  0.06f, -15.0f), -90f),
-                (new Vector3(-7.0f,  0.06f, -22.5f), 45f),
-                (new Vector3(168.0f, 0.06f, 5.5f), 180f)
+                (new Vector3(-18.0f, 0.06f,  67.2f), -90f), // Hamidiye Parkı
+                (new Vector3(-18.0f, 0.06f,  71.4f), -90f), // Hamidiye Parkı
+                (new Vector3(  8.0f, 0.16f, 134.8f), 180f), // Fatih Saat Kulesi
+                (new Vector3( 12.2f, 0.16f, 134.8f), 180f), // Fatih Saat Kulesi
+                (new Vector3( -1.62f,0.06f, -23.5f), -90f), // Spor Kompleksi
+                (new Vector3(  3.08f,0.06f, -23.5f), -90f), // Spor Kompleksi
+                (new Vector3(-163.6f,0.06f,   7.2f), -90f), // Sultanbeyli Göleti
+                (new Vector3(-163.6f,0.06f,  11.4f), -90f), // Sultanbeyli Göleti
+                (new Vector3( 49.2f, 0.06f, -15.0f), -90f), // Hz. Osman Camii
+                (new Vector3( 168.0f,0.06f,   5.5f), 180f), // Aydos Çiftliği
+                (new Vector3(-21.5f, 0.06f,-181.6f),   0f), // Kadife Kıraathanesi
+                (new Vector3(-10.5f, 0.06f,-181.6f), 180f)  // Kadife Kıraathanesi
             };
             for (int g = 0; g < teaGuests.Length; g++)
             {
@@ -443,8 +471,13 @@ namespace OurWorld.World
                 hum.SetLocomotion(0f, true, 0f);
             }
 
+            string npcTriggerId = $"living_npc_{index:00}";
+            InteractableTrigger npcTrig = hum.gameObject.AddComponent<InteractableTrigger>();
+            npcTrig.Configure(InteractableKind.TownCitizen, npcTriggerId, "ui.btn.chat", 2.85f);
+
             _npcs.Add(new LivingNpc
             {
+                InteractableId = npcTriggerId,
                 Root = hum.gameObject,
                 Humanoid = hum,
                 Role = role,
@@ -472,12 +505,14 @@ namespace OurWorld.World
             Transform root = new GameObject("Istanbul_Pigeon_Flocks").transform;
             root.SetParent(transform, false);
 
-            // 3 flocks of 6 pigeons (18 total): Town Square Simit Plaza, Mosque Courtyard, Sports Fountain Plaza
+            // 5 flocks of 6 pigeons (30 total) spread across Saat Kulesi, Mosque, Park, Havadis & Kadife!
             Vector3[] centers =
             {
-                new Vector3(9.5f, 0.04f, 13.0f),
-                new Vector3(52.0f, 0.04f, -18.5f),
-                new Vector3(-7.0f, 0.04f, -20.5f)
+                new Vector3(  4.5f, 0.16f,  136.0f), // Fatih Bulvarı Saat Kulesi Meydanı
+                new Vector3( 52.0f, 0.04f,  -18.5f), // Hz. Osman Camii Avlusu
+                new Vector3(-18.0f, 0.04f,   68.5f), // Hamidiye Parkı & Çay Bahçesi
+                new Vector3(-16.0f, 0.04f,  180.8f), // Havadis Sokağı Fırın önü
+                new Vector3(-14.0f, 0.04f, -180.8f)  // Kadife Sokağı Kıraathane önü
             };
 
             for (int f = 0; f < centers.Length; f++)
@@ -514,14 +549,17 @@ namespace OurWorld.World
 
             (Vector3 pos, string name, Color coat)[] cats =
             {
-                (new Vector3(13.2f, 0.04f, 13.8f), "Sarman", new Color(0.90f, 0.56f, 0.22f)),
-                (new Vector3(-11.0f, 0.04f, 8.8f), "Tekir", new Color(0.58f, 0.54f, 0.48f)),
-                (new Vector3(45.5f, 0.04f, -14.5f), "Pamuk", new Color(0.95f, 0.93f, 0.89f)),
-                (new Vector3(-1.2f, 0.04f, -21.8f), "Kömür", new Color(0.22f, 0.23f, 0.26f)),
-                (new Vector3(-28.0f, 0.04f, -23.0f), "Tarçın", new Color(0.76f, 0.42f, 0.20f)),
-                (new Vector3(26.5f, 0.04f, 9.5f), "Boncuk", new Color(0.86f, 0.72f, 0.52f)),
-                (new Vector3(-164.0f, 0.05f, 5.0f), "Martı", new Color(0.74f, 0.76f, 0.80f)),
-                (new Vector3(158.0f, 0.04f, 4.5f), "Fındık", new Color(0.84f, 0.52f, 0.26f))
+                (new Vector3(  14.0f, 0.04f,  132.8f), "Sarman", new Color(0.90f, 0.56f, 0.22f)), // Fatih Bulvarı
+                (new Vector3( -11.0f, 0.04f,    8.8f), "Tekir",  new Color(0.58f, 0.54f, 0.48f)), // Selman Sokağı
+                (new Vector3(  45.5f, 0.04f,  -14.5f), "Pamuk",  new Color(0.95f, 0.93f, 0.89f)), // Hz. Osman Camii
+                (new Vector3( -22.0f, 0.04f,   67.0f), "Kömür",  new Color(0.22f, 0.23f, 0.26f)), // Hamidiye Parkı
+                (new Vector3( -18.0f, 0.04f,  -71.8f), "Tarçın", new Color(0.76f, 0.42f, 0.20f)), // Petrol Yolu Cd.
+                (new Vector3(  16.0f, 0.04f, -151.2f), "Boncuk", new Color(0.86f, 0.72f, 0.52f)), // Zübeyde Hanım Cd.
+                (new Vector3(-164.0f, 0.05f,    5.0f), "Martı",  new Color(0.74f, 0.76f, 0.80f)), // Sultanbeyli Göleti
+                (new Vector3( 158.0f, 0.04f,    4.5f), "Fındık", new Color(0.84f, 0.52f, 0.26f)), // Aydos Çiftliği
+                (new Vector3(-152.0f, 0.04f,  -19.0f), "Mırnav", new Color(0.66f, 0.62f, 0.58f)), // 53 Eyyubi Büfesi
+                (new Vector3(  38.0f, 0.04f,  180.8f), "Lokum",  new Color(0.92f, 0.78f, 0.58f)), // Havadis Sokağı
+                (new Vector3( -28.0f, 0.04f, -180.8f), "Zeytin", new Color(0.18f, 0.20f, 0.24f))  // Kadife Sokağı
             };
 
             for (int i = 0; i < cats.Length; i++)
@@ -537,7 +575,7 @@ namespace OurWorld.World
                 string id = $"living_cat_{i}";
                 InteractableTrigger trig = cat.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.4f);
-                trig.SetCustomPrompt($"{c.name} Kedisini Sev (+12 Enerji)");
+                trig.SetCustomPrompt($"{c.name} Kedisini Sev (+12 Enerji)", $"Pet {c.name} the Cat (+12 Energy)");
 
                 _animals.Add(new LivingAnimal
                 {
@@ -566,12 +604,14 @@ namespace OurWorld.World
 
             (Vector3 pos, string name)[] dogs =
             {
-                (new Vector3(4.2f, 0.04f, 16.5f), "Paşa"),
-                (new Vector3(-16.5f, 0.04f, -22.8f), "Kral"),
-                (new Vector3(38.0f, 0.04f, -23.5f), "Poyraz"),
-                (new Vector3(-166.0f, 0.05f, 13.0f), "Rüzgar"),
-                (new Vector3(-165.5f, 0.05f, -12.0f), "Duman"),
-                (new Vector3(-28.0f, 0.04f, 10.2f), "Çakıl")
+                (new Vector3(  32.0f, 0.04f,   90.2f), "Paşa"),   // Atatürk Caddesi
+                (new Vector3( -16.5f, 0.04f,  -22.8f), "Kral"),   // Spor Kompleksi
+                (new Vector3( -18.0f, 0.04f, -119.5f), "Poyraz"), // Aziziye Cd. İlkokul
+                (new Vector3(-166.0f, 0.05f,   13.0f), "Rüzgar"), // Sultanbeyli Göleti
+                (new Vector3(-165.5f, 0.05f,  -12.0f), "Duman"),  // Sultanbeyli Göleti
+                (new Vector3( -28.0f, 0.04f,   10.2f), "Çakıl"),  // Selman Sokağı
+                (new Vector3( -30.0f, 0.04f,  180.6f), "Badem"),  // Havadis Sokağı
+                (new Vector3(  18.0f, 0.04f, -191.4f), "Tarçın")  // Kadife Sokağı
             };
 
             for (int i = 0; i < dogs.Length; i++)
@@ -768,6 +808,20 @@ namespace OurWorld.World
                             else
                             {
                                 Vector3 dir = delta / d;
+                                // Smart personal-space avoidance around the player so living NPCs politely step around Deniz!
+                                if (distSq > 0.01f && distSq < 1.95f * 1.95f)
+                                {
+                                    Vector3 away = pos - playerPos;
+                                    away.y = 0f;
+                                    float awayMag = away.magnitude;
+                                    if (awayMag > 0.01f)
+                                    {
+                                        float w = Mathf.InverseLerp(1.95f, 0.60f, awayMag) * 1.45f;
+                                        Vector3 steered = dir + (away / awayMag) * w;
+                                        steered.y = 0f;
+                                        if (steered.sqrMagnitude > 0.001f) dir = steered.normalized;
+                                    }
+                                }
                                 pos += dir * (npc.Speed * stepDt);
                                 npc.Root.transform.position = pos;
                                 Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
@@ -1395,6 +1449,34 @@ namespace OurWorld.World
         private void HandleLivingAnimalInteracted(InteractableTrigger trig)
         {
             if (trig == null || string.IsNullOrEmpty(trig.InteractableId)) return;
+
+            // Interactive Smart Conversation for ALL runtime LivingNeighborhoodPopulator NPCs!
+            if (trig.InteractableId.StartsWith("living_npc_", StringComparison.Ordinal))
+            {
+                Vector3 playerPos = PlayerModeController.Instance != null
+                    ? PlayerModeController.Instance.ActiveWorldPosition
+                    : Vector3.zero;
+                for (int i = 0; i < _npcs.Count; i++)
+                {
+                    LivingNpc npc = _npcs[i];
+                    if (!string.Equals(npc.InteractableId, trig.InteractableId, StringComparison.Ordinal)) continue;
+                    npc.PauseTimer = Mathf.Max(npc.PauseTimer, 4.5f);
+                    string roleTr = npc.Role == NpcRole.Jogger ? "Mahalle Koşucusu"
+                        : npc.Role == NpcRole.Spectator ? "Spor İzleyicisi"
+                        : npc.Role == NpcRole.Vendor ? "Mahalle Esnafı"
+                        : npc.Role == NpcRole.SeatedTeaGuest ? "Çay Bahçesi Misafiri"
+                        : "Hamidiye Sakini";
+                    string roleEn = npc.Role == NpcRole.Jogger ? "Neighborhood Jogger"
+                        : npc.Role == NpcRole.Spectator ? "Sports Fan"
+                        : npc.Role == NpcRole.Vendor ? "Street Vendor"
+                        : npc.Role == NpcRole.SeatedTeaGuest ? "Tea Garden Guest"
+                        : "Hamidiye Neighbor";
+                    SmartNpcInteractionPanel.EnsureInstance().OpenForLivingNpc(
+                        npc.Root.transform, npc.Humanoid, npc.DisplayName, roleTr, roleEn, npc.Lines, playerPos);
+                    return;
+                }
+            }
+
             for (int i = 0; i < _animals.Count; i++)
             {
                 LivingAnimal a = _animals[i];

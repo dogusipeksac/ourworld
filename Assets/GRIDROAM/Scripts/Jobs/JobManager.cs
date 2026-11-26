@@ -53,10 +53,9 @@ namespace OurWorld.Jobs
             "Antrasit"
         };
 
-        // Validated Hamidiye Mahallesi district-wide sidewalk pickup points across Selman Sk. & all 8 avenues!
+        // Validated Hamidiye Mahallesi district-wide sidewalk pickup points across all 10 avenues/streets, Lake & Farm!
         private static readonly Vector3[] TaxiPickupSpots =
         {
-            new Vector3(-64.0f, 0.08f,    4.7f), // Selman Sk. No:48 Önü
             new Vector3(  6.0f, 0.08f,    4.7f), // Selman Bakkal No:58
             new Vector3( 82.0f, 0.08f,  -23.5f), // Hz. Osman Camii Avlusu
             new Vector3( -8.0f, 0.08f,  132.2f), // Fatih Bulvarı · Saat Kulesi Meydanı
@@ -67,7 +66,14 @@ namespace OurWorld.Jobs
             new Vector3(-90.2f, 0.08f,   66.0f), // Seyyid Kutup Caddesi
             new Vector3(-18.0f, 0.08f,  -71.8f), // Petrol Yolu Caddesi · Ticaret
             new Vector3(-16.0f, 0.08f, -119.5f), // Aziziye Cd. · İTO İlkokulu
-            new Vector3( 14.0f, 0.08f, -151.2f)  // Zübeyde Hanım Caddesi
+            new Vector3( 14.0f, 0.08f, -151.2f), // Zübeyde Hanım Caddesi
+            new Vector3(-20.0f, 0.08f,  180.8f), // Havadis Sokağı · Taş Fırın
+            new Vector3( 48.0f, 0.08f,  191.2f), // Havadis Sokağı · Doğu
+            new Vector3(-16.0f, 0.08f, -180.8f), // Kadife Sokağı · Kıraathane
+            new Vector3( 44.0f, 0.08f, -191.2f), // Kadife Sokağı · Doğu
+            new Vector3(-164.0f,0.08f,    4.5f), // Sultanbeyli Göleti İskelesi
+            new Vector3( 146.0f,0.08f,    4.2f), // Aydos Yeşil Vadi · Çiftlik Girişi
+            new Vector3(-116.0f,0.08f,  -66.5f)  // Hamidiye Atlas AVM · Giriş Meydanı
         };
 
         private struct TaxiDestination
@@ -77,35 +83,87 @@ namespace OurWorld.Jobs
             public Vector3 WorldPos;
         }
 
-        // Validated drivable Hamidiye Mahallesi district-wide dropoff points across all avenues!
+        // Validated drivable Hamidiye Mahallesi district-wide dropoff points across all 10 avenues/streets, Lake & Farm!
         private static readonly TaxiDestination[] TaxiDestinations =
         {
-            new TaxiDestination { NameKey = "job.taxi.dest.fatih",       FallbackTr = "Fatih Bulvarı · Saat Kulesi",   WorldPos = new Vector3(  0.0f, 0.08f,  135.5f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.ataturk",     FallbackTr = "Atatürk Caddesi",               WorldPos = new Vector3( 30.0f, 0.08f,   96.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.mursit",      FallbackTr = "Mürşit Caddesi",                WorldPos = new Vector3( 10.0f, 0.08f,   46.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.eyyubi",      FallbackTr = "53 Eyyubi Mahalle Büfesi",      WorldPos = new Vector3(-148.0f,0.08f,  -18.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.seyyidkutup", FallbackTr = "Seyyid Kutup Cd. Kavşağı",      WorldPos = new Vector3(-85.0f, 0.08f,    0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.bakkal58",    FallbackTr = "No:58 Selman Bakkal",           WorldPos = new Vector3(  8.0f, 0.08f,    0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.camii",       FallbackTr = "Hz. Osman Camii",               WorldPos = new Vector3( 98.5f, 0.08f,  -31.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.petrolyolu",  FallbackTr = "Petrol Yolu Cd. · Akaryakıt",   WorldPos = new Vector3(-18.0f, 0.08f,  -78.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.aziziye",     FallbackTr = "Aziziye Cd. · İTO İlkokulu",    WorldPos = new Vector3(-16.0f, 0.08f, -114.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.zubeyde",     FallbackTr = "Zübeyde Hanım Caddesi",         WorldPos = new Vector3( 14.0f, 0.08f, -146.0f) }
+            new TaxiDestination { NameKey = "job.taxi.dest.fatih",       FallbackTr = "Fatih Bulvarı · Saat Kulesi",    WorldPos = new Vector3(  0.0f, 0.08f,  135.5f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.ataturk",     FallbackTr = "Atatürk Caddesi",                WorldPos = new Vector3( 30.0f, 0.08f,   96.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.mursit",      FallbackTr = "Mürşit Caddesi",                 WorldPos = new Vector3( 10.0f, 0.08f,   46.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.eyyubi",      FallbackTr = "53 Eyyubi Mahalle Büfesi",       WorldPos = new Vector3(-148.0f,0.08f,  -18.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.seyyidkutup", FallbackTr = "Seyyid Kutup Cd. Kavşağı",       WorldPos = new Vector3(-85.0f, 0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.bakkal58",    FallbackTr = "No:58 Selman Bakkal",            WorldPos = new Vector3(  8.0f, 0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.camii",       FallbackTr = "Hz. Osman Camii",                WorldPos = new Vector3( 98.5f, 0.08f,  -31.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.petrolyolu",  FallbackTr = "Petrol Yolu Cd. · Akaryakıt",    WorldPos = new Vector3(-18.0f, 0.08f,  -78.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.aziziye",     FallbackTr = "Aziziye Cd. · İTO İlkokulu",     WorldPos = new Vector3(-16.0f, 0.08f, -114.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.zubeyde",     FallbackTr = "Zübeyde Hanım Caddesi",          WorldPos = new Vector3( 14.0f, 0.08f, -146.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.havadis",     FallbackTr = "Havadis Sokağı · Taş Fırın",     WorldPos = new Vector3(-16.0f, 0.08f,  186.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.kadife",      FallbackTr = "Kadife Sokağı · Kıraathane",     WorldPos = new Vector3(-12.0f, 0.08f, -186.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.golet",       FallbackTr = "Sultanbeyli Göleti İskelesi",    WorldPos = new Vector3(-160.0f,0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.ciftlik",     FallbackTr = "Aydos Yeşil Vadi · Çiftlik",     WorldPos = new Vector3( 146.0f,0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.avm",         FallbackTr = "Hamidiye Atlas AVM",             WorldPos = new Vector3(-116.0f,0.08f,  -64.0f) }
         };
 
-        // 10 safe sidewalk litter points distributed along Petrol Yolu Cd., Aziziye Cd. & Abdülkadir Udeh!
-        private static readonly Vector3[] LitterSpawnPoints =
+        // 4 rotating district-wide sidewalk cleanup zones (10 items each) so every cleanup shift explores a different part of the map!
+        private static readonly Vector3[][] LitterDistrictZones =
         {
-            new Vector3(-54.0f, 0.08f,  -71.8f),
-            new Vector3(-28.0f, 0.08f,  -71.8f),
-            new Vector3( -6.0f, 0.08f,  -84.2f),
-            new Vector3( 20.0f, 0.08f,  -71.8f),
-            new Vector3( 52.0f, 0.08f,  -84.2f),
-            new Vector3( 93.2f, 0.08f,  -62.0f),
-            new Vector3( 93.2f, 0.08f,  -96.0f),
-            new Vector3( 24.0f, 0.08f, -119.5f),
-            new Vector3(-16.0f, 0.08f, -119.5f),
-            new Vector3(-52.0f, 0.08f, -119.5f)
+            // Zone 0: Petrol Yolu Cd. & Aziziye Cd. (South-Central)
+            new[]
+            {
+                new Vector3(-54.0f, 0.08f,  -71.8f),
+                new Vector3(-28.0f, 0.08f,  -71.8f),
+                new Vector3( -6.0f, 0.08f,  -84.2f),
+                new Vector3( 20.0f, 0.08f,  -71.8f),
+                new Vector3( 52.0f, 0.08f,  -84.2f),
+                new Vector3( 93.2f, 0.08f,  -62.0f),
+                new Vector3( 93.2f, 0.08f,  -96.0f),
+                new Vector3( 24.0f, 0.08f, -119.5f),
+                new Vector3(-16.0f, 0.08f, -119.5f),
+                new Vector3(-52.0f, 0.08f, -119.5f)
+            },
+            // Zone 1: Fatih Bulvarı & Havadis Sokağı (North District)
+            new[]
+            {
+                new Vector3(-42.0f, 0.08f,  132.4f),
+                new Vector3(-12.0f, 0.08f,  132.4f),
+                new Vector3( 22.0f, 0.08f,  132.4f),
+                new Vector3( 54.0f, 0.08f,  132.4f),
+                new Vector3( 46.0f, 0.08f,  180.8f),
+                new Vector3( 14.0f, 0.08f,  180.8f),
+                new Vector3(-18.0f, 0.08f,  180.8f),
+                new Vector3(-52.0f, 0.08f,  180.8f),
+                new Vector3(-34.0f, 0.08f,  191.2f),
+                new Vector3( 28.0f, 0.08f,  191.2f)
+            },
+            // Zone 2: Zübeyde Hanım Cd. & Kadife Sokağı (South District)
+            new[]
+            {
+                new Vector3(-42.0f, 0.08f, -151.2f),
+                new Vector3( -6.0f, 0.08f, -151.2f),
+                new Vector3( 30.0f, 0.08f, -151.2f),
+                new Vector3( 62.0f, 0.08f, -151.2f),
+                new Vector3( 48.0f, 0.08f, -180.8f),
+                new Vector3( 12.0f, 0.08f, -180.8f),
+                new Vector3(-20.0f, 0.08f, -180.8f),
+                new Vector3(-56.0f, 0.08f, -180.8f),
+                new Vector3(-36.0f, 0.08f, -191.2f),
+                new Vector3( 26.0f, 0.08f, -191.2f)
+            },
+            // Zone 3: Hamidiye Parkı, Mürşit Cd. & Atatürk Cd. (Park & North-Central)
+            new[]
+            {
+                new Vector3(-36.0f, 0.08f,   51.2f),
+                new Vector3( -4.0f, 0.08f,   51.2f),
+                new Vector3( 28.0f, 0.08f,   51.2f),
+                new Vector3(-24.0f, 0.08f,   68.5f),
+                new Vector3( -8.0f, 0.08f,   72.0f),
+                new Vector3(-46.0f, 0.08f,   90.2f),
+                new Vector3(-14.0f, 0.08f,   90.2f),
+                new Vector3( 20.0f, 0.08f,   90.2f),
+                new Vector3( 52.0f, 0.08f,   90.2f),
+                new Vector3( 76.0f, 0.08f,   90.2f)
+            }
         };
+        private int _lastLitterZoneIndex = -1;
 
         private JobType _activeJob = JobType.None;
         private string _currentJobHudText = string.Empty;
@@ -475,23 +533,39 @@ namespace OurWorld.Jobs
 
         private void PickNextPizzaHouse(PaintableHouse previous)
         {
+            Vector3 refPos = previous != null
+                ? previous.FrontDoorWorldPosition
+                : (PlayerModeController.Instance != null ? PlayerModeController.Instance.ActiveWorldPosition : Vector3.zero);
+
             PaintableHouse chosen = _allHouses[UnityEngine.Random.Range(0, _allHouses.Length)];
-            if (_allHouses.Length > 1 && chosen == previous)
+            if (_allHouses.Length > 1)
             {
-                for (int attempt = 0; attempt < 6; attempt++)
+                PaintableHouse bestFallback = chosen;
+                float bestDistSq = -1f;
+                for (int attempt = 0; attempt < 18; attempt++)
                 {
                     PaintableHouse candidate = _allHouses[UnityEngine.Random.Range(0, _allHouses.Length)];
-                    if (candidate != previous)
+                    if (candidate == null || candidate == previous) continue;
+                    float dSq = (candidate.FrontDoorWorldPosition - refPos).sqrMagnitude;
+                    if (dSq > bestDistSq)
+                    {
+                        bestDistSq = dSq;
+                        bestFallback = candidate;
+                    }
+                    // Encourage exploring different avenues (>= 65 m away from previous stop/player)
+                    if (dSq >= 4225f)
                     {
                         chosen = candidate;
+                        bestFallback = null;
                         break;
                     }
                 }
+                if (bestFallback != null) chosen = bestFallback;
             }
 
             _pizzaTargetHouse = chosen;
             _hasJobTimer = true;
-            _jobRemainingTime = 90f;
+            _jobRemainingTime = 115f;
             SetJobWaypoint(_pizzaTargetHouse.FrontDoorWorldPosition, 5.5f);
             RefreshJobHudText();
         }
@@ -787,13 +861,22 @@ namespace OurWorld.Jobs
         {
             _activeJob = JobType.StreetCleanup;
             _litterCollected = 0;
-            _litterTotal = LitterSpawnPoints.Length;
-            _hasJobTimer = true;
-            _jobRemainingTime = 180f; // 3 minutes
 
-            for (int i = 0; i < LitterSpawnPoints.Length; i++)
+            int zoneIdx = UnityEngine.Random.Range(0, LitterDistrictZones.Length);
+            if (LitterDistrictZones.Length > 1 && zoneIdx == _lastLitterZoneIndex)
             {
-                Vector3 pos = LitterSpawnPoints[i] + new Vector3(UnityEngine.Random.Range(-0.8f, 0.8f), 0f, UnityEngine.Random.Range(-0.8f, 0.8f));
+                zoneIdx = (zoneIdx + 1) % LitterDistrictZones.Length;
+            }
+            _lastLitterZoneIndex = zoneIdx;
+            Vector3[] activePoints = LitterDistrictZones[zoneIdx];
+
+            _litterTotal = activePoints.Length;
+            _hasJobTimer = true;
+            _jobRemainingTime = 240f; // 4 minutes to travel & clean the rotating district
+
+            for (int i = 0; i < activePoints.Length; i++)
+            {
+                Vector3 pos = activePoints[i] + new Vector3(UnityEngine.Random.Range(-0.8f, 0.8f), 0f, UnityEngine.Random.Range(-0.8f, 0.8f));
                 LitterPickup item = CreateLitterItem(pos, i);
                 _spawnedLitter.Add(item);
             }
@@ -912,7 +995,18 @@ namespace OurWorld.Jobs
 
             _activeJob = JobType.HousePainting;
             _hasJobTimer = false;
-            _targetPaintHouse = _allHouses[UnityEngine.Random.Range(0, _allHouses.Length)];
+            Vector3 playerPos = PlayerModeController.Instance != null ? PlayerModeController.Instance.ActiveWorldPosition : Vector3.zero;
+            PaintableHouse chosenHouse = _allHouses[UnityEngine.Random.Range(0, _allHouses.Length)];
+            for (int attempt = 0; attempt < 16; attempt++)
+            {
+                PaintableHouse cand = _allHouses[UnityEngine.Random.Range(0, _allHouses.Length)];
+                if (cand != null && (cand.FrontDoorWorldPosition - playerPos).sqrMagnitude >= 2500f)
+                {
+                    chosenHouse = cand;
+                    break;
+                }
+            }
+            _targetPaintHouse = chosenHouse;
 
             Color[] swatches = PaintPalettePanel.DefaultSwatchColors;
             int chosenSwatch = UnityEngine.Random.Range(0, swatches.Length);

@@ -448,5 +448,117 @@ namespace OurWorld.Editor.Tests
             }
             Assert.AreEqual(0, leaks.Count, "Single-argument Turkish SetCustomPrompt leaks found:\n" + string.Join("\n", leaks));
         }
+
+        [Test]
+        public void ExpandedGoogleMapsStreets_AndDoorwayClearance_AreValid()
+        {
+            EditorBuildSettingsScene primary = EditorBuildSettings.scenes[0];
+            Scene scene = EditorSceneManager.OpenScene(primary.path, OpenSceneMode.Single);
+            Assert.IsTrue(scene.IsValid() && scene.isLoaded);
+
+            // 1. Verify both new Google Maps streets & smart citizens exist in the rebuilt scene
+            Assert.IsNotNull(GameObject.Find("Street_09_HavadisSokagi"), "Street_09_HavadisSokagi must exist");
+            Assert.IsNotNull(GameObject.Find("Street_10_KadifeSokagi"), "Street_10_KadifeSokagi must exist");
+            Assert.IsNotNull(GameObject.Find("Road_HavadisSk"), "Road_HavadisSk must exist");
+            Assert.IsNotNull(GameObject.Find("Road_KadifeSk"), "Road_KadifeSk must exist");
+            Assert.IsNotNull(GameObject.Find("NPC_GultenTeyze_Havadis12"), "Havadis resident Gülten Teyze must exist");
+            Assert.IsNotNull(GameObject.Find("NPC_IbrahimDede_Kadife24"), "Kadife resident İbrahim Dede must exist");
+
+            // 2. Verify NO wardrobe/cabinet/bathroom/partition collider blocks the front doorway entry zone!
+            (string houseName, float doorX, float zFront)[] enterableHouses =
+            {
+                ("Selman_No48_HeroHouse", -2.65f, 0.80f),
+                ("Selman_No48_Backdrop_YellowApt", 0f, 4.9f),
+                ("Selman_No48_Backdrop_ModernApt", 0f, 5.1f),
+                ("Selman_No52_HalfBrickHouse", -2.8f, 0.80f),
+                ("Selman_No54_CoralHouse", -2.4f, 1.00f),
+                ("Selman_No66_YellowHouse", -0.75f, 0.40f),
+                ("Selman_No81_RoseHouse", 0f, -0.40f),
+                ("Selman_EastCorner_WhiteVilla", 0f, 1.20f),
+                ("Selman_No46S_GreyPinkHouse", -1.6f, 0.80f),
+                ("Selman_No50S_GardenHouse", -2.4f, 1.00f),
+                ("Selman_GursuCorner_PeachHouse", 0f, 1.10f),
+                ("Selman_GursuCorner_EastApt", 0f, 4.9f),
+                ("Selman_CicekciCorner_WestApt", 0f, 5.1f),
+                ("Selman_CicekciCorner_BrickHouse", -2.8f, 0.80f),
+                ("Selman_No66S_CobaltDoor_HafsaTesisat", 0.55f, 0.80f),
+                ("Selman_No81S_PowderBlueApt", 0f, 0.90f),
+                ("Selman_SECorner_ConcreteHouse", -1.6f, 0.80f),
+                ("Havadis_No12_YellowHouse", -0.75f, 0.40f),
+                ("Havadis_No18_HalfBrickHouse", -2.8f, 0.80f),
+                ("Havadis_No24_BlueApt", 0f, 0.90f),
+                ("Kadife_No14_CoralHouse", -2.4f, 1.00f),
+                ("Kadife_No24_RoseHouse", 0f, -0.40f),
+                ("Kadife_No32_YellowApt", 0f, 4.9f)
+            };
+
+            List<string> blockedDoors = new List<string>();
+            for (int i = 0; i < enterableHouses.Length; i++)
+            {
+                var h = enterableHouses[i];
+                GameObject houseGo = GameObject.Find(h.houseName);
+                Assert.IsNotNull(houseGo, $"Enterable house '{h.houseName}' must exist in scene");
+
+                // Entry foyer box in world space: 1.2m wide around doorX, extending 1.6m inward from front wall
+                Vector3 localEntryCenter = new Vector3(h.doorX, 1.0f, h.zFront - 0.95f);
+                Vector3 worldEntryCenter = houseGo.transform.TransformPoint(localEntryCenter);
+                Bounds entryCheck = new Bounds(worldEntryCenter, new Vector3(1.15f, 1.6f, 1.35f));
+
+                BoxCollider[] childCols = houseGo.GetComponentsInChildren<BoxCollider>(includeInactive: false);
+                for (int c = 0; c < childCols.Length; c++)
+                {
+                    BoxCollider bc = childCols[c];
+                    if (bc == null || bc.isTrigger || bc.gameObject == houseGo) continue;
+                    string n = bc.gameObject.name;
+                    if (n.Contains("Lintel") || n.Contains("Kilim") || n.Contains("Floor")) continue;
+                    if (bc.bounds.Intersects(entryCheck))
+                    {
+                        blockedDoors.Add($"{h.houseName} -> blocked by '{n}' (bounds={bc.bounds}, entry={entryCheck})");
+                    }
+                }
+            }
+
+            Assert.AreEqual(0, blockedDoors.Count,
+                "Found furniture/walls blocking house doorways:\n" + string.Join("\n", blockedDoors));
+        }
+
+        [Test]
+        public void FlagshipUiThemeApplier_StylesMainHudAndModals_WithoutErrors()
+        {
+            EditorBuildSettingsScene primary = EditorBuildSettings.scenes[0];
+            Scene scene = EditorSceneManager.OpenScene(primary.path, OpenSceneMode.Single);
+            Assert.IsTrue(scene.IsValid() && scene.isLoaded);
+
+            GameHUDController hud = UnityEngine.Object.FindAnyObjectByType<GameHUDController>();
+            Assert.IsNotNull(hud, "Main scene must contain GameHUDController");
+
+            GameObject tempApplier = new GameObject("TempThemeApplierTest");
+            try
+            {
+                OurWorldHudThemeApplier applier = tempApplier.AddComponent<OurWorldHudThemeApplier>();
+                applier.ApplyFlagshipTheme();
+
+                string[] cardNames = { "MissionBox", "DialoguePanel", "PhonePanel", "ShopCounterPanel", "PaintPalettePanel" };
+                Transform[] all = hud.GetComponentsInChildren<Transform>(includeInactive: true);
+                foreach (string cardName in cardNames)
+                {
+                    Transform found = null;
+                    for (int i = 0; i < all.Length; i++)
+                    {
+                        if (all[i].name == cardName) { found = all[i]; break; }
+                    }
+                    Assert.IsNotNull(found, $"HUD element '{cardName}' must exist");
+                    UnityEngine.UI.Image img = found.GetComponent<UnityEngine.UI.Image>();
+                    Assert.IsNotNull(img);
+                    Assert.AreEqual(OurWorldUiKit.CardSprite, img.sprite, $"'{cardName}' should use OurWorldUiKit.CardSprite");
+                    Assert.IsNotNull(found.Find("HairlineBorder"), $"'{cardName}' should have HairlineBorder");
+                    Assert.IsNotNull(found.Find("TopAccentGlow"), $"'{cardName}' should have TopAccentGlow");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(tempApplier);
+            }
+        }
     }
 }

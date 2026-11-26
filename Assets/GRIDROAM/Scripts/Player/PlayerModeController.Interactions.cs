@@ -321,11 +321,15 @@ namespace OurWorld.Player
             {
                 case InteractableKind.TownCitizen:
                 {
+                    footController?.Humanoid?.PlayWave();
                     TownPedestrian citizen = target.GetComponentInParent<TownPedestrian>();
                     if (citizen != null)
                     {
-                        footController?.Humanoid?.PlayWave();
                         citizen.TalkToPlayer(ActiveWorldPosition);
+                    }
+                    else
+                    {
+                        OnInteracted?.Invoke(target);
                     }
                     return true;
                 }

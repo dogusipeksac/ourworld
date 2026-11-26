@@ -1223,7 +1223,7 @@
     },
     {
       "key": "m06.step1.objective",
-      "value": "Güney kaldırımındaki Ayşe Teyze ile konuş."
+      "value": "Mürşit Caddesi'ndeki Ayşe Teyze ile konuş."
     },
     {
       "key": "m06.step2.objective",
@@ -1327,7 +1327,7 @@
     },
     {
       "key": "m08.step3.objective",
-      "value": "Süre bitmeden doğudaki nöbetçi eczaneye arabayla ulaş."
+      "value": "Süre bitmeden Petrol Yolu Caddesi'ndeki nöbetçi eczaneye arabayla ulaş."
     },
     {
       "key": "m08.step4.objective",
@@ -1375,7 +1375,7 @@
     },
     {
       "key": "m09.step2.objective",
-      "value": "Arabayla batıdaki benzin istasyonuna git."
+      "value": "Arabayla batıdaki 53 Eyyubi Caddesi'ne git."
     },
     {
       "key": "m09.step3.objective",
@@ -1423,15 +1423,15 @@
     },
     {
       "key": "m10.step2.objective",
-      "value": "Çay Ocağı önündeki çay kolisini al."
+      "value": "Kadife Sokağı Kıraathanesi önündeki çay kolisini al."
     },
     {
       "key": "m10.step3.objective",
-      "value": "Bakkalın yanındaki simit tepsisini al."
+      "value": "Havadis Sokağı Taş Fırın önündeki simit tepsisini al."
     },
     {
       "key": "m10.step4.objective",
-      "value": "Şenlik alanına (Gürsu Sk. futbol sahası) git."
+      "value": "Şenlik alanına (Fatih Bulvarı · Saat Kulesi Meydanı) git."
     },
     {
       "key": "m10.step5.objective",
@@ -1567,7 +1567,7 @@
     },
     {
       "key": "m13.step1.objective",
-      "value": "Selman Bakkal No:58 önündeki soğuk ikram kasasını al."
+      "value": "Havadis Sokağı Taş Fırın önündeki soğuk ikram kasasını al."
     },
     {
       "key": "m13.step2.objective",
@@ -1671,7 +1671,7 @@
     },
     {
       "key": "m15.step1.objective",
-      "value": "Selman Sokağı'ndaki Ayşe Teyze ile konuş ve ilk bilmeceyi dinle."
+      "value": "Mürşit Caddesi'ndeki Ayşe Teyze ile konuş ve ilk bilmeceyi dinle."
     },
     {
       "key": "m15.step2.objective",
@@ -1683,7 +1683,7 @@
     },
     {
       "key": "m15.step4.objective",
-      "value": "3. Bilmece: Zübeyde Hanım çamlı mavi evler önündeki 3. plakayı bul."
+      "value": "3. Bilmece: Kadife Sokağı'ndaki 3. pirinç şifre plakasını bul."
     },
     {
       "key": "m15.step5.objective",
@@ -1791,7 +1791,7 @@
     },
     {
       "key": "m17.step2.objective",
-      "value": "Süre bitmeden No:73 Oto Tamir önünden Yüksek Gerilim Sigorta Kutusu'nu al."
+      "value": "Süre bitmeden Havadis Sokağı'ndan Yüksek Gerilim Sigorta Kutusu'nu al."
     },
     {
       "key": "m17.step3.objective",
@@ -1855,7 +1855,7 @@
     },
     {
       "key": "m18.step3.objective",
-      "value": "1. Kapı: Süre bitmeden Fatih Bulvarı Saat Kulesi'nden geç!"
+      "value": "1. Kapı: Süre bitmeden kuzeydeki Havadis Sokağı kapısından geç!"
     },
     {
       "key": "m18.step4.objective",
@@ -1863,7 +1863,7 @@
     },
     {
       "key": "m18.step5.objective",
-      "value": "3. Kapı: Güneye in, Zübeyde Hanım Çamlı Düzlüğünden geç!"
+      "value": "3. Kapı: Güneye in, Kadife Sokağı düzlüğünden geç!"
     },
     {
       "key": "m18.step6.objective",
@@ -1963,7 +1963,7 @@
     },
     {
       "key": "m20.step3.objective",
-      "value": "Selman Bakkal önünden mahalle kutlama pastasını al."
+      "value": "Havadis Sokağı Taş Fırın önünden mahalle kutlama pastasını al."
     },
     {
       "key": "m20.step4.objective",
@@ -2383,7 +2383,7 @@
     },
     {
       "key": "m21.s1.obj",
-      "value": "Meydan simit tezgahında Simitçi Ahmet Amca ile konuş."
+      "value": "Havadis Sokağı'ndaki fırın önünden Simitçi Ahmet Amca ile konuş."
     },
     {
       "key": "m21.s2.obj",
@@ -2555,7 +2555,7 @@
     },
     {
       "key": "m25.s3.obj",
-      "value": "Meydan'da Simitçi Ahmet Amca'dan Şölen Simit Tepsisi'ni al."
+      "value": "Havadis Sokağı'nda Simitçi Ahmet Amca'dan Şölen Simit Tepsisi'ni al."
     },
     {
       "key": "m25.s4.obj",
@@ -2688,6 +2688,54 @@
     {
       "key": "feedback.default_sender",
       "value": "Oyuncu"
+    },
+    {
+      "key": "job.taxi.dest.fatih",
+      "value": "Fatih Bulvarı · Saat Kulesi"
+    },
+    {
+      "key": "job.taxi.dest.ataturk",
+      "value": "Atatürk Caddesi"
+    },
+    {
+      "key": "job.taxi.dest.mursit",
+      "value": "Mürşit Caddesi"
+    },
+    {
+      "key": "job.taxi.dest.eyyubi",
+      "value": "53 Eyyubi Mahalle Büfesi"
+    },
+    {
+      "key": "job.taxi.dest.petrolyolu",
+      "value": "Petrol Yolu Cd. · Akaryakıt"
+    },
+    {
+      "key": "job.taxi.dest.aziziye",
+      "value": "Aziziye Cd. · İTO İlkokulu"
+    },
+    {
+      "key": "job.taxi.dest.zubeyde",
+      "value": "Zübeyde Hanım Caddesi"
+    },
+    {
+      "key": "job.taxi.dest.havadis",
+      "value": "Havadis Sokağı · Taş Fırın"
+    },
+    {
+      "key": "job.taxi.dest.kadife",
+      "value": "Kadife Sokağı · Kıraathane"
+    },
+    {
+      "key": "job.taxi.dest.golet",
+      "value": "Sultanbeyli Göleti İskelesi"
+    },
+    {
+      "key": "job.taxi.dest.ciftlik",
+      "value": "Aydos Yeşil Vadi · Çiftlik"
+    },
+    {
+      "key": "job.taxi.dest.avm",
+      "value": "Hamidiye Atlas AVM"
     }
   ]
 }

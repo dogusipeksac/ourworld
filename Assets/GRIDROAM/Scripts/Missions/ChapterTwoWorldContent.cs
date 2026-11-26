@@ -58,31 +58,31 @@ namespace OurWorld.Missions
             GameObject femaleTpl = FindAnchorObject("npc_harbor_receiver") ?? FindAnchorObject("npc_elena_neighborhood");
             GameObject maleTpl = FindAnchorObject("npc_mechanic") ?? femaleTpl;
 
-            // --- NPCs ---
-            SpawnNpc("npc_ayse_teyze", "NPC_AyseTeyze", femaleTpl, new Vector3(-24.0f, 0.04f, -5.0f), 0f, 0.97f, ShirtAyse);
-            SpawnNpc("npc_efe", "NPC_Efe_Child", maleTpl, new Vector3(36.0f, 0.04f, -5.0f), 0f, 0.74f, ShirtEfe);
-            SpawnNpc("npc_pharmacist", "NPC_EczaciSelin", femaleTpl, new Vector3(70.0f, 0.04f, -5.2f), 0f, 1.0f, ShirtPharmacist);
-            SpawnNpc("npc_muhtar", "NPC_MuhtarRemzi", maleTpl, new Vector3(-44.0f, 0.04f, -12.5f), 90f, 1.02f, ShirtMuhtar);
+            // --- NPCs (distributed across Mürşit Cd., Hamidiye Parkı, Petrol Yolu Cd., and Fatih Bulvarı Saat Kulesi!) ---
+            SpawnNpc("npc_ayse_teyze", "NPC_AyseTeyze", femaleTpl, new Vector3(12.0f, 0.04f, 51.4f), 180f, 0.97f, ShirtAyse);
+            SpawnNpc("npc_efe", "NPC_Efe_Child", maleTpl, new Vector3(-22.0f, 0.04f, 66.5f), 0f, 0.74f, ShirtEfe);
+            SpawnNpc("npc_pharmacist", "NPC_EczaciSelin", femaleTpl, new Vector3(-28.0f, 0.04f, -71.8f), 180f, 1.0f, ShirtPharmacist);
+            SpawnNpc("npc_muhtar", "NPC_MuhtarRemzi", maleTpl, new Vector3(-8.0f, 0.16f, 136.5f), 180f, 1.02f, ShirtMuhtar);
 
             _idleLines.Add(new NpcIdleLine { anchorId = "npc_ayse_teyze", speakerKey = "npc.ayse.name", lineKey = "npc.ayse.idle" });
             _idleLines.Add(new NpcIdleLine { anchorId = "npc_efe", speakerKey = "npc.efe.name", lineKey = "npc.efe.idle" });
             _idleLines.Add(new NpcIdleLine { anchorId = "npc_pharmacist", speakerKey = "npc.pharmacist.name", lineKey = "npc.pharmacist.idle" });
             _idleLines.Add(new NpcIdleLine { anchorId = "npc_muhtar", speakerKey = "npc.muhtar.name", lineKey = "npc.muhtar.idle" });
 
-            // --- Pickups (only visible during their mission) ---
+            // --- Pickups (distributed across Selman Bakkal, Gürsu, Hz. Osman Camii, Eyyubi Cd., Kadife Sk. & Havadis Sk.) ---
             SpawnPickup("m06_grocery_bag", "m06_bakkal_siparisi", new Vector3(13.0f, 0.06f, 5.0f), 0.48f);
             SpawnPickup("m07_cat_collar", "m07_kayip_kedi", new Vector3(-38.5f, 0.06f, -15.0f), 0.25f);
             SpawnCat("m07_lost_cat", "m07_kayip_kedi", new Vector3(88.5f, 0.06f, -27.0f));
-            SpawnPickup("m09_spare_part", "m09_ustanin_parcasi", new Vector3(-78.0f, 0.06f, 5.0f), 0.55f);
-            SpawnPickup("m10_tea_box", "m10_mahalle_senligi", new Vector3(80.0f, 0.06f, 5.0f), 0.5f);
-            SpawnPickup("m10_simit_tray", "m10_mahalle_senligi", new Vector3(-6.0f, 0.06f, 5.0f), 0.5f);
+            SpawnPickup("m09_spare_part", "m09_ustanin_parcasi", new Vector3(-152.0f, 0.06f, -16.0f), 0.55f);
+            SpawnPickup("m10_tea_box", "m10_mahalle_senligi", new Vector3(-14.0f, 0.06f, -180.8f), 0.5f);
+            SpawnPickup("m10_simit_tray", "m10_mahalle_senligi", new Vector3(-18.0f, 0.06f, 180.8f), 0.5f);
 
             // --- Zones ---
             SpawnZone("m07_pitch_zone", new Vector3(-41.0f, 0.1f, -15.0f), 10f);
-            SpawnZone("m08_pharmacy_zone", new Vector3(70.0f, 0.1f, -1.8f), 8f);
-            SpawnZone("m09_fuel_zone", new Vector3(-84.5f, 0.1f, 12.0f), 10f);
+            SpawnZone("m08_pharmacy_zone", new Vector3(-28.0f, 0.1f, -76.5f), 10f);
+            SpawnZone("m09_fuel_zone", new Vector3(-148.0f, 0.1f, -16.0f), 12f);
             SpawnZone("m09_garage_zone", new Vector3(24.5f, 0.1f, 1.5f), 8f);
-            SpawnZone("m10_festival_zone", new Vector3(-41.0f, 0.1f, -15.0f), 10f);
+            SpawnZone("m10_festival_zone", new Vector3(0.0f, 0.16f, 136.5f), 14f);
 
             RefreshVisibility();
             if (PlayerModeController.Instance != null)

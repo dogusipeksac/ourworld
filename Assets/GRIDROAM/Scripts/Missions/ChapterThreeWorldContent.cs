@@ -56,7 +56,7 @@ namespace OurWorld.Missions
             SpawnStoryFolder("m12_sig_eyyubi", "m12_sekiz_cadde_imza", new Vector3(-152.2f, 0.08f, -15.5f), new Color(0.20f, 0.62f, 0.90f));
             SpawnStoryFolder("m12_sig_aziziye", "m12_sekiz_cadde_imza", new Vector3(-12.5f, 0.08f, -119.4f), new Color(0.20f, 0.62f, 0.90f));
             SpawnStoryFolder("m12_sig_petrol", "m12_sekiz_cadde_imza", new Vector3(5.2f, 0.08f, -71.5f), new Color(0.20f, 0.62f, 0.90f));
-            SpawnStoryFolder("m13_summer_crate", "m13_havuz_senligi", new Vector3(7.6f, 0.08f, 5.2f), new Color(0.18f, 0.78f, 0.52f), boxScale: new Vector3(0.62f, 0.42f, 0.48f));
+            SpawnStoryFolder("m13_summer_crate", "m13_havuz_senligi", new Vector3(-22.0f, 0.08f, 180.8f), new Color(0.18f, 0.78f, 0.52f), boxScale: new Vector3(0.62f, 0.42f, 0.48f));
             SpawnStoryFolder("m13_pool_table", "m13_havuz_senligi", new Vector3(16.0f, 1.44f, -33.8f), new Color(0.24f, 0.85f, 0.95f), boxScale: new Vector3(0.68f, 0.46f, 0.52f));
             SpawnStoryFolder("m14_charter_folder", "m14_hamidiye_zaferi", new Vector3(0.0f, 0.24f, 139.4f), new Color(0.98f, 0.80f, 0.20f));
 

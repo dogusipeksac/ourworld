@@ -15,10 +15,11 @@ APP_ID = ENV.fetch("ASC_APP_ID", "6838324963")
 KEY_ID = ENV.fetch("ASC_KEY_ID")
 ISSUER_ID = ENV.fetch("ASC_ISSUER_ID")
 KEY_PATH = ENV.fetch("ASC_KEY_PATH")
-VERSION_STR = ENV.fetch("IOS_MARKETING_VERSION", "1.0.0")
+VERSION_STR = ENV.fetch("IOS_MARKETING_VERSION", "1.0.10")
 BUILD_NUM = ENV["IOS_BUILD_NUMBER"]
 ATTACH_BUILD = ARGV.include?("--attach-build")
 SKIP_SCREENSHOTS = ARGV.include?("--skip-screenshots")
+SUBMIT_REVIEW = ARGV.include?("--submit-review")
 
 PROJECT_ROOT = File.expand_path("..", __dir__)
 SHOTS_ROOT = File.join(PROJECT_ROOT, "release", "store_screenshots")
@@ -62,11 +63,29 @@ def check!(label, code, resp)
   end
 end
 
-# 1. Fetch App Store Version & update versionString + copyright
+# 1. Fetch or CREATE PREPARE_FOR_SUBMISSION App Store Version (e.g. 1.1.0 when 1.0.0 is READY_FOR_SALE)
 code, vers = api_req("GET", "https://api.appstoreconnect.apple.com/v1/apps/#{APP_ID}/appStoreVersions?limit=5")
 abort("Failed to list versions: #{vers}") if code >= 300
-ver = (vers["data"] || []).find { |v| v.dig("attributes", "appStoreState") == "PREPARE_FOR_SUBMISSION" } || (vers["data"] || []).first
-abort("No App Store version found!") unless ver
+ver = (vers["data"] || []).find { |v| %w[PREPARE_FOR_SUBMISSION DEVELOPER_REJECTED REJECTED].include?(v.dig("attributes", "appStoreState")) }
+if ver.nil?
+  puts "No editable App Store version found (latest=#{vers.dig('data', 0, 'attributes', 'versionString')} #{vers.dig('data', 0, 'attributes', 'appStoreState')}). Creating new iOS version #{VERSION_STR}..."
+  code, created = api_req("POST", "https://api.appstoreconnect.apple.com/v1/appStoreVersions", {
+    data: {
+      type: "appStoreVersions",
+      attributes: {
+        platform: "IOS",
+        versionString: VERSION_STR,
+        copyright: "2026 Doğuş İpeksaç",
+        releaseType: "AFTER_APPROVAL"
+      },
+      relationships: {
+        app: { data: { type: "apps", id: APP_ID } }
+      }
+    }
+  })
+  abort("Failed to create App Store version #{VERSION_STR}: #{JSON.pretty_generate(created)}") unless check!("Create AppStoreVersion #{VERSION_STR}", code, created)
+  ver = created["data"]
+end
 ver_id = ver["id"]
 puts "Target Version ID=#{ver_id} current=#{ver.dig('attributes', 'versionString')} state=#{ver.dig('attributes', 'appStoreState')}"
 
@@ -253,23 +272,40 @@ desc_en = <<~TEXT.strip
   • Ad-Free & Offline Playable: Enjoy the entire neighborhood offline with zero ads or paywalls, and share feature ideas via the in-game Suggestions tab!
 TEXT
 
+whats_new_tr = <<~WN.strip
+  • YENİ: 5 Katlı Hamidiye Atlas AVM! Panoramik cam asansör ve yürüyen merdivenlerle gezilebilen 18 gerçek mağaza (5M Atlas Market, StarBean Coffee, Kahve Diyarı, Gratis Beauty, Atlas Waikiki 8 ceket stili, Mavi & Kotonica, TeknoCell, Karaca Home, D&M Kitap), 6 restoranlı Yemek Katı, canlı film izlenebilen CineAtlas Sinema Salonu, 6 makineli JoyPark Arcade ve Ennjoy Çatı Teras Kafe!
+  • YENİ: Harita 2 gerçek sokakla (Havadis Sokağı & Kadife Sokağı) büyüdü, tüm ev girişleri ferahlatıldı.
+  • Zeki ve Etkileşimli NPC'ler: Artık tüm komşularla sohbet edebilir, yol tarifi alıp haritada işaretletebilir, mini iyilikler yapabilir ve birlikte yürüyebilirsin!
+  • Keşif Odaklı Dağıtım & Yenilenen Arayüz: Görevler, yan işler, 7 bisiklet, 5 motosiklet, arabalar ve 15 hatıra tüm haritaya dağıtıldı; HUD, telefon ve tüm paneller yeni gece arduvazı & turkuaz tasarımla yenilendi.
+WN
+
+whats_new_en = <<~WN.strip
+  • NEW: 5-Level Hamidiye Atlas Mall! Explore 18 walk-in glass-fronted stores via panoramic elevator & escalators — 5M Market, StarBean Coffee, Kahve Diyarı, Atlas Waikiki (8 jacket styles), Mavi & Kotonica, TeknoCell, Karaca Home, D&M Books, a 6-restaurant Food Court, live CineAtlas Movie Theater, 6-cabinet JoyPark Arcade & Ennjoy Rooftop Cafe!
+  • NEW: Map expanded with 2 real streets (Havadis St. & Kadife St.) and cleared enterable home foyers.
+  • Smart Interactive NPCs: Chat with every neighbor, ask for pinned map directions, complete mini favors, or invite them to stroll with you!
+  • Map-Wide Exploration & Flagship UI: Missions, side jobs, 7 bicycles, 5 motorcycles, cars & 15 golden memories now span the full map with a unified night-slate & turquoise HUD.
+WN
+
 version_locs = {
   "tr" => {
-    promotionalText: "32 hikâye görevi, 10 Türkçe & 6 İngilizce seslendirme, Aydos Çiftliği, No:73 Oto Tamir, Gölet Balıkçılığı, 5 canlı spor ve Aydos Atış Poligonu tek açık dünyada!",
+    whatsNew: whats_new_tr,
+    promotionalText: "YENİ 5 katlı Hamidiye Atlas AVM (18 mağaza, sinema, yemek katı), Havadis & Kadife Sokakları, zeki NPC'ler, 32 hikâye görevi ve 5 spor tek açık dünyada!",
     description: desc_tr,
     keywords: "sürüş,tamir,balık,tenis,futbol,basketbol,voleybol,yüzme,simülasyon,şehir,mahalle,çevrimdışı,offline",
     supportUrl: "https://dogusipeksac.com",
     marketingUrl: "https://dogusipeksac.com"
   },
   "en-US" => {
-    promotionalText: "32 story missions, EN & TR voices, Aydos Farm, No:73 Auto Garage, Lake Fishing, 5 live sports & Aydos Shooting Range — all ad-free & offline in one living 3D world!",
+    whatsNew: whats_new_en,
+    promotionalText: "NEW 5-level Atlas Mall (18 stores, cinema, food court), 2 new streets, smart NPCs, 32 missions, Aydos Farm, Garage & 5 live sports — ad-free & offline!",
     description: desc_en,
     keywords: "sandbox,garage,car,fishing,tennis,football,basketball,volleyball,swimming,shooting,town,city,offline",
     supportUrl: "https://dogusipeksac.com",
     marketingUrl: "https://dogusipeksac.com"
   },
   "en-GB" => {
-    promotionalText: "32 story missions, EN & TR voices, Aydos Farm, No:73 Auto Garage, Lake Fishing, 5 live sports & Aydos Shooting Range — all ad-free & offline in one living 3D world!",
+    whatsNew: whats_new_en,
+    promotionalText: "NEW 5-level Atlas Mall (18 stores, cinema, food court), 2 new streets, smart NPCs, 32 missions, Aydos Farm, Garage & 5 live sports — ad-free & offline!",
     description: desc_en,
     keywords: "istanbul,motor,bisiklet,taksi,pizza,soccer,diving,range,target,crops,market,decor,story,rpg,quest",
     supportUrl: "https://dogusipeksac.com",
@@ -488,8 +524,8 @@ if ATTACH_BUILD
     bbl_map = {}
     (bbl["data"] || []).each { |l| bbl_map[l.dig("attributes", "locale")] = l["id"] }
     what_to_test = {
-      "tr" => "Build #{BUILD_NUM || '8'}: Yenilenen Yenilikler/Çiftlik/Oto Tamir/Ev Dekorasyonu ekranları, 224 İngilizce + 306 Türkçe seslendirme, tüm spor ve poligonlarda tam TR/EN dil desteği ve performans/boyut optimizasyonları.",
-      "en-US" => "Build #{BUILD_NUM || '8'}: Redesigned What's New, Farm, Auto Garage & Home Decor UI, full English (6 voices) + Turkish (10 voices) audio, 100% bilingual sports & shooting range, and mobile performance optimizations."
+      "tr" => "v#{VERSION_STR} Build #{BUILD_NUM || '10'}: 5 katlı Hamidiye Atlas AVM (18 mağaza, CineAtlas sinema, JoyPark arcade, 6 restoranlı yemek katı, panoramik asansör), Havadis & Kadife Sokakları, zeki NPC'ler, harita geneli görev/araç dağıtımı ve yenilenen arayüz.",
+      "en-US" => "v#{VERSION_STR} Build #{BUILD_NUM || '10'}: 5-level Hamidiye Atlas Mall (18 walk-in stores, CineAtlas cinema, JoyPark arcade, 6-restaurant food court, glass elevator), Havadis & Kadife Streets, smart NPCs, map-wide distribution & flagship UI."
     }
     what_to_test.each do |loc, text|
       if bbl_map[loc]
@@ -506,6 +542,35 @@ if ATTACH_BUILD
           }
         })
         check!("Create BetaBuildLocalization (#{loc})", c2, r2)
+      end
+    end
+
+    if SUBMIT_REVIEW
+      puts "Submitting version #{VERSION_STR} (id=#{ver_id}) to App Store Review (Production)..."
+      c_sub, r_sub = api_req("POST", "https://api.appstoreconnect.apple.com/v1/reviewSubmissions", {
+        data: {
+          type: "reviewSubmissions",
+          attributes: { platform: "IOS" },
+          relationships: { app: { data: { type: "apps", id: APP_ID } } }
+        }
+      })
+      if check!("Create ReviewSubmission", c_sub, r_sub)
+        sub_id = r_sub.dig("data", "id")
+        c_item, r_item = api_req("POST", "https://api.appstoreconnect.apple.com/v1/reviewSubmissionItems", {
+          data: {
+            type: "reviewSubmissionItems",
+            relationships: {
+              reviewSubmission: { data: { type: "reviewSubmissions", id: sub_id } },
+              appStoreVersion: { data: { type: "appStoreVersions", id: ver_id } }
+            }
+          }
+        })
+        if check!("Add AppStoreVersion to ReviewSubmission", c_item, r_item)
+          c_fin, r_fin = api_req("PATCH", "https://api.appstoreconnect.apple.com/v1/reviewSubmissions/#{sub_id}", {
+            data: { type: "reviewSubmissions", id: sub_id, attributes: { submitted: true } }
+          })
+          check!("Submit ReviewSubmission #{sub_id} to Apple App Review!", c_fin, r_fin)
+        end
       end
     end
   else

@@ -5,16 +5,48 @@ namespace OurWorld.World
 {
     public sealed partial class NeighborhoodSports
     {
-        private void BuildMotorcycle(Shader shader, Material rubber, Material cream, Material steel)
+        private void BuildMotorcycles(Shader shader, Material rubber, Material cream, Material steel)
         {
-            Material paint = MaterialFor(shader, "Terracotta motorcycle enamel", new Color(0.61f, 0.14f, 0.075f), 0.7f);
             Material leather = MaterialFor(shader, "Stitched black motorcycle saddle", new Color(0.065f, 0.043f, 0.037f), 0.27f);
             Material glass = MaterialFor(shader, "Warm headlamp lens", new Color(1f, 0.77f, 0.33f), 0.63f);
             glass.EnableKeyword("_EMISSION");
             glass.SetColor("_EmissionColor", new Color(0.30f, 0.16f, 0.05f));
+            AudioClip sharedEngineLoop = CreateMotorcycleEngineLoop();
 
-            Transform motor = Child(transform, "Selman_Motosiklet", new Vector3(-62.8f, 0.12f, -4.3f));
-            motor.localRotation = Quaternion.Euler(0f, 90f, 0f);
+            // 5 distinct motorcycles spread across Petrol Yolu, Fatih Blvd, Havadis St., Kadife St., and Eyyubi Ave
+            // (none clustered on No:48's doorstep, rewarding exploration across the full district!)
+            (string objName, string triggerId, Vector3 pos, float yaw, Color paintColor)[] bikes =
+            {
+                ("PetrolYolu_Motosiklet", "selman_motorcycle",  new Vector3(-24.0f, 0.12f,  -72.2f),  90f, new Color(0.61f, 0.14f, 0.075f)),
+                ("Fatih_Motosiklet",      "fatih_motorcycle",   new Vector3( 46.0f, 0.12f,  132.4f), 270f, new Color(0.10f, 0.48f, 0.56f)),
+                ("Havadis_Motosiklet",    "havadis_motorcycle", new Vector3( 52.0f, 0.12f,  180.6f), 270f, new Color(0.14f, 0.24f, 0.54f)),
+                ("Kadife_Motosiklet",     "kadife_motorcycle",  new Vector3(-42.0f, 0.12f, -180.6f),  90f, new Color(0.78f, 0.50f, 0.12f)),
+                ("Eyyubi_Motosiklet",     "eyyubi_motorcycle",  new Vector3(-152.5f,0.12f,  -14.5f),   0f, new Color(0.16f, 0.42f, 0.26f))
+            };
+
+            for (int i = 0; i < bikes.Length; i++)
+            {
+                var m = bikes[i];
+                Material paint = MaterialFor(shader, m.objName + " Enamel", m.paintColor, 0.7f);
+                BuildMotorcycleAt(m.objName, m.triggerId, m.pos, m.yaw, paint, leather, glass, rubber, cream, steel, sharedEngineLoop);
+            }
+        }
+
+        private void BuildMotorcycleAt(
+            string objName,
+            string triggerId,
+            Vector3 worldPos,
+            float yaw,
+            Material paint,
+            Material leather,
+            Material glass,
+            Material rubber,
+            Material cream,
+            Material steel,
+            AudioClip engineLoop)
+        {
+            Transform motor = Child(transform, objName, worldPos);
+            motor.localRotation = Quaternion.Euler(0f, yaw, 0f);
             if (Physics.Raycast(motor.position + Vector3.up, Vector3.down, out RaycastHit surface, 1.8f,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 motor.position = surface.point + Vector3.up * 0.018f;
@@ -77,7 +109,7 @@ namespace OurWorld.World
             MeshParts.AddRenderers(rearWheel, wheelMeshes, "Motorcycle tire");
 
             AudioSource engine = motor.gameObject.AddComponent<AudioSource>();
-            engine.clip = CreateMotorcycleEngineLoop();
+            engine.clip = engineLoop;
             engine.loop = true;
             engine.playOnAwake = false;
             engine.spatialBlend = 0.8f;
@@ -86,7 +118,7 @@ namespace OurWorld.World
             engine.volume = 0.14f;
             motor.gameObject.AddComponent<BicycleController>().ConfigureMotorcycle(visual, fork, frontWheel, rearWheel, engine);
             motor.gameObject.AddComponent<InteractableTrigger>()
-                .Configure(InteractableKind.Motorcycle, "selman_motorcycle", "ui.btn.ride_motorcycle", 2.7f);
+                .Configure(InteractableKind.Motorcycle, triggerId, "ui.btn.ride_motorcycle", 2.7f);
         }
 
         private AudioClip CreateMotorcycleEngineLoop()

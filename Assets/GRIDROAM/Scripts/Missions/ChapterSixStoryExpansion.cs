@@ -31,7 +31,7 @@ namespace OurWorld.Missions
         private readonly List<Material> _ownedMats = new List<Material>(8);
         private Transform _captainTarik;
         private Vector3 _captainPierPos = new Vector3(-178.2f, 0.44f, 0.0f);
-        private Vector3 _captainFestivalPos = new Vector3(16.4f, 0.04f, 16.8f);
+        private Vector3 _captainFestivalPos = new Vector3(-16.0f, 0.04f, 69.5f);
         private bool _subscribed;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -282,8 +282,8 @@ namespace OurWorld.Missions
             ProceduralHumanoid template = PlayerModeController.Instance?.FootController?.Humanoid;
             if (template == null) return;
 
-            SpawnStoryNpc("npc_simitci_ahmet", "NPC_SimitciAhmet", "Simitçi Ahmet Amca ile Konuş", template, new Vector3(5.6f, 0.04f, 14.2f), 140f, new Color(0.84f, 0.20f, 0.18f));
-            SpawnStoryNpc("npc_cayci_riza", "NPC_CayciRiza", "Çaycı Rıza Usta ile Konuş", template, new Vector3(13.2f, 0.04f, 14.8f), 170f, new Color(0.14f, 0.56f, 0.62f));
+            SpawnStoryNpc("npc_simitci_ahmet", "NPC_SimitciAhmet", "Simitçi Ahmet Amca ile Konuş", template, new Vector3(-14.0f, 0.04f, 180.8f), 180f, new Color(0.84f, 0.20f, 0.18f));
+            SpawnStoryNpc("npc_cayci_riza", "NPC_CayciRiza", "Çaycı Rıza Usta ile Konuş", template, new Vector3(-20.0f, 0.04f, 68.5f), 170f, new Color(0.14f, 0.56f, 0.62f));
             _captainTarik = SpawnStoryNpc("npc_kaptan_tarik", "NPC_KaptanTarik", "Kaptan Tarık ile Konuş", template, _captainPierPos, 90f, new Color(0.16f, 0.28f, 0.52f));
             SpawnStoryNpc("npc_havuz_selin", "NPC_HakemSelin", "Yüzme Hakemi Selin ile Konuş", template, new Vector3(11.4f, 1.44f, -34.0f), 160f, new Color(0.12f, 0.66f, 0.72f));
             SpawnStoryNpc("npc_farmer_irfan", "NPC_CiftciIrfan", "Çiftçi İrfan Amca ile Konuş", template, new Vector3(160.2f, 0.04f, -10.2f), -45f, new Color(0.46f, 0.54f, 0.22f));
@@ -297,7 +297,7 @@ namespace OurWorld.Missions
                 new Color(1.0f, 0.86f, 0.28f), new Vector3(0.56f, 0.36f, 0.42f), "Batık Gümüş Cep Saati Sandığını Çıkar");
             SpawnStoryPickup("m25_goat_cheese_crate", "m25_aydos_solen_sofrasi", new Vector3(163.5f, 0.06f, -11.5f),
                 new Color(0.96f, 0.90f, 0.66f), new Vector3(0.58f, 0.38f, 0.46f), "Taze Köy Peyniri Sepetini Al");
-            SpawnStoryPickup("m25_festival_simit_tray", "m25_aydos_solen_sofrasi", new Vector3(6.8f, 0.06f, 12.6f),
+            SpawnStoryPickup("m25_festival_simit_tray", "m25_aydos_solen_sofrasi", new Vector3(-16.0f, 0.06f, 181.2f),
                 new Color(0.94f, 0.64f, 0.22f), new Vector3(0.62f, 0.24f, 0.46f), "Şölen Simit Tepsisini Al");
         }
 

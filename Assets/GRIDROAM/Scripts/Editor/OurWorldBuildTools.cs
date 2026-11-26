@@ -346,6 +346,39 @@ namespace OurWorld.Editor
             ExecuteBuild(options, "iOS Xcode Project");
         }
 
+        public static void ExportIosXcodeProjectBatchmode()
+        {
+            OurWorldPrototypeSetup.ConfigureCrossPlatformMobileSettings();
+            string[] scenes = GetEnabledScenes();
+            if (scenes.Length == 0)
+            {
+                Debug.LogError("[OurWorld Build] No enabled scenes found for iOS Xcode export.");
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            Directory.CreateDirectory(IosBuildDir);
+            BuildPlayerOptions options = new BuildPlayerOptions
+            {
+                scenes = scenes,
+                locationPathName = IosBuildDir,
+                target = BuildTarget.iOS,
+                options = BuildOptions.None
+            };
+
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            BuildSummary summary = report.summary;
+            if (summary.result == BuildResult.Succeeded)
+            {
+                Debug.Log($"[OurWorld Build] iOS Xcode Project succeeded: {summary.outputPath} ({summary.totalSize / (1024f * 1024f):0.0} MB)");
+            }
+            else
+            {
+                Debug.LogError($"[OurWorld Build] iOS Xcode Project finished with result: {summary.result} (errors={summary.totalErrors})");
+                EditorApplication.Exit(1);
+            }
+        }
+
         private static string[] GetEnabledScenes()
         {
             List<string> enabled = new List<string>();

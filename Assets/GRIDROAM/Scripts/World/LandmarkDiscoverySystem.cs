@@ -32,7 +32,12 @@ namespace OurWorld.World
             new LandmarkDef { Id = "lm_eyyubi",      NameTr = "53 Eyyubi Mahalle Büfesi",          NameEn = "53 Eyyubi Neighborhood Market",     Center = new Vector3(-152f, 0f,  -18f), Radius = 18f },
             new LandmarkDef { Id = "lm_petrolyolu",  NameTr = "Petrol Yolu · Ticaret Şeridi",      NameEn = "Petrol Yolu Commercial Strip",      Center = new Vector3( -14f, 0f,  -78f), Radius = 22f },
             new LandmarkDef { Id = "lm_aziziye",     NameTr = "İTO Şehit Er Dursun Sıvaz İlkokulu",NameEn = "Aziziye Primary School",            Center = new Vector3( -16f, 0f, -118f), Radius = 18f },
-            new LandmarkDef { Id = "lm_zubeyde",     NameTr = "Zübeyde Hanım · Çamlı Mavi Evler",  NameEn = "Zübeyde Hanım Pine Houses",         Center = new Vector3(  14f, 0f, -148f), Radius = 20f }
+            new LandmarkDef { Id = "lm_zubeyde",     NameTr = "Zübeyde Hanım · Çamlı Mavi Evler",  NameEn = "Zübeyde Hanım Pine Houses",         Center = new Vector3(  14f, 0f, -148f), Radius = 20f },
+            new LandmarkDef { Id = "lm_havadis",     NameTr = "Havadis Sokağı · Taş Fırın & Çarşı",NameEn = "Havadis Street · Stone Bakery",     Center = new Vector3(  -6f, 0f,  186f), Radius = 24f },
+            new LandmarkDef { Id = "lm_kadife",      NameTr = "Kadife Sokağı · Kıraathane",        NameEn = "Kadife Street · Tea House",         Center = new Vector3(  -6f, 0f, -186f), Radius = 24f },
+            new LandmarkDef { Id = "lm_ciftlik",     NameTr = "Aydos Yeşil Vadi · Çiftlik",        NameEn = "Aydos Green Valley · Farm",         Center = new Vector3( 164f, 0f,    0f), Radius = 26f },
+            new LandmarkDef { Id = "lm_golet",       NameTr = "Sultanbeyli Göleti & Çam Korusu",   NameEn = "Sultanbeyli Lake & Pine Grove",     Center = new Vector3(-172f, 0f,    0f), Radius = 26f },
+            new LandmarkDef { Id = "lm_avm",         NameTr = "Hamidiye Atlas AVM · 5 Katlı",      NameEn = "Hamidiye Atlas Mall · 5 Levels",    Center = new Vector3(-116f, 0f,  -40f), Radius = 28f }
         };
 
         public static int TotalCount => Landmarks.Length;

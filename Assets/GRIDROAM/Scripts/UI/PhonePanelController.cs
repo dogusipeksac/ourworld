@@ -24,9 +24,9 @@ namespace OurWorld.UI
     {
         public static PhonePanelController Instance { get; private set; }
 
-        public const float ViewWorldMinX = -198f;
-        public const float ViewWorldMinZ = -188f;
-        public const float ViewWorldSpan = 380f;
+        public const float ViewWorldMinX = -230f;
+        public const float ViewWorldMinZ = -223f;
+        public const float ViewWorldSpan = 450f;
 
         [Header("Root & Tabs")]
         [SerializeField] private GameObject panelRoot;
@@ -78,8 +78,8 @@ namespace OurWorld.UI
         private Button _tabFeedbackButton;
         private Text _tabFeedbackLabel;
 
-        private static readonly Color ActiveTabColor = new Color(0.31f, 0.70f, 0.66f, 0.90f);
-        private static readonly Color InactiveTabColor = new Color(0.11f, 0.14f, 0.19f, 0.75f);
+        private static readonly Color ActiveTabColor = OurWorldUiKit.AccentTeal;
+        private static readonly Color InactiveTabColor = OurWorldUiKit.SurfaceBg;
         private static readonly Vector3 DefaultGasStationWorldPos = new Vector3(-84.5f, 0.04f, 12.0f);
         private Vector3 _resolvedGasStationPos = DefaultGasStationWorldPos;
 
@@ -373,6 +373,17 @@ namespace OurWorld.UI
             {
                 img.color = selected ? ActiveTabColor : InactiveTabColor;
             }
+            Text lbl = btn.GetComponentInChildren<Text>(true);
+            if (lbl != null)
+            {
+                lbl.color = selected ? OurWorldUiKit.InkDark : OurWorldUiKit.TextSecondary;
+            }
+            Transform borderTf = btn.transform.Find("HairlineBorder");
+            if (borderTf != null)
+            {
+                Image borderImg = borderTf.GetComponent<Image>();
+                if (borderImg != null) borderImg.color = selected ? Color.clear : OurWorldUiKit.BorderSubtle;
+            }
             UiButtonFeedback fb = btn.GetComponent<UiButtonFeedback>();
             if (fb != null)
             {
@@ -523,8 +534,23 @@ namespace OurWorld.UI
                 _cachedVehicles = FindObjectsByType<SedanVehicleController>(FindObjectsInactive.Include);
             }
 
-            if (mapCarMarkers != null)
+            if (mapCarMarkers != null && mapCarMarkers.Length > 0)
             {
+                // Dynamically expand marker pool so every drivable car across the entire expanded map is visible!
+                if (_cachedVehicles != null && _cachedVehicles.Length > mapCarMarkers.Length && mapCarMarkers[0] != null)
+                {
+                    RectTransform template = mapCarMarkers[0];
+                    RectTransform[] expanded = new RectTransform[_cachedVehicles.Length];
+                    for (int i = 0; i < mapCarMarkers.Length; i++) expanded[i] = mapCarMarkers[i];
+                    for (int i = mapCarMarkers.Length; i < expanded.Length; i++)
+                    {
+                        RectTransform clone = Instantiate(template, template.parent);
+                        clone.name = $"MapCarMarker_{i + 1:00}";
+                        expanded[i] = clone;
+                    }
+                    mapCarMarkers = expanded;
+                }
+
                 for (int i = 0; i < mapCarMarkers.Length; i++)
                 {
                     RectTransform marker = mapCarMarkers[i];
@@ -668,11 +694,14 @@ namespace OurWorld.UI
             string[] labels = isEn
                 ? new[] { "Balance", "Reputation", "Story Progress", "Explore & Memories", "Pizza & Taxi", "Paint & Cleanup", "Play Time" }
                 : new[] { "Bakiye", "Mahalle Saygınlığı", "Hikâye İlerlemesi", "Keşif & Hatıralar", "Pizza & Taksi", "Boyama & Temizlik", "Oynama Süresi" };
+            int totalMissions = MissionManager.Instance != null && MissionManager.Instance.Catalog != null && MissionManager.Instance.Catalog.missions != null
+                ? MissionManager.Instance.Catalog.missions.Count
+                : 26;
             string[] values =
             {
                 $"₺ {money}",
                 $"{rankTitle} ({repXp} XP)",
-                $"{missionsDone}/14",
+                $"{missionsDone}/{totalMissions}",
                 $"{landmarks}/{LandmarkDiscoverySystem.TotalCount}  ·  {memories}/{NeighborhoodCollectibleManager.TotalCount}",
                 $"{pizzas}  ·  {taxis}",
                 $"{painted}  ·  {litter}",

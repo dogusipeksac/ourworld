@@ -252,6 +252,42 @@ namespace OurWorld.UI
                 SpawnYaw = -90f,
                 PreviewCamPos = new Vector3(-156.0f, 6.6f, -18.0f),
                 PreviewLookAt = new Vector3(-196.0f, 1.0f, 0.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_havadis",
+                NameTr = "Havadis Sokağı (Yeni)",
+                NameEn = "Havadis Street (New)",
+                TagTr = "Taş Fırın · Berber · Gezilebilir Evler",
+                TagEn = "Stone Bakery · Barber · Enterable Homes",
+                SpawnPos = new Vector3(-12.0f, 0.12f, 186.0f),
+                SpawnYaw = 0f,
+                PreviewCamPos = new Vector3(-34.0f, 4.6f, 183.0f),
+                PreviewLookAt = new Vector3(-14.0f, 2.4f, 193.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_kadife",
+                NameTr = "Kadife Sokağı (Yeni)",
+                NameEn = "Kadife Street (New)",
+                TagTr = "Kıraathane · Çiçekçi · Gezilebilir Evler",
+                TagEn = "Tea House · Florist · Enterable Homes",
+                SpawnPos = new Vector3(-4.0f, 0.12f, -186.0f),
+                SpawnYaw = 180f,
+                PreviewCamPos = new Vector3(-28.0f, 4.6f, -183.0f),
+                PreviewLookAt = new Vector3(4.0f, 2.4f, -193.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_avm",
+                NameTr = "Hamidiye Atlas AVM (5 Kat)",
+                NameEn = "Hamidiye Atlas Mall (5 Levels)",
+                TagTr = "Asansör · Moda · Yemek · Sinema · Teras",
+                TagEn = "Elevator · Fashion · Food · Cinema · Roof",
+                SpawnPos = new Vector3(-116.0f, 0.12f, -58.0f),
+                SpawnYaw = 0f,
+                PreviewCamPos = new Vector3(-134.0f, 11.5f, -72.0f),
+                PreviewLookAt = new Vector3(-116.0f, 9.5f, -38.0f)
             }
         };
 
