@@ -178,5 +178,11 @@ namespace OurWorld.Core
         // Player Backpack / Portable Groceries & Fruit Bag Inventory
         public bool hasStarterBackpackItems;
         public List<BackpackItemSaveEntry> backpackItems = new List<BackpackItemSaveEntry>();
+
+        // GTA 6 Open-World Sandbox Records (Stunt Jumps, Speed Traps, Pursuits & Street Crimes)
+        public List<string> completedStuntJumpIds = new List<string>();
+        public float bestSpeedTrapKmh;
+        public int pursuitsEscapedCount;
+        public int streetCrimesStoppedCount;
     }
 }

@@ -87,6 +87,7 @@ namespace OurWorld.UI
         private Text _callCarLabel;
         private Text _statsDailyBtnLabel;
         private Text _statsStyleBtnLabel;
+        private Text _statsCh78BtnLabel;
 
         private static readonly Color ActiveTabColor = OurWorldUiKit.AccentTeal;
         private static readonly Color InactiveTabColor = OurWorldUiKit.SurfaceBg;
@@ -710,13 +711,58 @@ namespace OurWorld.UI
                 });
 
             OurWorldUiKit.CreatePillButton("Btn_OpenStyleStudio", bar.transform,
-                "Stil & Aksesuarlar (Gözlük/Şapka)", 17, OurWorldUiKit.SurfaceActive, OurWorldUiKit.TextPrimary, OurWorldUiKit.AccentTeal,
+                "Stil & Aksesuarlar (Gözlük/Şapka)", 16, OurWorldUiKit.SurfaceActive, OurWorldUiKit.TextPrimary, OurWorldUiKit.AccentTeal,
                 out _statsStyleBtnLabel, () =>
                 {
                     GameFeelAudio.PlayUiClick();
                     Close();
                     BarberAndStylePanel.Instance?.Show();
                 });
+
+            OurWorldUiKit.CreatePillButton("Btn_LaunchCh78Story", bar.transform,
+                "🔥 Bölüm 7: Aydos'un Gölgesi", 16, new Color(0.68f, 0.14f, 0.18f, 0.96f), OurWorldUiKit.TextPrimary, OurWorldUiKit.AccentGold,
+                out _statsCh78BtnLabel, HandleLaunchChapterSevenEight);
+        }
+
+        private void HandleLaunchChapterSevenEight()
+        {
+            MissionManager mm = MissionManager.Instance;
+            if (mm == null) return;
+
+            string[] ch78Ids =
+            {
+                "m27_karanlik_teklif",
+                "m28_bosna_baskini",
+                "m29_geceyarisi_m5",
+                "m30_mimarsinan_sifresi",
+                "m31_aydos_kusatmasi",
+                "m32_sultanbeyli_efsanesi"
+            };
+
+            string targetId = ch78Ids[0];
+            SaveData save = SaveManager.Instance != null ? SaveManager.Instance.Data : null;
+            if (save != null && save.completedMissionIds != null)
+            {
+                for (int i = 0; i < ch78Ids.Length; i++)
+                {
+                    if (!save.completedMissionIds.Contains(ch78Ids[i]))
+                    {
+                        targetId = ch78Ids[i];
+                        break;
+                    }
+                }
+            }
+
+            if (mm.JumpToMissionById(targetId))
+            {
+                GameFeelAudio.PlayMilestoneFanfare();
+                Close();
+                bool isEn = LocalizationService.IsEnglish;
+                string title = mm.ActiveMission != null ? LocalizationService.Tr(mm.ActiveMission.titleKey) : "Aydos'un Gölgesi";
+                PlayerModeController.Instance?.RaiseStatusMessage(isEn
+                    ? $"🔥 Story Campaign Started: {title}! Follow the objective beacon!"
+                    : $"🔥 Yeni Hikâye Başlatıldı: {title}! Haritadaki hedef ışığını takip et!");
+            }
         }
 
         private void HandleFastTravelToWaypoint()
@@ -725,6 +771,15 @@ namespace OurWorld.UI
             PlayerModeController mode = PlayerModeController.Instance;
             bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             if (mode == null || mode.FootController == null) return;
+
+            if (PoliceWantedSystem.Instance != null && PoliceWantedSystem.Instance.IsWanted)
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn
+                    ? "🚨 No taxi will pick you up while Police are chasing you! Shake the chase or respray at Garage!"
+                    : "🚨 Polis peşindeyken taksi durmaz! Önce izini kaybettir veya garajda arabanı boyat!");
+                return;
+            }
 
             if (PlayerShoppingCart.HasActiveItems)
             {
@@ -1067,13 +1122,16 @@ namespace OurWorld.UI
                 : new[] { "Bakiye", "Mahalle Saygınlığı", "Hikâye İlerlemesi", "Keşif & Hatıralar", "Pizza & Taksi", "Boyama & Temizlik", "Oynama Süresi" };
             int totalMissions = MissionManager.Instance != null && MissionManager.Instance.Catalog != null && MissionManager.Instance.Catalog.missions != null
                 ? MissionManager.Instance.Catalog.missions.Count
-                : 26;
+                : 32;
+            int stunts = GtaSandboxActivities.Instance != null
+                ? GtaSandboxActivities.Instance.CompletedStuntCount
+                : (d != null && d.completedStuntJumpIds != null ? d.completedStuntJumpIds.Count : 0);
             string[] values =
             {
                 $"₺ {money}",
                 $"{rankTitle} ({repXp} XP)",
                 $"{missionsDone}/{totalMissions}",
-                $"{landmarks}/{LandmarkDiscoverySystem.TotalCount}  ·  {memories}/{NeighborhoodCollectibleManager.TotalCount}",
+                $"{landmarks}/{LandmarkDiscoverySystem.TotalCount}  ·  {memories}/{NeighborhoodCollectibleManager.TotalCount}  ·  🏆{stunts}/10",
                 $"{pizzas}  ·  {taxis}",
                 $"{painted}  ·  {litter}",
                 timeFormatted
@@ -1099,7 +1157,11 @@ namespace OurWorld.UI
             }
             if (_statsStyleBtnLabel != null)
             {
-                _statsStyleBtnLabel.text = isEn ? "Style & 3D Accessories" : "Stil & Aksesuarlar (Gözlük/Şapka)";
+                _statsStyleBtnLabel.text = isEn ? "Style & Accessories" : "Stil & Aksesuarlar";
+            }
+            if (_statsCh78BtnLabel != null)
+            {
+                _statsCh78BtnLabel.text = isEn ? "🔥 Ch.7-8: Aydos Shadow" : "🔥 Bölüm 7-8: Aydos'un Gölgesi";
             }
         }
 

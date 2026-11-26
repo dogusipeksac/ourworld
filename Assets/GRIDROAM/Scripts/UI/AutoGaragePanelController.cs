@@ -338,6 +338,7 @@ namespace OurWorld.UI
             d.carPaintIndex = idx;
             SaveManager.Instance.Save();
             ApplyTuningLive();
+            PoliceWantedSystem.Instance?.ClearWantedFromRespray();
             SetFooter(IsEn ? $"Painted your Sedan {PaintNamesEn[idx]}!" : $"Aracın {PaintNamesTr[idx]} metalik boyayla boyandı!");
             RefreshAll();
         }

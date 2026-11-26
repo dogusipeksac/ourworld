@@ -37,12 +37,20 @@ namespace OurWorld.EditorTools
             if (importer == null) return;
 
             bool isNormal = assetPath.IndexOf("_normal.", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isFoliageAlpha = !isNormal && assetPath.IndexOf("foliage_", StringComparison.OrdinalIgnoreCase) >= 0;
             importer.textureType = isNormal ? TextureImporterType.NormalMap : TextureImporterType.Default;
             importer.sRGBTexture = !isNormal;
-            importer.wrapMode = TextureWrapMode.Repeat;
+            importer.wrapMode = isFoliageAlpha ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
             importer.filterMode = FilterMode.Trilinear;
             importer.anisoLevel = 4;
             importer.mipmapEnabled = true;
+            if (isFoliageAlpha)
+            {
+                importer.alphaSource = TextureImporterAlphaSource.FromInput;
+                importer.alphaIsTransparency = true;
+                importer.mipMapsPreserveCoverage = true;
+                importer.alphaTestReferenceValue = 0.40f;
+            }
             importer.maxTextureSize = 512;
             importer.textureCompression = TextureImporterCompression.Compressed;
         }

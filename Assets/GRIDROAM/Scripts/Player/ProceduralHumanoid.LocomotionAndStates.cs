@@ -186,6 +186,18 @@ namespace OurWorld.Player
                 }
             }
 
+            if (_dodgeRollTimer >= 0f)
+            {
+                _dodgeRollTimer += dt;
+                if (_dodgeRollTimer >= _dodgeRollDuration)
+                {
+                    _dodgeRollTimer = -1f;
+                }
+            }
+
+            _crouchBlend = Mathf.Lerp(_crouchBlend, _isCrouching ? 1f : 0f, 1f - Mathf.Exp(-10.5f * dt));
+            _slideBlend = Mathf.Lerp(_slideBlend, _isSprintSliding ? 1f : 0f, 1f - Mathf.Exp(-13.5f * dt));
+
             if (_sportAnimTimer >= 0f)
             {
                 _sportAnimTimer += dt;
@@ -724,6 +736,14 @@ namespace OurWorld.Player
             {
                 ApplyVaultPose(ref p);
             }
+            else if (_dodgeRollTimer >= 0f)
+            {
+                ApplyDodgeRollPose(ref p);
+            }
+            else if (_slideBlend > 0.02f)
+            {
+                ApplySprintSlidePose(ref p);
+            }
             else if (_knockdownTimer >= 0f)
             {
                 ApplyKnockdownPose(ref p);
@@ -744,6 +764,65 @@ namespace OurWorld.Player
             {
                 ApplyWavePose(ref p);
             }
+
+            // Smooth GTA Stealth Crouch posture overlay (compatible with walk, idle & combat!)
+            if (_crouchBlend > 0.02f && !_isLyingDown && !_isSwimming && _knockdownTimer < 0f && _dodgeRollTimer < 0f && _slideBlend < 0.3f)
+            {
+                float c = _crouchBlend;
+                p.targetHipsPos.y -= 0.23f * c;
+                p.targetSpineRot.x += 24f * c;
+                p.targetNeckRot.x -= 12f * c;
+                p.targetHeadRot.x -= 10f * c;
+                p.targetLHipRot.x -= 36f * c;
+                p.targetRHipRot.x -= 36f * c;
+                p.targetLKneeRot.x += 58f * c;
+                p.targetRKneeRot.x += 58f * c;
+                p.targetLAnkleRot.x -= 18f * c;
+                p.targetRAnkleRot.x -= 18f * c;
+                if (!p.carrying && _punchTimer < 0f)
+                {
+                    p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-28f, 0f, -14f), c * 0.65f);
+                    p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(-28f, 0f,  14f), c * 0.65f);
+                    p.targetLElbowRot = Vector3.Lerp(p.targetLElbowRot, new Vector3(-42f, 0f, 0f), c * 0.65f);
+                    p.targetRElbowRot = Vector3.Lerp(p.targetRElbowRot, new Vector3(-42f, 0f, 0f), c * 0.65f);
+                }
+            }
+        }
+
+        private void ApplyDodgeRollPose(ref FramePose p)
+        {
+            float u = Mathf.Clamp01(_dodgeRollTimer / Mathf.Max(0.25f, _dodgeRollDuration));
+            float env = Mathf.Sin(u * Mathf.PI);
+            float spinPitch = u * 360f;
+            p.knockdownFootBlend = 0f;
+            p.targetHipsPos = new Vector3(0f, Mathf.Lerp(hipsBaseY, 0.36f, env), 0.14f * env);
+            p.targetHipsRot = new Vector3(spinPitch, 0f, 12f * env);
+            p.targetSpineRot = new Vector3(44f * env, 0f, 0f);
+            p.targetHeadRot = new Vector3(32f * env, 0f, 0f);
+            p.targetLShoulderRot = new Vector3(-68f * env, 0f, -18f * env);
+            p.targetRShoulderRot = new Vector3(-68f * env, 0f,  18f * env);
+            p.targetLElbowRot = new Vector3(-88f * env, 0f, 0f);
+            p.targetRElbowRot = new Vector3(-88f * env, 0f, 0f);
+            p.targetLHipRot = new Vector3(-92f * env, 0f, -6f);
+            p.targetRHipRot = new Vector3(-92f * env, 0f,  6f);
+            p.targetLKneeRot = new Vector3(112f * env, 0f, 0f);
+            p.targetRKneeRot = new Vector3(112f * env, 0f, 0f);
+        }
+
+        private void ApplySprintSlidePose(ref FramePose p)
+        {
+            float s = _slideBlend;
+            p.knockdownFootBlend = 0f;
+            p.targetHipsPos = Vector3.Lerp(p.targetHipsPos, new Vector3(0f, 0.27f, -0.08f), s);
+            p.targetHipsRot = Vector3.Lerp(p.targetHipsRot, new Vector3(-46f, 16f, -10f), s);
+            p.targetSpineRot = Vector3.Lerp(p.targetSpineRot, new Vector3(24f, -12f, 0f), s);
+            p.targetHeadRot = Vector3.Lerp(p.targetHeadRot, new Vector3(22f, -8f, 0f), s);
+            p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(28f, 0f, -38f), s);
+            p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(-24f, 0f, 32f), s);
+            p.targetLHipRot = Vector3.Lerp(p.targetLHipRot, new Vector3(-62f, 0f, -6f), s);
+            p.targetLKneeRot = Vector3.Lerp(p.targetLKneeRot, new Vector3(10f, 0f, 0f), s);
+            p.targetRHipRot = Vector3.Lerp(p.targetRHipRot, new Vector3(-28f, 0f, 18f), s);
+            p.targetRKneeRot = Vector3.Lerp(p.targetRKneeRot, new Vector3(96f, 0f, 0f), s);
         }
 
         // --- Bed sleep lying-down override (Stand -> SitOnMattress -> Lie variant + breathing + stirring) ---

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OurWorld.Input;
+using OurWorld.Vehicle;
 using UnityEngine;
 
 namespace OurWorld.CameraSystem
@@ -77,6 +78,62 @@ namespace OurWorld.CameraSystem
         private float _smoothedCornerLookAheadYaw;
         private float _surfaceVibAmp;
         private float _surfaceVibDecay;
+
+        // Strictly 2 Camera Modes ONLY: Third Person (default) & First Person!
+        private bool _isFirstPerson;
+        private bool _isCrouchingFp;
+        private float _fpEyeHeightCurrent = 1.62f;
+        private float _fpDriveLookYawOffset;
+        private float _fpDriveLookPitch = 3f;
+        private float _defaultNearClip = 0.2f;
+        private bool _nearClipSaved;
+        private Transform _cachedSedanTarget;
+        private SedanVehicleController _cachedSedan;
+
+        public bool IsFirstPerson => _isFirstPerson;
+        public bool IsAimOrSportOverride => _aimCameraActive || _sportCameraActive;
+        public int CameraPresetIndex => _isFirstPerson ? 1 : 0;
+        public event System.Action<bool> OnCameraModeChanged;
+
+        public void SetCrouchEyeMode(bool crouching)
+        {
+            _isCrouchingFp = crouching;
+        }
+
+        public void SetFirstPerson(bool firstPerson)
+        {
+            if (_isFirstPerson == firstPerson) return;
+            _isFirstPerson = firstPerson;
+            if (_isFirstPerson)
+            {
+                _fpDriveLookYawOffset = 0f;
+                _fpDriveLookPitch = 3f;
+                _pitch = Mathf.Clamp(_pitch, -20f, 20f);
+                if (target != null && !_isDrivingMode)
+                {
+                    _fpEyeHeightCurrent = _isSeatedMode ? 1.22f : (_isCrouchingFp ? 1.08f : 1.62f);
+                }
+            }
+            else
+            {
+                _pitch = _isDrivingMode ? drivingDefaultPitch : 14f;
+                _collisionDistInit = false;
+            }
+            OnCameraModeChanged?.Invoke(_isFirstPerson);
+        }
+
+        public int CycleCameraPreset()
+        {
+            SetFirstPerson(!_isFirstPerson);
+            return CameraPresetIndex;
+        }
+
+        public string GetCameraPresetLabel(bool isEn)
+        {
+            return _isFirstPerson
+                ? (isEn ? "First Person" : "1. Şahıs Kamera")
+                : (isEn ? "Third Person" : "3. Şahıs Kamera");
+        }
 
         public void SetSprintMotion(float sprint01)
         {
@@ -220,7 +277,9 @@ namespace OurWorld.CameraSystem
         {
             if (target == null) return;
             _yaw = target.eulerAngles.y;
-            _pitch = _isDrivingMode ? drivingDefaultPitch : 14f;
+            _pitch = _isFirstPerson ? 3f : (_isDrivingMode ? drivingDefaultPitch : 14f);
+            _fpDriveLookYawOffset = 0f;
+            _fpDriveLookPitch = 3f;
             Vector3 offset = _isDrivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
             _smoothedPivot = target.position + offset;
             _currentDistance = _isDrivingMode ? drivingDistance : GetEffectiveFootMaxDistance();
@@ -236,6 +295,26 @@ namespace OurWorld.CameraSystem
             rotation = transform.rotation;
             fov = _camera != null ? _camera.fieldOfView : baseFov;
             if (target == null) return false;
+
+            if (_isFirstPerson && !_sportCameraActive)
+            {
+                if (_isDrivingMode)
+                {
+                    position = target.position + target.up * 1.42f + target.forward * 0.62f;
+                    rotation = Quaternion.LookRotation(target.forward, Vector3.up) * Quaternion.Euler(3f, 0f, 0f);
+                }
+                else
+                {
+                    float eyeH = _isSeatedMode ? 1.22f : (_isCrouchingFp ? 1.08f : 1.62f);
+                    position = target.position + Vector3.up * eyeH;
+                    rotation = Quaternion.Euler(Mathf.Clamp(_pitch, -68f, 72f), _yaw, 0f);
+                }
+                if (_camera == null) _camera = GetComponent<Camera>();
+                float aspFp = (_camera != null && _camera.aspect > 0.1f) ? _camera.aspect : (16f / 9f);
+                float tabFp = aspFp < 1.70f ? Mathf.Clamp((1.70f - aspFp) * 20f, 0f, 10f) : 0f;
+                fov = 68f + tabFp;
+                return true;
+            }
 
             Vector3 offset = _isDrivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
             Vector3 pivot = target.position + offset;
@@ -287,6 +366,8 @@ namespace OurWorld.CameraSystem
                 _sprintMotion01 = 0f;
                 _footStrideSpeed = 0f;
                 _underwaterActive = false;
+                _fpDriveLookYawOffset = 0f;
+                _fpDriveLookPitch = 3f;
             }
             else
             {
@@ -359,9 +440,17 @@ namespace OurWorld.CameraSystem
                 Vector2 look = input.LookDelta;
                 if (look.sqrMagnitude > 0.00001f)
                 {
-                    float scale = _aimCameraActive ? _aimSensScale : 1f;
-                    _yaw += look.x * scale;
-                    _pitch -= look.y * scale;
+                    float scale = _aimCameraActive ? _aimSensScale : (_isFirstPerson ? 0.85f : 1f);
+                    if (_isFirstPerson && _isDrivingMode && !_aimCameraActive && !_sportCameraActive)
+                    {
+                        _fpDriveLookYawOffset = Mathf.Clamp(_fpDriveLookYawOffset + look.x * scale, -85f, 85f);
+                        _fpDriveLookPitch = Mathf.Clamp(_fpDriveLookPitch - look.y * scale, -22f, 26f);
+                    }
+                    else
+                    {
+                        _yaw += look.x * scale;
+                        _pitch -= look.y * scale;
+                    }
                     _timeSinceManualLook = 0f;
                 }
                 else
@@ -554,20 +643,134 @@ namespace OurWorld.CameraSystem
                 speedFactor = Mathf.InverseLerp(0f, fovMaxSpeedKmh, speedKmh);
             }
 
+            // =================================================================
+            // FIRST-PERSON CAMERA MODE (On-Foot Eye-Level + Driving Cockpit/Windshield)
+            // =================================================================
+            if (_isFirstPerson && !_sportCameraActive)
+            {
+                Vector3 fpShake = Vector3.zero;
+                if (_shakeTimer > 0f)
+                {
+                    _shakeTimer -= Time.unscaledDeltaTime;
+                    if (_shakeTimer <= 0f)
+                    {
+                        _shakeTimer = 0f;
+                        _shakeIntensity = 0f;
+                    }
+                    else
+                    {
+                        float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
+                        fpShake = new Vector3(
+                            (Mathf.PerlinNoise(Time.unscaledTime * 42f, 1.3f) - 0.5f) * 2f * amp * 0.55f,
+                            (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 42f) - 0.5f) * 2f * amp * 0.55f,
+                            0f);
+                    }
+                }
+
+                if (_camera == null) _camera = GetComponent<Camera>();
+                if (_camera != null && !_nearClipSaved)
+                {
+                    _defaultNearClip = Mathf.Max(0.15f, _camera.nearClipPlane);
+                    _nearClipSaved = true;
+                }
+                float aspectFp = (_camera != null && _camera.aspect > 0.1f) ? _camera.aspect : (16f / 9f);
+                float tabletBoostFp = aspectFp < 1.70f ? Mathf.Clamp((1.70f - aspectFp) * 20f, 0f, 10f) : 0f;
+
+                if (_isDrivingMode)
+                {
+                    // Gently auto-center driver's head straight ahead after 1.15s of no manual look
+                    if (_timeSinceManualLook > 1.15f)
+                    {
+                        _fpDriveLookYawOffset = Mathf.Lerp(_fpDriveLookYawOffset, 0f, 1f - Mathf.Exp(-5.5f * dtNorm));
+                        _fpDriveLookPitch = Mathf.Lerp(_fpDriveLookPitch, 2.5f, 1f - Mathf.Exp(-4.5f * dtNorm));
+                    }
+
+                    if (_cachedSedanTarget != target)
+                    {
+                        _cachedSedanTarget = target;
+                        _cachedSedan = target != null ? target.GetComponent<SedanVehicleController>() : null;
+                    }
+
+                    // True 3D Cockpit Driver Eye Position (behind rotating leather steering wheel & glowing gauges!)
+                    Vector3 driveEye = _cachedSedan != null
+                        ? _cachedSedan.GetFirstPersonCockpitEyeWorldPos()
+                        : (target.position + target.right * -0.36f + target.up * 1.21f - target.forward * 0.05f);
+
+                    if (_surfaceVibAmp > 0.001f)
+                    {
+                        fpShake += new Vector3(
+                            (Mathf.PerlinNoise(Time.time * 38f, 9.2f) - 0.5f) * 2f * _surfaceVibAmp * 0.45f,
+                            (Mathf.PerlinNoise(5.4f, Time.time * 44f) - 0.5f) * 2f * _surfaceVibAmp * 0.7f,
+                            0f);
+                    }
+
+                    Quaternion baseCarRot = Quaternion.LookRotation(target.forward, Vector3.up);
+                    Quaternion fpDriveRot = baseCarRot * Quaternion.Euler(_fpDriveLookPitch, _fpDriveLookYawOffset + _smoothedCornerLookAheadYaw * 0.35f, _smoothedDriveRollDeg * 0.75f);
+                    _yaw = fpDriveRot.eulerAngles.y;
+
+                    if (_camera != null)
+                    {
+                        _camera.nearClipPlane = 0.075f;
+                        float fpDriveFov = Mathf.Lerp(68f, 79f, speedFactor) + _nitroBoostBlend * 7.5f + tabletBoostFp + _fovImpulse;
+                        _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, Mathf.Clamp(fpDriveFov, 60f, 92f), 1f - Mathf.Exp(-fovSmoothSpeed * dtNorm));
+                    }
+
+                    transform.SetPositionAndRotation(driveEye + fpDriveRot * fpShake, fpDriveRot);
+                    return;
+                }
+
+                // Restore standard near clip outside First-Person Cockpit Driving
+                if (_camera != null && _nearClipSaved && Mathf.Abs(_camera.nearClipPlane - _defaultNearClip) > 0.01f)
+                {
+                    _camera.nearClipPlane = _defaultNearClip;
+                }
+
+                // On-Foot / Seated / Crouch / Swimming Eye-Level First Person
+                float targetEyeH = _isSeatedMode ? 1.22f : (_underwaterActive ? 1.44f : (_isCrouchingFp ? 1.08f : 1.62f));
+                _fpEyeHeightCurrent = Mathf.Lerp(_fpEyeHeightCurrent, targetEyeH, 1f - Mathf.Exp(-12f * dtNorm));
+                _pitch = Mathf.Clamp(_pitch, _isSeatedMode ? -42f : -68f, _isSeatedMode ? 50f : 72f);
+
+                Quaternion fpRot = Quaternion.Euler(_pitch, _yaw, _underwaterActive ? _smoothedDriveRollDeg : 0f);
+                Vector3 headBob = organicMicroOffset * 1.15f;
+                Vector3 eyePos = target.position + Vector3.up * (_fpEyeHeightCurrent + _landingDipY) + fpRot * (headBob + fpShake);
+
+                // Clamp cleanly below ceiling so player never peeks through a low roof
+                if (hasOverheadCeiling && eyePos.y > ceilingY - 0.16f)
+                {
+                    eyePos.y = ceilingY - 0.16f;
+                }
+
+                if (_camera != null)
+                {
+                    float fpFootFov = 68f + _smoothedSprint01 * 5.0f + tabletBoostFp + _fovImpulse;
+                    _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, Mathf.Clamp(fpFootFov, 58f, 88f), 1f - Mathf.Exp(-fovSmoothSpeed * dtNorm));
+                }
+
+                transform.SetPositionAndRotation(eyePos, fpRot);
+                return;
+            }
+
+            // =================================================================
+            // THIRD-PERSON CAMERA MODE (Single Clean Standard View)
+            // =================================================================
             float footSprintPull = effectivelyIndoors ? 0f : _smoothedSprint01 * 0.34f;
             float desiredDistance = _sportCameraActive
                 ? _sportCameraDistance
                 : (_isDrivingMode
-                    ? drivingDistance + speedFactor * drivingSpeedExtraDistance + _nitroBoostBlend * 0.62f
+                    ? (drivingDistance + speedFactor * drivingSpeedExtraDistance + _nitroBoostBlend * 0.62f)
                     : (hasOverheadCeiling
                         ? Mathf.Min(GetEffectiveFootMaxDistance(), 1.90f)
-                        : GetEffectiveFootMaxDistance() + footSprintPull));
+                        : (GetEffectiveFootMaxDistance() + footSprintPull)));
             float distSpeed = effectivelyIndoors ? distanceBlendSpeed * 2.2f : distanceBlendSpeed;
             _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distSpeed * dtNorm));
 
             if (_camera == null) _camera = GetComponent<Camera>();
             if (_camera != null)
             {
+                if (_nearClipSaved && Mathf.Abs(_camera.nearClipPlane - _defaultNearClip) > 0.01f)
+                {
+                    _camera.nearClipPlane = _defaultNearClip;
+                }
                 float sprintFovKick = effectivelyIndoors ? 0f : _smoothedSprint01 * 4.2f;
                 float nitroFovKick = _nitroBoostBlend * 6.5f;
                 float baseTargetFov = _sportCameraActive

@@ -29,8 +29,8 @@ namespace OurWorld.Core
         [SerializeField] private int editorTargetFps = 60;
         [SerializeField] private float lowRenderScale = 0.75f;
         [SerializeField] private float lowShadowDistance = 26f;
-        [SerializeField] private float mediumRenderScale = 0.96f;
-        [SerializeField] private float mediumShadowDistance = 58f;
+        [SerializeField] private float mediumRenderScale = 0.98f;
+        [SerializeField] private float mediumShadowDistance = 92f;
 
         public GraphicsTier CurrentTier { get; private set; } = GraphicsTier.Medium;
         public event Action<GraphicsTier> OnTierChanged;

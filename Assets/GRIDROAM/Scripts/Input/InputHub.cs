@@ -52,6 +52,9 @@ namespace OurWorld.Input
         private bool _touchPhoneQueued;
         private bool _touchAttackQueued;
         private bool _touchJumpQueued;
+        private bool _touchCrouchSlideQueued;
+        private bool _touchDodgeRollQueued;
+        private bool _touchCycleCameraQueued;
         private bool _touchAttackHeld;
         private bool _touchJumpHeld;
         private bool _prevAttackHeld;
@@ -81,6 +84,9 @@ namespace OurWorld.Input
         public event Action OnContinueDialoguePressed;
         public event Action OnRetryPressed;
         public event Action OnTogglePhonePressed;
+        public event Action OnCrouchSlidePressed;
+        public event Action OnDodgeRollPressed;
+        public event Action OnCycleCameraPressed;
         public event Action OnTogglePerfOverlayPressed;
         public event Action OnCycleGraphicsPressed;
         public event Action OnExportPerfReportPressed;
@@ -144,6 +150,9 @@ namespace OurWorld.Input
                 _touchPhoneQueued = false;
                 _touchAttackQueued = false;
                 _touchJumpQueued = false;
+                _touchCrouchSlideQueued = false;
+                _touchDodgeRollQueued = false;
+                _touchCycleCameraQueued = false;
                 return;
             }
 
@@ -265,12 +274,25 @@ namespace OurWorld.Input
             _prevAttackHeld = attackHeldNow;
             _prevJumpHeld = jumpHeldNow;
 
+            bool crouchSlide = _touchCrouchSlideQueued || (kb != null && kb.cKey.wasPressedThisFrame);
+            bool dodgeRoll = _touchDodgeRollQueued || (kb != null && (kb.xKey.wasPressedThisFrame || kb.leftCtrlKey.wasPressedThisFrame));
+            bool cycleCamera = _touchCycleCameraQueued || (kb != null && kb.vKey.wasPressedThisFrame && kb.leftShiftKey.isPressed);
+            // Note: also allow dedicated Tab key for GTA Camera Angle cycling without colliding with V (attack)!
+            if (kb != null && kb.tabKey.wasPressedThisFrame) cycleCamera = true;
+
             _touchInteractQueued = false;
             _touchExitVehicleQueued = false;
             _touchContinueDialogueQueued = false;
             _touchPhoneQueued = false;
             _touchAttackQueued = false;
             _touchJumpQueued = false;
+            _touchCrouchSlideQueued = false;
+            _touchDodgeRollQueued = false;
+            _touchCycleCameraQueued = false;
+
+            if (crouchSlide) OnCrouchSlidePressed?.Invoke();
+            if (dodgeRoll) OnDodgeRollPressed?.Invoke();
+            if (cycleCamera) OnCycleCameraPressed?.Invoke();
 
             if (togglePhone)
             {
@@ -364,6 +386,9 @@ namespace OurWorld.Input
         public void TriggerTouchExitVehicle() => _touchExitVehicleQueued = true;
         public void TriggerTouchContinueDialogue() => _touchContinueDialogueQueued = true;
         public void TriggerTouchPhone() => _touchPhoneQueued = true;
+        public void TriggerTouchCrouchSlide() => _touchCrouchSlideQueued = true;
+        public void TriggerTouchDodgeRoll() => _touchDodgeRollQueued = true;
+        public void TriggerTouchCycleCamera() => _touchCycleCameraQueued = true;
 
         public void ClearDrivingTouchInputs()
         {

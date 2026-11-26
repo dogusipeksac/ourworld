@@ -1,4 +1,5 @@
 using System.Collections;
+using OurWorld.CameraSystem;
 using OurWorld.Core;
 using OurWorld.Player;
 using OurWorld.Vehicle;
@@ -22,10 +23,15 @@ namespace OurWorld.UI
         private Text _hornLabel;
         private Text _radioLabel;
         private Text _lightsLabel;
+        private Text _driveCamLabel;
+        private Text _footCrouchLabel;
+        private Text _footDodgeLabel;
+        private Text _footCamLabel;
         private Text _photoBtnLabel;
         private GameObject _photoExitOverlay;
         private Text _photoExitLabel;
         private bool _inPhotoMode;
+        private ThirdPersonCameraRig _camRig;
 
         public bool IsPhotoModeActive => _inPhotoMode;
 
@@ -58,12 +64,18 @@ namespace OurWorld.UI
             if (hud != null)
             {
                 BuildDrivingUtilityBar(hud.transform);
+                BuildOnFootTacticalBar(hud.transform);
                 BuildPhotoModeControls(hud.transform);
             }
 
             if (LocalizationService.Instance != null)
             {
                 LocalizationService.Instance.OnLanguageChanged += HandleLanguageChanged;
+            }
+            _camRig = FindAnyObjectByType<ThirdPersonCameraRig>();
+            if (_camRig != null)
+            {
+                _camRig.OnCameraModeChanged += HandleCameraModeChanged;
             }
             RefreshLabels();
         }
@@ -74,10 +86,15 @@ namespace OurWorld.UI
             {
                 LocalizationService.Instance.OnLanguageChanged -= HandleLanguageChanged;
             }
+            if (_camRig != null)
+            {
+                _camRig.OnCameraModeChanged -= HandleCameraModeChanged;
+            }
             if (Instance == this) Instance = null;
         }
 
         private void HandleLanguageChanged(string _) => RefreshLabels();
+        private void HandleCameraModeChanged(bool _) => RefreshLabels();
 
         private void Update()
         {
@@ -106,16 +123,16 @@ namespace OurWorld.UI
             rt.anchorMax = new Vector2(0.5f, 1f);
             rt.pivot = new Vector2(0.5f, 1f);
             rt.anchoredPosition = new Vector2(0f, -20f);
-            rt.sizeDelta = new Vector2(540f, 68f);
+            rt.sizeDelta = new Vector2(680f, 68f);
 
             HorizontalLayoutGroup hlg = bar.AddComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 14f;
+            hlg.spacing = 12f;
             hlg.childControlWidth = true;
             hlg.childControlHeight = true;
             hlg.childForceExpandWidth = true;
             hlg.childForceExpandHeight = true;
 
-            OurWorldUiKit.CreatePillButton("Btn_CarHorn", bar.transform, "Korna", 22,
+            OurWorldUiKit.CreatePillButton("Btn_CarHorn", bar.transform, "Korna", 21,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.AccentGold, OurWorldUiKit.BorderSubtle, out _hornLabel, () =>
                 {
                     PlayerModeController mode = PlayerModeController.Instance;
@@ -125,7 +142,7 @@ namespace OurWorld.UI
                     }
                 });
 
-            OurWorldUiKit.CreatePillButton("Btn_CarRadio", bar.transform, "FM Radyo", 22,
+            OurWorldUiKit.CreatePillButton("Btn_CarRadio", bar.transform, "FM Radyo", 21,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.AccentTeal, OurWorldUiKit.BorderSubtle, out _radioLabel, () =>
                 {
                     PlayerModeController mode = PlayerModeController.Instance;
@@ -135,7 +152,7 @@ namespace OurWorld.UI
                     }
                 });
 
-            OurWorldUiKit.CreatePillButton("Btn_CarLights", bar.transform, "Farlar", 22,
+            OurWorldUiKit.CreatePillButton("Btn_CarLights", bar.transform, "Farlar", 21,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.TextPrimary, OurWorldUiKit.BorderSubtle, out _lightsLabel, () =>
                 {
                     PlayerModeController mode = PlayerModeController.Instance;
@@ -143,6 +160,53 @@ namespace OurWorld.UI
                     {
                         mode.CurrentVehicle.ToggleHeadlights();
                     }
+                });
+
+            OurWorldUiKit.CreatePillButton("Btn_DriveCam", bar.transform, "Kamera", 21,
+                OurWorldUiKit.SurfaceBg, new Color(0.54f, 0.88f, 1.0f), OurWorldUiKit.BorderSubtle, out _driveCamLabel, () =>
+                {
+                    OurWorld.Input.InputHub.Instance?.TriggerTouchCycleCamera();
+                });
+        }
+
+        private void BuildOnFootTacticalBar(Transform hudRoot)
+        {
+            Transform footRoot = FindDescendant(hudRoot, "OnFootControls")
+                                 ?? FindDescendant(hudRoot, "OnFootControlsRoot");
+            if (footRoot == null) return;
+
+            GameObject bar = new GameObject("MobileGtaTacticalBar", typeof(RectTransform));
+            bar.transform.SetParent(footRoot, false);
+            RectTransform rt = (RectTransform)bar.transform;
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, 22f);
+            rt.sizeDelta = new Vector2(440f, 58f);
+
+            HorizontalLayoutGroup hlg = bar.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 12f;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = true;
+            hlg.childForceExpandHeight = true;
+
+            OurWorldUiKit.CreatePillButton("Btn_CrouchSlide", bar.transform, "Eğil / Kay", 20,
+                OurWorldUiKit.SurfaceBg, OurWorldUiKit.AccentTeal, OurWorldUiKit.BorderSubtle, out _footCrouchLabel, () =>
+                {
+                    OurWorld.Input.InputHub.Instance?.TriggerTouchCrouchSlide();
+                });
+
+            OurWorldUiKit.CreatePillButton("Btn_DodgeRoll", bar.transform, "Takla", 20,
+                OurWorldUiKit.SurfaceBg, OurWorldUiKit.AccentGold, OurWorldUiKit.BorderSubtle, out _footDodgeLabel, () =>
+                {
+                    OurWorld.Input.InputHub.Instance?.TriggerTouchDodgeRoll();
+                });
+
+            OurWorldUiKit.CreatePillButton("Btn_FootCam", bar.transform, "Kamera", 20,
+                OurWorldUiKit.SurfaceBg, OurWorldUiKit.TextPrimary, OurWorldUiKit.BorderSubtle, out _footCamLabel, () =>
+                {
+                    OurWorld.Input.InputHub.Instance?.TriggerTouchCycleCamera();
                 });
         }
 
@@ -212,6 +276,14 @@ namespace OurWorld.UI
             if (_hornLabel != null) _hornLabel.text = isEn ? "Horn" : "Korna";
             if (_radioLabel != null) _radioLabel.text = isEn ? "FM Radio" : "FM Radyo";
             if (_lightsLabel != null) _lightsLabel.text = isEn ? "Lights" : "Farlar";
+            bool fp = _camRig != null && _camRig.IsFirstPerson;
+            string camBtnText = fp
+                ? (isEn ? "1st Person" : "1. Şahıs")
+                : (isEn ? "3rd Person" : "3. Şahıs");
+            if (_driveCamLabel != null) _driveCamLabel.text = camBtnText;
+            if (_footCrouchLabel != null) _footCrouchLabel.text = isEn ? "Crouch/Slide" : "Eğil / Kay";
+            if (_footDodgeLabel != null) _footDodgeLabel.text = isEn ? "Dodge Roll" : "Takla";
+            if (_footCamLabel != null) _footCamLabel.text = camBtnText;
             if (_photoBtnLabel != null) _photoBtnLabel.text = isEn ? "Photo" : "Foto";
             if (_photoExitLabel != null) _photoExitLabel.text = isEn ? "✕ Exit Photo Mode" : "✕ Fotoğraf Modundan Çık";
         }

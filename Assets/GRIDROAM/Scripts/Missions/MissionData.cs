@@ -15,7 +15,10 @@ namespace OurWorld.Missions
         TailVehicle,
         PlaySportMatch,
         SwimAtPool,
-        RideTwoWheeler
+        RideTwoWheeler,
+        DefeatHostiles,
+        EvadePolice,
+        StealthReach
     }
 
     [Serializable]
@@ -63,6 +66,13 @@ namespace OurWorld.Missions
         [Header("Atmosphere Override")]
         [Tooltip("If >= 0, transitions the world clock to this hour (0-24) when this step starts.")]
         public float setTimeOfDayHours = -1f;
+
+        [Header("GTA Action Step Settings (Chapter 7-8)")]
+        [Tooltip("For EvadePolice steps: Wanted Star level (1-5) triggered when the step starts.")]
+        public int wantedStarsToTrigger = 0;
+
+        [Tooltip("For DefeatHostiles steps: number of gang hostiles to knock out.")]
+        public int hostileCount = 0;
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using OurWorld.Core;
 using OurWorld.Input;
+using OurWorld.Missions;
 using OurWorld.Vehicle;
 using OurWorld.World;
 using UnityEngine;
@@ -342,6 +343,19 @@ namespace OurWorld.Player
             PlayerModeController mode = PlayerModeController.Instance;
             if (mode == null || mode.IsModalLocked || mode.CurrentMode != ControlMode.OnFoot || MosquePrayerInteractable.IsPlayerPraying) return;
 
+            // GTA 6 Combat Dodge Roll i-frames cleanly evade incoming punches & police tackles!
+            if (mode.FootController != null && mode.FootController.IsDodgeInvulnerable)
+            {
+                bool enDodge = LocalizationService.IsEnglish;
+                VisualEffectsManager.SpawnFloatingText(
+                    mode.FootController.transform.position + Vector3.up * 1.75f,
+                    enDodge ? "⚡ DODGED!" : "⚡ SIYRILDIN!",
+                    new Color(0.28f, 0.92f, 0.98f),
+                    scale: 0.98f,
+                    duration: 0.85f);
+                return;
+            }
+
             _hitInvulnTimer = heavyHit ? 0.52f : 0.40f;
             _timeSinceLastDamage = 0f;
 
@@ -531,6 +545,11 @@ namespace OurWorld.Player
             TownPedestrian.CalmAllAngryCitizens();
             LivingNeighborhoodPopulator.CalmAllAngryNpcs();
             IstanbulDiverseCitizensPopulator.CalmAllHostileCitizens();
+            PoliceWantedSystem.Instance?.ClearWantedQuietly();
+            bool knockedOutInMissionFight = MissionManager.Instance != null &&
+                                            MissionManager.Instance.CurrentStep != null &&
+                                            MissionManager.Instance.CurrentStep.stepType == MissionStepType.DefeatHostiles;
+            ChapterSevenEightStoryExpansion.Instance?.ClearActiveHostiles();
             HamidiyeMallInteractionHandler.CalmAllShoppers();
             WorldExpansionAndFarmBuilder.CalmShepherdDog();
             NeighborhoodConsequenceSystem.CoolDownHeatOnRecovery();
@@ -625,6 +644,11 @@ namespace OurWorld.Player
 
             _isBusy = false;
             _isKnockedOut = false;
+
+            if (knockedOutInMissionFight)
+            {
+                MissionManager.Instance?.FailActiveCombatStepOnPlayerKnockout();
+            }
 
             string feeText = clinicFee > 0
                 ? (en ? $"-{clinicFee} ₺ medical fee" : $"-{clinicFee} ₺ tedavi ücreti")
@@ -727,6 +751,7 @@ namespace OurWorld.Player
             TownPedestrian.CalmAllAngryCitizens();
             LivingNeighborhoodPopulator.CalmAllAngryNpcs();
             IstanbulDiverseCitizensPopulator.CalmAllHostileCitizens();
+            PoliceWantedSystem.Instance?.ClearWantedQuietly();
             HamidiyeMallInteractionHandler.CalmAllShoppers();
             WorldExpansionAndFarmBuilder.CalmShepherdDog();
             NeighborhoodConsequenceSystem.CoolDownHeatOnRecovery();

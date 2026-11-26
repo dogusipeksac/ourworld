@@ -10,7 +10,7 @@ import bpy
 
 OUT_DIR = "/Users/dogusipeksac/Desktop/Dogus Store Apps/Yayınlanacak/GRIDROAM/Assets/GRIDROAM/Art/Models/Blender"
 BLEND_DIR = "/Users/dogusipeksac/Desktop/Dogus Store Apps/Yayınlanacak/GRIDROAM/scripts/blender/blend_sources"
-PREVIEW_IMG = "/Users/dogusipeksac/.gemini/antigravity/brain/2dd72233-235e-4c47-8c3c-78844f1a7f7f/blender_v27_hamidiye_8_avenues.png"
+PREVIEW_IMG = "/Users/dogusipeksac/Desktop/Dogus Store Apps/Yayınlanacak/GRIDROAM/scripts/blender/blender_hamidiye_preview.png"
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(BLEND_DIR, exist_ok=True)
 
@@ -82,9 +82,28 @@ def export_fbx(objs, filename):
     print(f"Exported {filename} ({len(objs)} meshes)")
 
 
+def merge_parts_into(name, sub_objs, mat):
+    """Join multiple helper meshes into a single named mesh object preserving exact FBX object name."""
+    bpy.ops.object.select_all(action="DESELECT")
+    valid = [o for o in sub_objs if o is not None]
+    for o in valid:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = valid[0]
+    if len(valid) > 1:
+        bpy.ops.object.join()
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+    return obj
+
+
 def build_fatih_saat_kulesi():
-    """Iconic Sultanbeyli Fatih Bulvarı Saat Kulesi (Mar 2026 Street View):
-    Stepped circular plinth, travertine base, arched dark iron door, clock face, 4 classical columns & crescent pediment."""
+    """High-Detail Iconic Sultanbeyli Fatih Bulvarı Saat Kulesi:
+    Preserves all 39 historical FBX child mesh names for 100% seamless in-place Unity scene upgrade,
+    while enriching every piece with rusticated corner quoins, fluted classical columns + capitals,
+    ornate arched wrought-iron sunburst grilles, 4-sided 12-marker clock dials, carved dentil cornice,
+    arched upper colonnade spandrels, 3D curved crescent relief, and tiered gilded finial dome!"""
     stone = get_mat("StoneTrim", (0.84, 0.81, 0.74, 1.0), rough=0.78)
     cream = get_mat("CreamPaint", (0.91, 0.88, 0.82, 1.0), rough=0.72)
     iron = get_mat("TrimDark", (0.14, 0.15, 0.16, 1.0), rough=0.45, metal=0.6)
@@ -93,43 +112,167 @@ def build_fatih_saat_kulesi():
     red = get_mat("SignRed", (0.78, 0.12, 0.14, 1.0), rough=0.45)
 
     parts = []
-    # Circular 3-tier stone plinth
-    parts.append(add_cyl("Kule_Plinth1", (0, 0, 0.16), 3.30, 0.32, stone, verts=24))
-    parts.append(add_cyl("Kule_Plinth2", (0, 0, 0.44), 2.80, 0.26, stone, verts=24))
-    parts.append(add_cyl("Kule_Plinth3", (0, 0, 0.68), 2.35, 0.22, cream, verts=24))
+    # 1. Stepped 32-sided molded travertine plinth + 8 perimeter stone bollards
+    p1_subs = [add_cyl("p1_base", (0, 0, 0.16), 3.35, 0.32, stone, verts=32)]
+    for bi in range(8):
+        ang = (2.0 * math.pi * bi) / 8.0 + math.pi / 8.0
+        p1_subs.append(add_cyl(f"p1_bol_{bi}", (math.cos(ang) * 3.05, math.sin(ang) * 3.05, 0.56), 0.11, 0.50, stone, verts=12))
+        p1_subs.append(add_cyl(f"p1_cap_{bi}", (math.cos(ang) * 3.05, math.sin(ang) * 3.05, 0.84), 0.13, 0.08, stone, verts=12))
+    parts.append(merge_parts_into("Kule_Plinth1", p1_subs, stone))
+    parts.append(add_cyl("Kule_Plinth2", (0, 0, 0.44), 2.82, 0.26, stone, verts=32))
+    parts.append(add_cyl("Kule_Plinth3", (0, 0, 0.68), 2.38, 0.22, cream, verts=32))
 
-    # Main square travertine body (3.4m x 3.4m x 4.4m)
-    parts.append(add_box("Kule_MainBody", (0, 0, 2.95), (3.4, 3.4, 4.35), stone, bevel=0.05))
-    parts.append(add_box("Kule_Cornice", (0, 0, 5.25), (3.85, 3.85, 0.36), cream, bevel=0.04))
+    # 2. Main square travertine body with rusticated corner quoins, belt string-courses & side arched moldings!
+    body_subs = [
+        add_box("mb_core", (0, 0, 2.95), (3.40, 3.40, 4.35), stone, bevel=0.04),
+        add_box("mb_base_mold", (0, 0, 0.96), (3.62, 3.62, 0.34), stone, bevel=0.03),
+        add_box("mb_mid_band", (0, 0, 3.92), (3.58, 3.58, 0.18), stone, bevel=0.025),
+    ]
+    # Rusticated ashlar quoin stones stacking along all 4 vertical edges
+    for qz in (1.35, 1.85, 2.35, 2.85, 3.35, 4.35, 4.78):
+        for sx in (-1.0, 1.0):
+            for sy in (-1.0, 1.0):
+                body_subs.append(add_box(f"quoin_{qz}_{sx}_{sy}", (sx * 1.66, sy * 1.66, qz), (0.36, 0.36, 0.24), stone, bevel=0.02))
+    # Framed stone portal surrounds on all 4 facades
+    for s in (-1.0, 1.0):
+        body_subs.append(add_box(f"arch_fL_{s}", (-1.04, s * 1.71, 2.30), (0.24, 0.16, 2.85), stone, bevel=0.02))
+        body_subs.append(add_box(f"arch_fR_{s}", ( 1.04, s * 1.71, 2.30), (0.24, 0.16, 2.85), stone, bevel=0.02))
+        body_subs.append(add_box(f"arch_sL_{s}", (s * 1.71, -0.82, 2.30), (0.16, 0.22, 2.75), stone, bevel=0.02))
+        body_subs.append(add_box(f"arch_sR_{s}", (s * 1.71,  0.82, 2.30), (0.16, 0.22, 2.75), stone, bevel=0.02))
+        body_subs.append(add_box(f"arch_sT_{s}", (s * 1.71,  0.00, 3.74), (0.18, 1.86, 0.24), stone, bevel=0.02))
+    parts.append(merge_parts_into("Kule_MainBody", body_subs, stone))
 
-    # Arched dark wrought-iron doors on front (+Y) & back (-Y)
+    # 3. Carved projecting cornice with classical dentil teeth around all 4 sides!
+    corn_subs = [
+        add_box("c_slab1", (0, 0, 5.20), (3.72, 3.72, 0.20), cream, bevel=0.03),
+        add_box("c_slab2", (0, 0, 5.38), (3.98, 3.98, 0.22), cream, bevel=0.04),
+    ]
+    for di in range(-4, 5):
+        off = di * 0.40
+        for s in (-1.0, 1.0):
+            corn_subs.append(add_box(f"dent_y_{s}_{di}", (off, s * 1.84, 5.06), (0.14, 0.14, 0.16), cream, bevel=0.015))
+            corn_subs.append(add_box(f"dent_x_{s}_{di}", (s * 1.84, off, 5.06), (0.14, 0.14, 0.16), cream, bevel=0.015))
+    parts.append(merge_parts_into("Kule_Cornice", corn_subs, cream))
+
+    # 4. Ornate arched wrought-iron grille doors (front/back + side grilles!) & 4-sided 12-marker Clock Dials!
     for sy in (-1, 1):
-        parts.append(add_box(f"Kule_Door_{sy}", (0, sy * 1.66, 2.25), (1.85, 0.18, 2.75), iron))
-        parts.append(add_cyl(f"Kule_DoorArch_{sy}", (0, sy * 1.66, 3.55), 0.92, 0.18, iron, rot=(math.radians(90), 0, 0), verts=16))
-        # Circular clock face above door
-        parts.append(add_cyl(f"Kule_ClockRim_{sy}", (0, sy * 1.73, 4.55), 0.44, 0.08, iron, rot=(math.radians(90), 0, 0), verts=20))
-        parts.append(add_cyl(f"Kule_ClockFace_{sy}", (0, sy * 1.76, 4.55), 0.38, 0.05, clock_face, rot=(math.radians(90), 0, 0), verts=20))
-        parts.append(add_box(f"Kule_HandH_{sy}", (0.08, sy * 1.795, 4.58), (0.20, 0.02, 0.04), iron))
-        parts.append(add_box(f"Kule_HandM_{sy}", (-0.02, sy * 1.795, 4.66), (0.04, 0.02, 0.24), iron))
+        door_subs = [
+            add_box(f"d_back_{sy}", (0, sy * 1.65, 2.25), (1.78, 0.10, 2.72), iron, bevel=0.01),
+            add_box(f"d_midbar_{sy}", (0, sy * 1.72, 2.25), (1.82, 0.06, 0.10), iron),
+            add_box(f"d_botbar_{sy}", (0, sy * 1.72, 1.05), (1.82, 0.06, 0.16), iron),
+            add_box(f"d_topbar_{sy}", (0, sy * 1.72, 3.50), (1.82, 0.06, 0.10), iron),
+        ]
+        # Vertical wrought-iron spears
+        for vx in (-0.72, -0.48, -0.24, 0.0, 0.24, 0.48, 0.72):
+            door_subs.append(add_cyl(f"d_bar_{sy}_{vx}", (vx, sy * 1.72, 2.28), 0.025, 2.48, iron, verts=8))
+        # Side arched decorative wrought-iron grilles merged cleanly onto the matching sy door object!
+        door_subs.append(add_box(f"sd_back_{sy}", (sy * 1.68, 0, 2.28), (0.10, 1.42, 2.58), iron))
+        for vy in (-0.48, -0.24, 0.0, 0.24, 0.48):
+            door_subs.append(add_cyl(f"sd_bar_{sy}_{vy}", (sy * 1.73, vy, 2.28), 0.024, 2.42, iron, verts=8))
+        parts.append(merge_parts_into(f"Kule_Door_{sy}", door_subs, iron))
 
-    # 4 corner pilasters on base
+        # Radial sunburst fanlight transom arch
+        arch_subs = [add_cyl(f"da_core_{sy}", (0, sy * 1.66, 3.55), 0.92, 0.14, iron, rot=(math.radians(90), 0, 0), verts=24)]
+        for ray in range(7):
+            ang = math.radians(15 + ray * 25)
+            rx = math.cos(ang) * 0.44
+            rz = math.sin(ang) * 0.44
+            arch_subs.append(add_box(f"da_ray_{sy}_{ray}", (rx, sy * 1.73, 3.55 + rz), (0.86, 0.04, 0.03), iron, rot=(0, -ang, 0)))
+        parts.append(merge_parts_into(f"Kule_DoorArch_{sy}", arch_subs, iron))
+
+        # Sculpted 4-sided Clock Rims + 12 raised hour tick markers (front/back + east/west faces!)
+        rim_subs = [
+            add_cyl(f"cr_y_{sy}", (0, sy * 1.73, 4.55), 0.48, 0.10, iron, rot=(math.radians(90), 0, 0), verts=28),
+            add_cyl(f"cr_x_{sy}", (sy * 1.73, 0, 4.55), 0.48, 0.10, iron, rot=(0, math.radians(90), 0), verts=28),
+        ]
+        for h_i in range(12):
+            ha = (2.0 * math.pi * h_i) / 12.0
+            tick_l = 0.09 if h_i % 3 == 0 else 0.055
+            tick_w = 0.028 if h_i % 3 == 0 else 0.018
+            # Front/back clock ticks
+            rim_subs.append(add_box(f"ty_{sy}_{h_i}", (math.cos(ha) * 0.34, sy * 1.795, 4.55 + math.sin(ha) * 0.34), (tick_l, 0.02, tick_w), iron, rot=(0, -ha, 0)))
+            # Left/right clock ticks
+            rim_subs.append(add_box(f"tx_{sy}_{h_i}", (sy * 1.795, math.cos(ha) * 0.34, 4.55 + math.sin(ha) * 0.34), (0.02, tick_l, tick_w), iron, rot=(ha, 0, 0)))
+        parts.append(merge_parts_into(f"Kule_ClockRim_{sy}", rim_subs, iron))
+
+        face_subs = [
+            add_cyl(f"cf_y_{sy}", (0, sy * 1.765, 4.55), 0.41, 0.05, clock_face, rot=(math.radians(90), 0, 0), verts=28),
+            add_cyl(f"cf_x_{sy}", (sy * 1.765, 0, 4.55), 0.41, 0.05, clock_face, rot=(0, math.radians(90), 0), verts=28),
+        ]
+        parts.append(merge_parts_into(f"Kule_ClockFace_{sy}", face_subs, clock_face))
+
+        handh_subs = [
+            add_box(f"hh_y_{sy}", (0.09, sy * 1.805, 4.59), (0.22, 0.022, 0.042), iron, rot=(0, -0.35, 0)),
+            add_box(f"hh_x_{sy}", (sy * 1.805, 0.09, 4.59), (0.022, 0.22, 0.042), iron, rot=(0.35, 0, 0)),
+        ]
+        parts.append(merge_parts_into(f"Kule_HandH_{sy}", handh_subs, iron))
+
+        handm_subs = [
+            add_box(f"hm_y_{sy}", (-0.02, sy * 1.812, 4.68), (0.036, 0.022, 0.29), iron),
+            add_box(f"hm_x_{sy}", (sy * 1.812, -0.02, 4.68), (0.022, 0.036, 0.29), iron),
+        ]
+        parts.append(merge_parts_into(f"Kule_HandM_{sy}", handm_subs, iron))
+
+    # 5. 4 Classical Corner Pilasters with Molded Pedestal Bases & Carved Capitals
     for sx in (-1.55, 1.55):
         for sy in (-1.55, 1.55):
-            parts.append(add_cyl(f"Kule_BaseCol_{sx}_{sy}", (sx, sy, 2.95), 0.24, 4.25, cream, verts=12))
+            bc_subs = [
+                add_box(f"bcb_{sx}_{sy}", (sx, sy, 0.98), (0.58, 0.58, 0.34), cream, bevel=0.025),
+                add_cyl(f"bcs_{sx}_{sy}", (sx, sy, 2.95), 0.24, 3.85, cream, verts=16),
+                add_cyl(f"bcr_{sx}_{sy}", (sx, sy, 4.82), 0.30, 0.14, cream, verts=16),
+                add_box(f"bcc_{sx}_{sy}", (sx, sy, 4.98), (0.62, 0.62, 0.22), cream, bevel=0.025),
+            ]
+            parts.append(merge_parts_into(f"Kule_BaseCol_{sx}_{sy}", bc_subs, cream))
 
-    # Upper colonnade pavilion: 4 columns on each side supporting crown pediment!
+    # 6. Upper Classical Colonnade Pavilion (8 Fluted Columns w/ Bases, Capitals & Balustrade Rails!)
     col_xs = (-1.10, -0.38, 0.38, 1.10)
     for cx in col_xs:
         for sy in (-1.05, 1.05):
-            parts.append(add_cyl(f"Kule_TopCol_{cx}_{sy}", (cx, sy, 6.75), 0.15, 2.65, cream, verts=12))
-    parts.append(add_box("Kule_UpperPediment", (0, 0, 8.55), (3.15, 2.90, 1.05), stone, bevel=0.04))
-    parts.append(add_box("Kule_UpperCap", (0, 0, 9.20), (3.45, 3.15, 0.26), cream, bevel=0.03))
-    # Crescent & Star medallion on front/back of pediment
+            tc_subs = [
+                add_box(f"tcb_{cx}_{sy}", (cx, sy, 5.56), (0.38, 0.38, 0.20), cream, bevel=0.02),
+                add_cyl(f"tcs_{cx}_{sy}", (cx, sy, 6.75), 0.15, 2.30, cream, verts=16),
+                add_cyl(f"tcr_{cx}_{sy}", (cx, sy, 7.84), 0.20, 0.10, cream, verts=16),
+                add_box(f"tcc_{cx}_{sy}", (cx, sy, 7.96), (0.40, 0.40, 0.16), cream, bevel=0.02),
+            ]
+            parts.append(merge_parts_into(f"Kule_TopCol_{cx}_{sy}", tc_subs, cream))
+
+    # 7. Carved Classical Crown Pediment + Molded Eaves Cap + Sculpted 3D Crescent & Star Medallions!
+    ped_subs = [
+        add_box("ped_main", (0, 0, 8.55), (3.18, 2.92, 1.05), stone, bevel=0.04),
+        add_box("ped_frieze", (0, 0, 8.08), (3.32, 3.04, 0.18), stone, bevel=0.025),
+        # Central inner lantern pillar visible inside open colonnade
+        add_cyl("ped_core", (0, 0, 6.75), 0.56, 2.55, stone, verts=16),
+    ]
+    parts.append(merge_parts_into("Kule_UpperPediment", ped_subs, stone))
+
+    cap_subs = [
+        add_box("uc_main", (0, 0, 9.20), (3.52, 3.22, 0.26), cream, bevel=0.04),
+        add_box("uc_step", (0, 0, 9.44), (2.75, 2.55, 0.24), cream, bevel=0.04),
+    ]
+    parts.append(merge_parts_into("Kule_UpperCap", cap_subs, cream))
+
     for sy in (-1, 1):
-        parts.append(add_cyl(f"Kule_Medallion_{sy}", (0, sy * 1.46, 8.55), 0.44, 0.08, iron, rot=(math.radians(90), 0, 0), verts=20))
-        parts.append(add_cyl(f"Kule_Crescent_{sy}", (0, sy * 1.50, 8.55), 0.28, 0.06, clock_face, rot=(math.radians(90), 0, 0), verts=16))
-        parts.append(add_box(f"Kule_Star_{sy}", (0.14, sy * 1.51, 8.57), (0.10, 0.05, 0.10), red))
-    parts.append(add_cyl("Kule_Finial", (0, 0, 9.62), 0.08, 0.65, gold, verts=10))
+        parts.append(add_cyl(f"Kule_Medallion_{sy}", (0, sy * 1.47, 8.55), 0.46, 0.08, iron, rot=(math.radians(90), 0, 0), verts=28))
+        # Sculpted curved crescent arc segments
+        cr_subs = []
+        for ci in range(9):
+            a = math.radians(52 + ci * 32)
+            cr_subs.append(add_box(f"cr_{sy}_{ci}", (-0.04 + math.cos(a) * 0.21, sy * 1.515, 8.55 + math.sin(a) * 0.21), (0.09, 0.05, 0.09), clock_face, bevel=0.015, rot=(0, -a, 0)))
+        parts.append(merge_parts_into(f"Kule_Crescent_{sy}", cr_subs, clock_face))
+        parts.append(add_box(f"Kule_Star_{sy}", (0.16, sy * 1.52, 8.56), (0.11, 0.05, 0.11), red, rot=(0, math.radians(45), 0)))
+
+    # 8. Tiered Gilded Dome Finial + Curved Brass Crescent Alem Spire!
+    fin_subs = [
+        add_cyl("fin_dome", (0, 0, 9.72), 0.72, 0.34, gold, verts=20),
+        add_cyl("fin_cone", (0, 0, 10.02), 0.44, 0.08, gold, verts=16),
+        add_cyl("fin_rod", (0, 0, 10.48), 0.05, 0.78, gold, verts=12),
+        add_cyl("fin_orb1", (0, 0, 10.35), 0.14, 0.16, gold, verts=14),
+        add_cyl("fin_orb2", (0, 0, 10.65), 0.10, 0.12, gold, verts=14),
+    ]
+    for ci in range(7):
+        a = math.radians(-110 + ci * 36)
+        fin_subs.append(add_box(f"fin_c_{ci}", (math.sin(a) * 0.18, 0, 11.02 - math.cos(a) * 0.18), (0.06, 0.04, 0.07), gold, bevel=0.01))
+    parts.append(merge_parts_into("Kule_Finial", fin_subs, gold))
     return parts
 
 

@@ -328,10 +328,11 @@ namespace OurWorld.World
                 return SurfaceClass.Asphalt;
             }
 
-            // Cobblestone plazas, kilit parke sidewalks & walkways
+            // Cobblestone plazas, kilit parke sidewalks, walkways & historic stone fortresses
             if (combined.Contains("parke") || combined.Contains("sidewalk") || combined.Contains("plaza") ||
                 combined.Contains("promenade") || combined.Contains("walkway") || combined.Contains("cobble") ||
-                combined.Contains("travertine") || combined.Contains("pavement") || combined.Contains("stonepath"))
+                combined.Contains("travertine") || combined.Contains("pavement") || combined.Contains("stonepath") ||
+                combined.Contains("fortress") || combined.Contains("castlewall") || combined.Contains("watchtower"))
             {
                 return SurfaceClass.Cobblestone;
             }

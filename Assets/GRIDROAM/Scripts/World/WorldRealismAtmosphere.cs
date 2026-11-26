@@ -402,12 +402,12 @@ namespace OurWorld.World
                         });
                     }
                 }
-                else if ((n.StartsWith("OW_PlaneTree", StringComparison.OrdinalIgnoreCase) ||
-                          n.StartsWith("OW_CypressTree", StringComparison.OrdinalIgnoreCase)) &&
-                         tr.childCount > 0)
+                else if (n.StartsWith("OW_PlaneTree", StringComparison.OrdinalIgnoreCase) ||
+                         n.StartsWith("OW_CypressTree", StringComparison.OrdinalIgnoreCase) ||
+                         n.StartsWith("OW_AydosPineTree", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Tilt visual model child (not collider root!) gently in Istanbul breeze
-                    Transform visChild = tr.GetChild(0);
+                    // Tilt visual model (not collider root!) gently in Istanbul breeze
+                    Transform visChild = tr.childCount > 0 ? tr.GetChild(0) : tr;
                     if (visChild != null && visChild.GetComponent<Collider>() == null && addedSway.Add(visChild) && _swayTargets.Count < 140)
                     {
                         _swayTargets.Add(new SwayEntry

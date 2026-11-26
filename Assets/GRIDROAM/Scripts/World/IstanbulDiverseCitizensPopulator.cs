@@ -717,7 +717,38 @@ namespace OurWorld.World
             string[] linesEn,
             int accessoryVariant)
         {
-            ProceduralHumanoid hum = Instantiate(template, parent);
+            bool isChild = arch == CitizenArchetype.ChildPlay || arch == CitizenArchetype.ChildWithParent;
+            CharacterArchetype meshArch = arch switch
+            {
+                CitizenArchetype.ChildPlay or CitizenArchetype.ChildWithParent => CharacterArchetype.Child,
+                CitizenArchetype.Mother or CitizenArchetype.ElderWoman => CharacterArchetype.CasualFemale,
+                CitizenArchetype.Student => (serial % 2 == 0) ? CharacterArchetype.CasualFemale : CharacterArchetype.CasualMale,
+                CitizenArchetype.Sweeper or CitizenArchetype.Courier or CitizenArchetype.Zabita or CitizenArchetype.Worker => CharacterArchetype.Worker,
+                _ => CharacterArchetype.CasualMale
+            };
+
+            Color shirtCol = ExtractMatColor(arch switch
+            {
+                CitizenArchetype.ChildPlay or CitizenArchetype.ChildWithParent => _kidShirtMats[serial % _kidShirtMats.Length],
+                CitizenArchetype.Sweeper => _hiVisYellowMat,
+                CitizenArchetype.Courier => (serial % 2 == 0) ? _hiVisOrangeMat : _adultShirtMats[6],
+                CitizenArchetype.Zabita => _zabitaNavyMat,
+                CitizenArchetype.Worker => _hiVisOrangeMat,
+                _ => _adultShirtMats[serial % _adultShirtMats.Length]
+            });
+            Color pantsCol = ExtractMatColor(arch == CitizenArchetype.Zabita ? _zabitaNavyMat : _pantsMats[(serial * 3 + 1) % _pantsMats.Length]);
+            Color hairCol = (arch == CitizenArchetype.ElderMan || arch == CitizenArchetype.ElderWoman)
+                ? RealisticCharacterFactory.SilverElderHair
+                : RealisticCharacterFactory.DiverseHairPalette[(serial * 5) % RealisticCharacterFactory.DiverseHairPalette.Length];
+            Color skinCol = RealisticCharacterFactory.DiverseSkinPalette[serial % RealisticCharacterFactory.DiverseSkinPalette.Length];
+            Color? packCol = isChild ? ExtractMatColor(_backpackMats[accessoryVariant % _backpackMats.Length]) : (Color?)null;
+
+            ProceduralHumanoid hum = RealisticCharacterFactory.BuildCharacter(
+                parent, meshArch, template, shirtCol, pantsCol, hairCol, skinCol,
+                height: 1.78f,
+                goldAccents: arch == CitizenArchetype.Zabita,
+                backpackOrBeltColor: packCol);
+            if (hum == null) hum = Instantiate(template, parent);
             hum.name = $"DiverseCitizen_{serial:00}_{arch}_{displayName}";
 
             Vector3 startPos = route[0];
@@ -737,7 +768,6 @@ namespace OurWorld.World
             }
             hum.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
-            bool isChild = arch == CitizenArchetype.ChildPlay || arch == CitizenArchetype.ChildWithParent;
             float heightScale = arch switch
             {
                 CitizenArchetype.ChildPlay => UnityEngine.Random.Range(0.66f, 0.74f),
@@ -750,12 +780,6 @@ namespace OurWorld.World
                 _ => UnityEngine.Random.Range(0.96f, 1.05f)
             };
             hum.transform.localScale = Vector3.one * heightScale;
-
-            // Natural child head proportion (slightly larger head ratio looks unmistakably like a real child!)
-            if (isChild && hum.HeadPivot != null)
-            {
-                hum.HeadPivot.localScale = Vector3.one * 1.13f;
-            }
 
             // Replace any stray colliders with a single accurate CapsuleCollider + kinematic Rigidbody + LivingNpcColliderBridge
             Collider[] oldCols = hum.GetComponentsInChildren<Collider>(true);
@@ -770,8 +794,7 @@ namespace OurWorld.World
             int listIdx = _citizens.Count;
             hum.gameObject.AddComponent<LivingNpcColliderBridge>().ConfigureDiverse(listIdx);
 
-            // Apply distinctive outfit, pants, hair & skin materials
-            ApplyArchetypeMaterials(hum, arch, serial);
+            // Attach distinctive role accessories (scarf, cap, broom, thermal box, hard hat; Child already has sculpted Blender backpack!)
             AttachArchetypeAccessories(hum, arch, accessoryVariant);
 
             hum.SetLocomotion(0f, true, 0f);
@@ -868,6 +891,14 @@ namespace OurWorld.World
             }
         }
 
+        private static Color ExtractMatColor(Material m)
+        {
+            if (m == null) return new Color(0.28f, 0.42f, 0.58f);
+            if (m.HasProperty(BaseColorId)) return m.GetColor(BaseColorId);
+            if (m.HasProperty(ColorId)) return m.GetColor(ColorId);
+            return new Color(0.28f, 0.42f, 0.58f);
+        }
+
         private void AttachArchetypeAccessories(ProceduralHumanoid hum, CitizenArchetype arch, int variant)
         {
             Transform headTf = hum.HeadPivot ?? FindChildRecursive(hum.transform, "Head");
@@ -878,11 +909,8 @@ namespace OurWorld.World
             {
                 case CitizenArchetype.ChildPlay:
                 case CitizenArchetype.ChildWithParent:
-                    if (spineTf != null)
-                    {
-                        BuildSchoolBackpack(spineTf, _backpackMats[variant % _backpackMats.Length], _reflectiveMat);
-                    }
-                    if (headTf != null && (variant % 2 == 1))
+                    // Sculpted Blender Character_Child already has a 3D hoodie & backpack baked into Part_Chest!
+                    if (headTf != null && (variant % 3 == 1))
                     {
                         BuildBaseballCap(headTf, _backpackMats[(variant + 2) % _backpackMats.Length], _goldBadgeMat);
                     }

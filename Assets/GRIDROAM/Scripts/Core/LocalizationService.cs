@@ -19,6 +19,17 @@ namespace OurWorld.Core
         public event Action<string> OnLanguageChanged;
 
         private readonly Dictionary<string, string> _table = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, (string tr, string en)> RuntimeFallbackTable
+            = new Dictionary<string, (string tr, string en)>(StringComparer.OrdinalIgnoreCase);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRuntimeTable() => RuntimeFallbackTable.Clear();
+
+        public static void RegisterRuntimeText(string key, string trValue, string enValue)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            RuntimeFallbackTable[key] = (trValue ?? string.Empty, enValue ?? trValue ?? string.Empty);
+        }
 
         [Serializable]
         private class LocalizationEntry
@@ -135,6 +146,11 @@ namespace OurWorld.Core
             if (_table.TryGetValue(key, out string value))
             {
                 return value;
+            }
+
+            if (RuntimeFallbackTable.TryGetValue(key, out var rt))
+            {
+                return string.Equals(CurrentLanguage, "en", StringComparison.OrdinalIgnoreCase) ? rt.en : rt.tr;
             }
 
             return !string.IsNullOrEmpty(fallback) ? fallback : key;

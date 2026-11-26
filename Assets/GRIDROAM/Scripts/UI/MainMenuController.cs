@@ -54,7 +54,7 @@ namespace OurWorld.UI
         private static readonly Color SegInactive = new Color(0.13f, 0.18f, 0.26f, 0.95f);
 
         private const string PrefMasterVolumeKey = "ow_master_volume";
-        private const int DefaultTotalStoryMissions = 26;
+        private const int DefaultTotalStoryMissions = 32;
 
         private struct ScenicVista
         {

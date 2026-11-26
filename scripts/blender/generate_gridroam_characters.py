@@ -24,6 +24,7 @@ from mathutils import Vector, Matrix, Euler
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 OUT_FBX_DIR = os.path.join(PROJECT_ROOT, "Assets", "GRIDROAM", "Art", "Models", "Blender")
+RES_CHAR_DIR = os.path.join(PROJECT_ROOT, "Assets", "GRIDROAM", "Resources", "OurWorldCharacters")
 BLEND_OUT_DIR = os.path.join(SCRIPT_DIR, "blend_sources")
 PREVIEW_PATH = os.environ.get(
     "GRIDROAM_CHAR_PREVIEW_PATH",
@@ -31,6 +32,7 @@ PREVIEW_PATH = os.environ.get(
 )
 
 os.makedirs(OUT_FBX_DIR, exist_ok=True)
+os.makedirs(RES_CHAR_DIR, exist_ok=True)
 os.makedirs(BLEND_OUT_DIR, exist_ok=True)
 
 
@@ -270,46 +272,62 @@ def build_torso_mesh(mats, variant="male"):
     parts = []
     is_female = (variant == "female")
     is_worker = (variant == "worker")
+    is_child = (variant == "child")
+    is_boss = (variant == "boss")
 
     # v13: anatomical V-taper — narrow waist, full chest, sloped trapezius rolling into the
     # shoulder pivot (x≈0.20 male / 0.174 female at z=0.382) so arms read as attached, not boxy.
     def torso_profile(inflate):
-        if is_female:
+        if is_female or is_child:
             base = [
                 (-0.050, 0.150, 0.118, 0.124, -0.002),
                 (0.040,  0.128, 0.108, 0.112, 0.000),   # natural waist
                 (0.140,  0.140, 0.118, 0.116, 0.003),
-                (0.230,  0.160, 0.148, 0.120, 0.008),   # bust
-                (0.300,  0.168, 0.150, 0.124, 0.008),
-                (0.350,  0.176, 0.128, 0.122, 0.004),
-                (0.392,  0.172, 0.108, 0.110, 0.002),
+                (0.230,  0.156 if is_child else 0.160, 0.130 if is_child else 0.148, 0.120, 0.006 if is_child else 0.008),
+                (0.300,  0.164 if is_child else 0.168, 0.132 if is_child else 0.150, 0.124, 0.006 if is_child else 0.008),
+                (0.350,  0.174 if is_child else 0.176, 0.124 if is_child else 0.128, 0.122, 0.004),
+                (0.392,  0.170 if is_child else 0.172, 0.108, 0.110, 0.002),
                 (0.425,  0.132, 0.090, 0.096, 0.000),
                 (0.455,  0.094, 0.078, 0.084, -0.002),
                 (0.480,  0.068, 0.066, 0.072, -0.003),
             ]
         else:
+            b_mul = 1.07 if is_boss else 1.0
             base = [
-                (-0.050, 0.162, 0.124, 0.130, -0.002),
-                (0.050,  0.152, 0.120, 0.122, 0.000),   # waist
-                (0.150,  0.166, 0.130, 0.126, 0.003),
-                (0.240,  0.188, 0.142, 0.132, 0.006),   # lower chest
-                (0.310,  0.200, 0.150, 0.138, 0.008),   # pecs
-                (0.355,  0.206, 0.138, 0.134, 0.004),
-                (0.395,  0.200, 0.118, 0.120, 0.002),   # deltoid / acromion
-                (0.428,  0.150, 0.098, 0.104, 0.000),   # trapezius slope
-                (0.456,  0.108, 0.084, 0.090, -0.002),
-                (0.480,  0.076, 0.074, 0.080, -0.003),
+                (-0.050, 0.162 * b_mul, 0.124 * b_mul, 0.130 * b_mul, -0.002),
+                (0.050,  0.152 * b_mul, 0.120 * b_mul, 0.122 * b_mul, 0.000),   # waist
+                (0.150,  0.166 * b_mul, 0.130 * b_mul, 0.126 * b_mul, 0.003),
+                (0.240,  0.188 * b_mul, 0.142 * b_mul, 0.132 * b_mul, 0.006),   # lower chest
+                (0.310,  0.200 * b_mul, 0.150 * b_mul, 0.138 * b_mul, 0.008),   # pecs
+                (0.355,  0.206 * b_mul, 0.138 * b_mul, 0.134 * b_mul, 0.004),
+                (0.395,  0.200 * b_mul, 0.118 * b_mul, 0.120 * b_mul, 0.002),   # deltoid / acromion
+                (0.428,  0.150 * b_mul, 0.098 * b_mul, 0.104 * b_mul, 0.000),   # trapezius slope
+                (0.456,  0.108 * b_mul, 0.084 * b_mul, 0.090 * b_mul, -0.002),
+                (0.480,  0.076 * b_mul, 0.074 * b_mul, 0.080 * b_mul, -0.003),
             ]
         return [(z, rx + inflate, f + inflate, b + inflate, y, 0.0) for (z, rx, f, b, y) in base]
 
     # Inner undershirt core (full realistic ribcage depth — zero cardboard-thin silhouette!)
     inner_specs = torso_profile(-0.012)
-    inner_mat = mats["CharShirt"] if is_worker else mats["CharUndershirt"]
-    parts.append(loft_oval_rings("Torso_Inner", inner_specs, 16 if not is_worker else 20, inner_mat, smooth_angle=68.0, subsurf_levels=0 if not is_worker else 1))
+    inner_mat = mats["CharShirt"] if (is_worker or is_child) else mats["CharUndershirt"]
+    parts.append(loft_oval_rings("Torso_Inner", inner_specs, 16 if not (is_worker or is_child) else 20, inner_mat, smooth_angle=68.0, subsurf_levels=0 if not (is_worker or is_child) else 1))
     chest_f = inner_specs[4][2] + 0.012
 
-    # Main outer sculpted jacket / shirt shell with natural sloped trapezius shoulders & clean hem
-    if is_worker:
+    # Main outer sculpted jacket / hoodie / trenchcoat shell
+    if is_child:
+        # Cozy pullover hoodie + flush kangaroo pocket + resting hood behind neck + 3D school backpack!
+        hoodie_specs = torso_profile(0.011)
+        parts.append(loft_oval_rings("Torso_ChildHoodie", hoodie_specs, 18, mats["CharShirt"], smooth_angle=68.0, subsurf_levels=1))
+        parts.append(add_bevel_box("Hoodie_KangarooPocket", (0.0, chest_f - 0.004, 0.115), (0.168, 0.016, 0.095), mats["CharShirt"], bevel=0.007, segments=1))
+        parts.append(add_ellipsoid("Hoodie_RestingHood", (0.0, -0.098, 0.435), (0.110, 0.064, 0.056), mats["CharShirt"], segs=14, rings=8, rot_euler=(0.35, 0.0, 0.0)))
+        # Sculpted school backpack cleanly seated on back + flush contoured shoulder straps!
+        parts.append(add_bevel_box("Child_BackpackMain", (0.0, -0.185, 0.255), (0.225, 0.115, 0.295), mats["CharBelt"], bevel=0.028, segments=2))
+        parts.append(add_bevel_box("Child_BackpackFrontPouch", (0.0, -0.244, 0.185), (0.175, 0.044, 0.140), mats["CharPants"], bevel=0.014, segments=1))
+        parts.append(add_bevel_box("Child_BackpackZipper", (0.0, -0.264, 0.236), (0.155, 0.009, 0.010), mats["CharBuckle"], bevel=0.003, segments=1))
+        for sx in (-1.0, 1.0):
+            parts.append(add_bevel_box(f"Child_StrapTop_{sx}", (sx * 0.098, -0.018, 0.418), (0.032, 0.205, 0.016), mats["CharBelt"], bevel=0.005, segments=1, rot_euler=(0.14, 0.0, 0.0)))
+            parts.append(add_bevel_box(f"Child_StrapFront_{sx}", (sx * 0.098, chest_f - 0.006, 0.270), (0.028, 0.014, 0.255), mats["CharBelt"], bevel=0.004, segments=1, rot_euler=(-0.08, 0.0, 0.0)))
+    elif is_worker:
         jacket_specs = torso_profile(0.010)
         parts.append(loft_oval_rings("Torso_WorkJacket", jacket_specs, 20, mats["CharShirt"], smooth_angle=68.0, subsurf_levels=1))
         parts.append(add_bevel_box("Work_ZipPlacket", (0.0, chest_f + 0.010, 0.21), (0.024, 0.014, 0.41), mats["CharBelt"], bevel=0.004, segments=1))
@@ -317,14 +335,19 @@ def build_torso_mesh(mats, variant="male"):
             parts.append(add_bevel_box(f"Work_Pocket_{sx}", (sx * 0.086, chest_f + 0.008, 0.295), (0.068, 0.018, 0.072), mats["CharShirt"], bevel=0.006, segments=1))
             parts.append(add_bevel_box(f"Work_PocketFlap_{sx}", (sx * 0.086, chest_f + 0.012, 0.326), (0.072, 0.014, 0.022), mats["CharPants"], bevel=0.004, segments=1))
     else:
-        # Open-front casual jacket: sculpted lapel drape & rich athletic chest volume
+        # Open-front casual jacket or long Boss leather trenchcoat with sharp lapels!
         bm = bmesh.new()
         segs = 20
-        ring_specs = torso_profile(0.012)
-        ring_specs[0] = (ring_specs[0][0] - 0.004, ring_specs[0][1] + 0.010, ring_specs[0][2] + 0.008, ring_specs[0][3] + 0.010, ring_specs[0][4], 0.0)  # relaxed hem flare
+        ring_specs = torso_profile(0.014 if is_boss else 0.012)
+        if is_boss:
+            # Extended boss trenchcoat hem draping down past the hips + sharp gold lapel trim!
+            hem_low = (-0.155, ring_specs[0][1] + 0.032, ring_specs[0][2] + 0.020, ring_specs[0][3] + 0.034, -0.006, 0.0)
+            ring_specs = [hem_low] + ring_specs
+        else:
+            ring_specs[0] = (ring_specs[0][0] - 0.004, ring_specs[0][1] + 0.010, ring_specs[0][2] + 0.008, ring_specs[0][3] + 0.010, ring_specs[0][4], 0.0)
         jacket_angles = [math.radians(108.0 + (s / (segs - 1)) * 324.0) for s in range(segs)]
         out_rings, in_rings = [], []
-        thick = 0.015
+        thick = 0.017 if is_boss else 0.015
         for (z, rx, ry_f, ry_b, y_off, x_off) in ring_specs:
             ro, ri = [], []
             for ang in jacket_angles:
@@ -346,11 +369,16 @@ def build_torso_mesh(mats, variant="male"):
             bm.faces.new((out_rings[-1][s], out_rings[-1][s + 1], in_rings[-1][s + 1], in_rings[-1][s]))
 
         parts.append(make_obj_from_bm("Torso_OpenJacket", bm, mats["CharShirt"], smooth_angle=66.0, subsurf_levels=1))
+        if is_boss:
+            for sx in (-1.0, 1.0):
+                parts.append(add_bevel_box(f"Boss_LapelTrim_{sx}", (sx * 0.082, chest_f + 0.012, 0.345), (0.036, 0.014, 0.195), mats["CharBuckle"], bevel=0.004, segments=1, rot_euler=(-0.10, sx * 0.16, 0.0)))
+                parts.append(add_bevel_box(f"Boss_Epaulette_{sx}", (sx * 0.168, 0.002, 0.422), (0.072, 0.038, 0.016), mats["CharBuckle"], bevel=0.004, segments=1, rot_euler=(0.0, sx * 0.28, 0.0)))
 
-    # Rolled jacket collar sitting snugly around neck base
+    # Rolled jacket collar (raised boss collar for Boss Kuzgun!)
+    collar_top = 0.522 if is_boss else 0.498
     collar_specs = [
         (0.455, 0.094, 0.088, 0.092, -0.005, 0.0),
-        (0.498, 0.086, 0.082, 0.088, -0.007, 0.0),
+        (collar_top, 0.088 if is_boss else 0.086, 0.082, 0.094 if is_boss else 0.088, -0.008, 0.0),
     ]
     parts.append(loft_oval_rings("Torso_Collar", collar_specs, 18, mats["CharShirt"], cap_bottom=False, cap_top=True, smooth_angle=56.0, subsurf_levels=0))
 
@@ -372,6 +400,8 @@ def build_head_mesh(mats, variant="male"):
     parts = []
     is_female = (variant == "female")
     is_worker = (variant == "worker")
+    is_child = (variant == "child")
+    is_boss = (variant == "boss")
 
     jaw_w = 0.064 if is_female else 0.072
     cheek_w = 0.082 if is_female else 0.086
@@ -499,9 +529,24 @@ def build_head_mesh(mats, variant="male"):
             parts.append(add_ellipsoid(f"Hair_MaleTuft_{sx}", (sx * 0.050, 0.010, 0.214 + z_shift), (0.036, 0.060, 0.022), mats["CharHair"], segs=10, rings=6, rot_euler=(0.0, sx * 0.30, 0.0)))
             parts.append(add_bevel_box(f"Hair_Sideburn_{sx}", (sx * 0.086, 0.020, 0.112 + z_shift), (0.010, 0.020, 0.044), mats["CharHair"], bevel=0.004, segments=1))
 
+    if is_boss:
+        # Boss "Kuzgun" Bora Karahan: sculpted dark trimmed beard/goatee + gold-rimmed dark aviator sunglasses!
+        beard_specs = [
+            (-0.002 + z_shift, 0.036, 0.046, 0.020, 0.042, 0.0),
+            (0.018 + z_shift, 0.064, 0.078, 0.036, 0.024, 0.0),
+            (0.044 + z_shift, 0.074, 0.090, 0.046, 0.016, 0.0),
+            (0.068 + z_shift, 0.076, 0.094, 0.042, 0.012, 0.0),
+        ]
+        parts.append(loft_oval_rings("Boss_TrimmedBeard", beard_specs, 16, mats["CharHair"], smooth_angle=65.0, subsurf_levels=1))
+        for sx in (-1.0, 1.0):
+            parts.append(add_bevel_box(f"Boss_ShadeLens_{sx}", (sx * 0.034, 0.112, 0.117 + z_shift), (0.046, 0.010, 0.028), mats["CharEyeIris"], bevel=0.004, segments=1))
+            parts.append(add_bevel_box(f"Boss_ShadeArm_{sx}", (sx * 0.082, 0.055, 0.120 + z_shift), (0.007, 0.115, 0.007), mats["CharBuckle"], bevel=0.002, segments=1))
+        parts.append(add_bevel_box("Boss_ShadeBridge", (0.0, 0.114, 0.124 + z_shift), (0.120, 0.009, 0.008), mats["CharBuckle"], bevel=0.002, segments=1))
+
     head = join_parts_at_origin(parts, "Head_Mesh")
-    # v13: slightly larger head for natural adult proportions next to the broader torso
-    head.scale = Vector((1.07, 1.07, 1.07))
+    # Natural head proportion (slightly larger youthful ratio for children!)
+    h_scale = 1.15 if is_child else 1.07
+    head.scale = Vector((h_scale, h_scale, h_scale))
     bpy.ops.object.select_all(action="DESELECT")
     head.select_set(True)
     bpy.context.view_layer.objects.active = head
@@ -683,9 +728,9 @@ def loft_superellipse_y(name, specs, segments, mat, exponent=2.5, subsurf_levels
 # Full Articulated Character Rig Assembly (Exact 14 Pivots for Unity!)
 # ---------------------------------------------------------------------------
 def build_character_rig(rig_name, variant, mats):
-    is_female = (variant == "female")
-    is_worker = (variant == "worker")
-    shldr_x = 0.174 if is_female else 0.200
+    is_female = (variant == "female" or variant == "child")
+    is_worker = (variant == "worker" or variant == "boss")
+    shldr_x = 0.172 if is_female else (0.212 if variant == "boss" else 0.200)
     hip_x = 0.102 if is_female else 0.106
 
     root = make_pivot(rig_name, None, (0.0, 0.0, 0.0))
@@ -734,8 +779,8 @@ def build_flat_export_parts(variant, mats):
     directly into vertices with identity transforms!
     Unity's ProceduralHumanoid mounts each named part onto its exact corresponding skeleton pivot.
     """
-    is_female = (variant == "female")
-    is_worker = (variant == "worker")
+    is_female = (variant == "female" or variant == "child")
+    is_worker = (variant == "worker" or variant == "boss")
 
     parts = [
         ("Part_Pelvis",      build_pelvis_mesh(mats, is_female=is_female)),
@@ -763,8 +808,8 @@ def build_flat_export_parts(variant, mats):
     return out
 
 
-def export_parts_fbx(part_objs, filename):
-    filepath = os.path.join(OUT_FBX_DIR, filename)
+def export_parts_fbx(part_objs, filename, out_dir=None):
+    filepath = os.path.join(out_dir if out_dir else OUT_FBX_DIR, filename)
     bpy.ops.object.select_all(action="DESELECT")
     for t in part_objs:
         t.select_set(True)
@@ -802,21 +847,25 @@ def render_character_showcase():
     bmesh.ops.create_grid(bm_g, x_segments=1, y_segments=1, size=14.0)
     create_floor = make_obj_from_bm("StudioFloor", bm_g, make_mat("Floor", (0.20, 0.22, 0.25), roughness=0.72))
 
-    # Build 4 showcase poses: Player (blue jacket), Elena (teal coat), Marco (orange work jacket + cap), Back 3/4 Pedestrian (burgundy)
+    # Build 5 showcase poses: Deniz (blue jacket), Elena (teal coat), Worker (orange jacket + cap), Child (hoodie + backpack), Boss Kuzgun Bora (black leather trenchcoat + gold trim)
     configs = [
-        ("Showcase_Player",   "male",   (-1.55, 0.0, 0.0),  162.0, (0.16, 0.30, 0.48), (0.14, 0.16, 0.22), (0.12, 0.08, 0.05)),
-        ("Showcase_Elena",    "female", (-0.50, 0.0, 0.0),  175.0, (0.16, 0.54, 0.46), (0.16, 0.18, 0.22), (0.22, 0.13, 0.07)),
-        ("Showcase_Marco",    "worker", (0.55,  0.0, 0.0),  192.0, (0.76, 0.42, 0.14), (0.18, 0.20, 0.24), (0.14, 0.10, 0.07)),
-        ("Showcase_BackView", "male",   (1.58,  0.0, 0.0),  -38.0, (0.46, 0.14, 0.24), (0.20, 0.22, 0.26), (0.18, 0.12, 0.08)),
+        ("Showcase_Player",   "male",   (-2.05, 0.0, 0.0),  165.0, (0.16, 0.30, 0.48), (0.14, 0.16, 0.22), (0.12, 0.08, 0.05), 1.00),
+        ("Showcase_Female",   "female", (-1.05, 0.0, 0.0),  175.0, (0.16, 0.54, 0.46), (0.16, 0.18, 0.22), (0.22, 0.13, 0.07), 0.96),
+        ("Showcase_Worker",   "worker", ( 0.00, 0.0, 0.0),  185.0, (0.76, 0.42, 0.14), (0.18, 0.20, 0.24), (0.14, 0.10, 0.07), 1.00),
+        ("Showcase_Child",    "child",  ( 0.95, 0.0, 0.0),  192.0, (0.86, 0.26, 0.22), (0.18, 0.26, 0.44), (0.16, 0.10, 0.06), 0.72),
+        ("Showcase_Boss",     "boss",   ( 1.95, 0.0, 0.0),  200.0, (0.10, 0.11, 0.14), (0.09, 0.10, 0.12), (0.07, 0.07, 0.08), 1.07),
     ]
 
-    for cname, variant, pos, yaw_deg, shirt_rgb, pants_rgb, hair_rgb in configs:
+    for cname, variant, pos, yaw_deg, shirt_rgb, pants_rgb, hair_rgb, sc in configs:
         m = dict(mats_base)
-        m["CharShirt"] = make_mat(f"{cname}_Shirt", shirt_rgb, roughness=0.72)
+        m["CharShirt"] = make_mat(f"{cname}_Shirt", shirt_rgb, roughness=0.38 if variant == "boss" else 0.72)
         m["CharPants"] = make_mat(f"{cname}_Pants", pants_rgb, roughness=0.80)
         m["CharHair"] = make_mat(f"{cname}_Hair", hair_rgb, roughness=0.60)
+        if variant == "boss":
+            m["CharBuckle"] = make_mat(f"{cname}_Gold", (0.94, 0.74, 0.22), roughness=0.20, metallic=0.92)
         rig = build_character_rig(cname, variant, m)
         rig.location = Vector(pos)
+        rig.scale = Vector((sc, sc, sc))
         rig.rotation_euler = Euler((0.0, 0.0, math.radians(yaw_deg)), "XYZ")
 
     # Lighting + World
@@ -851,7 +900,7 @@ def render_character_showcase():
     cam_d.lens = 50.0
     cam = bpy.data.objects.new("CharCam", cam_d)
     bpy.context.collection.objects.link(cam)
-    cam.location = Vector((0.0, -5.2, 1.25))
+    cam.location = Vector((0.0, -6.9, 1.25))
     direction = Vector((0.0, 0.0, 0.95)) - cam.location
     cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
     bpy.context.scene.camera = cam
@@ -872,16 +921,19 @@ def main():
         ("Character_CasualMale.fbx",   "Character_CasualMale",   "male"),
         ("Character_CasualFemale.fbx", "Character_CasualFemale", "female"),
         ("Character_Worker.fbx",       "Character_Worker",       "worker"),
+        ("Character_Child.fbx",        "Character_Child",        "child"),
+        ("Character_BossKuzgun.fbx",   "Character_BossKuzgun",   "boss"),
     ]
-    print(f"[GRIDROAM Blender] Generating {len(variants)} articulated realistic human FBX rigs into {OUT_FBX_DIR} ...")
+    print(f"[GRIDROAM Blender] Generating {len(variants)} articulated realistic human FBX rigs into {RES_CHAR_DIR} & {OUT_FBX_DIR} ...")
     for fbx_name, rig_name, variant in variants:
         reset_scene()
         mats = get_character_materials()
         part_objs = build_flat_export_parts(variant, mats)
-        export_parts_fbx(part_objs, fbx_name)
+        export_parts_fbx(part_objs, fbx_name, out_dir=RES_CHAR_DIR)
+        export_parts_fbx(part_objs, fbx_name, out_dir=OUT_FBX_DIR)
 
     render_character_showcase()
-    print("[GRIDROAM Blender] All 3 articulated human character rigs exported successfully!")
+    print("[GRIDROAM Blender] All 5 articulated human character rigs exported successfully!")
 
 
 if __name__ == "__main__":

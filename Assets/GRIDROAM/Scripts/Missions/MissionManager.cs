@@ -49,6 +49,8 @@ namespace OurWorld.Missions
         private float _tailGraceTimer;
         private TailWarningState _tailWarningState = TailWarningState.None;
         private float _swimStepTimer;
+        private float _stealthWarnCooldown;
+        private bool _evadeStepArmed;
 
         // Dialogue state
         private DialogueData _activeDialogue;
@@ -201,24 +203,62 @@ namespace OurWorld.Missions
             }
 
             StopAllCoroutines();
+            ChapterSevenEightStoryExpansion.Instance?.ClearActiveHostiles();
             _activeMission = mission;
             _currentStepIndex = -1;
             _isFailed = false;
             _isInFreeRoam = false;
             _hasActiveTimer = false;
+            _evadeStepArmed = false;
             _tailWarningState = TailWarningState.None;
 
             AdvanceToNextStep();
         }
 
+        public bool JumpToMissionById(string missionId)
+        {
+            if (missionCatalog == null || string.IsNullOrEmpty(missionId)) return false;
+            MissionData target = missionCatalog.GetById(missionId);
+            if (target == null) return false;
+            if (SaveManager.Instance != null && !SaveManager.Instance.Data.hasVehicleKeys)
+            {
+                SaveManager.Instance.SetVehicleKeysUnlocked(true);
+            }
+            CloseDialogueImmediate();
+            StartMission(target);
+            return true;
+        }
+
+        public void NotifyHostilesDefeated(string targetAnchorId)
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed || IsDialoguePlaying) return;
+            if (step.stepType != MissionStepType.DefeatHostiles) return;
+            if (!string.Equals(step.targetAnchorId, targetAnchorId, StringComparison.OrdinalIgnoreCase)) return;
+
+            GameFeelAudio.PlayMilestoneFanfare();
+            CompleteCurrentStep(step);
+        }
+
+        public void FailActiveCombatStepOnPlayerKnockout()
+        {
+            MissionStepData step = CurrentStep;
+            if (step == null || _isFailed) return;
+            if (step.stepType != MissionStepType.DefeatHostiles) return;
+
+            FailActiveMission("ch78.fail.ko");
+        }
+
         public void EnterFreeRoam()
         {
+            ChapterSevenEightStoryExpansion.Instance?.ClearActiveHostiles();
             _activeMission = null;
             _currentStepIndex = -1;
             _currentTargetAnchor = null;
             _isFailed = false;
             _isInFreeRoam = true;
             _hasActiveTimer = false;
+            _evadeStepArmed = false;
             _tailWarningState = TailWarningState.None;
 
             if (objectiveBeacon != null)
@@ -240,6 +280,8 @@ namespace OurWorld.Missions
             MissionData missionToRetry = _activeMission;
             _isFailed = false;
             CloseDialogueImmediate();
+            ChapterSevenEightStoryExpansion.Instance?.ClearActiveHostiles();
+            PoliceWantedSystem.Instance?.ClearWantedQuietly();
 
             // Reset player & vehicle to safe retry anchors.
             PlayerModeController mode = PlayerModeController.Instance;
@@ -323,6 +365,7 @@ namespace OurWorld.Missions
             _hasActiveTimer = false;
             _tailGraceTimer = 0f;
             _swimStepTimer = 0f;
+            _evadeStepArmed = false;
             _tailWarningState = TailWarningState.None;
 
             if (_currentStepIndex >= _activeMission.steps.Count)
@@ -343,6 +386,24 @@ namespace OurWorld.Missions
             {
                 _hasActiveTimer = true;
                 _remainingTime = step.timeLimitSeconds;
+            }
+
+            // GTA Action Step Initialization (Police Pursuit / Gang Ambush)
+            if (step.stepType == MissionStepType.EvadePolice)
+            {
+                if (PoliceWantedSystem.PoliceSystemEnabled)
+                {
+                    int stars = Mathf.Clamp(step.wantedStarsToTrigger > 0 ? step.wantedStarsToTrigger : 2, 1, 5);
+                    PoliceWantedSystem.EnsureInstance()?.SetWantedLevel(stars, announce: true);
+                }
+                _evadeStepArmed = true;
+            }
+            else if (step.stepType == MissionStepType.DefeatHostiles)
+            {
+                ChapterSevenEightStoryExpansion.Instance?.BeginHostileEncounter(
+                    step.targetAnchorId,
+                    Mathf.Max(1, step.hostileCount),
+                    _activeMission.missionId);
             }
 
             UpdateBeaconForCurrentStep();
@@ -386,6 +447,26 @@ namespace OurWorld.Missions
                 }
             }
 
+            // GTA EvadePolice step completes anywhere on the map once Wanted Level reaches 0 (unless Busted)!
+            if (step.stepType == MissionStepType.EvadePolice)
+            {
+                PoliceWantedSystem pws = PoliceWantedSystem.Instance;
+                if (pws != null && pws.IsBusting) return;
+
+                if (_evadeStepArmed && (pws == null || !pws.IsWanted))
+                {
+                    _evadeStepArmed = false;
+                    if (pws != null && pws.WasLastClearByBusted)
+                    {
+                        FailActiveMission("ch78.fail.busted");
+                        return;
+                    }
+                    GameFeelAudio.PlayMilestoneFanfare();
+                    CompleteCurrentStep(step);
+                }
+                return;
+            }
+
             if (_currentTargetAnchor == null && !string.IsNullOrEmpty(step.targetAnchorId))
             {
                 _currentTargetAnchor = WorldAnchorRegistry.Get(step.targetAnchorId);
@@ -414,6 +495,29 @@ namespace OurWorld.Missions
                 if (modeMatches && dist <= radius)
                 {
                     CompleteCurrentStep(step);
+                }
+            }
+            else if (step.stepType == MissionStepType.StealthReach)
+            {
+                if (_stealthWarnCooldown > 0f) _stealthWarnCooldown -= Time.deltaTime;
+                float radius = step.triggerRadius > 0f ? step.triggerRadius : Mathf.Max(3.5f, _currentTargetAnchor.DefaultRadius);
+                bool onFoot = mode.CurrentMode == ControlMode.OnFoot && mode.FootController != null;
+                bool crouching = onFoot && mode.FootController.IsCrouching;
+                if (dist <= radius)
+                {
+                    if (crouching)
+                    {
+                        GameFeelAudio.PlayCoinChime();
+                        CompleteCurrentStep(step);
+                    }
+                    else if (_stealthWarnCooldown <= 0f)
+                    {
+                        _stealthWarnCooldown = 2.6f;
+                        bool enStealth = LocalizationService.IsEnglish;
+                        mode.RaiseStatusMessage(enStealth
+                            ? "🤫 Stay low! Press C (or Crouch) to sneak quietly into the zone!"
+                            : "🤫 Sessiz ol! İçeri gizlice sızmak için eğil (C / Eğil)!");
+                    }
                 }
             }
             else if (step.stepType == MissionStepType.TailVehicle)
@@ -682,6 +786,8 @@ namespace OurWorld.Missions
 
             _isFailed = true;
             _hasActiveTimer = false;
+            _evadeStepArmed = false;
+            ChapterSevenEightStoryExpansion.Instance?.ClearActiveHostiles();
             if (objectiveBeacon != null)
             {
                 objectiveBeacon.SetVisible(false);

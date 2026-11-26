@@ -159,6 +159,12 @@ namespace OurWorld.Player
         private float _hitReactTimer = -1f;
         private float _knockdownTimer = -1f;
         private float _vaultTimer = -1f;
+        private bool _isCrouching;
+        private float _crouchBlend;
+        private bool _isSprintSliding;
+        private float _slideBlend;
+        private float _dodgeRollTimer = -1f;
+        private float _dodgeRollDuration = 0.48f;
         private Vector3? _vaultSupport;
         private bool _isSwimming;
         private bool _swimBreaststroke;
@@ -406,6 +412,24 @@ namespace OurWorld.Player
             _vaultTimer = 0f;
             _vaultSupport = support;
             _waveTimer = -1f;
+        }
+
+        public void SetCrouch(bool crouching)
+        {
+            _isCrouching = crouching;
+        }
+
+        public void SetSprintSlide(bool sliding)
+        {
+            _isSprintSliding = sliding;
+        }
+
+        public void PlayDodgeRoll(float duration = 0.48f)
+        {
+            _dodgeRollDuration = Mathf.Max(0.32f, duration);
+            _dodgeRollTimer = 0f;
+            _waveTimer = -1f;
+            _punchTimer = -1f;
         }
 
         public void PlayLanding()

@@ -119,6 +119,7 @@ namespace OurWorld.Player
             {
                 InputHub.Instance.OnInteractPressed += HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed += HandleExitVehiclePressed;
+                InputHub.Instance.OnCycleCameraPressed += HandleCycleCameraPressed;
                 InputHub.Instance.OnAttackPressed += HandleSportAction;
                 InputHub.Instance.OnAttackReleased += HandleSportActionReleased;
                 InputHub.Instance.OnJumpPressed += HandleSportSecondaryAction;
@@ -144,6 +145,7 @@ namespace OurWorld.Player
             {
                 InputHub.Instance.OnInteractPressed -= HandleInteractPressed;
                 InputHub.Instance.OnExitVehiclePressed -= HandleExitVehiclePressed;
+                InputHub.Instance.OnCycleCameraPressed -= HandleCycleCameraPressed;
                 InputHub.Instance.OnAttackPressed -= HandleSportAction;
                 InputHub.Instance.OnAttackReleased -= HandleSportActionReleased;
                 InputHub.Instance.OnJumpPressed -= HandleSportSecondaryAction;
@@ -880,21 +882,35 @@ namespace OurWorld.Player
             OnEnteredVehicle?.Invoke(_currentVehicle);
         }
 
+        private void HandleCycleCameraPressed()
+        {
+            if (IsModalLocked || cameraRig == null) return;
+            cameraRig.CycleCameraPreset();
+            GameFeelAudio.PlayUiClick();
+            RaiseStatusMessage($"🎥 {cameraRig.GetCameraPresetLabel(IsEn)}");
+        }
+
         public void TryExitVehicle()
         {
             SedanVehicleController activeVeh = _currentVehicle != null ? _currentVehicle : playerSedan;
             if (activeVeh == null || footController == null) return;
 
-            if (activeVeh.SpeedKmh > vehicleExitMaxSpeedKmh)
-            {
-                RaiseStatusMessage(L("Araçtan inmek için önce yavaşla!", "Slow down before exiting the vehicle!"));
-                return;
-            }
+            float exitSpeedKmh = activeVeh.SpeedKmh;
+            bool highSpeedBailOut = exitSpeedKmh > vehicleExitMaxSpeedKmh;
+            Vector3 carVel = Vector3.zero;
+            Rigidbody carRb = activeVeh.GetComponent<Rigidbody>();
+            if (carRb != null) carVel = carRb.linearVelocity;
 
             Vector3 exitPos = activeVeh.GetSafeExitPosition();
             Quaternion exitRot = Quaternion.LookRotation(activeVeh.transform.forward, Vector3.up);
 
             activeVeh.SetPlayerDriving(false);
+            // Preserve forward coasting momentum when player bails out of a speeding car GTA-style!
+            if (highSpeedBailOut && carRb != null)
+            {
+                carRb.linearVelocity = carVel * 0.88f;
+            }
+
             _currentVehicle = null;
             SetNearestInteractable(null);
 
@@ -911,6 +927,11 @@ namespace OurWorld.Player
 
             OnModeChanged?.Invoke(CurrentMode);
             OnExitedVehicle?.Invoke(activeVeh);
+
+            if (highSpeedBailOut)
+            {
+                footController.TriggerVehicleBailOut(carVel, exitSpeedKmh);
+            }
         }
 
         public void TrySitOnSeat(SeatInteractable seat)

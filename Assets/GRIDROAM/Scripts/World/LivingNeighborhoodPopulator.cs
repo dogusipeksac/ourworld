@@ -554,7 +554,31 @@ namespace OurWorld.World
             string[] lines,
             int index)
         {
-            ProceduralHumanoid hum = Instantiate(template, parent);
+            // Real diverse Blender 5.3.0 silhouettes (Male, Female & Worker) with live PBR normal-mapped fabrics/skin/hair!
+            CharacterArchetype meshArch = role == NpcRole.Vendor
+                ? CharacterArchetype.Worker
+                : ((index % 2 == 1) ? CharacterArchetype.CasualFemale : CharacterArchetype.CasualMale);
+            Color shirtCol = (shirtMat != null && shirtMat.HasProperty("_BaseColor"))
+                ? shirtMat.GetColor("_BaseColor")
+                : new Color(0.24f, 0.38f, 0.56f);
+            Color[] npcPants =
+            {
+                new Color(0.16f, 0.24f, 0.38f),
+                new Color(0.14f, 0.15f, 0.18f),
+                new Color(0.36f, 0.31f, 0.25f),
+                new Color(0.20f, 0.22f, 0.28f)
+            };
+            Color pantsCol = npcPants[index % npcPants.Length];
+            bool isElder = !string.IsNullOrEmpty(displayName) &&
+                           (displayName.Contains("Teyze") || displayName.Contains("Amca"));
+            Color hairCol = isElder
+                ? new Color(0.68f, 0.69f, 0.72f)
+                : RealisticCharacterFactory.DiverseHairPalette[(index * 3) % RealisticCharacterFactory.DiverseHairPalette.Length];
+            Color skinCol = RealisticCharacterFactory.DiverseSkinPalette[(index * 2) % RealisticCharacterFactory.DiverseSkinPalette.Length];
+
+            ProceduralHumanoid hum = RealisticCharacterFactory.BuildCharacter(
+                parent, meshArch, template, shirtCol, pantsCol, hairCol, skinCol, height: 1.78f);
+            if (hum == null) hum = Instantiate(template, parent);
             hum.name = $"LivingNPC_{index:00}_{role}";
             Vector3 startPos = route[0];
             if (route.Length > 1)
@@ -565,7 +589,9 @@ namespace OurWorld.World
             }
             hum.transform.position = startPos;
             hum.transform.rotation = Quaternion.Euler(0f, baseYaw, 0f);
-            float heightScale = UnityEngine.Random.Range(0.92f, 1.07f);
+            float heightScale = meshArch == CharacterArchetype.CasualFemale
+                ? UnityEngine.Random.Range(0.91f, 0.98f)
+                : UnityEngine.Random.Range(0.96f, 1.06f);
             hum.transform.localScale = Vector3.one * heightScale;
 
             // Replace any stray template colliders with one clean CapsuleCollider + kinematic Rigidbody
@@ -589,17 +615,6 @@ namespace OurWorld.World
             Rigidbody npcRb = WorldPhysicsSolidifier.EnsureKinematicRigidbody(hum.gameObject);
             int listIdx = _npcs.Count;
             hum.gameObject.AddComponent<LivingNpcColliderBridge>().Configure(listIdx);
-
-            // Apply distinctive neighborhood outfit color
-            Renderer[] rends = hum.GetComponentsInChildren<Renderer>(true);
-            for (int r = 0; r < rends.Length; r++)
-            {
-                string rn = rends[r].name.ToLowerInvariant();
-                if (rn.Contains("chest") || rn.Contains("torso") || rn.Contains("shirt") || rn.Contains("jacket") || rn.Contains("upperarm"))
-                {
-                    rends[r].sharedMaterial = shirtMat;
-                }
-            }
 
             if (role == NpcRole.SeatedTeaGuest)
             {

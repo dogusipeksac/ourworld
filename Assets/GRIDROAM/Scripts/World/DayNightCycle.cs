@@ -321,6 +321,16 @@ namespace OurWorld.World
                 _volBloom = profile.Add<Bloom>(true);
             }
 
+            if (!profile.TryGet(out Tonemapping tone) || tone == null)
+            {
+                tone = profile.Add<Tonemapping>(true);
+            }
+            if (tone != null)
+            {
+                tone.active = true;
+                tone.mode.Override(TonemappingMode.ACES);
+            }
+
             if (!profile.TryGet(out _volWhiteBalance))
             {
                 _volWhiteBalance = profile.Add<WhiteBalance>(true);

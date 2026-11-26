@@ -155,12 +155,15 @@ namespace OurWorld.Vehicle
         private float _exhaustWispTimer;
         private float _driftStreakSeconds;
         private float _driftGraceTimer;
+        private float _burnoutCharge01;
         private bool _wasNitroEmptyWarned;
+        public bool IsAllWheelsAirborne { get; private set; }
 
         private ProceduralHumanoid _seatedDriverHumanoid;
         private Light _headlightBeam;
         private Quaternion _steeringWheelBaseRot = Quaternion.identity;
         private bool _steeringWheelCached;
+        private bool _cockpitUpgraded;
         private bool _wheelVisualsSynced;
 
         // Phase 2 Tuning & Car Wash state + Phase 4 Oto Galeri vehicle spec
@@ -433,7 +436,8 @@ namespace OurWorld.Vehicle
                         {
                             if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", paint);
                             if (mat.HasProperty("_Color")) mat.SetColor("_Color", paint);
-                            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.78f);
+                            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.84f);
+                            UrpRealismLightingOverhaul.EnableClearcoatOnMaterial(mat);
                             changed = true;
                         }
                     }
@@ -553,7 +557,8 @@ namespace OurWorld.Vehicle
                         r.sharedMaterial.name.IndexOf("Body", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         Material m = r.material;
-                        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.86f);
+                        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.88f);
+                        UrpRealismLightingOverhaul.EnableClearcoatOnMaterial(m);
                     }
                 }
             }
@@ -778,6 +783,101 @@ namespace OurWorld.Vehicle
                 _steeringWheelBaseRot = steeringWheelTransform.localRotation;
                 _steeringWheelCached = true;
             }
+
+            if (!_cockpitUpgraded && steeringWheelTransform != null)
+            {
+                _cockpitUpgraded = true;
+                UpgradeCockpitSteeringWheelAndGlow();
+            }
+        }
+
+        /// <summary>
+        /// Replaces primitive cylinder/cube steering wheel with sculpted Blender OW_SteeringWheel.fbx
+        /// (contoured leather rim, red 12-o'clock sport stripe, brushed 3-spoke chrome hub)
+        /// and adds subtle glowing cockpit dashboard gauge & infotainment accents for 1st-Person Cockpit view!
+        /// </summary>
+        private void UpgradeCockpitSteeringWheelAndGlow()
+        {
+            GameObject sculptedWheel = OurWorldModelLibrary.InstantiateModel(
+                "OW_SteeringWheel", steeringWheelTransform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            if (sculptedWheel != null)
+            {
+                for (int i = 0; i < steeringWheelTransform.childCount; i++)
+                {
+                    Transform ch = steeringWheelTransform.GetChild(i);
+                    if (ch != null && ch.gameObject != sculptedWheel &&
+                        (ch.name.Contains("Rim") || ch.name.Contains("Spoke")))
+                    {
+                        ch.gameObject.SetActive(false);
+                    }
+                }
+            }
+
+            // Subtle glowing cockpit instrument cluster & center infotainment screen accent (visible through windshield & in 1st Person!)
+            if (bodyVisualRoot != null && bodyVisualRoot.Find("Cockpit_GaugeGlow") == null)
+            {
+                Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                if (lit != null)
+                {
+                    Material gaugeMat = new Material(lit) { name = "MAT_Cockpit_GaugeGlow" };
+                    Color cyanGlow = new Color(0.28f, 0.86f, 1.0f, 1f);
+                    if (gaugeMat.HasProperty("_BaseColor")) gaugeMat.SetColor("_BaseColor", new Color(0.08f, 0.14f, 0.18f, 1f));
+                    if (gaugeMat.HasProperty("_EmissionColor"))
+                    {
+                        gaugeMat.EnableKeyword("_EMISSION");
+                        gaugeMat.SetColor("_EmissionColor", cyanGlow * 1.45f);
+                    }
+
+                    Vector3 swPos = steeringWheelTransform.localPosition;
+                    GameObject dashGlow = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    dashGlow.name = "Cockpit_GaugeGlow";
+                    dashGlow.transform.SetParent(bodyVisualRoot, false);
+                    dashGlow.transform.localPosition = new Vector3(swPos.x, swPos.y + 0.055f, swPos.z + 0.22f);
+                    dashGlow.transform.localRotation = Quaternion.Euler(10f, 180f, 0f);
+                    dashGlow.transform.localScale = new Vector3(0.26f, 0.072f, 1f);
+                    Collider dc = dashGlow.GetComponent<Collider>();
+                    if (dc != null) Destroy(dc);
+                    Renderer dr = dashGlow.GetComponent<Renderer>();
+                    if (dr != null)
+                    {
+                        dr.sharedMaterial = gaugeMat;
+                        dr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    }
+
+                    GameObject navGlow = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    navGlow.name = "Cockpit_NavGlow";
+                    navGlow.transform.SetParent(bodyVisualRoot, false);
+                    navGlow.transform.localPosition = new Vector3(0.02f, swPos.y + 0.055f, swPos.z + 0.21f);
+                    navGlow.transform.localRotation = Quaternion.Euler(8f, 180f, 0f);
+                    navGlow.transform.localScale = new Vector3(0.19f, 0.105f, 1f);
+                    Collider nc = navGlow.GetComponent<Collider>();
+                    if (nc != null) Destroy(nc);
+                    Renderer nr = navGlow.GetComponent<Renderer>();
+                    if (nr != null)
+                    {
+                        nr.sharedMaterial = gaugeMat;
+                        nr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Computes authentic driver-seat eye position inside the 3D cockpit behind the rotating steering wheel,
+        /// looking over the glowing instrument binnacle and sloped clearcoat hood through the transparent windshield.
+        /// Automatically adapts cleanly across Sedan, Hatchback, SportsCoupe, SUV, Pickup & DeliveryVan!
+        /// </summary>
+        public Vector3 GetFirstPersonCockpitEyeWorldPos()
+        {
+            if (steeringWheelTransform != null && bodyVisualRoot != null)
+            {
+                Vector3 swLocal = steeringWheelTransform.localPosition;
+                // Place eye right behind the steering wheel with comfortable headroom below the dark roof headliner
+                float eyeUp = swLocal.y < 0.92f ? 0.19f : 0.22f; // Extra-low roof clearance on SportsCoupe
+                Vector3 localEye = new Vector3(swLocal.x, swLocal.y + eyeUp, swLocal.z - 0.36f);
+                return bodyVisualRoot.TransformPoint(localEye);
+            }
+            return transform.TransformPoint(new Vector3(-0.36f, 1.21f, -0.05f));
         }
 
         private void UpdateSeatedDriverVisibility()
@@ -1597,6 +1697,62 @@ namespace OurWorld.Vehicle
 
             MaxRearSidewaysSlip = maxRearSlip;
 
+            // Check airborne state for GTA Mid-Air Pitch/Roll Control & Stunt Jump detection!
+            bool anyWheelGrounded = false;
+            for (int i = 0; i < axleInfos.Count; i++)
+            {
+                AxleInfo ax = axleInfos[i];
+                if ((ax.leftWheel != null && ax.leftWheel.isGrounded) || (ax.rightWheel != null && ax.rightWheel.isGrounded))
+                {
+                    anyWheelGrounded = true;
+                    break;
+                }
+            }
+            IsAllWheelsAirborne = !anyWheelGrounded;
+
+            // GTA 5/6 Mid-Air Chassis Control: W/S pitches nose, A/D rolls/steers smoothly while flying off stunt ramps!
+            if (_isPlayerDriving && !_inputLocked && IsAllWheelsAirborne && speedKmh > 25f)
+            {
+                float pitchInput = throttleInput - brakeInput;
+                _rb.AddRelativeTorque(new Vector3(pitchInput * _rb.mass * 1.15f, steerInput * _rb.mass * 0.45f, -steerInput * _rb.mass * 1.35f), ForceMode.Force);
+            }
+
+            // GTA Burnout Launch: hold Gas + Brake/Handbrake at standstill -> redline rubber smoke -> release for explosive launch!
+            if (_isPlayerDriving && !_inputLocked && !IsAllWheelsAirborne && fuel > 0.01f && (_damageSystem == null || !_damageSystem.IsStalled))
+            {
+                bool burningOut = throttleInput > 0.65f && (brakeInput > 0.45f || handbrake) && speedKmh < 7.5f;
+                if (burningOut)
+                {
+                    _burnoutCharge01 = Mathf.Min(1f, _burnoutCharge01 + dt * 0.85f);
+                    EngineRpm = Mathf.Lerp(EngineRpm, redlineRpm * 0.90f, 1f - Mathf.Exp(-8f * dt));
+                    _driftSmokeTimer -= dt;
+                    if (_driftSmokeTimer <= 0f)
+                    {
+                        _driftSmokeTimer = 0.055f;
+                        Vector3 rearL = transform.TransformPoint(new Vector3(-0.82f, 0.14f, -1.32f));
+                        Vector3 rearR = transform.TransformPoint(new Vector3( 0.82f, 0.14f, -1.32f));
+                        VisualEffectsManager.SpawnTireSmoke(rearL, -transform.forward * 2.2f, 1.30f);
+                        VisualEffectsManager.SpawnTireSmoke(rearR, -transform.forward * 2.2f, 1.30f);
+                    }
+                }
+                else if (_burnoutCharge01 >= 0.45f && throttleInput > 0.5f && brakeInput < 0.2f && !handbrake)
+                {
+                    float launchImpulse = Mathf.Lerp(5.5f, 10.5f, _burnoutCharge01);
+                    _rb.AddForce(transform.forward * (_rb.mass * launchImpulse), ForceMode.Impulse);
+                    _burnoutCharge01 = 0f;
+                    _cachedCamRig?.AddFovImpulse(4.8f);
+                    _cachedCamRig?.AddShake(0.14f, 0.22f);
+                    Vector3 rearL = transform.TransformPoint(new Vector3(-0.82f, 0.14f, -1.32f));
+                    Vector3 rearR = transform.TransformPoint(new Vector3( 0.82f, 0.14f, -1.32f));
+                    VisualEffectsManager.SpawnTireSmoke(rearL, -transform.forward * 3.5f, 1.45f);
+                    VisualEffectsManager.SpawnTireSmoke(rearR, -transform.forward * 3.5f, 1.45f);
+                }
+                else
+                {
+                    _burnoutCharge01 = Mathf.MoveTowards(_burnoutCharge01, 0f, dt * 1.4f);
+                }
+            }
+
             // Gentle drift yaw-stabilization assist: keeps handbrake drifts sweeping & controllable instead of uncontrollable snap-spins
             if (_isPlayerDriving && !_inputLocked && maxRearSlip > 0.32f && speedKmh > 18f)
             {
@@ -1811,12 +1967,24 @@ namespace OurWorld.Vehicle
                 steeringWheelTransform.localRotation = _steeringWheelBaseRot * Quaternion.Euler(0f, -_currentSteerAngle * 4.5f, 0f);
             }
 
-            if (_isPlayerDriving && _seatedDriverHumanoid != null)
+            if (_isPlayerDriving)
             {
-                _seatedDriverHumanoid.SetSteeringAngle(_currentSteerAngle);
-                _seatedDriverHumanoid.SetSteeringWheel(steeringWheelTransform);
-                float pedalHint = IsBraking ? -0.85f : CurrentThrottle;
-                _seatedDriverHumanoid.SetDrivingDynamics(pedalHint, -_bodyPitch * 4.0f);
+                if (_cachedCamRig == null && UnityEngine.Camera.main != null)
+                {
+                    _cachedCamRig = UnityEngine.Camera.main.GetComponent<OurWorld.CameraSystem.ThirdPersonCameraRig>();
+                }
+                bool hideDriverForCockpit = _cachedCamRig != null && _cachedCamRig.IsFirstPerson && !_cachedCamRig.IsAimOrSportOverride;
+                if (seatedDriverObject != null && seatedDriverObject.activeSelf == hideDriverForCockpit)
+                {
+                    seatedDriverObject.SetActive(!hideDriverForCockpit);
+                }
+                if (!hideDriverForCockpit && _seatedDriverHumanoid != null)
+                {
+                    _seatedDriverHumanoid.SetSteeringAngle(_currentSteerAngle);
+                    _seatedDriverHumanoid.SetSteeringWheel(steeringWheelTransform);
+                    float pedalHint = IsBraking ? -0.85f : CurrentThrottle;
+                    _seatedDriverHumanoid.SetDrivingDynamics(pedalHint, -_bodyPitch * 4.0f);
+                }
             }
         }
 

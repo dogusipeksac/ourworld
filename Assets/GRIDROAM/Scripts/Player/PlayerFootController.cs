@@ -3,6 +3,7 @@ using System.Collections;
 using OurWorld.CameraSystem;
 using OurWorld.Core;
 using OurWorld.Input;
+using OurWorld.Missions;
 using OurWorld.Vehicle;
 using OurWorld.World;
 using UnityEngine;
@@ -33,6 +34,12 @@ namespace OurWorld.Player
 
         private static readonly int SpeedHash = Animator.StringToHash("Speed");
         private static readonly int GroundedHash = Animator.StringToHash("IsGrounded");
+        private static readonly int CrouchingHash = Animator.StringToHash("IsCrouching");
+        private static readonly int SwimmingHash = Animator.StringToHash("IsSwimming");
+        private static readonly int PunchTrigHash = Animator.StringToHash("Punch");
+        private static readonly int DodgeRollTrigHash = Animator.StringToHash("DodgeRoll");
+        private static readonly int JumpTrigHash = Animator.StringToHash("Jump");
+        private static readonly int HitReactTrigHash = Animator.StringToHash("HitReact");
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly Color[] JacketColors =
         {
@@ -136,6 +143,21 @@ namespace OurWorld.Player
         private float _groundSampleHoldTimer;
         private float _slopeProbeTimer;
 
+        // GTA 6 Tactical Movement: Stealth Crouch, Sprint-Slide, Combat Dodge Roll & Vehicle Bail-Out
+        private bool _isCrouching;
+        private float _sprintSlideTimer;
+        private Vector3 _sprintSlideDir;
+        private float _dodgeRollTimer;
+        private float _dodgeCooldown;
+        private Vector3 _dodgeRollDir;
+        private float _bailOutTimer;
+        private float _standingControllerHeight = 1.80f;
+        private float _standingControllerCenterY = 0.90f;
+        private readonly System.Collections.Generic.List<Material> _ownedAccessoryMats = new System.Collections.Generic.List<Material>(4);
+        private readonly System.Collections.Generic.Dictionary<Renderer, UnityEngine.Rendering.ShadowCastingMode> _fpSavedShadows
+            = new System.Collections.Generic.Dictionary<Renderer, UnityEngine.Rendering.ShadowCastingMode>(24);
+        private bool _isVisualHiddenForFirstPerson;
+
         public Transform VisualRoot => visualRoot;
         public ProceduralHumanoid Humanoid => humanoid;
         public float CurrentSpeed => _currentSpeed;
@@ -144,6 +166,9 @@ namespace OurWorld.Player
         public float SwimOxygen01 => _swimOxygen01;
         public float RainWetness01 => _rainWetness01;
         public bool IsRainSoaked => _rainWetness01 > 0.50f;
+        public bool IsCrouching => _isCrouching;
+        public bool IsSprintSliding => _sprintSlideTimer > 0f;
+        public bool IsDodgeInvulnerable => _dodgeRollTimer > 0.06f;
 
         public void ConfigureVisuals(Transform root, Animator animator = null, ProceduralHumanoid proceduralHumanoid = null)
         {
@@ -210,11 +235,18 @@ namespace OurWorld.Player
 
         private void Start()
         {
+            if (_controller != null)
+            {
+                _standingControllerHeight = _controller.height;
+                _standingControllerCenterY = _controller.center.y;
+            }
             _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
             if (InputHub.Instance != null)
             {
                 InputHub.Instance.OnAttackPressed += HandleAttackPressed;
                 InputHub.Instance.OnJumpPressed += HandleJumpOrVaultPressed;
+                InputHub.Instance.OnCrouchSlidePressed += ToggleCrouchOrSlide;
+                InputHub.Instance.OnDodgeRollPressed += TriggerDodgeRoll;
             }
             if (SaveManager.Instance != null && SaveManager.Instance.Data != null)
             {
@@ -232,12 +264,168 @@ namespace OurWorld.Player
             ApplyHeadAccessories(data.ownsSunglasses && data.equipSunglasses, data.ownsStreetCap && data.equipStreetCap);
         }
 
+        private void TrySetMixamoAnimatorBool(int hash, bool val)
+        {
+            if (characterAnimator == null || characterAnimator.runtimeAnimatorController == null) return;
+            var ps = characterAnimator.parameters;
+            for (int i = 0; i < ps.Length; i++)
+            {
+                if (ps[i].nameHash == hash && ps[i].type == AnimatorControllerParameterType.Bool)
+                {
+                    characterAnimator.SetBool(hash, val);
+                    return;
+                }
+            }
+        }
+
+        private void TryTriggerMixamoAnimator(int hash)
+        {
+            if (characterAnimator == null || characterAnimator.runtimeAnimatorController == null) return;
+            var ps = characterAnimator.parameters;
+            for (int i = 0; i < ps.Length; i++)
+            {
+                if (ps[i].nameHash == hash && ps[i].type == AnimatorControllerParameterType.Trigger)
+                {
+                    characterAnimator.SetTrigger(hash);
+                    return;
+                }
+            }
+        }
+
         private void OnDestroy()
         {
             if (InputHub.Instance != null)
             {
                 InputHub.Instance.OnAttackPressed -= HandleAttackPressed;
                 InputHub.Instance.OnJumpPressed -= HandleJumpOrVaultPressed;
+                InputHub.Instance.OnCrouchSlidePressed -= ToggleCrouchOrSlide;
+                InputHub.Instance.OnDodgeRollPressed -= TriggerDodgeRoll;
+            }
+            for (int i = 0; i < _ownedAccessoryMats.Count; i++)
+            {
+                if (_ownedAccessoryMats[i] != null) Destroy(_ownedAccessoryMats[i]);
+            }
+            _ownedAccessoryMats.Clear();
+        }
+
+        public void ToggleCrouchOrSlide()
+        {
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (!_movementEnabled || _isSwimming || _isVaulting || _dodgeRollTimer > 0f || _bailOutTimer > 0f) return;
+            if (mode == null || mode.CurrentMode != ControlMode.OnFoot || mode.IsModalLocked) return;
+
+            // Sprinting + C triggers a high-momentum GTA Sprint-Slide!
+            if (!_isCrouching && _controller != null && _controller.isGrounded && _currentSpeed >= 3.85f && _sprintSlideTimer <= 0f)
+            {
+                _sprintSlideTimer = 0.56f;
+                _sprintSlideDir = _moveDirection.sqrMagnitude > 0.01f ? _moveDirection.normalized : transform.forward;
+                _isCrouching = true;
+                humanoid?.SetSprintSlide(true);
+                humanoid?.SetCrouch(true);
+                SampleGroundSurface();
+                VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: true, tintOverride: GetSurfaceDustTint(_groundSurface));
+                if (_footstepAudio != null && _sharedPunchWhooshClip != null)
+                {
+                    _footstepAudio.pitch = 0.92f;
+                    _footstepAudio.PlayOneShot(_sharedPunchWhooshClip, 0.30f);
+                }
+                _cameraRig?.AddLandingDip(0.55f);
+                return;
+            }
+
+            SetCrouching(!_isCrouching);
+        }
+
+        public void SetCrouching(bool crouch)
+        {
+            if (_isCrouching == crouch) return;
+            if (!crouch && _controller != null)
+            {
+                // Verify headroom before standing up inside low spaces
+                Vector3 headProbe = transform.position + Vector3.up * 1.15f;
+                if (Physics.SphereCast(headProbe, 0.22f, Vector3.up, out _, 0.65f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    return;
+                }
+            }
+            _isCrouching = crouch;
+            humanoid?.SetCrouch(_isCrouching);
+            if (_controller != null)
+            {
+                _controller.height = _isCrouching ? Mathf.Min(1.22f, _standingControllerHeight * 0.68f) : _standingControllerHeight;
+                Vector3 c = _controller.center;
+                c.y = _isCrouching ? _controller.height * 0.5f : _standingControllerCenterY;
+                _controller.center = c;
+            }
+            GameFeelAudio.PlayUiClick();
+        }
+
+        public void TriggerDodgeRoll()
+        {
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (!_movementEnabled || _isSwimming || _isVaulting || _dodgeRollTimer > 0f || _dodgeCooldown > 0f || _bailOutTimer > 0f) return;
+            if (mode == null || mode.CurrentMode != ControlMode.OnFoot || mode.IsModalLocked) return;
+            if (_controller == null || !_controller.isGrounded) return;
+
+            CarryableProp.DropHeldPropIfAny();
+            StreetCatController.CancelActivePet();
+
+            Vector2 inp = InputHub.Instance != null ? InputHub.Instance.MoveInput : Vector2.zero;
+            Vector3 fwd = _cameraRig != null ? _cameraRig.FlatForward : transform.forward;
+            Vector3 right = _cameraRig != null ? _cameraRig.FlatRight : transform.right;
+            Vector3 rollDir = fwd * inp.y + right * inp.x;
+            if (rollDir.sqrMagnitude < 0.04f) rollDir = transform.forward;
+            rollDir.y = 0f;
+            rollDir.Normalize();
+
+            _dodgeRollDir = rollDir;
+            _dodgeRollTimer = 0.48f;
+            _dodgeCooldown = 0.85f;
+            _sprintSlideTimer = 0f;
+            humanoid?.SetSprintSlide(false);
+            transform.rotation = Quaternion.LookRotation(rollDir, Vector3.up);
+            humanoid?.PlayDodgeRoll(0.48f);
+            TryTriggerMixamoAnimator(DodgeRollTrigHash);
+
+            SampleGroundSurface();
+            VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: false, tintOverride: GetSurfaceDustTint(_groundSurface));
+            if (_footstepAudio != null && _sharedPunchWhooshClip != null)
+            {
+                _footstepAudio.pitch = 1.18f;
+                _footstepAudio.PlayOneShot(_sharedPunchWhooshClip, 0.34f);
+            }
+            _cameraRig?.AddFovImpulse(2.2f);
+            _cameraRig?.AddLandingDip(0.35f);
+        }
+
+        public void TriggerVehicleBailOut(Vector3 carVelocity, float speedKmh)
+        {
+            SetCrouching(false);
+            _sprintSlideTimer = 0f;
+            _dodgeRollTimer = 0f;
+            _bailOutTimer = 1.55f;
+
+            Vector3 flatVel = new Vector3(carVelocity.x, 0f, carVelocity.z);
+            float launchSpd = Mathf.Clamp(flatVel.magnitude * 0.72f, 5.5f, 13.5f);
+            Vector3 dir = flatVel.sqrMagnitude > 0.1f ? flatVel.normalized : transform.forward;
+            _hitStumbleVelocity = dir * launchSpd;
+            _planarVelocity = Vector3.zero;
+            transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
+            humanoid?.PlayKnockdown(1.55f);
+
+            VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: true);
+            _cameraRig?.AddShake(0.28f, 0.35f);
+            _cameraRig?.AddFovImpulse(4.5f);
+
+            bool en = LocalizationService.IsEnglish;
+            PlayerModeController.Instance?.RaiseStatusMessage(en
+                ? $"💥 Bailed out at {Mathf.RoundToInt(speedKmh)} km/h!"
+                : $"💥 {Mathf.RoundToInt(speedKmh)} km/h hızda hareketli araçtan atladın!");
+
+            if (speedKmh >= 55f)
+            {
+                float scrapeDmg = Mathf.Clamp((speedKmh - 45f) * 0.42f, 8f, 38f);
+                PlayerNeedsController.Instance?.TakeDamage(scrapeDmg, transform.position - dir, en ? "Vehicle Bail-Out" : "Hareketli Araçtan Atlama", heavyHit: speedKmh >= 85f);
             }
         }
 
@@ -304,17 +492,82 @@ namespace OurWorld.Player
                 _streetCapObj = BuildStreetCapRig(headTf);
             }
             if (_streetCapObj != null) _streetCapObj.SetActive(showCap);
+            if (_isVisualHiddenForFirstPerson)
+            {
+                ApplyFirstPersonVisualHiding(true);
+            }
         }
 
-        private static GameObject BuildSunglassesRig(Transform headTf)
+        private void LateUpdate()
+        {
+            PlayerModeController mode = PlayerModeController.Instance;
+            bool wantFpHide = _cameraRig != null &&
+                              _cameraRig.IsFirstPerson &&
+                              !_cameraRig.ExternalCameraControl &&
+                              !_cameraRig.IsAimOrSportOverride &&
+                              !OurWorld.UI.MainMenuController.IsMenuActive &&
+                              mode != null &&
+                              (mode.CurrentMode == ControlMode.OnFoot || mode.CurrentMode == ControlMode.Seated || mode.CurrentMode == ControlMode.Cycling);
+
+            if (wantFpHide != _isVisualHiddenForFirstPerson)
+            {
+                ApplyFirstPersonVisualHiding(wantFpHide);
+            }
+        }
+
+        private void ApplyFirstPersonVisualHiding(bool hide)
+        {
+            _isVisualHiddenForFirstPerson = hide;
+            if (visualRoot == null) return;
+
+            Renderer[] rends = visualRoot.GetComponentsInChildren<Renderer>(true);
+            if (hide)
+            {
+                for (int i = 0; i < rends.Length; i++)
+                {
+                    Renderer r = rends[i];
+                    if (r == null) continue;
+                    if (!_fpSavedShadows.ContainsKey(r))
+                    {
+                        _fpSavedShadows[r] = r.shadowCastingMode;
+                    }
+                    if (_fpSavedShadows[r] == UnityEngine.Rendering.ShadowCastingMode.Off)
+                    {
+                        r.enabled = false;
+                    }
+                    else
+                    {
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < rends.Length; i++)
+                {
+                    Renderer r = rends[i];
+                    if (r == null) continue;
+                    if (_fpSavedShadows.TryGetValue(r, out UnityEngine.Rendering.ShadowCastingMode orig))
+                    {
+                        r.shadowCastingMode = orig;
+                    }
+                    r.enabled = true;
+                }
+                _fpSavedShadows.Clear();
+            }
+        }
+
+        private GameObject BuildSunglassesRig(Transform headTf)
         {
             Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             Material lensMat = new Material(sh);
+            _ownedAccessoryMats.Add(lensMat);
             if (lensMat.HasProperty(BaseColorId)) lensMat.SetColor(BaseColorId, new Color(0.05f, 0.08f, 0.14f, 1f));
             if (lensMat.HasProperty("_Smoothness")) lensMat.SetFloat("_Smoothness", 0.92f);
             if (lensMat.HasProperty("_Metallic")) lensMat.SetFloat("_Metallic", 0.45f);
 
             Material frameMat = new Material(sh);
+            _ownedAccessoryMats.Add(frameMat);
             if (frameMat.HasProperty(BaseColorId)) frameMat.SetColor(BaseColorId, new Color(0.86f, 0.70f, 0.26f, 1f));
             if (frameMat.HasProperty("_Smoothness")) frameMat.SetFloat("_Smoothness", 0.85f);
             if (frameMat.HasProperty("_Metallic")) frameMat.SetFloat("_Metallic", 0.80f);
@@ -333,14 +586,16 @@ namespace OurWorld.Player
             return root;
         }
 
-        private static GameObject BuildStreetCapRig(Transform headTf)
+        private GameObject BuildStreetCapRig(Transform headTf)
         {
             Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             Material capMat = new Material(sh);
+            _ownedAccessoryMats.Add(capMat);
             if (capMat.HasProperty(BaseColorId)) capMat.SetColor(BaseColorId, new Color(0.10f, 0.24f, 0.48f, 1f));
             if (capMat.HasProperty("_Smoothness")) capMat.SetFloat("_Smoothness", 0.25f);
 
             Material accentMat = new Material(sh);
+            _ownedAccessoryMats.Add(accentMat);
             if (accentMat.HasProperty(BaseColorId)) accentMat.SetColor(BaseColorId, new Color(0.95f, 0.72f, 0.20f, 1f));
             if (accentMat.HasProperty("_Smoothness")) accentMat.SetFloat("_Smoothness", 0.35f);
 
@@ -438,6 +693,7 @@ namespace OurWorld.Player
             {
                 humanoid.PlayCombatMove(step);
             }
+            TryTriggerMixamoAnimator(PunchTrigHash);
 
             // Natural forward weight transfer during strike
             _combatLungeVelocity = transform.forward * (step == 2 ? 3.8f : (step == 1 ? 2.6f : 1.9f));
@@ -577,6 +833,21 @@ namespace OurWorld.Player
             if (!hitLiving && IstanbulDiverseCitizensPopulator.Instance != null)
             {
                 hitLiving = IstanbulDiverseCitizensPopulator.Instance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving && PoliceWantedSystem.Instance != null)
+            {
+                hitLiving = PoliceWantedSystem.Instance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving && GtaSandboxActivities.Instance != null)
+            {
+                hitLiving = GtaSandboxActivities.Instance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving && ChapterSevenEightStoryExpansion.Instance != null)
+            {
+                hitLiving = ChapterSevenEightStoryExpansion.Instance.TryReceivePlayerPunch(
                     strikeCenter, radius, transform.position, transform.forward, step);
             }
             if (!hitLiving)
@@ -769,6 +1040,7 @@ namespace OurWorld.Player
             if (!CarryableProp.IsHoldingProp) CarryableProp.DropHeldPropIfAny();
 
             _verticalVelocity = Mathf.Sqrt(2f * Mathf.Abs(gravity) * jumpHeight);
+            TryTriggerMixamoAnimator(JumpTrigHash);
             _wasGrounded = false;
             _airPeakY = transform.position.y;
             SampleGroundSurface();
@@ -1261,7 +1533,7 @@ namespace OurWorld.Player
                 }
             }
 
-            float vol = Mathf.Lerp(0.11f, 0.26f, Mathf.Clamp01(runBlend)) * volMult;
+            float vol = Mathf.Lerp(0.11f, 0.26f, Mathf.Clamp01(runBlend)) * volMult * (_isCrouching ? 0.35f : 1.0f);
             _footstepAudio.pitch = pitchBase * UnityEngine.Random.Range(0.92f, 1.08f);
             _footstepAudio.PlayOneShot(clip, vol);
 
@@ -1482,6 +1754,7 @@ namespace OurWorld.Player
                 if (knockout) humanoid.PlayKnockdown(2.8f);
                 else humanoid.PlayHitReact();
             }
+            TryTriggerMixamoAnimator(HitReactTrigHash);
 
             if (_footstepAudio != null)
             {
@@ -1568,6 +1841,10 @@ namespace OurWorld.Player
                 _nextCamRigLookupTime = Time.time + 1f;
                 _cameraRig = FindAnyObjectByType<ThirdPersonCameraRig>();
             }
+            if (_cameraRig != null)
+            {
+                _cameraRig.SetCrouchEyeMode(_isCrouching || _sprintSlideTimer > 0f);
+            }
 
             float dt = Time.deltaTime;
             if (_punchCooldown > 0f)
@@ -1577,6 +1854,48 @@ namespace OurWorld.Player
             if (_comboResetTimer > 0f)
             {
                 _comboResetTimer -= dt;
+            }
+            if (_dodgeCooldown > 0f) _dodgeCooldown -= dt;
+
+            // Active Vehicle Bail-Out Tumble
+            if (_bailOutTimer > 0f)
+            {
+                _bailOutTimer -= dt;
+                _verticalVelocity += gravity * dt;
+                if (_controller.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
+                Vector3 bailMove = _hitStumbleVelocity + Vector3.up * _verticalVelocity;
+                _hitStumbleVelocity = Vector3.MoveTowards(_hitStumbleVelocity, Vector3.zero, 8.8f * dt);
+                _controller.Move(bailMove * dt);
+                humanoid?.SetLocomotion(0f, _controller.isGrounded, _verticalVelocity);
+                return;
+            }
+
+            // Active GTA 6 Combat Dodge Roll (directional invulnerable roll!)
+            if (_dodgeRollTimer > 0f)
+            {
+                _dodgeRollTimer -= dt;
+                _verticalVelocity += gravity * dt;
+                if (_controller.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
+                float rollSpd = Mathf.Lerp(4.2f, 7.6f, Mathf.Clamp01(_dodgeRollTimer / 0.48f));
+                _controller.Move((_dodgeRollDir * rollSpd + Vector3.up * _verticalVelocity) * dt);
+                humanoid?.SetLocomotion(0f, _controller.isGrounded, _verticalVelocity);
+                return;
+            }
+
+            // Active GTA 6 Sprint-Slide (high momentum slide -> smoothly enters stealth crouch!)
+            if (_sprintSlideTimer > 0f)
+            {
+                _sprintSlideTimer -= dt;
+                _verticalVelocity += gravity * dt;
+                if (_controller.isGrounded && _verticalVelocity < 0f) _verticalVelocity = -2f;
+                float slideSpd = Mathf.Lerp(2.4f, 7.8f, Mathf.Clamp01(_sprintSlideTimer / 0.56f));
+                _controller.Move((_sprintSlideDir * slideSpd + Vector3.up * _verticalVelocity) * dt);
+                humanoid?.SetLocomotion(0f, _controller.isGrounded, _verticalVelocity);
+                if (_sprintSlideTimer <= 0f)
+                {
+                    humanoid?.SetSprintSlide(false);
+                }
+                return;
             }
 
             Vector2 moveInput = (_movementEnabled && InputHub.Instance != null)
@@ -1607,8 +1926,21 @@ namespace OurWorld.Player
             {
                 desiredDir.Normalize();
                 _moveDirection = desiredDir;
-                Quaternion targetRot = Quaternion.LookRotation(_moveDirection, Vector3.up);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 1f - Mathf.Exp(-(_isSwimming ? 7.5f : rotationSpeed) * dt));
+                if (_cameraRig != null && _cameraRig.IsFirstPerson && !autoApproach)
+                {
+                    Quaternion fpFace = Quaternion.Euler(0f, _cameraRig.Yaw, 0f);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, fpFace, 1f - Mathf.Exp(-18f * dt));
+                }
+                else
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(_moveDirection, Vector3.up);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 1f - Mathf.Exp(-(_isSwimming ? 7.5f : rotationSpeed) * dt));
+                }
+            }
+            else if (_cameraRig != null && _cameraRig.IsFirstPerson && _movementEnabled && !autoApproach)
+            {
+                Quaternion fpFace = Quaternion.Euler(0f, _cameraRig.Yaw, 0f);
+                transform.rotation = Quaternion.Slerp(transform.rotation, fpFace, 1f - Mathf.Exp(-18f * dt));
             }
 
             // Check swimmable water zones (e.g. Çınarlı Açık Yüzme Havuzu)
@@ -1809,7 +2141,13 @@ namespace OurWorld.Player
             float baseRun = hasShoes ? (runSpeed * 1.22f) : runSpeed;
             float fatigueMult = (isTired ? 0.75f : 1f) * (isStarving ? 0.80f : 1f) * (_rainWetness01 > 0.75f ? 0.92f : 1f);
             float effectiveRunSpeed = baseRun * fatigueMult;
-            float targetSpeed = autoApproach ? pickupSpeed : (sprint ? effectiveRunSpeed : walkSpeed) * inputMag;
+            // Sprinting automatically stands you up out of Stealth Crouch
+            if (_isCrouching && sprint && inputMag > 0.25f)
+            {
+                SetCrouching(false);
+            }
+            float baseMoveTarget = _isCrouching ? 2.15f : (sprint ? effectiveRunSpeed : walkSpeed);
+            float targetSpeed = autoApproach ? pickupSpeed : baseMoveTarget * inputMag;
             Vector3 targetPlanarVel = desiredDir.sqrMagnitude > 0.0001f ? desiredDir * targetSpeed : Vector3.zero;
 
             // Real 2D planar momentum (eliminates 180-deg reverse skating while feeling super snappy & athletic!)
@@ -1883,6 +2221,8 @@ namespace OurWorld.Player
             {
                 characterAnimator.SetFloat(SpeedHash, actualSpeed, 0.08f, dt);
                 characterAnimator.SetBool(GroundedHash, _controller.isGrounded);
+                TrySetMixamoAnimatorBool(CrouchingHash, _isCrouching);
+                TrySetMixamoAnimatorBool(SwimmingHash, _isSwimming);
             }
 
             if (humanoid != null)

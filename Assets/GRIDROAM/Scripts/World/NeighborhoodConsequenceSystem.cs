@@ -142,8 +142,12 @@ namespace OurWorld.World
             int immediateFineTl = 0,
             float heatDelta = 1.0f)
         {
+            // When Police/Zabıta enforcement is disabled, street punches cleanly knock out NPCs without chases or fines.
+            if (!PoliceWantedSystem.PoliceSystemEnabled) return;
+
             _lastOffenseTime = Time.time;
             _heatScore = Mathf.Clamp(_heatScore + heatDelta, 0f, 8f);
+            PoliceWantedSystem.Instance?.AddCrimeHeat(heatDelta, worldPos, targetLabel);
 
             if (repPenalty > 0)
             {
@@ -261,6 +265,10 @@ namespace OurWorld.World
                 if (hName.Contains("StoreSecurityGuard") ||
                     hName.StartsWith("LivingNPC_", StringComparison.OrdinalIgnoreCase) ||
                     hName.StartsWith("DiverseCitizen_", StringComparison.OrdinalIgnoreCase) ||
+                    hName.StartsWith("PoliceOfficer_", StringComparison.OrdinalIgnoreCase) ||
+                    hName.StartsWith("GTA_PurseSnatcher", StringComparison.OrdinalIgnoreCase) ||
+                    hName.StartsWith("StoryHostile_", StringComparison.OrdinalIgnoreCase) ||
+                    hName.StartsWith("StoryNPC_Ch78_", StringComparison.OrdinalIgnoreCase) ||
                     hName.StartsWith("MallShopper_", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;

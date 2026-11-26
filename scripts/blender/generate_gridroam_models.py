@@ -317,8 +317,44 @@ def export_fbx(obj, filename):
     return filepath
 
 
-def finalize_car_with_light_children(body_parts, head_parts, tail_parts, rev_parts, car_name):
+def enforce_material_slot_order(obj, ordered_names):
+    """Guarantee exact Unity submesh material slot index ordering when re-exporting FBX in place."""
+    mesh = obj.data
+    if not isinstance(mesh, bpy.types.Mesh) or not ordered_names:
+        return
+    old_mats = list(mesh.materials)
+    old_names = [m.name if m else "" for m in old_mats]
+    if old_names == list(ordered_names):
+        return
+    # Map existing materials by name
+    by_name = {m.name: m for m in old_mats if m is not None}
+    new_mats = []
+    for nm in ordered_names:
+        m = by_name.get(nm) or bpy.data.materials.get(nm)
+        if m is not None:
+            new_mats.append(m)
+    # Append any unexpected extra materials at the end (should never happen)
+    for m in old_mats:
+        if m is not None and m not in new_mats:
+            new_mats.append(m)
+    idx_remap = {}
+    for oi, om in enumerate(old_mats):
+        if om in new_mats:
+            idx_remap[oi] = new_mats.index(om)
+    poly_new_idx = [idx_remap.get(p.material_index, 0) for p in mesh.polygons]
+    mesh.materials.clear()
+    for nm in new_mats:
+        mesh.materials.append(nm)
+    for p, ni in zip(mesh.polygons, poly_new_idx):
+        p.material_index = ni
+    mesh.update()
+
+
+def finalize_car_with_light_children(body_parts, head_parts, tail_parts, rev_parts, car_name, slot_order=None):
     body = join_objects(body_parts, car_name)
+    if slot_order is None:
+        slot_order = ["BodyPaint", "TrimDark", "Glass", "Chrome", "InteriorDark", "ReverseLight"]
+    enforce_material_slot_order(body, slot_order)
     for child_parts, child_name in (
         (head_parts, "Car_Headlights"),
         (tail_parts, "Car_Taillights"),
@@ -331,83 +367,109 @@ def finalize_car_with_light_children(body_parts, head_parts, tail_parts, rev_par
 
 
 # ---------------------------------------------------------------------------
-# 1. Realistic Sculpted Car Wheel (Tire + 5-Twin-Spoke Alloy Rim + Brake Caliper)
+# 1. Realistic Sculpted Car Wheel (Tire + Deep 5-Y-Spoke Alloy Rim + Ventilated Disc & Caliper)
 # ---------------------------------------------------------------------------
 def build_car_wheel(mats):
     parts = []
-    # Revolved tire profile centered at origin, axle along X (width 0.24m, outer radius 0.34m, rim inner 0.215m)
+    # Smooth 36-segment revolved tire profile with subtle tread grooves (radius 0.34m, width 0.24m)
     tire_profile = [
-        (0.210, -0.105),
-        (0.232, -0.118),
-        (0.278, -0.124),
-        (0.320, -0.118),
-        (0.336, -0.102),
-        (0.340, -0.065),
-        (0.341, 0.000),
-        (0.340, 0.065),
-        (0.336, 0.102),
-        (0.320, 0.118),
-        (0.278, 0.124),
-        (0.232, 0.118),
-        (0.210, 0.105),
-        (0.205, 0.088),
-        (0.205, -0.088),
-        (0.210, -0.105),
+        (0.214, -0.106),
+        (0.236, -0.119),
+        (0.280, -0.125),
+        (0.322, -0.118),
+        (0.337, -0.100),
+        (0.341, -0.068),
+        (0.338, -0.056),
+        (0.341, -0.044),
+        (0.341, -0.010),
+        (0.338,  0.000),
+        (0.341,  0.010),
+        (0.341,  0.044),
+        (0.338,  0.056),
+        (0.341,  0.068),
+        (0.337,  0.100),
+        (0.322,  0.118),
+        (0.280,  0.125),
+        (0.236,  0.119),
+        (0.214,  0.106),
+        (0.208,  0.088),
+        (0.208, -0.088),
+        (0.214, -0.106),
     ]
-    parts.append(add_revolved_profile("Tire", tire_profile, 28, mats["WheelRubber"], axis="X", smooth_angle=52.0))
+    parts.append(add_revolved_profile("Tire", tire_profile, 36, mats["WheelRubber"], axis="X", smooth_angle=52.0))
 
-    # Metallic outer rim barrel & lip
+    # Deep-dish machined outer rim barrel & lip
     rim_profile = [
-        (0.185, -0.095),
-        (0.214, -0.098),
-        (0.216, -0.075),
-        (0.196, -0.065),
-        (0.196, 0.065),
-        (0.216, 0.075),
-        (0.214, 0.098),
-        (0.185, 0.095),
-        (0.185, -0.095),
+        (0.186, -0.098),
+        (0.216, -0.102),
+        (0.218, -0.082),
+        (0.204, -0.072),
+        (0.194, -0.055),
+        (0.194,  0.055),
+        (0.204,  0.072),
+        (0.218,  0.082),
+        (0.216,  0.102),
+        (0.186,  0.098),
+        (0.186, -0.098),
     ]
-    parts.append(add_revolved_profile("RimBarrel", rim_profile, 24, mats["Chrome"], axis="X", smooth_angle=44.0))
+    parts.append(add_revolved_profile("RimBarrel", rim_profile, 32, mats["Chrome"], axis="X", smooth_angle=44.0))
 
-    # Concave center hub
-    parts.append(add_cylinder_part("RimHub", (0.0, 0.0, 0.0), 0.064, 0.056, 0.13, 18, mats["Chrome"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
-    parts.append(add_cylinder_part("CenterCap_L", (-0.068, 0.0, 0.0), 0.036, 0.034, 0.014, 16, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
-    parts.append(add_cylinder_part("CenterCap_R", (0.068, 0.0, 0.0), 0.036, 0.034, 0.014, 16, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+    # Concave center hub + dark logo emblem cap + chrome bezel ring
+    parts.append(add_cylinder_part("RimHub", (0.0, 0.0, 0.0), 0.066, 0.056, 0.132, 20, mats["Chrome"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+    for side_sign in (-1.0, 1.0):
+        parts.append(add_cylinder_part(f"CenterCap_{side_sign}", (side_sign * 0.069, 0.0, 0.0), 0.036, 0.034, 0.014, 18, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+        parts.append(add_cylinder_part(f"CenterRing_{side_sign}", (side_sign * 0.073, 0.0, 0.0), 0.022, 0.020, 0.008, 16, mats["Chrome"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
 
-    # 5 sculpted twin alloy spokes (visible cleanly from both left and right sides)
+    # 5 sculpted concave Y-split twin alloy spokes (visible cleanly from both sides!)
     for i in range(5):
         base_ang = (2.0 * math.pi * i) / 5.0
         for side_sign in (-1.0, 1.0):
-            for twin_off in (-0.11, 0.11):
+            # Inner stem radiating from hub
+            stem_y = math.cos(base_ang) * 0.082
+            stem_z = math.sin(base_ang) * 0.082
+            bm_s = bmesh.new()
+            bmesh.ops.create_cube(bm_s, size=1.0)
+            bmesh.ops.scale(bm_s, vec=Vector((0.024, 0.065, 0.030)), verts=bm_s.verts)
+            bmesh.ops.bevel(bm_s, geom=list(bm_s.edges), offset=0.004, segments=1, affect="EDGES", clamp_overlap=True)
+            bmesh.ops.transform(
+                bm_s,
+                matrix=Matrix.Translation(Vector((side_sign * 0.055, stem_y, stem_z))) @ Matrix.Rotation(base_ang, 4, "X"),
+                verts=bm_s.verts,
+            )
+            parts.append(create_mesh_object(f"Stem_{i}_{side_sign}", bm_s, mat=mats["Chrome"], smooth_angle=35.0))
+
+            # Diverging Y-fork outer spokes sweeping out to the machined rim lip
+            for twin_off in (-0.17, 0.17):
                 ang = base_ang + twin_off
-                cy = math.cos(ang) * 0.125
-                cz = math.sin(ang) * 0.125
-                # Spoke slightly angled outward toward rim lip
+                cy = math.cos(ang) * 0.148
+                cz = math.sin(ang) * 0.148
                 bm = bmesh.new()
                 bmesh.ops.create_cube(bm, size=1.0)
-                bmesh.ops.scale(bm, vec=Vector((0.022, 0.145, 0.024)), verts=bm.verts)
+                bmesh.ops.scale(bm, vec=Vector((0.020, 0.118, 0.021)), verts=bm.verts)
                 bmesh.ops.bevel(bm, geom=list(bm.edges), offset=0.004, segments=1, affect="EDGES", clamp_overlap=True)
-                rot_x = Matrix.Rotation(ang, 4, "X")
-                tilt = Matrix.Rotation(side_sign * 0.12, 4, "Z")
+                rot_x = Matrix.Rotation(ang + twin_off * 0.35, 4, "X")
+                tilt = Matrix.Rotation(side_sign * 0.18, 4, "Z")
                 bmesh.ops.transform(
                     bm,
-                    matrix=Matrix.Translation(Vector((side_sign * 0.058, cy, cz))) @ rot_x @ tilt,
+                    matrix=Matrix.Translation(Vector((side_sign * 0.072, cy, cz))) @ rot_x @ tilt,
                     verts=bm.verts,
                 )
                 parts.append(create_mesh_object(f"Spoke_{i}_{side_sign}_{twin_off}", bm, mat=mats["Chrome"], smooth_angle=35.0))
 
-        # 5 lug nuts on each side
-        ly = math.cos(base_ang) * 0.044
-        lz = math.sin(base_ang) * 0.044
-        parts.append(add_cylinder_part(f"LugL_{i}", (-0.064, ly, lz), 0.008, 0.007, 0.016, 6, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
-        parts.append(add_cylinder_part(f"LugR_{i}", (0.064, ly, lz), 0.008, 0.007, 0.016, 6, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+        # 5 recessed lug nuts on each side
+        ly = math.cos(base_ang + 0.314) * 0.045
+        lz = math.sin(base_ang + 0.314) * 0.045
+        parts.append(add_cylinder_part(f"LugL_{i}", (-0.066, ly, lz), 0.0085, 0.0075, 0.016, 6, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+        parts.append(add_cylinder_part(f"LugR_{i}", (0.066, ly, lz), 0.0085, 0.0075, 0.016, 6, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
 
-    # Brake rotor disc + red brake caliper tucked inside rim
-    parts.append(add_cylinder_part("BrakeDisc", (0.0, 0.0, 0.0), 0.150, 0.150, 0.026, 20, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
-    parts.append(add_beveled_box("BrakeCaliper", (0.0, 0.115, 0.045), (0.056, 0.068, 0.095), mats["BrakeCaliper"], bevel=0.010, segments=1))
+    # Brushed ventilated brake rotor disc + sculpted twin-piston red performance caliper!
+    parts.append(add_cylinder_part("BrakeDisc", (0.0, 0.0, 0.0), 0.158, 0.158, 0.024, 24, mats["Chrome"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+    parts.append(add_cylinder_part("BrakeHat", (0.0, 0.0, 0.0), 0.095, 0.095, 0.036, 18, mats["TrimDark"], rot_euler=(0.0, math.pi * 0.5, 0.0)))
+    parts.append(add_beveled_box("BrakeCaliper", (0.0, 0.122, 0.042), (0.062, 0.072, 0.115), mats["BrakeCaliper"], bevel=0.014, segments=2))
 
-    return join_objects(parts, "Car_Wheel")
+    wheel = join_objects(parts, "Car_Wheel")
+    enforce_material_slot_order(wheel, ["WheelRubber", "Chrome", "TrimDark", "BrakeCaliper"])
+    return wheel
 
 
 # ---------------------------------------------------------------------------
@@ -427,10 +489,11 @@ def apply_subsurf(obj, levels=2, smooth_angle=62.0):
     return obj
 
 
-def build_lofted_lower_hull(name, sections, mat, front_axle_y, rear_axle_y, arch_radius, arch_center_z):
+def build_lofted_lower_hull(name, sections, mat, front_axle_y, rear_axle_y, arch_radius, arch_center_z, cabin_y_range=None):
     """
     Build a smooth, sleek, Catmull-Clark subdivided lower vehicle body lofted across Y stations.
-    Automatically forms clean curved wheel arches with zero harsh jagged seams.
+    Automatically forms clean curved wheel arches AND carves a real recessed hollow interior
+    cockpit tub inside cabin_y_range so 3D seats, dashboard & steering wheel are clearly visible!
     """
     # Insert dense intermediate stations near wheel arches so arch curves stay ultra-clean under Subsurf
     dense_sections = []
@@ -454,7 +517,20 @@ def build_lofted_lower_hull(name, sections, mat, front_axle_y, rear_axle_y, arch
 
         z_sill = z_b + arch_lift
         z_mid_adj = max(z_m, z_sill + 0.06)
-        # Smooth contoured cross-section with soft shoulder tumblehome
+
+        # Carve recessed hollow cockpit tub smoothly inside cabin_y_range while preserving exterior beltline!
+        tub_dip = 0.0
+        if cabin_y_range is not None:
+            cy0, cy1 = cabin_y_range
+            if cy0 < y < cy1:
+                margin = min(0.24, (cy1 - cy0) * 0.22)
+                t0 = min(1.0, (y - cy0) / max(0.05, margin))
+                t1 = min(1.0, (cy1 - y) / max(0.05, margin))
+                t_cab = min(t0, t1)
+                t_cab = t_cab * t_cab * (3.0 - 2.0 * t_cab)
+                tub_dip = 0.44 * t_cab
+
+        # Smooth contoured cross-section with soft shoulder tumblehome & sculpted hood crown
         pts = [
             Vector((0.0, y, z_b)),
             Vector((hw_b * 0.74, y, z_b + 0.015)),
@@ -463,9 +539,9 @@ def build_lofted_lower_hull(name, sections, mat, front_axle_y, rear_axle_y, arch
             Vector((hw_m, y, z_mid_adj)),
             Vector((hw_t * 1.01, y, (z_mid_adj + z_ts) * 0.55)),
             Vector((hw_t, y, z_ts)),
-            Vector((hw_t * 0.55, y, (z_ts + z_tc) * 0.5 + 0.016)),
-            Vector((0.0, y, z_tc)),
-            Vector((-hw_t * 0.55, y, (z_ts + z_tc) * 0.5 + 0.016)),
+            Vector((hw_t * 0.66, y, (z_ts + z_tc) * 0.5 + 0.014 - tub_dip)),
+            Vector((0.0, y, z_tc - tub_dip)),
+            Vector((-hw_t * 0.66, y, (z_ts + z_tc) * 0.5 + 0.014 - tub_dip)),
             Vector((-hw_t, y, z_ts)),
             Vector((-hw_t * 1.01, y, (z_mid_adj + z_ts) * 0.55)),
             Vector((-hw_m, y, z_mid_adj)),
@@ -531,19 +607,21 @@ def build_wheel_arch_flares_and_wells(parts, half_wid, front_y, rear_y, arch_r, 
 
 def build_cabin_greenhouse(parts, y_back_base, y_back_roof, y_front_roof, y_front_base, z_belt, z_roof, hw_belt, hw_roof, mats, rear_window_open=True):
     """
-    Build a realistic tapered car cabin with sculpted A/B/C pillars, recessed dark glass,
-    curved roof panel, and subtle dark interior seating/dashboard!
+    Build a realistic tapered car cabin with sculpted A/B/C pillars, outward-facing transparent
+    automotive glass panes, crowned roof + dark headliner, windshield wipers, AND a complete 3D
+    cockpit interior (sculpted dashboard, hooded speedometer/RPM cluster, center touchscreen,
+    console & gear shifter, leather bucket seats + headrests, rear-view mirror & sun visors)!
     """
-    # 1. Recessed tinted glass core (slightly inset inside pillars so pillars stand proud!)
+    # 1. Clean outward-facing automotive glass panes (NO solid top cap — clear 1st-person view out, glossy sky reflections from outside!)
     bm = bmesh.new()
-    inset = 0.032
+    inset = 0.030
     y_bb = y_back_base + 0.03
     y_br = y_back_roof + 0.02
     y_fr = y_front_roof - 0.02
     y_fb = y_front_base - 0.03
     hwb = hw_belt - inset
     hwr = hw_roof - inset
-    zr = z_roof - 0.045
+    zr = z_roof - 0.042
 
     v0 = bm.verts.new(Vector((-hwb, y_bb, z_belt)))
     v1 = bm.verts.new(Vector((hwb, y_bb, z_belt)))
@@ -555,19 +633,32 @@ def build_cabin_greenhouse(parts, y_back_base, y_back_roof, y_front_roof, y_fron
     v6 = bm.verts.new(Vector((hwr, y_fr, zr)))
     v7 = bm.verts.new(Vector((-hwr, y_fr, zr)))
 
-    bm.faces.new((v0, v1, v5, v4))  # Rear glass
-    bm.faces.new((v2, v3, v7, v6))  # Front windshield
-    bm.faces.new((v1, v2, v6, v5))  # Right side glass
-    bm.faces.new((v3, v0, v4, v7))  # Left side glass
-    bm.faces.new((v4, v5, v6, v7))  # Top cap
-    parts.append(create_mesh_object("Cabin_GlassCore", bm, mat=mats["Glass"], smooth_angle=28.0))
+    glass_faces = [
+        bm.faces.new((v0, v1, v5, v4)),  # Rear glass
+        bm.faces.new((v2, v3, v7, v6)),  # Front windshield
+        bm.faces.new((v1, v2, v6, v5)),  # Right side glass
+        bm.faces.new((v3, v0, v4, v7)),  # Left side glass
+    ]
+    cab_center = Vector((0.0, (y_bb + y_fb) * 0.5, (z_belt + zr) * 0.5))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in glass_faces:
+        if f.normal.dot(f.calc_center_median() - cab_center) < 0.0:
+            f.normal_flip()
+    mesh_g = bpy.data.meshes.new("Cabin_GlassCore_Mesh")
+    bm.to_mesh(mesh_g)
+    bm.free()
+    glass_obj = bpy.data.objects.new("Cabin_GlassCore", mesh_g)
+    bpy.context.collection.objects.link(glass_obj)
+    glass_obj.data.materials.append(mats["Glass"])
+    box_uv_project(glass_obj, scale=1.0)
+    apply_auto_smooth(glass_obj, angle_deg=24.0)
+    parts.append(glass_obj)
 
-    # 2. Sculpted crowned roof cap (BodyPaint)
+    # 2. Sculpted crowned roof cap (BodyPaint) + dark interior ceiling headliner underneath!
     bm_r = bmesh.new()
     crown = 0.055
     ro_y0, ro_y1 = y_back_roof - 0.04, y_front_roof + 0.04
     ro_x = hw_roof + 0.015
-    # 3 longitudinal strips for smooth crowned roof
     ys = [ro_y0, (ro_y0 + ro_y1) * 0.5, ro_y1]
     roof_rings = []
     for yi, yy in enumerate(ys):
@@ -586,7 +677,6 @@ def build_cabin_greenhouse(parts, y_back_base, y_back_roof, y_front_roof, y_fron
         r0, r1 = roof_rings[i], roof_rings[i + 1]
         for k in range(len(r0) - 1):
             bm_r.faces.new((r0[k], r0[k + 1], r1[k + 1], r1[k]))
-    # Close underside + front/rear roof header rails
     for i in range(len(roof_rings) - 1):
         r0, r1 = roof_rings[i], roof_rings[i + 1]
         bm_r.faces.new((r0[-1], r0[0], r1[0], r1[-1]))
@@ -594,26 +684,30 @@ def build_cabin_greenhouse(parts, y_back_base, y_back_roof, y_front_roof, y_fron
     bm_r.faces.new(list(reversed(roof_rings[-1])))
     parts.append(create_mesh_object("Cabin_RoofPanel", bm_r, mat=mats["BodyPaint"], smooth_angle=55.0))
 
-    # 3. Sculpted A-pillars, B-pillars, C-pillars & window sill trim
+    # Dark interior headliner slab so looking up inside 1st-person cockpit shows realistic trim!
+    parts.append(add_beveled_box(
+        "Interior_Headliner",
+        (0.0, (y_back_roof + y_front_roof) * 0.5, zr - 0.012),
+        (hw_roof * 1.82, max(0.35, (y_front_roof - y_back_roof) - 0.06), 0.032),
+        mats["InteriorDark"], bevel=0.008, segments=1,
+    ))
+
+    # 3. Sculpted A-pillars, B-pillars, C-pillars & chrome window beltline trim
     for sx in (-1.0, 1.0):
-        # A-pillar (front windshield frame)
         p_a0 = Vector((sx * (hw_belt - 0.01), y_front_base - 0.02, z_belt - 0.02))
         p_a1 = Vector((sx * (hw_roof - 0.005), y_front_roof + 0.01, z_roof - 0.02))
-        parts.append(add_tube_along_points(f"Pillar_A_{sx}", [p_a0, p_a1], [0.048, 0.042], 6, mats["BodyPaint"], smooth_angle=35.0))
+        parts.append(add_tube_along_points(f"Pillar_A_{sx}", [p_a0, p_a1], [0.048, 0.042], 8, mats["BodyPaint"], smooth_angle=35.0))
 
-        # C-pillar (rear quarter pillar - wider, painted)
         p_c0 = Vector((sx * (hw_belt - 0.01), y_back_base + 0.04, z_belt - 0.02))
         p_c1 = Vector((sx * (hw_roof - 0.005), y_back_roof - 0.01, z_roof - 0.02))
-        parts.append(add_tube_along_points(f"Pillar_C_{sx}", [p_c0, p_c1], [0.072, 0.056], 6, mats["BodyPaint"], smooth_angle=35.0))
+        parts.append(add_tube_along_points(f"Pillar_C_{sx}", [p_c0, p_c1], [0.072, 0.056], 8, mats["BodyPaint"], smooth_angle=35.0))
 
-        # B-pillar (center matte-black divider between front & rear doors)
         y_mid_b = (y_back_base + y_front_base) * 0.46
         if abs(y_front_roof - y_back_roof) > 1.15:
             p_b0 = Vector((sx * (hw_belt - 0.018), y_mid_b, z_belt))
             p_b1 = Vector((sx * (hw_roof - 0.015), y_mid_b - 0.03, zr))
             parts.append(add_tube_along_points(f"Pillar_B_{sx}", [p_b0, p_b1], [0.036, 0.032], 6, mats["TrimDark"], smooth_angle=30.0))
 
-        # Lower chrome window beltline trim strip
         parts.append(add_tube_along_points(
             f"WindowBeltTrim_{sx}",
             [Vector((sx * (hw_belt + 0.004), y_back_base + 0.06, z_belt + 0.01)),
@@ -621,67 +715,154 @@ def build_cabin_greenhouse(parts, y_back_base, y_back_roof, y_front_roof, y_fron
             [0.014, 0.014], 6, mats["Chrome"], smooth_angle=35.0,
         ))
 
-    # Subtle shark-fin roof antenna
+    # Subtle shark-fin roof antenna + twin windshield wiper blades resting on cowl
     parts.append(add_beveled_box("RoofAntenna", (0.0, y_back_roof + 0.22, z_roof + crown + 0.03), (0.04, 0.14, 0.07), mats["TrimDark"], bevel=0.01, segments=1))
+    for wx_off in (-0.32, 0.24):
+        parts.append(add_beveled_box(
+            f"WiperBlade_{wx_off}",
+            (wx_off, y_front_base + 0.02, z_belt + 0.018),
+            (0.46, 0.026, 0.020),
+            mats["TrimDark"], bevel=0.005, segments=1, rot_euler=(0.0, 0.0, 0.08),
+        ))
+
+    # 4. FULL 3D COCKPIT INTERIOR (Dashboard, Gauges, Infotainment, Console, Seats, Mirror, Visors!)
+    cab_w = max(1.12, min(hw_belt * 1.66, (hw_belt + hw_roof) * 0.86))
+    cab_len = max(0.75, y_front_base - y_back_base - 0.26)
+    z_floor = z_belt - 0.42
+    y_dash = y_front_base - 0.34
+    cab_h = max(0.32, z_roof - z_belt)
+
+    # Dark interior floor tub + inner door trim sills + flush cowl deck under windshield base
+    parts.append(add_beveled_box("Interior_FloorTub", (0.0, (y_back_base + y_front_base) * 0.5, z_floor), (cab_w, cab_len, 0.06), mats["InteriorDark"], bevel=0.01, segments=1))
+    parts.append(add_beveled_box("Interior_CowlDeck", (0.0, y_front_base - 0.14, z_belt - 0.025), (cab_w, 0.24, 0.05), mats["TrimDark"], bevel=0.01, segments=1))
+    for sx in (-1.0, 1.0):
+        parts.append(add_beveled_box(f"Interior_DoorCard_{sx}", (sx * (hw_belt - 0.10), (y_back_base + y_front_base) * 0.5, z_belt - 0.18), (0.07, cab_len * 0.88, 0.34), mats["InteriorDark"], bevel=0.015, segments=1))
+
+    # Sculpted 2-tier Dashboard + Hooded Driver Instrument Cluster Binnacle (left side x = -0.35)
+    parts.append(add_beveled_box("Dash_UpperPad", (0.0, y_dash, z_belt + 0.01), (cab_w * 0.96, 0.38, 0.13), mats["InteriorDark"], bevel=0.036, segments=2))
+    parts.append(add_beveled_box("Dash_LowerWall", (0.0, y_dash + 0.03, z_belt - 0.18), (cab_w * 0.92, 0.30, 0.32), mats["TrimDark"], bevel=0.025, segments=1))
+    # Chrome accent trim bar running across passenger side of dash
+    parts.append(add_beveled_box("Dash_ChromeTrim", (0.24, y_dash - 0.185, z_belt + 0.00), (cab_w * 0.38, 0.018, 0.022), mats["Chrome"], bevel=0.004, segments=1))
+    # Hooded driver gauge cluster binnacle + twin chrome-bezel Speedometer / RPM dials!
+    driver_x = -min(0.36, cab_w * 0.27)
+    gauge_z = z_belt + min(0.095, cab_h * 0.24)
+    parts.append(add_beveled_box("Dash_GaugeHood", (driver_x, y_dash - 0.04, gauge_z + 0.008), (0.38, 0.26, 0.11), mats["InteriorDark"], bevel=0.032, segments=2))
+    parts.append(add_beveled_box("Dash_GaugeBackplate", (driver_x, y_dash - 0.155, gauge_z), (0.31, 0.03, 0.088), mats["TrimDark"], bevel=0.008, segments=1))
+    for gx_off in (-0.085, 0.085):
+        parts.append(add_cylinder_part(f"GaugeRing_{gx_off}", (driver_x + gx_off, y_dash - 0.172, gauge_z), 0.040, 0.040, 0.018, 16, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+        parts.append(add_cylinder_part(f"GaugeDial_{gx_off}", (driver_x + gx_off, y_dash - 0.177, gauge_z), 0.033, 0.033, 0.012, 16, mats["ReverseLight"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+    # Steering column housing extending cleanly toward SteeringWheel
+    parts.append(add_cylinder_part("SteeringColumn", (driver_x, y_dash - 0.20, z_belt + 0.005), 0.055, 0.050, 0.26, 10, mats["TrimDark"], rot_euler=(math.pi * 0.42, 0.0, 0.0)))
+
+    # Floating Center Infotainment Touchscreen + Chrome Frame + Center Console Tunnel & Gear Shifter!
+    parts.append(add_beveled_box("Infotainment_Bezel", (0.02, y_dash - 0.17, gauge_z + 0.005), (0.24, 0.032, 0.145), mats["Chrome"], bevel=0.008, segments=1, rot_euler=(0.14, 0.0, 0.0)))
+    parts.append(add_beveled_box("Infotainment_Screen", (0.02, y_dash - 0.184, gauge_z + 0.005), (0.21, 0.014, 0.122), mats["ReverseLight"], bevel=0.004, segments=1, rot_euler=(0.14, 0.0, 0.0)))
+    parts.append(add_beveled_box("CenterConsole", (0.0, y_dash - 0.48, z_belt - 0.24), (0.22, min(0.80, cab_len * 0.48), 0.28), mats["InteriorDark"], bevel=0.03, segments=1))
+    # Gear shifter stalk + chrome shift knob
+    parts.append(add_cylinder_part("GearShifter_Stalk", (0.0, y_dash - 0.34, z_belt - 0.05), 0.014, 0.014, 0.15, 8, mats["TrimDark"], rot_euler=(0.14, 0.0, 0.0)))
+    parts.append(add_cylinder_part("GearShifter_Knob", (0.0, y_dash - 0.33, z_belt + 0.032), 0.026, 0.022, 0.042, 12, mats["Chrome"]))
+
+    # Sculpted Front Bucket Seats (Driver & Passenger) cleanly tucked under the roof on every chassis!
+    seat_y = max(y_back_roof + 0.24, min(y_front_roof - 0.26, y_front_base - 0.94))
+    seat_z_base = z_belt - 0.32
+    back_h = min(0.50, max(0.32, (z_roof - 0.26) - (seat_z_base + 0.08)))
+    headrest_z = min(z_roof - 0.18, seat_z_base + back_h + 0.14)
+    for sx_label, sx_pos in (("L", driver_x), ("R", -driver_x)):
+        parts.append(add_beveled_box(f"SeatBase_{sx_label}", (sx_pos, seat_y + 0.10, seat_z_base), (0.44, 0.44, 0.13), mats["InteriorDark"], bevel=0.038, segments=2))
+        parts.append(add_beveled_box(f"SeatBack_{sx_label}", (sx_pos, seat_y - 0.12, seat_z_base + back_h * 0.5 + 0.04), (0.43, 0.12, back_h), mats["InteriorDark"], bevel=0.040, segments=2, rot_euler=(-0.20, 0.0, 0.0)))
+        for hp in (-0.060, 0.060):
+            parts.append(add_cylinder_part(f"HeadrestPost_{sx_label}_{hp}", (sx_pos + hp, seat_y - 0.17, headrest_z - 0.07), 0.009, 0.009, 0.10, 6, mats["Chrome"]))
+        parts.append(add_beveled_box(f"Headrest_{sx_label}", (sx_pos, seat_y - 0.18, headrest_z), (0.21, 0.09, 0.14), mats["InteriorDark"], bevel=0.028, segments=2, rot_euler=(-0.14, 0.0, 0.0)))
+
+    # Sculpted Rear Bench Seat + Dual Headrests ONLY when rear roof covers it cleanly (Sedan, Hatchback, SUV)
+    if (seat_y - y_back_roof) > 0.56 and cab_h > 0.38:
+        rear_seat_y = y_back_roof + 0.18
+        rear_hr_z = min(z_roof - 0.19, seat_z_base + back_h + 0.10)
+        parts.append(add_beveled_box("RearBench_Base", (0.0, rear_seat_y + 0.10, seat_z_base), (cab_w - 0.18, 0.42, 0.13), mats["InteriorDark"], bevel=0.035, segments=1))
+        parts.append(add_beveled_box("RearBench_Back", (0.0, rear_seat_y - 0.10, seat_z_base + back_h * 0.48 + 0.04), (cab_w - 0.20, 0.12, back_h * 0.94), mats["InteriorDark"], bevel=0.038, segments=1, rot_euler=(-0.16, 0.0, 0.0)))
+        for r_sx in (-0.34, 0.34):
+            parts.append(add_beveled_box(f"RearHeadrest_{r_sx}", (r_sx, rear_seat_y - 0.14, rear_hr_z), (0.20, 0.085, 0.13), mats["InteriorDark"], bevel=0.026, segments=1))
+
+    # Overhead Rear-View Mirror + Dual Sun Visors inside upper windshield header
+    parts.append(add_cylinder_part("RearViewMirror_Stalk", (0.0, y_front_roof + 0.01, zr - 0.045), 0.010, 0.010, 0.075, 6, mats["TrimDark"]))
+    parts.append(add_beveled_box("RearViewMirror_Body", (0.0, y_front_roof - 0.01, zr - 0.095), (0.20, 0.035, 0.062), mats["TrimDark"], bevel=0.012, segments=1))
+    for vx in (-0.34, 0.34):
+        parts.append(add_beveled_box(f"SunVisor_{vx}", (vx, y_front_roof - 0.03, zr - 0.035), (0.34, 0.13, 0.020), mats["InteriorDark"], bevel=0.006, segments=1, rot_euler=(0.12, 0.0, 0.0)))
 
 
 def add_car_trim_details(parts, head_parts, tail_parts, rev_parts, half_wid, half_len, front_y, rear_y, z_bumper, z_light, mirror_y, mirror_z, door_handle_ys, mats, is_pickup=False):
-    """Add contoured front/rear bumpers, sculpted grille, separate-child lights, mirrors, handles, plates, exhaust."""
-    # Contoured front bumper tucked cleanly to tapered nose width + chin lip
+    """Add contoured front/rear bumpers, sculpted grille, multi-element projector headlights & LED taillights, mirrors, handles, plates, diffuser & exhaust."""
+    # Contoured front bumper tucked cleanly to tapered nose width + sport chin splitter
     bumper_w = half_wid * (1.82 if is_pickup else 1.72)
     parts.append(add_beveled_box("FrontBumper", (0.0, half_len - 0.08, z_bumper), (bumper_w, 0.22, 0.22), mats["TrimDark"], bevel=0.065, segments=2))
-    parts.append(add_beveled_box("FrontChinSpoiler", (0.0, half_len - 0.03, z_bumper - 0.085), (bumper_w - 0.14, 0.14, 0.055), mats["TrimDark"], bevel=0.018, segments=1))
-    # Lower bumper mesh air intake
-    parts.append(add_beveled_box("LowerIntake", (0.0, half_len + 0.015, z_bumper + 0.01), (bumper_w * 0.52, 0.05, 0.11), mats["InteriorDark"], bevel=0.015, segments=1))
+    parts.append(add_beveled_box("FrontChinSpoiler", (0.0, half_len - 0.02, z_bumper - 0.085), (bumper_w - 0.12, 0.16, 0.052), mats["TrimDark"], bevel=0.018, segments=1))
+    parts.append(add_beveled_box("LowerIntake", (0.0, half_len + 0.015, z_bumper + 0.01), (bumper_w * 0.54, 0.05, 0.115), mats["InteriorDark"], bevel=0.015, segments=1))
 
-    # Sculpted chrome grille surround + horizontal chrome bars
-    grille_w = 0.80 if not is_pickup else 0.96
-    grille_h = 0.20 if not is_pickup else 0.28
+    # Sculpted chrome grille surround + horizontal chrome bars + central chrome emblem
+    grille_w = 0.82 if not is_pickup else 0.98
+    grille_h = 0.21 if not is_pickup else 0.29
     parts.append(add_beveled_box("GrilleFrame", (0.0, half_len - 0.05, z_light - 0.03), (grille_w, 0.08, grille_h), mats["Chrome"], bevel=0.022, segments=2))
     parts.append(add_beveled_box("GrilleRecess", (0.0, half_len - 0.03, z_light - 0.03), (grille_w - 0.07, 0.07, grille_h - 0.06), mats["TrimDark"], bevel=0.01, segments=1))
     for k in range(3):
         gz = (z_light - 0.03) + (k - 1) * (grille_h * 0.24)
-        parts.append(add_beveled_box(f"GrilleSlat_{k}", (0.0, half_len - 0.005, gz), (grille_w - 0.08, 0.025, 0.018), mats["Chrome"], bevel=0.005, segments=1))
+        parts.append(add_beveled_box(f"GrilleSlat_{k}", (0.0, half_len - 0.004, gz), (grille_w - 0.08, 0.026, 0.018), mats["Chrome"], bevel=0.005, segments=1))
+    parts.append(add_cylinder_part("FrontEmblem", (0.0, half_len + 0.008, z_light - 0.03), 0.048, 0.048, 0.018, 16, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
 
-    # Recessed wraparound Headlights + fog lights tucked cleanly inside tapered nose
+    # Multi-Element Projector Headlights (dark housing + twin chrome projector bezels + LED DRL brow + outer lens!)
     hl_x = bumper_w * 0.5 - 0.23
     for sx in (-1.0, 1.0):
-        parts.append(add_beveled_box(f"HeadlightHousing_{sx}", (sx * hl_x, half_len - 0.10, z_light), (0.34, 0.14, 0.14), mats["TrimDark"], bevel=0.028, segments=2, rot_euler=(0.0, 0.0, -sx * 0.20)))
-        head_parts.append(add_beveled_box(f"HeadlightLens_{sx}", (sx * hl_x, half_len - 0.07, z_light), (0.30, 0.12, 0.105), mats["Headlight"], bevel=0.022, segments=2, rot_euler=(0.0, 0.0, -sx * 0.20)))
-        parts.append(add_beveled_box(f"FogLight_{sx}", (sx * (hl_x - 0.02), half_len - 0.01, z_bumper + 0.01), (0.14, 0.06, 0.06), mats["Chrome"], bevel=0.012, segments=1))
+        yaw = -sx * 0.20
+        parts.append(add_beveled_box(f"HeadlightHousing_{sx}", (sx * hl_x, half_len - 0.10, z_light), (0.36, 0.15, 0.145), mats["TrimDark"], bevel=0.028, segments=2, rot_euler=(0.0, 0.0, yaw)))
+        # Twin circular chrome projector reflector bezels
+        for p_off in (-0.075, 0.075):
+            parts.append(add_cylinder_part(f"ProjBezel_{sx}_{p_off}", (sx * hl_x + p_off, half_len - 0.055, z_light + 0.005), 0.044, 0.038, 0.045, 14, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, yaw)))
+        # Glowing sculpted projector lens + sharp LED DRL brow strip
+        head_parts.append(add_beveled_box(f"HeadlightLens_{sx}", (sx * hl_x, half_len - 0.065, z_light), (0.31, 0.11, 0.095), mats["Headlight"], bevel=0.022, segments=2, rot_euler=(0.0, 0.0, yaw)))
+        head_parts.append(add_beveled_box(f"HeadlightDRL_{sx}", (sx * hl_x, half_len - 0.045, z_light - 0.048), (0.32, 0.06, 0.020), mats["Headlight"], bevel=0.006, segments=1, rot_euler=(0.0, 0.0, yaw)))
+        # Recessed lower fog light housing + chrome ring
+        parts.append(add_beveled_box(f"FogHousing_{sx}", (sx * (hl_x - 0.02), half_len - 0.01, z_bumper + 0.01), (0.17, 0.06, 0.075), mats["InteriorDark"], bevel=0.012, segments=1))
+        parts.append(add_cylinder_part(f"FogLight_{sx}", (sx * (hl_x - 0.02), half_len + 0.01, z_bumper + 0.01), 0.034, 0.030, 0.024, 12, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
 
-    # Contoured rear bumper + diffuser + dual chrome exhaust tips
+    # Contoured rear bumper + sporty aero diffuser fins + dual chrome exhaust tips
     rear_w = half_wid * (1.88 if is_pickup else 1.78)
     parts.append(add_beveled_box("RearBumper", (0.0, -half_len + 0.07, z_bumper + 0.02), (rear_w, 0.20, 0.23), mats["TrimDark"], bevel=0.06, segments=2))
+    for fx in (-0.32, -0.11, 0.11, 0.32):
+        parts.append(add_beveled_box(f"RearDiffuserFin_{fx}", (fx, -half_len - 0.015, z_bumper - 0.055), (0.024, 0.08, 0.09), mats["InteriorDark"], bevel=0.005, segments=1))
     for sx in (-1.0, 1.0):
-        parts.append(add_cylinder_part(f"Exhaust_{sx}", (sx * (half_wid * 0.50), -half_len - 0.03, z_bumper - 0.07), 0.042, 0.042, 0.15, 12, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+        parts.append(add_cylinder_part(f"ExhaustOuter_{sx}", (sx * (half_wid * 0.50), -half_len - 0.035, z_bumper - 0.07), 0.046, 0.044, 0.16, 14, mats["Chrome"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
+        parts.append(add_cylinder_part(f"ExhaustInner_{sx}", (sx * (half_wid * 0.50), -half_len - 0.08, z_bumper - 0.07), 0.034, 0.034, 0.08, 12, mats["InteriorDark"], rot_euler=(math.pi * 0.5, 0.0, 0.0)))
 
-    # Sculpted Taillights + Reverse Lights (separate children for runtime brake/reverse glow!)
+    # Sculpted 3D LED Taillights (dark housing + upper/lower LED blades) + Reverse Lights
     tl_z = z_light + 0.04
     tl_x = rear_w * 0.5 - 0.22
     for sx in (-1.0, 1.0):
-        tail_parts.append(add_beveled_box(f"Taillight_{sx}", (sx * tl_x, -half_len + 0.06, tl_z), (0.36, 0.11, 0.13), mats["Taillight"], bevel=0.024, segments=2, rot_euler=(0.0, 0.0, sx * 0.12)))
-        rev_parts.append(add_beveled_box(f"ReverseLight_{sx}", (sx * (tl_x - 0.22), -half_len + 0.05, tl_z - 0.01), (0.12, 0.09, 0.095), mats["ReverseLight"], bevel=0.016, segments=1))
+        parts.append(add_beveled_box(f"TaillightHousing_{sx}", (sx * tl_x, -half_len + 0.075, tl_z), (0.40, 0.12, 0.15), mats["TrimDark"], bevel=0.024, segments=2, rot_euler=(0.0, 0.0, sx * 0.12)))
+        tail_parts.append(add_beveled_box(f"Taillight_{sx}", (sx * tl_x, -half_len + 0.052, tl_z + 0.018), (0.36, 0.10, 0.095), mats["Taillight"], bevel=0.020, segments=2, rot_euler=(0.0, 0.0, sx * 0.12)))
+        tail_parts.append(add_beveled_box(f"TaillightBlade_{sx}", (sx * (tl_x - 0.06), -half_len + 0.048, tl_z - 0.045), (0.28, 0.08, 0.026), mats["Taillight"], bevel=0.008, segments=1, rot_euler=(0.0, 0.0, sx * 0.12)))
+        rev_parts.append(add_beveled_box(f"ReverseLight_{sx}", (sx * (tl_x - 0.23), -half_len + 0.045, tl_z - 0.008), (0.12, 0.085, 0.085), mats["ReverseLight"], bevel=0.016, segments=1))
 
-    # License plates front & rear
+    # License plates front & rear + rear trunk chrome trim bar
     parts.append(add_beveled_box("PlateFront", (0.0, half_len + 0.03, z_bumper + 0.01), (0.44, 0.024, 0.105), mats["ReverseLight"], bevel=0.005, segments=1))
     parts.append(add_beveled_box("PlateRear", (0.0, -half_len - 0.03, z_bumper + 0.14), (0.44, 0.024, 0.105), mats["ReverseLight"], bevel=0.005, segments=1))
+    parts.append(add_beveled_box("RearChromeBar", (0.0, -half_len + 0.01, tl_z - 0.02), (rear_w * 0.44, 0.025, 0.024), mats["Chrome"], bevel=0.005, segments=1))
 
-    # Aerodynamic side mirrors on angled stalks
+    # Sculpted aerodynamic side mirrors on angled stalks + chrome turn-signal strip + mirror glass!
     for sx in (-1.0, 1.0):
         parts.append(add_tube_along_points(
             f"MirrorStalk_{sx}",
             [Vector((sx * (half_wid - 0.06), mirror_y, mirror_z - 0.04)),
              Vector((sx * (half_wid + 0.06), mirror_y - 0.03, mirror_z + 0.01))],
-            [0.022, 0.018], 6, mats["TrimDark"],
+            [0.024, 0.018], 8, mats["TrimDark"],
         ))
-        parts.append(add_beveled_box(f"MirrorCap_{sx}", (sx * (half_wid + 0.11), mirror_y - 0.03, mirror_z + 0.02), (0.16, 0.10, 0.10), mats["BodyPaint"], bevel=0.032, segments=2))
-        parts.append(add_beveled_box(f"MirrorGlass_{sx}", (sx * (half_wid + 0.11), mirror_y - 0.078, mirror_z + 0.02), (0.12, 0.015, 0.075), mats["Glass"], bevel=0.004, segments=1))
+        parts.append(add_beveled_box(f"MirrorCap_{sx}", (sx * (half_wid + 0.115), mirror_y - 0.03, mirror_z + 0.02), (0.175, 0.105, 0.105), mats["BodyPaint"], bevel=0.036, segments=2))
+        parts.append(add_beveled_box(f"MirrorTurnStrip_{sx}", (sx * (half_wid + 0.12), mirror_y + 0.022, mirror_z + 0.015), (0.14, 0.016, 0.018), mats["Chrome"], bevel=0.004, segments=1))
+        parts.append(add_beveled_box(f"MirrorGlass_{sx}", (sx * (half_wid + 0.115), mirror_y - 0.080, mirror_z + 0.02), (0.135, 0.015, 0.078), mats["Chrome"], bevel=0.004, segments=1))
 
     # Recessed Door Handles + Rocker Sills
     for sx in (-1.0, 1.0):
         for di, dy in enumerate(door_handle_ys):
-            parts.append(add_beveled_box(f"DoorHandle_{sx}_{di}", (sx * (half_wid + 0.002), dy, z_light + 0.11), (0.032, 0.14, 0.030), mats["Chrome"], bevel=0.008, segments=1))
+            parts.append(add_beveled_box(f"DoorHandleRecess_{sx}_{di}", (sx * (half_wid - 0.012), dy, z_light + 0.11), (0.020, 0.17, 0.052), mats["TrimDark"], bevel=0.006, segments=1))
+            parts.append(add_beveled_box(f"DoorHandle_{sx}_{di}", (sx * (half_wid + 0.006), dy, z_light + 0.11), (0.030, 0.145, 0.028), mats["Chrome"], bevel=0.008, segments=1))
         parts.append(add_beveled_box(f"RockerSkirt_{sx}", (sx * (half_wid - 0.02), (front_y + rear_y) * 0.5, z_bumper - 0.08), (0.08, (front_y - rear_y) - 0.84, 0.09), mats["TrimDark"], bevel=0.02, segments=1))
 
 
@@ -710,7 +891,7 @@ def build_car_sedan(mats):
         (1.98,  0.83, 0.89, 0.78, 0.29, 0.60, 0.80, 0.85),
         (2.19,  0.72, 0.80, 0.70, 0.34, 0.58, 0.74, 0.78),
     ]
-    parts.append(build_lofted_lower_hull("Sedan_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    parts.append(build_lofted_lower_hull("Sedan_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z, cabin_y_range=(-1.36, 0.94)))
     build_wheel_arch_flares_and_wells(parts, 0.93, front_y, rear_y, arch_r, arch_z, mats)
     build_cabin_greenhouse(
         parts,
@@ -750,7 +931,7 @@ def build_car_hatchback(mats):
         (1.78,  0.78, 0.84, 0.74, 0.29, 0.57, 0.78, 0.82),
         (1.93,  0.68, 0.76, 0.66, 0.33, 0.55, 0.72, 0.76),
     ]
-    parts.append(build_lofted_lower_hull("Hatch_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    parts.append(build_lofted_lower_hull("Hatch_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z, cabin_y_range=(-1.68, 0.84)))
     build_wheel_arch_flares_and_wells(parts, 0.89, front_y, rear_y, arch_r, arch_z, mats)
     build_cabin_greenhouse(
         parts,
@@ -788,7 +969,7 @@ def build_car_pickup(mats):
         (2.26,  0.86, 0.92, 0.84, 0.35, 0.70, 0.99, 1.03),
         (2.48,  0.78, 0.86, 0.78, 0.40, 0.69, 0.94, 0.98),
     ]
-    parts.append(build_lofted_lower_hull("Pickup_FrontBody", cab_sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    parts.append(build_lofted_lower_hull("Pickup_FrontBody", cab_sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z, cabin_y_range=(-0.32, 1.14)))
 
     # Real hollowed open cargo bed (y = -2.48..-0.38): bed floor, ribbed liner, side fenders & tailgate!
     parts.append(add_beveled_box("Pickup_BedBase", (0.0, -1.42, 0.48), (1.84, 2.08, 0.28), mats["TrimDark"], bevel=0.03, segments=1))
@@ -856,7 +1037,7 @@ def build_car_sports_coupe(mats):
         (2.04,  0.76, 0.84, 0.72, 0.24, 0.47, 0.65, 0.69),
         (2.16,  0.66, 0.74, 0.62, 0.27, 0.44, 0.58, 0.62),
     ]
-    parts.append(build_lofted_lower_hull("Sports_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    parts.append(build_lofted_lower_hull("Sports_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z, cabin_y_range=(-1.42, 0.88)))
     build_wheel_arch_flares_and_wells(parts, 0.97, front_y, rear_y, arch_r, arch_z, mats)
 
     # Low sleek teardrop fastback cabin
@@ -903,7 +1084,7 @@ def build_car_suv(mats):
         (2.22,  0.84, 0.91, 0.84, 0.39, 0.73, 1.02, 1.06),
         (2.30,  0.76, 0.84, 0.78, 0.43, 0.72, 0.98, 1.02),
     ]
-    parts.append(build_lofted_lower_hull("SUV_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    parts.append(build_lofted_lower_hull("SUV_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z, cabin_y_range=(-2.08, 1.14)))
     build_wheel_arch_flares_and_wells(parts, 0.98, front_y, rear_y, arch_r, arch_z, mats)
 
     # Tall spacious full-length SUV greenhouse
@@ -937,7 +1118,10 @@ def build_car_suv(mats):
         z_bumper=0.47, z_light=0.88, mirror_y=0.86, mirror_z=1.18,
         door_handle_ys=(-0.72, 0.24), mats=mats, is_pickup=True,
     )
-    return finalize_car_with_light_children(parts, head_parts, tail_parts, rev_parts, "Car_SUV")
+    return finalize_car_with_light_children(
+        parts, head_parts, tail_parts, rev_parts, "Car_SUV",
+        slot_order=["BodyPaint", "TrimDark", "Glass", "Chrome", "WheelRubber", "InteriorDark", "ReverseLight"],
+    )
 
 
 def build_car_delivery_van(mats):
@@ -956,7 +1140,7 @@ def build_car_delivery_van(mats):
         (2.38,  0.83, 0.89, 0.82, 0.38, 0.68, 0.96, 1.00),
         (2.50,  0.74, 0.82, 0.74, 0.42, 0.66, 0.88, 0.92),
     ]
-    parts.append(build_lofted_lower_hull("Van_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z))
+    parts.append(build_lofted_lower_hull("Van_LowerBody", sections, mats["BodyPaint"], front_y, rear_y, arch_r, arch_z, cabin_y_range=(0.50, 1.84)))
     build_wheel_arch_flares_and_wells(parts, 0.98, front_y, rear_y, arch_r, arch_z, mats)
 
     # Tall solid commercial cargo box behind front cab (y = -2.48..+0.55, z = 1.10..2.18)
@@ -991,89 +1175,134 @@ def build_car_delivery_van(mats):
 # ---------------------------------------------------------------------------
 # 4. Organic Plane Tree (Çınar Ağacı) — Flared Roots, Forking Limbs & Multi-Cluster Canopy
 # ---------------------------------------------------------------------------
+def add_foliage_card_cluster(name, cards_specs, mat):
+    """
+    Create a single smooth-lit multi-card botanical foliage mesh.
+    Each card is a gently arched 2x2 quad patch (4 sub-quads) with exact [0..1] UVs
+    so alpha-cutout leaf cluster textures render with realistic 3D depth from every angle!
+    """
+    bm = bmesh.new()
+    uv_layer = bm.loops.layers.uv.verify()
+    for (center, size_w, size_h, rot_euler, bend) in cards_specs:
+        rot_m = Euler(rot_euler, "XYZ").to_matrix()
+        c_vec = Vector(center)
+        # 3x3 grid of vertices -> 4 arched quads with clean [0..1] UVs
+        grid = []
+        for iy in range(3):
+            v_coord = iy * 0.5
+            ly = (v_coord - 0.5) * size_h
+            row = []
+            for ix in range(3):
+                u_coord = ix * 0.5
+                lx = (u_coord - 0.5) * size_w
+                # Gentle natural leaf-spray arch downward at edges
+                dist2 = (u_coord - 0.5) ** 2 + (v_coord - 0.5) ** 2
+                lz = -bend * dist2 * min(size_w, size_h)
+                wp = c_vec + rot_m @ Vector((lx, ly, lz))
+                row.append((bm.verts.new(wp), u_coord, v_coord))
+            grid.append(row)
+        for iy in range(2):
+            for ix in range(2):
+                v00, u00, w00 = grid[iy][ix]
+                v10, u10, w10 = grid[iy][ix + 1]
+                v11, u11, w11 = grid[iy + 1][ix + 1]
+                v01, u01, w01 = grid[iy + 1][ix]
+                f = bm.faces.new((v00, v10, v11, v01))
+                f.smooth = True
+                for loop, (uu, vv) in zip(f.loops, ((u00, w00), (u10, w10), (u11, w11), (u01, w01))):
+                    loop[uv_layer].uv = (uu, vv)
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(mat)
+    return obj
+
+
 def build_plane_tree(mats):
     parts = []
     rng = random.Random(2026)
 
-    # Main trunk gently curving upward from ground (z = -0.15..2.95)
+    # Gnarled main trunk curving organically upward from ground (z = -0.15..3.15)
     trunk_pts = [
         (0.0, 0.0, -0.15),
-        (0.02, -0.02, 0.45),
-        (0.05, 0.04, 1.25),
-        (0.01, 0.07, 2.15),
-        (-0.04, 0.03, 2.95),
+        (0.03, -0.02, 0.45),
+        (0.06, 0.04, 1.30),
+        (0.01, 0.07, 2.20),
+        (-0.04, 0.03, 3.15),
     ]
-    trunk_radii = [0.34, 0.26, 0.21, 0.17, 0.12]
-    parts.append(add_tube_along_points("Tree_MainTrunk", trunk_pts, trunk_radii, 9, mats["Bark"], smooth_angle=55.0))
+    trunk_radii = [0.36, 0.27, 0.22, 0.17, 0.11]
+    parts.append(add_tube_along_points("Tree_MainTrunk", trunk_pts, trunk_radii, 10, mats["Bark"], smooth_angle=55.0))
 
     # 5 flared buttress roots grounding the trunk naturally
     for i in range(5):
         ang = (2.0 * math.pi * i) / 5.0 + 0.25
         ca, sa = math.cos(ang), math.sin(ang)
         r_pts = [
-            (ca * 0.14, sa * 0.14, 0.58),
-            (ca * 0.30, sa * 0.30, 0.18),
-            (ca * 0.48, sa * 0.48, -0.08),
+            (ca * 0.14, sa * 0.14, 0.62),
+            (ca * 0.32, sa * 0.32, 0.18),
+            (ca * 0.52, sa * 0.52, -0.08),
         ]
-        parts.append(add_tube_along_points(f"Tree_Root_{i}", r_pts, [0.12, 0.09, 0.05], 6, mats["Bark"], smooth_angle=55.0))
+        parts.append(add_tube_along_points(f"Tree_Root_{i}", r_pts, [0.13, 0.09, 0.05], 6, mats["Bark"], smooth_angle=55.0))
 
-    # 5 primary sweeping boughs + secondary forks
-    canopy_centers = [
-        (Vector((0.0, 0.0, 4.65)), 1.55, 1.15, "FoliageA"),
-        (Vector((0.15, -0.10, 5.15)), 1.10, 0.85, "FoliageB"),
+    # 6 primary sweeping boughs + secondary forks + upper leader branches
+    canopy_nodes = [
+        (Vector((0.0, 0.0, 4.75)), 1.55, "FoliageB"),
+        (Vector((0.18, -0.12, 5.25)), 1.35, "FoliageB"),
+        (Vector((-0.22, 0.15, 4.40)), 1.45, "FoliageA"),
     ]
     bough_specs = [
-        (0.20, 2.05, 1.48, 3.65),
-        (1.45, 2.25, 1.52, 3.85),
-        (2.70, 2.10, 1.44, 3.55),
-        (3.95, 2.35, 1.50, 3.92),
-        (5.20, 1.95, 1.38, 3.48),
+        (0.15, 2.10, 1.62, 3.72),
+        (1.20, 2.30, 1.58, 3.95),
+        (2.25, 2.05, 1.54, 3.60),
+        (3.30, 2.38, 1.60, 4.02),
+        (4.35, 2.00, 1.48, 3.58),
+        (5.40, 2.25, 1.52, 3.85),
     ]
     for idx, (ang, start_z, reach, top_z) in enumerate(bough_specs):
         ca, sa = math.cos(ang), math.sin(ang)
         p0 = Vector((0.0, 0.0, start_z))
-        p1 = Vector((ca * reach * 0.55, sa * reach * 0.55, (start_z + top_z) * 0.52))
+        p1 = Vector((ca * reach * 0.52, sa * reach * 0.52, (start_z + top_z) * 0.52))
         p2 = Vector((ca * reach, sa * reach, top_z))
-        parts.append(add_tube_along_points(f"Tree_Bough_{idx}", [p0, p1, p2], [0.12, 0.085, 0.048], 6, mats["Bark"], smooth_angle=55.0))
+        parts.append(add_tube_along_points(f"Tree_Bough_{idx}", [p0, p1, p2], [0.125, 0.085, 0.042], 7, mats["Bark"], smooth_angle=55.0))
 
         mat_k = "FoliageA" if idx % 2 == 0 else "FoliageB"
-        canopy_centers.append((p2 + Vector((0, 0, 0.35)), 1.25, 0.88, mat_k))
+        canopy_nodes.append((p2 + Vector((0.0, 0.0, 0.25)), 1.48, mat_k))
+        canopy_nodes.append((p1 + Vector((ca * 0.22, sa * 0.22, 0.55)), 1.32, "FoliageA"))
 
-        # Secondary side twig + upper bough cluster
-        ang2 = ang + 0.52
-        p3 = p1 + Vector((math.cos(ang2) * 0.85, math.sin(ang2) * 0.85, 0.85))
-        parts.append(add_tube_along_points(f"Tree_Twig_{idx}", [p1, p3], [0.065, 0.032], 5, mats["Bark"], smooth_angle=55.0))
+        # Secondary upward side twig
+        ang2 = ang + 0.50
+        p3 = p1 + Vector((math.cos(ang2) * 0.92, math.sin(ang2) * 0.92, 0.95))
+        parts.append(add_tube_along_points(f"Tree_Twig_{idx}", [p1, p3], [0.068, 0.028], 5, mats["Bark"], smooth_angle=55.0))
         mat_k2 = "FoliageB" if idx % 2 == 0 else "FoliageA"
-        canopy_centers.append((p3 + Vector((0, 0, 0.25)), 1.02, 0.74, mat_k2))
+        canopy_nodes.append((p3 + Vector((0.0, 0.0, 0.22)), 1.36, mat_k2))
 
-    # Sculpted lush layered foliage clusters (18 organically sculpted sub-boughs for rich, natural silhouette)
-    extra_crown = [
-        (Vector((0.75, 0.65, 4.35)), 1.05, 0.78, "FoliageB"),
-        (Vector((-0.82, 0.52, 4.25)), 1.08, 0.76, "FoliageA"),
-        (Vector((0.55, -0.82, 4.15)), 1.02, 0.74, "FoliageA"),
-        (Vector((-0.68, -0.74, 4.30)), 1.06, 0.78, "FoliageB"),
-        (Vector((0.0, 0.88, 3.85)), 0.92, 0.68, "FoliageA"),
-        (Vector((-0.12, -0.92, 3.75)), 0.95, 0.70, "FoliageB"),
-    ]
-    canopy_centers.extend(extra_crown)
+    # Build 108 organically arched, crossed 3D botanical leaf-cluster cards (NO icosphere blobs!)
+    cards_a, cards_b = [], []
+    crown_center = Vector((0.0, 0.0, 4.15))
+    for ni, (node_pos, scale, mat_key) in enumerate(canopy_nodes):
+        target = cards_a if mat_key == "FoliageA" else cards_b
+        # 5 crossed & layered angled leaf sprays per branch node so canopy reads lush from every angle (incl. underneath!)
+        for k in range(5):
+            az = (2.0 * math.pi * k) / 5.0 + rng.uniform(-0.35, 0.35) + ni * 0.6
+            off = Vector((math.cos(az) * 0.42 * scale, math.sin(az) * 0.42 * scale, rng.uniform(-0.28, 0.36) * scale))
+            pos = node_pos + off
+            w = scale * rng.uniform(0.92, 1.24)
+            h = scale * rng.uniform(0.88, 1.18)
+            # Tilt cards organically outward around the crown dome
+            out_dir = (pos - crown_center)
+            yaw = math.atan2(out_dir.y, out_dir.x) + rng.uniform(-0.7, 0.7)
+            pitch = rng.uniform(0.35, 1.18) if k < 3 else rng.uniform(-0.22, 0.38)
+            roll = rng.uniform(-0.55, 0.55)
+            target.append((pos, w, h, (pitch, roll, yaw), rng.uniform(0.28, 0.48)))
 
-    for ci, (center, rx, rz, mat_key) in enumerate(canopy_centers):
-        bm = bmesh.new()
-        bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
-        seed_off = ci * 3.17
-        for v in bm.verts:
-            p = v.co
-            lobe = (
-                1.0
-                + 0.24 * math.sin(p.x * 4.2 + seed_off) * math.cos(p.y * 3.8 - seed_off)
-                + 0.16 * math.sin(p.z * 5.0 + p.x * 3.1 + seed_off)
-                + 0.09 * rng.uniform(-1.0, 1.0)
-            )
-            z_scale = rz * (0.70 if p.z < 0 else 1.0)
-            v.co = Vector((p.x * rx * lobe, p.y * rx * lobe, p.z * z_scale * lobe)) + center
-        parts.append(create_mesh_object(f"CanopyCluster_{ci}", bm, mat=mats[mat_key], smooth_angle=75.0, uv_scale=0.6))
+    parts.append(add_foliage_card_cluster("Canopy_Cards_A", cards_a, mats["FoliageA"]))
+    parts.append(add_foliage_card_cluster("Canopy_Cards_B", cards_b, mats["FoliageB"]))
 
-    return join_objects(parts, "Tree_PlaneTree")
+    tree = join_objects(parts, "Tree_PlaneTree")
+    enforce_material_slot_order(tree, ["Bark", "FoliageA", "FoliageB"])
+    return tree
 
 
 # ---------------------------------------------------------------------------
@@ -1627,6 +1856,21 @@ def render_showcase(preview_entries):
 
     tree = build_plane_tree(mats)
     tree.location = Vector((-7.2, 4.2, 0.0))
+
+    # Preview transparent smoked glass & alpha-cutout plane leaves in showcase render!
+    glass_bsdf = mats["Glass"].node_tree.nodes.get("Principled BSDF")
+    if glass_bsdf is not None and "Alpha" in glass_bsdf.inputs:
+        glass_bsdf.inputs["Alpha"].default_value = 0.34
+    leaf_tex_path = os.path.join(PROJECT_ROOT, "Assets", "GRIDROAM", "Resources", "OurWorldTheme", "Textures", "foliage_plane_albedo.png")
+    if os.path.exists(leaf_tex_path):
+        leaf_img = bpy.data.images.load(leaf_tex_path)
+        for fk in ("FoliageA", "FoliageB"):
+            nt = mats[fk].node_tree
+            bsdf = nt.nodes.get("Principled BSDF")
+            tex_node = nt.nodes.new("ShaderNodeTexImage")
+            tex_node.image = leaf_img
+            nt.links.new(tex_node.outputs["Color"], bsdf.inputs["Base Color"])
+            nt.links.new(tex_node.outputs["Alpha"], bsdf.inputs["Alpha"])
 
     fountain = build_town_fountain(mats)
     fountain.location = Vector((-1.6, 4.8, 0.0))

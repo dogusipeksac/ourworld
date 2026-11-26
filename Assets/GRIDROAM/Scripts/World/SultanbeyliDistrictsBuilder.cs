@@ -66,13 +66,19 @@ namespace OurWorld.World
             new DistrictZone { Id = "turgutreis",      TitleTr = "Turgut Reis Mah. · Tarihi Aydos Kalesi",  TitleEn = "Turgut Reis · Historic Aydos Castle",  Center = new Vector3( 238f, 0f, -138f), Radius =  68f }
         };
 
+        private const string PbrTexRoot = "OurWorldTheme/Textures/";
+        private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+        private static readonly int MainTexId = Shader.PropertyToID("_MainTex");
+        private static readonly int BumpMapId = Shader.PropertyToID("_BumpMap");
+        private static readonly int BumpScaleId = Shader.PropertyToID("_BumpScale");
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int ColorId = Shader.PropertyToID("_Color");
         private static readonly int SmoothnessId = Shader.PropertyToID("_Smoothness");
         private static readonly int MetallicId = Shader.PropertyToID("_Metallic");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
-        private readonly List<Material> _mats = new List<Material>(48);
+        private readonly List<Material> _mats = new List<Material>(96);
+        private readonly Dictionary<string, Material> _tiledMatCache = new Dictionary<string, Material>(64);
         private readonly List<Texture2D> _textures = new List<Texture2D>(24);
         private readonly List<Transform> _flags = new List<Transform>(10);
         private readonly List<Transform> _fountainJets = new List<Transform>(8);
@@ -155,6 +161,7 @@ namespace OurWorld.World
             BuildBattalgaziDistrict(worldRoot);
             BuildMimarSinanDistrict(worldRoot);
             BuildTurgutReisAndAydosCastleDistrict(worldRoot);
+            BuildDistrictHeroBlenderProps(worldRoot);
 
             if (PlayerModeController.Instance != null)
             {
@@ -181,6 +188,7 @@ namespace OurWorld.World
                 if (_textures[i] != null) Destroy(_textures[i]);
             }
             _mats.Clear();
+            _tiledMatCache.Clear();
             _textures.Clear();
             if (Instance == this) Instance = null;
         }
@@ -256,9 +264,17 @@ namespace OurWorld.World
         }
 
         // =====================================================================
-        // MATERIALS
+        // MATERIALS (POLY HAVEN CC0 PBR ALBEDO + NORMAL MAPS · 0 MB EXTRA!)
         // =====================================================================
-        private Material CreateMat(Shader sh, string name, Color col, float smoothness = 0.22f, float metallic = 0f, Color? emission = null)
+        private Material CreateMat(
+            Shader sh,
+            string name,
+            Color col,
+            float smoothness = 0.22f,
+            float metallic = 0f,
+            Color? emission = null,
+            string pbrPrefix = null,
+            float bumpScale = 0.85f)
         {
             Material m = new Material(sh) { name = name };
             if (m.HasProperty(BaseColorId)) m.SetColor(BaseColorId, col);
@@ -270,8 +286,68 @@ namespace OurWorld.World
                 m.EnableKeyword("_EMISSION");
                 m.SetColor(EmissionColorId, emission.Value);
             }
+
+            if (!string.IsNullOrEmpty(pbrPrefix))
+            {
+                Texture2D alb = Resources.Load<Texture2D>(PbrTexRoot + pbrPrefix + "_albedo");
+                Texture2D nor = Resources.Load<Texture2D>(PbrTexRoot + pbrPrefix + "_normal");
+                if (alb != null)
+                {
+                    if (m.HasProperty(BaseMapId)) m.SetTexture(BaseMapId, alb);
+                    if (m.HasProperty(MainTexId)) m.SetTexture(MainTexId, alb);
+                }
+                if (nor != null && m.HasProperty(BumpMapId))
+                {
+                    m.SetTexture(BumpMapId, nor);
+                    m.EnableKeyword("_NORMALMAP");
+                    if (m.HasProperty(BumpScaleId)) m.SetFloat(BumpScaleId, bumpScale);
+                }
+            }
+
             _mats.Add(m);
             return m;
+        }
+
+        private Material GetWorldTiledMaterial(Material baseMat, Vector3 scale)
+        {
+            if (baseMat == null || !baseMat.HasProperty(BaseMapId) || baseMat.GetTexture(BaseMapId) == null)
+            {
+                return baseMat;
+            }
+
+            // Determine clean world-space repeat density based on material role (bucketed to preserve SRP Batcher!)
+            float tileMeters = 4.2f;
+            string n = baseMat.name;
+            if (n.Contains("Asphalt")) tileMeters = 6.5f;
+            else if (n.Contains("Grass")) tileMeters = 8.0f;
+            else if (n.Contains("Plaster")) tileMeters = 5.5f;
+            else if (n.Contains("Wood")) tileMeters = 2.6f;
+            else if (n.Contains("RoofTile")) tileMeters = 3.2f;
+            else if (n.Contains("Fortress") || n.Contains("Stone")) tileMeters = 3.8f;
+
+            // For vertical walls (height > depth or width), tile across width x height; for slabs, width x depth
+            bool isWall = scale.y > Mathf.Min(scale.x, scale.z) * 1.4f && scale.y > 1.2f;
+            float spanU = isWall ? Mathf.Max(scale.x, scale.z) : scale.x;
+            float spanV = isWall ? scale.y : scale.z;
+
+            int tx = Mathf.Clamp(Mathf.RoundToInt(spanU / tileMeters), 1, 24);
+            int ty = Mathf.Clamp(Mathf.RoundToInt(spanV / tileMeters), 1, 24);
+            if (tx == 1 && ty == 1) return baseMat;
+
+            string key = $"{baseMat.name}_{tx}x{ty}";
+            if (_tiledMatCache.TryGetValue(key, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+
+            Material clone = new Material(baseMat) { name = key };
+            Vector2 tiling = new Vector2(tx, ty);
+            if (clone.HasProperty(BaseMapId)) clone.SetTextureScale(BaseMapId, tiling);
+            if (clone.HasProperty(MainTexId)) clone.SetTextureScale(MainTexId, tiling);
+            if (clone.HasProperty(BumpMapId)) clone.SetTextureScale(BumpMapId, tiling);
+            _tiledMatCache[key] = clone;
+            _mats.Add(clone);
+            return clone;
         }
 
         private void BuildMaterials()
@@ -279,41 +355,41 @@ namespace OurWorld.World
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
             if (lit == null) return;
 
-            _asphaltMat = CreateMat(lit, "MAT_Dist_Asphalt", new Color(0.22f, 0.23f, 0.25f), 0.20f);
-            _laneWhiteMat = CreateMat(lit, "MAT_Dist_LaneMark", new Color(0.92f, 0.92f, 0.90f), 0.15f);
-            _sidewalkMat = CreateMat(lit, "MAT_Dist_Sidewalk_Parke", new Color(0.72f, 0.69f, 0.64f), 0.22f);
-            _plazaTravertineMat = CreateMat(lit, "MAT_Dist_Plaza_Travertine", new Color(0.84f, 0.80f, 0.72f), 0.28f);
-            _parkGrassMat = CreateMat(lit, "MAT_Dist_Park_Grass", new Color(0.28f, 0.56f, 0.24f), 0.12f);
-            _joggingTrackMat = CreateMat(lit, "MAT_Dist_Track", new Color(0.72f, 0.29f, 0.22f), 0.26f);
-            _stoneFortressMat = CreateMat(lit, "MAT_Dist_Fortress_Stone", new Color(0.64f, 0.60f, 0.53f), 0.14f);
-            _stoneDarkMat = CreateMat(lit, "MAT_Dist_StoneDark", new Color(0.42f, 0.40f, 0.37f), 0.16f);
-            _roofTileMat = CreateMat(lit, "MAT_Dist_RoofTile_Kiremit", new Color(0.68f, 0.30f, 0.19f), 0.22f);
-            _mosqueDomeMat = CreateMat(lit, "MAT_Dist_MosqueDome", new Color(0.56f, 0.60f, 0.64f), 0.45f, 0.35f);
-            _glassBlueMat = CreateMat(lit, "MAT_Dist_Glass", new Color(0.20f, 0.44f, 0.62f), 0.86f, 0.28f);
-            _windowLitMat = CreateMat(lit, "MAT_Dist_WindowGlass", new Color(0.22f, 0.34f, 0.46f), 0.82f, 0.20f);
-            _woodMat = CreateMat(lit, "MAT_Dist_Wood_Pergola", new Color(0.54f, 0.35f, 0.19f), 0.24f);
-            _darkMetalMat = CreateMat(lit, "MAT_Dist_DarkMetal", new Color(0.18f, 0.20f, 0.24f), 0.55f, 0.65f);
-            _whiteTrimMat = CreateMat(lit, "MAT_Dist_WhiteTrim", new Color(0.93f, 0.92f, 0.89f), 0.26f);
-            _metroRedMat = CreateMat(lit, "MAT_Dist_MetroRed", new Color(0.84f, 0.14f, 0.16f), 0.42f);
-            _istanbulBlueMat = CreateMat(lit, "MAT_Dist_IstanbulBlue", new Color(0.10f, 0.34f, 0.68f), 0.38f);
-            _turkishRedMat = CreateMat(lit, "MAT_Dist_TurkishRed", new Color(0.86f, 0.08f, 0.12f), 0.22f);
-            _goldAccentMat = CreateMat(lit, "MAT_Dist_Gold", new Color(0.92f, 0.74f, 0.24f), 0.76f, 0.72f);
-            _waterBlueMat = CreateMat(lit, "MAT_Dist_FountainWater", new Color(0.22f, 0.72f, 0.92f), 0.88f, 0.10f, new Color(0.08f, 0.26f, 0.36f));
-            _pineMat = CreateMat(lit, "MAT_Dist_PineLeaf", new Color(0.16f, 0.38f, 0.20f), 0.12f);
-            _planeLeafMat = CreateMat(lit, "MAT_Dist_PlaneLeaf", new Color(0.26f, 0.52f, 0.22f), 0.14f);
-            _trunkMat = CreateMat(lit, "MAT_Dist_Trunk", new Color(0.36f, 0.25f, 0.16f), 0.12f);
-            _sandMat = CreateMat(lit, "MAT_Dist_Sandbox_Sand", new Color(0.86f, 0.77f, 0.56f), 0.14f);
-            _lampBulbMat = CreateMat(lit, "MAT_Dist_LampBulb", new Color(1.0f, 0.90f, 0.64f), 0.5f, 0f, new Color(1.0f, 0.84f, 0.46f) * 1.4f);
+            _asphaltMat         = CreateMat(lit, "MAT_Dist_Asphalt",          new Color(0.76f, 0.78f, 0.80f), 0.28f, 0.02f, null, "ph_asphalt",     0.85f);
+            _laneWhiteMat       = CreateMat(lit, "MAT_Dist_LaneMark",         new Color(0.93f, 0.93f, 0.91f), 0.16f);
+            _sidewalkMat        = CreateMat(lit, "MAT_Dist_Sidewalk_Parke",   new Color(0.88f, 0.85f, 0.80f), 0.24f, 0.00f, null, "ph_cobblestone", 0.90f);
+            _plazaTravertineMat = CreateMat(lit, "MAT_Dist_Plaza_Travertine", new Color(0.96f, 0.93f, 0.87f), 0.32f, 0.00f, null, "ph_cobblestone", 0.68f);
+            _parkGrassMat       = CreateMat(lit, "MAT_Dist_Park_Grass",       new Color(0.80f, 0.92f, 0.72f), 0.12f, 0.00f, null, "ph_grass",       0.85f);
+            _joggingTrackMat    = CreateMat(lit, "MAT_Dist_Track",            new Color(0.78f, 0.34f, 0.26f), 0.24f, 0.00f, null, "ph_asphalt",     0.45f);
+            _stoneFortressMat   = CreateMat(lit, "MAT_Dist_Fortress_Stone",   new Color(0.82f, 0.77f, 0.69f), 0.18f, 0.00f, null, "ph_cobblestone", 1.25f);
+            _stoneDarkMat       = CreateMat(lit, "MAT_Dist_StoneDark",        new Color(0.56f, 0.54f, 0.50f), 0.20f, 0.04f, null, "ph_cobblestone", 1.15f);
+            _roofTileMat        = CreateMat(lit, "MAT_Dist_RoofTile_Kiremit", new Color(0.92f, 0.68f, 0.56f), 0.24f, 0.00f, null, "ph_rooftiles",   1.15f);
+            _mosqueDomeMat      = CreateMat(lit, "MAT_Dist_MosqueDome",       new Color(0.58f, 0.62f, 0.67f), 0.52f, 0.42f);
+            _glassBlueMat       = CreateMat(lit, "MAT_Dist_Glass",            new Color(0.18f, 0.42f, 0.62f), 0.92f, 0.34f);
+            _windowLitMat       = CreateMat(lit, "MAT_Dist_WindowGlass",      new Color(0.20f, 0.32f, 0.46f), 0.88f, 0.24f);
+            _woodMat            = CreateMat(lit, "MAT_Dist_Wood_Pergola",     new Color(0.84f, 0.68f, 0.52f), 0.26f, 0.00f, null, "ph_woodplanks",  0.95f);
+            _darkMetalMat       = CreateMat(lit, "MAT_Dist_DarkMetal",        new Color(0.17f, 0.19f, 0.23f), 0.62f, 0.72f);
+            _whiteTrimMat       = CreateMat(lit, "MAT_Dist_WhiteTrim",        new Color(0.95f, 0.94f, 0.91f), 0.26f, 0.00f, null, "ph_plaster",     0.45f);
+            _metroRedMat        = CreateMat(lit, "MAT_Dist_MetroRed",         new Color(0.84f, 0.14f, 0.16f), 0.52f, 0.18f);
+            _istanbulBlueMat    = CreateMat(lit, "MAT_Dist_IstanbulBlue",     new Color(0.10f, 0.34f, 0.68f), 0.46f, 0.14f);
+            _turkishRedMat      = CreateMat(lit, "MAT_Dist_TurkishRed",       new Color(0.86f, 0.08f, 0.12f), 0.22f);
+            _goldAccentMat      = CreateMat(lit, "MAT_Dist_Gold",             new Color(0.92f, 0.74f, 0.24f), 0.82f, 0.78f);
+            _waterBlueMat       = CreateMat(lit, "MAT_Dist_FountainWater",    new Color(0.22f, 0.72f, 0.92f), 0.92f, 0.10f, new Color(0.08f, 0.26f, 0.36f));
+            _pineMat            = CreateMat(lit, "MAT_Dist_PineLeaf",         new Color(0.16f, 0.38f, 0.20f), 0.14f);
+            _planeLeafMat       = CreateMat(lit, "MAT_Dist_PlaneLeaf",        new Color(0.26f, 0.52f, 0.22f), 0.16f);
+            _trunkMat           = CreateMat(lit, "MAT_Dist_Trunk",            new Color(0.58f, 0.46f, 0.34f), 0.14f, 0.00f, null, "ph_woodplanks",  0.85f);
+            _sandMat            = CreateMat(lit, "MAT_Dist_Sandbox_Sand",     new Color(0.96f, 0.92f, 0.82f), 0.14f, 0.00f, null, "ph_sand",        0.80f);
+            _lampBulbMat        = CreateMat(lit, "MAT_Dist_LampBulb",         new Color(1.0f, 0.90f, 0.64f), 0.5f, 0f, new Color(1.0f, 0.84f, 0.46f) * 1.4f);
 
-            // Warm authentic Sultanbeyli apartment facade plaster palette
+            // Warm authentic Sultanbeyli apartment facade stucco plaster (with real PolyHaven Plaster Albedo + Normal Map!)
             _plasterPalette = new[]
             {
-                CreateMat(lit, "MAT_Dist_Plaster_Cream",     new Color(0.91f, 0.86f, 0.76f), 0.16f),
-                CreateMat(lit, "MAT_Dist_Plaster_Apricot",   new Color(0.90f, 0.74f, 0.58f), 0.16f),
-                CreateMat(lit, "MAT_Dist_Plaster_Terracotta",new Color(0.82f, 0.56f, 0.44f), 0.16f),
-                CreateMat(lit, "MAT_Dist_Plaster_Sage",      new Color(0.75f, 0.82f, 0.74f), 0.16f),
-                CreateMat(lit, "MAT_Dist_Plaster_SkyGrey",   new Color(0.76f, 0.80f, 0.84f), 0.18f),
-                CreateMat(lit, "MAT_Dist_Plaster_Anthracite",new Color(0.34f, 0.37f, 0.42f), 0.22f)
+                CreateMat(lit, "MAT_Dist_Plaster_Cream",     new Color(0.96f, 0.92f, 0.84f), 0.16f, 0f, null, "ph_plaster", 0.68f),
+                CreateMat(lit, "MAT_Dist_Plaster_Apricot",   new Color(0.95f, 0.80f, 0.66f), 0.16f, 0f, null, "ph_plaster", 0.68f),
+                CreateMat(lit, "MAT_Dist_Plaster_Terracotta",new Color(0.88f, 0.62f, 0.50f), 0.16f, 0f, null, "ph_plaster", 0.68f),
+                CreateMat(lit, "MAT_Dist_Plaster_Sage",      new Color(0.80f, 0.87f, 0.79f), 0.16f, 0f, null, "ph_plaster", 0.68f),
+                CreateMat(lit, "MAT_Dist_Plaster_SkyGrey",   new Color(0.82f, 0.85f, 0.89f), 0.18f, 0f, null, "ph_plaster", 0.62f),
+                CreateMat(lit, "MAT_Dist_Plaster_Anthracite",new Color(0.42f, 0.45f, 0.50f), 0.24f, 0f, null, "ph_plaster", 0.58f)
             };
 
             _canopyPalette = new[]
@@ -696,6 +772,64 @@ namespace OurWorld.World
             BuildStreetLamp(d, new Vector3(246f, 0.08f, -118f));
         }
 
+        private void BuildDistrictHeroBlenderProps(Transform root)
+        {
+            Transform propsRoot = new GameObject("District_Blender_HeroProps").transform;
+            propsRoot.SetParent(root, false);
+
+            // 1. Sculpted Travertine Tulip Planters (OW_FlowerPlanter) across all plazas & metro squares
+            (Vector3 pos, float yaw)[] planters =
+            {
+                (new Vector3( 168f, 0.10f,  188f),   0f), // Abdurrahmangazi Kent Meydanı
+                (new Vector3( 192f, 0.10f,  188f),   0f),
+                (new Vector3( 168f, 0.10f,  204f), 180f),
+                (new Vector3( 192f, 0.10f,  204f), 180f),
+                (new Vector3( -18f, 0.10f,  261f),   0f), // Mehmet Akif M5 Metro Plaza
+                (new Vector3(   6f, 0.10f,  261f),   0f),
+                (new Vector3(-164f, 0.10f,  176f),   0f), // Hasanpaşa M5 Metro
+                (new Vector3(-152f, 0.10f,  176f),   0f),
+                (new Vector3( -47f, 0.08f, -299f),   0f), // Mimar Sinan Park Fountain
+                (new Vector3( -57f, 0.08f, -299f),   0f)
+            };
+            for (int i = 0; i < planters.Length; i++)
+            {
+                GameObject pl = OurWorldModelLibrary.InstantiateModel("OW_FlowerPlanter", propsRoot, planters[i].pos, Quaternion.Euler(0f, planters[i].yaw, 0f), Vector3.one, removeColliders: true);
+                if (pl != null) WorldPhysicsSolidifier.EnsureBoxCollider(pl, new Vector3(0f, 0.35f, 0f), new Vector3(1.1f, 0.70f, 1.1f));
+            }
+
+            // 2. Sculpted Turkish Tea Garden Umbrella Tables (OW_TeaGardenSet) at Kent Meydanı, Millet Parkı & Aydos Kale!
+            (Vector3 pos, float yaw)[] teaSets =
+            {
+                (new Vector3( 162f, 0.10f,  193f),  15f), // Kent Meydanı Tea Corner
+                (new Vector3( 162f, 0.10f,  198f), -12f),
+                (new Vector3(-172f, 0.08f,  198f),  20f), // Hasanpaşa Millet Parkı
+                (new Vector3( 228f, 0.08f, -130f),  10f), // Aydos Kale Çay Bahçesi
+                (new Vector3( 233f, 0.08f, -126f), -18f),
+                (new Vector3( 224f, 0.08f, -118f),  25f)
+            };
+            for (int i = 0; i < teaSets.Length; i++)
+            {
+                GameObject set = OurWorldModelLibrary.InstantiateModel("OW_TeaGardenSet", propsRoot, teaSets[i].pos, Quaternion.Euler(0f, teaSets[i].yaw, 0f), Vector3.one, removeColliders: true);
+                if (set != null)
+                {
+                    if (i % 2 == 1) OurWorldModelLibrary.TintMaterialByKeyword(set, "TerracottaWarm", new Color(0.11f, 0.56f, 0.60f));
+                    WorldPhysicsSolidifier.EnsureBoxCollider(set, new Vector3(0f, 0.52f, 0f), new Vector3(0.92f, 1.04f, 0.92f));
+                }
+            }
+
+            // 3. Iconic Istanbul Simit Carts (OW_SimitCart) outside M5 Metro & Kent Meydanı!
+            (Vector3 pos, float yaw)[] simitCarts =
+            {
+                (new Vector3( 175f, 0.10f,  183f), -15f), // Kent Meydanı entrance
+                (new Vector3( -12f, 0.10f,  264f),  18f)  // M5 Sultanbeyli Metro exit
+            };
+            for (int i = 0; i < simitCarts.Length; i++)
+            {
+                GameObject cart = OurWorldModelLibrary.InstantiateModel("OW_SimitCart", propsRoot, simitCarts[i].pos, Quaternion.Euler(0f, simitCarts[i].yaw, 0f), Vector3.one * 1.05f, removeColliders: true);
+                if (cart != null) WorldPhysicsSolidifier.EnsureBoxCollider(cart, new Vector3(0f, 0.85f, 0f), new Vector3(1.55f, 1.70f, 0.85f));
+            }
+        }
+
         // =====================================================================
         // ARCHITECTURAL & STREETSCAPE BUILDERS (CLEAN, SOLID, MOBILE-OPTIMIZED)
         // =====================================================================
@@ -716,35 +850,52 @@ namespace OurWorld.World
             ramp.transform.localPosition = new Vector3(-18.5f, 1.40f, 0f);
             ramp.transform.localRotation = Quaternion.Euler(0f, 0f, 14.5f);
             ramp.transform.localScale = new Vector3(13.5f, 0.45f, 5.2f);
-            SetupMeshMat(ramp, _stoneDarkMat, castShadows: false);
+            SetupMeshMat(ramp, GetWorldTiledMaterial(_stoneDarkMat, ramp.transform.localScale), castShadows: false);
 
             // 2. Fortress Courtyard Floor at Y = 3.0m
             BuildSlab(castle.transform, "Aydos_Castle_Courtyard_Plaza", new Vector3(0f, 3.05f, 0f), new Vector3(22f, 0.25f, 20f), _plazaTravertineMat, solid: true);
 
-            // 3. Medieval Stone Curtain Walls (North, South, East + West Gate Walls)
-            BuildWall(castle.transform, "CastleWall_North", new Vector3(0f, 5.2f,  9.5f), new Vector3(22f, 4.4f, 1.4f), _stoneFortressMat);
-            BuildWall(castle.transform, "CastleWall_South", new Vector3(0f, 5.2f, -9.5f), new Vector3(22f, 4.4f, 1.4f), _stoneFortressMat);
-            BuildWall(castle.transform, "CastleWall_East",  new Vector3(10.5f, 5.2f, 0f), new Vector3(1.4f, 4.4f, 20f), _stoneFortressMat);
-            // West wall with open arched entrance gate!
-            BuildWall(castle.transform, "CastleWall_WestN", new Vector3(-10.5f, 5.2f,  6.2f), new Vector3(1.4f, 4.4f, 6.6f), _stoneFortressMat);
-            BuildWall(castle.transform, "CastleWall_WestS", new Vector3(-10.5f, 5.2f, -6.2f), new Vector3(1.4f, 4.4f, 6.6f), _stoneFortressMat);
-            BuildWall(castle.transform, "CastleGate_Arch",  new Vector3(-10.5f, 6.7f,  0.0f), new Vector3(1.6f, 1.4f, 6.2f), _stoneDarkMat);
-
-            // Crenellated Battlements along wall tops
-            for (int b = -8; b <= 8; b += 4)
+            // 3. High-Detail Sculpted Blender 5.3.0 Historic Byzantine/Ottoman Aydos Kalesi (OW_AydosCastle.fbx):
+            //    4 stone watchtowers (NE Keep + SE Octagonal Conical Bastion + NW/SW Gate Towers) w/ machicolations,
+            //    voussoir arched West gateway w/ raised iron portcullis & swung-open oak doors, buttressed curtain walls & ramparts!
+            GameObject castleFbx = OurWorldModelLibrary.InstantiateModel("OW_AydosCastle", castle.transform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            if (castleFbx != null)
             {
-                BuildDecorativeBox(castle.transform, "Merlon_N", new Vector3(b, 7.8f,  9.5f), new Vector3(1.6f, 0.9f, 1.5f), _stoneDarkMat);
-                BuildDecorativeBox(castle.transform, "Merlon_S", new Vector3(b, 7.8f, -9.5f), new Vector3(1.6f, 0.9f, 1.5f), _stoneDarkMat);
+                // Clean invisible solid colliders matching perimeter curtain walls & 4 corner towers (West Gate X=-10.5, Z=-2.7..+2.7 stays WIDE OPEN!)
+                AddInvisibleColliderBox(castle.transform, "Col_CastleWall_North", new Vector3(0f, 5.25f,  9.5f), new Vector3(22f, 4.6f, 1.6f));
+                AddInvisibleColliderBox(castle.transform, "Col_CastleWall_South", new Vector3(0f, 5.25f, -9.5f), new Vector3(22f, 4.6f, 1.6f));
+                AddInvisibleColliderBox(castle.transform, "Col_CastleWall_East",  new Vector3(10.5f, 5.25f, 0f), new Vector3(1.6f, 4.6f, 20f));
+                AddInvisibleColliderBox(castle.transform, "Col_CastleWall_WestN", new Vector3(-10.5f, 5.25f,  6.2f), new Vector3(1.8f, 4.6f, 6.6f));
+                AddInvisibleColliderBox(castle.transform, "Col_CastleWall_WestS", new Vector3(-10.5f, 5.25f, -6.2f), new Vector3(1.8f, 4.6f, 6.6f));
+                AddInvisibleColliderBox(castle.transform, "Col_Tower_NE", new Vector3( 10.5f, 7.2f,  9.5f), new Vector3(5.2f, 8.6f, 5.2f));
+                AddInvisibleColliderBox(castle.transform, "Col_Tower_SE", new Vector3( 10.5f, 6.8f, -9.5f), new Vector3(4.8f, 7.8f, 4.8f));
+                AddInvisibleColliderBox(castle.transform, "Col_Tower_NW", new Vector3(-10.5f, 6.4f,  9.5f), new Vector3(4.4f, 7.0f, 4.4f));
+                AddInvisibleColliderBox(castle.transform, "Col_Tower_SW", new Vector3(-10.5f, 6.2f, -9.5f), new Vector3(4.4f, 6.6f, 4.4f));
             }
+            else
+            {
+                // Fallback primitive curtain walls & cylindrical towers
+                BuildWall(castle.transform, "CastleWall_North", new Vector3(0f, 5.2f,  9.5f), new Vector3(22f, 4.4f, 1.4f), _stoneFortressMat);
+                BuildWall(castle.transform, "CastleWall_South", new Vector3(0f, 5.2f, -9.5f), new Vector3(22f, 4.4f, 1.4f), _stoneFortressMat);
+                BuildWall(castle.transform, "CastleWall_East",  new Vector3(10.5f, 5.2f, 0f), new Vector3(1.4f, 4.4f, 20f), _stoneFortressMat);
+                BuildWall(castle.transform, "CastleWall_WestN", new Vector3(-10.5f, 5.2f,  6.2f), new Vector3(1.4f, 4.4f, 6.6f), _stoneFortressMat);
+                BuildWall(castle.transform, "CastleWall_WestS", new Vector3(-10.5f, 5.2f, -6.2f), new Vector3(1.4f, 4.4f, 6.6f), _stoneFortressMat);
+                BuildWall(castle.transform, "CastleGate_Arch",  new Vector3(-10.5f, 6.7f,  0.0f), new Vector3(1.6f, 1.4f, 6.2f), _stoneDarkMat);
 
-            // 4. Twin Cylindrical Byzantine/Ottoman Watchtowers (NE & SE corners)
-            BuildWatchtower(castle.transform, new Vector3( 10.5f, 3.0f,  9.5f), 8.5f);
-            BuildWatchtower(castle.transform, new Vector3( 10.5f, 3.0f, -9.5f), 7.5f);
-            BuildWatchtower(castle.transform, new Vector3(-10.5f, 3.0f,  9.5f), 6.5f);
+                for (int b = -8; b <= 8; b += 4)
+                {
+                    BuildDecorativeBox(castle.transform, "Merlon_N", new Vector3(b, 7.8f,  9.5f), new Vector3(1.6f, 0.9f, 1.5f), _stoneDarkMat);
+                    BuildDecorativeBox(castle.transform, "Merlon_S", new Vector3(b, 7.8f, -9.5f), new Vector3(1.6f, 0.9f, 1.5f), _stoneDarkMat);
+                }
+
+                BuildWatchtower(castle.transform, new Vector3( 10.5f, 3.0f,  9.5f), 8.5f);
+                BuildWatchtower(castle.transform, new Vector3( 10.5f, 3.0f, -9.5f), 7.5f);
+                BuildWatchtower(castle.transform, new Vector3(-10.5f, 3.0f,  9.5f), 6.5f);
+            }
 
             // 5. Giant Turkish Flag flying high above Aydos Castle!
             BuildFlagpole(castle.transform, new Vector3(10.5f, 11.4f, 9.5f), 6.2f);
-            BuildSignBoard(castle.transform, new Vector3(-11.4f, 6.6f, 0f), -90f, "TARİHİ AYDOS KALESİ", "325M · SULTANBEYLİ", _stoneDarkMat);
+            BuildSignBoard(castle.transform, new Vector3(-11.75f, 7.8f, 0f), -90f, "TARİHİ AYDOS KALESİ", "325M · SULTANBEYLİ", _stoneDarkMat);
 
             // 6. Panoramic Wooden Viewing Deck + Interactive Viewpoint overlooking all of Sultanbeyli!
             BuildSlab(castle.transform, "Aydos_Panoramic_Deck", new Vector3(-4.5f, 3.22f, -4.5f), new Vector3(6.5f, 0.16f, 5.2f), _woodMat, solid: true);
@@ -765,7 +916,7 @@ namespace OurWorld.World
             t.transform.SetParent(parent, false);
             t.transform.localPosition = localPos + Vector3.up * (height * 0.5f);
             t.transform.localScale = new Vector3(4.6f, height * 0.5f, 4.6f);
-            SetupMeshMat(t, _stoneFortressMat, castShadows: true);
+            SetupMeshMat(t, GetWorldTiledMaterial(_stoneFortressMat, new Vector3(14f, height, 14f)), castShadows: true);
 
             GameObject crown = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             crown.name = "Watchtower_Crown";
@@ -901,6 +1052,15 @@ namespace OurWorld.World
             BuildSignBoard(m.transform, new Vector3(0f, 5.15f, 11.55f), 180f, title, "SULTANBEYLİ", _stoneDarkMat);
         }
 
+        private static void AddInvisibleColliderBox(Transform parent, string name, Vector3 localPos, Vector3 size)
+        {
+            GameObject go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            BoxCollider bc = go.AddComponent<BoxCollider>();
+            bc.size = size;
+        }
+
         private void BuildMetroStationEntrance(Transform parent, Vector3 pos, float yaw, string stationTitle)
         {
             GameObject metro = new GameObject($"Metro_{stationTitle}");
@@ -908,26 +1068,36 @@ namespace OurWorld.World
             metro.transform.position = pos;
             metro.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
-            // Modern Glass & Red Steel Entrance Canopy
-            BuildDecorativeBox(metro.transform, "Metro_CanopyTop", new Vector3(0f, 3.85f, 0f), new Vector3(11.5f, 0.36f, 6.4f), _glassBlueMat);
-            BuildDecorativeBox(metro.transform, "Metro_FasciaRed", new Vector3(0f, 3.88f, 3.24f), new Vector3(11.6f, 0.56f, 0.18f), _metroRedMat);
-            BuildWall(metro.transform, "Metro_PostFL", new Vector3(-5.4f, 1.9f,  2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
-            BuildWall(metro.transform, "Metro_PostFR", new Vector3( 5.4f, 1.9f,  2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
-            BuildWall(metro.transform, "Metro_PostBL", new Vector3(-5.4f, 1.9f, -2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
-            BuildWall(metro.transform, "Metro_PostBR", new Vector3( 5.4f, 1.9f, -2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
-            // Side glass balustrades + dark stair entrance hall
-            BuildWall(metro.transform, "Metro_BackWall", new Vector3(0f, 1.6f, -2.9f), new Vector3(10.8f, 3.2f, 0.35f), _stoneDarkMat);
-            BuildDecorativeBox(metro.transform, "Metro_EscalatorOpening", new Vector3(0f, 0.08f, -0.5f), new Vector3(7.4f, 0.06f, 4.2f), _darkMetalMat);
+            // Authentic Sculpted Blender 5.3.0 Istanbul M5 Metro Entrance (OW_M5MetroEntrance.fbx):
+            // Curved transparent glass barrel-vault canopy, 5 brushed steel ribs, twin escalators, glass railings & red M totem!
+            GameObject metroFbx = OurWorldModelLibrary.InstantiateModel("OW_M5MetroEntrance", metro.transform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            if (metroFbx != null)
+            {
+                AddInvisibleColliderBox(metro.transform, "Col_MetroRearWall", new Vector3(0f, 1.55f, -3.02f), new Vector3(11.1f, 3.1f, 0.35f));
+                AddInvisibleColliderBox(metro.transform, "Col_MetroSideL",    new Vector3(-5.25f, 0.90f, -0.15f), new Vector3(0.40f, 1.8f, 5.85f));
+                AddInvisibleColliderBox(metro.transform, "Col_MetroSideR",    new Vector3( 5.25f, 0.90f, -0.15f), new Vector3(0.40f, 1.8f, 5.85f));
+                AddInvisibleColliderBox(metro.transform, "Col_MetroTotem",    new Vector3(-7.40f, 3.40f,  2.20f), new Vector3(0.75f, 6.8f, 0.65f));
+            }
+            else
+            {
+                // Fallback primitive canopy
+                BuildDecorativeBox(metro.transform, "Metro_CanopyTop", new Vector3(0f, 3.85f, 0f), new Vector3(11.5f, 0.36f, 6.4f), _glassBlueMat);
+                BuildDecorativeBox(metro.transform, "Metro_FasciaRed", new Vector3(0f, 3.88f, 3.24f), new Vector3(11.6f, 0.56f, 0.18f), _metroRedMat);
+                BuildWall(metro.transform, "Metro_PostFL", new Vector3(-5.4f, 1.9f,  2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
+                BuildWall(metro.transform, "Metro_PostFR", new Vector3( 5.4f, 1.9f,  2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
+                BuildWall(metro.transform, "Metro_PostBL", new Vector3(-5.4f, 1.9f, -2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
+                BuildWall(metro.transform, "Metro_PostBR", new Vector3( 5.4f, 1.9f, -2.9f), new Vector3(0.32f, 3.8f, 0.32f), _darkMetalMat);
+                BuildWall(metro.transform, "Metro_BackWall", new Vector3(0f, 1.6f, -2.9f), new Vector3(10.8f, 3.2f, 0.35f), _stoneDarkMat);
+                BuildDecorativeBox(metro.transform, "Metro_EscalatorOpening", new Vector3(0f, 0.08f, -0.5f), new Vector3(7.4f, 0.06f, 4.2f), _darkMetalMat);
+                BuildWall(metro.transform, "Metro_TotemPole", new Vector3(-7.4f, 3.4f, 2.2f), new Vector3(0.45f, 6.8f, 0.45f), _darkMetalMat);
+                BuildDecorativeBox(metro.transform, "Metro_TotemBox", new Vector3(-7.4f, 6.4f, 2.2f), new Vector3(1.85f, 1.85f, 0.55f), _metroRedMat);
+            }
 
-            // Iconic Istanbul Red-White 'M' Tall Metro Totem Pylon!
-            BuildWall(metro.transform, "Metro_TotemPole", new Vector3(-7.4f, 3.4f, 2.2f), new Vector3(0.45f, 6.8f, 0.45f), _darkMetalMat);
-            BuildDecorativeBox(metro.transform, "Metro_TotemBox", new Vector3(-7.4f, 6.4f, 2.2f), new Vector3(1.85f, 1.85f, 0.55f), _metroRedMat);
-            BuildSignTextMesh(metro.transform, new Vector3(-7.4f, 6.42f, 2.52f), Quaternion.Euler(0f, 180f, 0f), "M", 0.34f, 68, Color.white);
-            BuildSignTextMesh(metro.transform, new Vector3(-7.4f, 6.42f, 1.88f), Quaternion.identity, "M", 0.34f, 68, Color.white);
-
-            // Illuminated station name fascia
-            BuildSignTextMesh(metro.transform, new Vector3(0f, 3.88f, 3.38f), Quaternion.Euler(0f, 180f, 0f), stationTitle, 0.11f, 40, Color.white);
-            BuildSignTextMesh(metro.transform, new Vector3(0f, 3.88f, -3.38f), Quaternion.identity, stationTitle, 0.11f, 40, Color.white);
+            // Crisp Illuminated 'M' Emblem on Totem Pylon + Station Name Fascia!
+            BuildSignTextMesh(metro.transform, new Vector3(-7.4f, 6.42f, 2.55f), Quaternion.Euler(0f, 180f, 0f), "M", 0.34f, 68, Color.white);
+            BuildSignTextMesh(metro.transform, new Vector3(-7.4f, 6.42f, 1.85f), Quaternion.identity, "M", 0.34f, 68, Color.white);
+            BuildSignTextMesh(metro.transform, new Vector3(0f, 3.86f, 3.40f), Quaternion.Euler(0f, 180f, 0f), stationTitle, 0.11f, 40, Color.white);
+            BuildSignTextMesh(metro.transform, new Vector3(0f, 3.86f, -3.40f), Quaternion.identity, stationTitle, 0.11f, 40, Color.white);
         }
 
         private void BuildBusStopShelter(Transform parent, Vector3 pos, float yaw, string stopName)
@@ -980,11 +1150,17 @@ namespace OurWorld.World
             BuildWall(apt.transform, "Apt_Building_Facade", new Vector3(0f, height * 0.5f, 0f), new Vector3(width, height, depth), wallMat);
             BuildDecorativeBox(apt.transform, "Apt_Roof_Kiremit", new Vector3(0f, height + 0.55f, 0f), new Vector3(width + 0.9f, 1.1f, depth + 0.9f), _roofTileMat);
 
-            // Ground-floor shopfront fascia + striped awning + shop display window
+            // Ground-floor stone plinth + shopfront fascia + real Blender OW_ShopAwning + display glass!
             float frontZ = depth * 0.5f;
-            BuildDecorativeBox(apt.transform, "Shop_DisplayGlass", new Vector3(0f, 1.5f, frontZ + 0.08f), new Vector3(width * 0.72f, 2.4f, 0.14f), _glassBlueMat);
-            BuildDecorativeBox(apt.transform, "Shop_Awning", new Vector3(0f, 3.05f, frontZ + 0.85f), new Vector3(width * 0.76f, 0.24f, 1.65f), _canopyPalette[plasterIdx % _canopyPalette.Length]);
-            BuildSignTextMesh(apt.transform, new Vector3(0f, 3.46f, frontZ + 0.15f), Quaternion.Euler(0f, 180f, 0f), shopLabel, 0.10f, 36, Color.white);
+            BuildDecorativeBox(apt.transform, "Apt_StonePlinth", new Vector3(0f, 0.35f, 0f), new Vector3(width + 0.18f, 0.70f, depth + 0.18f), _stoneDarkMat);
+            BuildDecorativeBox(apt.transform, "Shop_DisplayGlass", new Vector3(0f, 1.55f, frontZ + 0.08f), new Vector3(width * 0.72f, 2.35f, 0.14f), _glassBlueMat);
+            GameObject awningFbx = OurWorldModelLibrary.InstantiateModel("OW_ShopAwning", apt.transform,
+                new Vector3(0f, 2.95f, frontZ + 0.12f), Quaternion.identity, new Vector3(Mathf.Clamp(width * 0.18f, 1.8f, 2.8f), 1.0f, 1.15f), removeColliders: true);
+            if (awningFbx == null)
+            {
+                BuildDecorativeBox(apt.transform, "Shop_Awning", new Vector3(0f, 3.05f, frontZ + 0.85f), new Vector3(width * 0.76f, 0.24f, 1.65f), _canopyPalette[plasterIdx % _canopyPalette.Length]);
+            }
+            BuildSignTextMesh(apt.transform, new Vector3(0f, 3.56f, frontZ + 0.16f), Quaternion.Euler(0f, 180f, 0f), shopLabel, 0.10f, 36, Color.white);
 
             // Upper residential floor windows & recessed balconies (auto-glow at night!)
             int floors = Mathf.Clamp(Mathf.FloorToInt((height - 3.6f) / 3.0f), 2, 4);
@@ -1056,18 +1232,30 @@ namespace OurWorld.World
             f.transform.position = pos;
             f.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
-            BuildWall(f.transform, "Cesme_StoneBody", new Vector3(0f, 1.35f, 0f), new Vector3(2.4f, 2.7f, 1.2f), _stoneFortressMat);
-            BuildDecorativeBox(f.transform, "Cesme_Roof", new Vector3(0f, 2.85f, 0f), new Vector3(2.8f, 0.35f, 1.6f), _roofTileMat);
-            BuildDecorativeBox(f.transform, "Cesme_Basin", new Vector3(0f, 0.42f, 0.85f), new Vector3(1.8f, 0.55f, 0.65f), _stoneDarkMat);
-            BuildDecorativeBox(f.transform, "Cesme_Water", new Vector3(0f, 0.68f, 0.85f), new Vector3(1.5f, 0.08f, 0.45f), _waterBlueMat);
-            GameObject stream = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            stream.name = "Cesme_Stream";
-            stream.transform.SetParent(f.transform, false);
-            stream.transform.localPosition = new Vector3(0f, 0.95f, 0.72f);
-            stream.transform.localScale = new Vector3(0.08f, 0.36f, 0.08f);
-            Destroy(stream.GetComponent<Collider>());
-            SetupMeshMat(stream, _waterBlueMat, castShadows: false);
-            _fountainJets.Add(stream.transform);
+            // Real sculpted Ottoman stone fountain Blender FBX (OW_IstanbulFountain) with clean fallback
+            GameObject fbx = OurWorldModelLibrary.InstantiateModel("OW_IstanbulFountain", f.transform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            if (fbx != null)
+            {
+                WorldPhysicsSolidifier.EnsureBoxCollider(f, new Vector3(0f, 1.45f, 0f), new Vector3(2.2f, 2.9f, 2.0f));
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    GameObject stream = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    stream.name = $"Cesme_Stream_{s}";
+                    stream.transform.SetParent(f.transform, false);
+                    stream.transform.localPosition = new Vector3(s * 0.28f, 0.94f, 0.80f);
+                    stream.transform.localScale = new Vector3(0.036f, 0.34f, 0.036f);
+                    Destroy(stream.GetComponent<Collider>());
+                    SetupMeshMat(stream, _waterBlueMat, castShadows: false);
+                    _fountainJets.Add(stream.transform);
+                }
+            }
+            else
+            {
+                BuildWall(f.transform, "Cesme_StoneBody", new Vector3(0f, 1.35f, 0f), new Vector3(2.4f, 2.7f, 1.2f), _stoneFortressMat);
+                BuildDecorativeBox(f.transform, "Cesme_Roof", new Vector3(0f, 2.85f, 0f), new Vector3(2.8f, 0.35f, 1.6f), _roofTileMat);
+                BuildDecorativeBox(f.transform, "Cesme_Basin", new Vector3(0f, 0.42f, 0.85f), new Vector3(1.8f, 0.55f, 0.65f), _stoneDarkMat);
+                BuildDecorativeBox(f.transform, "Cesme_Water", new Vector3(0f, 0.68f, 0.85f), new Vector3(1.5f, 0.08f, 0.45f), _waterBlueMat);
+            }
 
             InteractableTrigger trig = f.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.9f);
@@ -1291,14 +1479,23 @@ namespace OurWorld.World
             bench.transform.localPosition = pos;
             bench.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
 
-            BuildWall(bench.transform, "BenchSeat", new Vector3(0f, 0.45f, 0f), new Vector3(1.95f, 0.08f, 0.52f), _woodMat);
-            BuildDecorativeBox(bench.transform, "BenchBack", new Vector3(0f, 0.80f, -0.22f), new Vector3(1.95f, 0.42f, 0.07f), _woodMat);
-            BuildDecorativeBox(bench.transform, "LegL", new Vector3(-0.82f, 0.22f, 0f), new Vector3(0.08f, 0.44f, 0.46f), _darkMetalMat);
-            BuildDecorativeBox(bench.transform, "LegR", new Vector3( 0.82f, 0.22f, 0f), new Vector3(0.08f, 0.44f, 0.46f), _darkMetalMat);
+            // Real sculpted cast-iron & wood Blender Park Bench (OW_ParkBench) with fallback
+            GameObject fbx = OurWorldModelLibrary.InstantiateModel("OW_ParkBench", bench.transform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            if (fbx != null)
+            {
+                WorldPhysicsSolidifier.EnsureBoxCollider(bench, new Vector3(0f, 0.46f, -0.04f), new Vector3(1.82f, 0.92f, 0.66f));
+            }
+            else
+            {
+                BuildWall(bench.transform, "BenchSeat", new Vector3(0f, 0.45f, 0f), new Vector3(1.95f, 0.08f, 0.52f), _woodMat);
+                BuildDecorativeBox(bench.transform, "BenchBack", new Vector3(0f, 0.80f, -0.22f), new Vector3(1.95f, 0.42f, 0.07f), _woodMat);
+                BuildDecorativeBox(bench.transform, "LegL", new Vector3(-0.82f, 0.22f, 0f), new Vector3(0.08f, 0.44f, 0.46f), _darkMetalMat);
+                BuildDecorativeBox(bench.transform, "LegR", new Vector3( 0.82f, 0.22f, 0f), new Vector3(0.08f, 0.44f, 0.46f), _darkMetalMat);
+            }
 
             GameObject sitPt = new GameObject("SitPoint");
             sitPt.transform.SetParent(bench.transform, false);
-            sitPt.transform.localPosition = new Vector3(0f, 0.50f, 0.04f);
+            sitPt.transform.localPosition = new Vector3(0f, 0.48f, 0.02f);
             sitPt.transform.localRotation = Quaternion.identity;
 
             InteractableTrigger trig = bench.AddComponent<InteractableTrigger>();
@@ -1312,23 +1509,29 @@ namespace OurWorld.World
             GameObject tree = new GameObject("District_CinarTree");
             tree.transform.SetParent(parent, false);
             tree.transform.position = pos;
+            tree.transform.rotation = Quaternion.Euler(0f, (pos.x * 13f + pos.z * 7f) % 360f, 0f);
             tree.transform.localScale = Vector3.one * scale;
 
-            GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            trunk.name = "Trunk";
-            trunk.transform.SetParent(tree.transform, false);
-            trunk.transform.localPosition = new Vector3(0f, 1.8f, 0f);
-            trunk.transform.localScale = new Vector3(0.46f, 1.8f, 0.46f);
-            Destroy(trunk.GetComponent<Collider>());
-            SetupMeshMat(trunk, _trunkMat, castShadows: false);
+            // Real multi-branch Blender Istanbul Çınar Tree (OW_PlaneTree) with fallback!
+            GameObject fbx = OurWorldModelLibrary.InstantiateModel("OW_PlaneTree", tree.transform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            if (fbx == null)
+            {
+                GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                trunk.name = "Trunk";
+                trunk.transform.SetParent(tree.transform, false);
+                trunk.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+                trunk.transform.localScale = new Vector3(0.46f, 1.8f, 0.46f);
+                Destroy(trunk.GetComponent<Collider>());
+                SetupMeshMat(trunk, _trunkMat, castShadows: false);
 
-            GameObject crown1 = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            crown1.name = "CrownMain";
-            crown1.transform.SetParent(tree.transform, false);
-            crown1.transform.localPosition = new Vector3(0f, 4.6f, 0f);
-            crown1.transform.localScale = new Vector3(4.2f, 3.2f, 4.2f);
-            Destroy(crown1.GetComponent<Collider>());
-            SetupMeshMat(crown1, _planeLeafMat, castShadows: true);
+                GameObject crown1 = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                crown1.name = "CrownMain";
+                crown1.transform.SetParent(tree.transform, false);
+                crown1.transform.localPosition = new Vector3(0f, 4.6f, 0f);
+                crown1.transform.localScale = new Vector3(4.2f, 3.2f, 4.2f);
+                Destroy(crown1.GetComponent<Collider>());
+                SetupMeshMat(crown1, _planeLeafMat, castShadows: true);
+            }
 
             WorldPhysicsSolidifier.EnsureTrunkCollider(tree, radius: 0.36f, height: 3.4f);
         }
@@ -1338,26 +1541,33 @@ namespace OurWorld.World
             GameObject tree = new GameObject("District_AydosPine");
             tree.transform.SetParent(parent, false);
             tree.transform.position = pos;
+            tree.transform.rotation = Quaternion.Euler(0f, (pos.x * 17f - pos.z * 11f) % 360f, 0f);
             tree.transform.localScale = Vector3.one * scale;
 
-            GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            trunk.name = "Trunk";
-            trunk.transform.SetParent(tree.transform, false);
-            trunk.transform.localPosition = new Vector3(0f, 1.4f, 0f);
-            trunk.transform.localScale = new Vector3(0.38f, 1.4f, 0.38f);
-            Destroy(trunk.GetComponent<Collider>());
-            SetupMeshMat(trunk, _trunkMat, castShadows: false);
-
-            for (int tier = 0; tier < 2; tier++)
+            // Authentic Aydos Kızılçam / Mediterranean Umbrella Pine with alpha-cutout radiating pine needle rosettes!
+            GameObject fbx = OurWorldModelLibrary.InstantiateModel("OW_AydosPineTree", tree.transform, Vector3.zero, Quaternion.identity, Vector3.one * 1.05f, removeColliders: true);
+            if (fbx == null) fbx = OurWorldModelLibrary.InstantiateModel("OW_CypressTree", tree.transform, Vector3.zero, Quaternion.identity, Vector3.one * 1.15f, removeColliders: true);
+            if (fbx == null)
             {
-                GameObject foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                foliage.name = $"PineTier_{tier}";
-                foliage.transform.SetParent(tree.transform, false);
-                foliage.transform.localPosition = new Vector3(0f, 3.5f + tier * 1.9f, 0f);
-                float r = tier == 0 ? 3.2f : 2.2f;
-                foliage.transform.localScale = new Vector3(r, 2.5f, r);
-                Destroy(foliage.GetComponent<Collider>());
-                SetupMeshMat(foliage, _pineMat, castShadows: tier == 0);
+                GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                trunk.name = "Trunk";
+                trunk.transform.SetParent(tree.transform, false);
+                trunk.transform.localPosition = new Vector3(0f, 1.4f, 0f);
+                trunk.transform.localScale = new Vector3(0.38f, 1.4f, 0.38f);
+                Destroy(trunk.GetComponent<Collider>());
+                SetupMeshMat(trunk, _trunkMat, castShadows: false);
+
+                for (int tier = 0; tier < 2; tier++)
+                {
+                    GameObject foliage = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    foliage.name = $"PineTier_{tier}";
+                    foliage.transform.SetParent(tree.transform, false);
+                    foliage.transform.localPosition = new Vector3(0f, 3.5f + tier * 1.9f, 0f);
+                    float r = tier == 0 ? 3.2f : 2.2f;
+                    foliage.transform.localScale = new Vector3(r, 2.5f, r);
+                    Destroy(foliage.GetComponent<Collider>());
+                    SetupMeshMat(foliage, _pineMat, castShadows: tier == 0);
+                }
             }
 
             WorldPhysicsSolidifier.EnsureTrunkCollider(tree, radius: 0.32f, height: 3.0f);
@@ -1369,22 +1579,45 @@ namespace OurWorld.World
             lamp.transform.SetParent(parent, false);
             lamp.transform.localPosition = localPos;
 
-            GameObject pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pole.name = "LampPole";
-            pole.transform.SetParent(lamp.transform, false);
-            pole.transform.localPosition = new Vector3(0f, 2.8f, 0f);
-            pole.transform.localScale = new Vector3(0.14f, 2.8f, 0.14f);
-            SetupMeshMat(pole, _darkMetalMat, castShadows: false);
+            // Real sculpted Blender Istanbul Cast-Iron Street Lantern (OW_IstanbulLantern)!
+            GameObject fbx = OurWorldModelLibrary.InstantiateModel("OW_IstanbulLantern", lamp.transform, Vector3.zero, Quaternion.identity, Vector3.one, removeColliders: true);
+            MeshRenderer mr = null;
+            float lightY = 4.6f;
 
-            GameObject bulb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            bulb.name = "LampBulb";
-            bulb.transform.SetParent(lamp.transform, false);
-            bulb.transform.localPosition = new Vector3(0f, 5.7f, 0f);
-            bulb.transform.localScale = new Vector3(0.46f, 0.34f, 0.46f);
-            Destroy(bulb.GetComponent<Collider>());
-            MeshRenderer mr = SetupMeshMat(bulb, _lampBulbMat, castShadows: false);
+            if (fbx != null)
+            {
+                WorldPhysicsSolidifier.EnsureTrunkCollider(lamp, radius: 0.16f, height: 3.6f);
+                GameObject bulb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                bulb.name = "LampBulb";
+                bulb.transform.SetParent(lamp.transform, false);
+                bulb.transform.localPosition = new Vector3(0f, lightY, 0f);
+                bulb.transform.localScale = new Vector3(0.28f, 0.26f, 0.28f);
+                Destroy(bulb.GetComponent<Collider>());
+                mr = SetupMeshMat(bulb, _lampBulbMat, castShadows: false);
+            }
+            else
+            {
+                lightY = 5.7f;
+                GameObject pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                pole.name = "LampPole";
+                pole.transform.SetParent(lamp.transform, false);
+                pole.transform.localPosition = new Vector3(0f, 2.8f, 0f);
+                pole.transform.localScale = new Vector3(0.14f, 2.8f, 0.14f);
+                SetupMeshMat(pole, _darkMetalMat, castShadows: false);
 
-            Light pt = bulb.AddComponent<Light>();
+                GameObject bulb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                bulb.name = "LampBulb";
+                bulb.transform.SetParent(lamp.transform, false);
+                bulb.transform.localPosition = new Vector3(0f, lightY, 0f);
+                bulb.transform.localScale = new Vector3(0.46f, 0.34f, 0.46f);
+                Destroy(bulb.GetComponent<Collider>());
+                mr = SetupMeshMat(bulb, _lampBulbMat, castShadows: false);
+            }
+
+            GameObject ptGo = new GameObject("LampLight");
+            ptGo.transform.SetParent(lamp.transform, false);
+            ptGo.transform.localPosition = new Vector3(0f, lightY - 0.15f, 0f);
+            Light pt = ptGo.AddComponent<Light>();
             pt.type = LightType.Point;
             pt.color = new Color(1.0f, 0.84f, 0.56f);
             pt.intensity = 38f;
@@ -1435,7 +1668,7 @@ namespace OurWorld.World
             return trig;
         }
 
-        private static void BuildSlab(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat, bool solid)
+        private void BuildSlab(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat, bool solid)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -1447,20 +1680,20 @@ namespace OurWorld.World
                 Collider c = go.GetComponent<Collider>();
                 if (c != null) Destroy(c);
             }
-            SetupMeshMat(go, mat, castShadows: false);
+            SetupMeshMat(go, GetWorldTiledMaterial(mat, scale), castShadows: false);
         }
 
-        private static void BuildWall(Transform parent, string name, Vector3 localPos, Vector3 scale, Material mat)
+        private void BuildWall(Transform parent, string name, Vector3 localPos, Vector3 scale, Material mat)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;
             go.transform.localScale = scale;
-            SetupMeshMat(go, mat, castShadows: true);
+            SetupMeshMat(go, GetWorldTiledMaterial(mat, scale), castShadows: true);
         }
 
-        private static void BuildDecorativeBox(Transform parent, string name, Vector3 localPos, Vector3 scale, Material mat)
+        private void BuildDecorativeBox(Transform parent, string name, Vector3 localPos, Vector3 scale, Material mat)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -1469,7 +1702,7 @@ namespace OurWorld.World
             go.transform.localScale = scale;
             Collider c = go.GetComponent<Collider>();
             if (c != null) Destroy(c);
-            SetupMeshMat(go, mat, castShadows: false);
+            SetupMeshMat(go, GetWorldTiledMaterial(mat, scale), castShadows: false);
         }
 
         private static MeshRenderer SetupMeshMat(GameObject go, Material mat, bool castShadows)
