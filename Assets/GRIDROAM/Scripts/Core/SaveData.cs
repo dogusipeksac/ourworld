@@ -135,5 +135,28 @@ namespace OurWorld.Core
         public float bestTennisServeKmh;
         public int swimWins;
         public float bestSwim50mSeconds;
+
+        // Character Customization (Berber Tuncay + Atlas Optik + Mavi & Kotonica)
+        public int playerPantsColorIndex;
+        public int playerHairColorIndex;
+        public bool ownsSunglasses;
+        public bool equipSunglasses;
+        public bool ownsStreetCap;
+        public bool equipStreetCap;
+
+        // Daily Quests & Achievements
+        public string dailyQuestDate = string.Empty;
+        public int dailyMallOrShopCount;
+        public int dailyJobsCount;
+        public int dailySocialOrSportCount;
+        public bool dailyQuest0Claimed;
+        public bool dailyQuest1Claimed;
+        public bool dailyQuest2Claimed;
+        public int totalMallPurchases;
+        public int totalNpcChats;
+
+        // Hamidiye Oto Galeri (Owned Vehicle Garage)
+        public List<string> ownedVehicleIds = new List<string>();
+        public string activeOwnedVehicleId = "car_classic_sedan";
     }
 }

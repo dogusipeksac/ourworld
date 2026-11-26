@@ -300,13 +300,14 @@ namespace OurWorld.World
                         {
                             _contactMade = true;
                             GameFeelAudio.PlayCatMeow();
+                            bool isEnCat = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                             if (Time.time - _lastEnergyPetTime >= 10f)
                             {
                                 _lastEnergyPetTime = Time.time;
                                 PlayerNeedsController.Instance?.RestoreEnergy(12f);
-                                _petMode.RaiseStatusMessage($"{catName} eline başını yaslayıp mırladı. (+12 Enerji)");
+                                _petMode.RaiseStatusMessage(isEnCat ? $"{catName} leaned into your hand and purred. (+12 Energy)" : $"{catName} eline başını yaslayıp mırladı. (+12 Enerji)");
                             }
-                            else _petMode.RaiseStatusMessage($"{catName} keyifle mırlıyor.");
+                            else _petMode.RaiseStatusMessage(isEnCat ? $"{catName} is purring happily." : $"{catName} keyifle mırlıyor.");
                         }
                         if (petTime >= PetDuration) EndPet();
                     }

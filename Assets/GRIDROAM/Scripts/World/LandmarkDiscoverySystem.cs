@@ -37,7 +37,8 @@ namespace OurWorld.World
             new LandmarkDef { Id = "lm_kadife",      NameTr = "Kadife Sokağı · Kıraathane",        NameEn = "Kadife Street · Tea House",         Center = new Vector3(  -6f, 0f, -186f), Radius = 24f },
             new LandmarkDef { Id = "lm_ciftlik",     NameTr = "Aydos Yeşil Vadi · Çiftlik",        NameEn = "Aydos Green Valley · Farm",         Center = new Vector3( 164f, 0f,    0f), Radius = 26f },
             new LandmarkDef { Id = "lm_golet",       NameTr = "Sultanbeyli Göleti & Çam Korusu",   NameEn = "Sultanbeyli Lake & Pine Grove",     Center = new Vector3(-172f, 0f,    0f), Radius = 26f },
-            new LandmarkDef { Id = "lm_avm",         NameTr = "Hamidiye Atlas AVM · 5 Katlı",      NameEn = "Hamidiye Atlas Mall · 5 Levels",    Center = new Vector3(-116f, 0f,  -40f), Radius = 28f }
+            new LandmarkDef { Id = "lm_avm",         NameTr = "Hamidiye Atlas AVM · 5 Katlı",      NameEn = "Hamidiye Atlas Mall · 5 Levels",    Center = new Vector3(-116f, 0f,  -40f), Radius = 28f },
+            new LandmarkDef { Id = "lm_otogaleri",   NameTr = "Hamidiye Oto Galeri & Garaj",       NameEn = "Hamidiye Auto Gallery & Garage",    Center = new Vector3(-115f, 0f,   71f), Radius = 24f }
         };
 
         public static int TotalCount => Landmarks.Length;

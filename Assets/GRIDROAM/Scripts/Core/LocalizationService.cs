@@ -140,6 +140,11 @@ namespace OurWorld.Core
             return !string.IsNullOrEmpty(fallback) ? fallback : key;
         }
 
+        public static bool IsEnglish =>
+            Instance != null && string.Equals(Instance.CurrentLanguage, "en", StringComparison.OrdinalIgnoreCase);
+
+        public static string Bi(string tr, string en) => IsEnglish ? en : tr;
+
         public static string Tr(string key, string fallback = null)
         {
             if (Instance != null)

@@ -29,11 +29,19 @@ namespace OurWorld.World
             new Vector3(-90.2f, 0.08f,  42.0f), // Seyyid Kutup Cd.
             new Vector3( -8.0f, 0.08f, -71.5f), // Petrol Yolu Cd.
             new Vector3(-22.0f, 0.08f,-119.6f), // Aziziye School
-            new Vector3(  8.0f, 0.08f,-151.4f)  // Zübeyde Hanım Cd.
+            new Vector3(  8.0f, 0.08f,-151.4f), // Zübeyde Hanım Cd.
+            new Vector3(-18.0f, 0.08f, 180.8f), // Havadis Sokağı · Taş Fırın
+            new Vector3( 36.0f, 0.08f, 191.2f), // Havadis Sokağı · Doğu
+            new Vector3(-14.0f, 0.08f,-180.8f), // Kadife Sokağı · Kıraathane
+            new Vector3( 34.0f, 0.08f,-191.2f), // Kadife Sokağı · Doğu
+            new Vector3(-116.0f,0.08f, -58.0f), // Hamidiye Atlas AVM · Ön Meydan
+            new Vector3(-164.0f,0.08f,   6.0f), // Sultanbeyli Göleti İskelesi
+            new Vector3( 150.0f,0.08f,   4.2f)  // Aydos Yeşil Vadi · Çiftlik
         };
 
         private float _cooldown = 55f;
         private GameObject _activeEventGo;
+        private Transform _activeRingTransform;
         private Vector3 _activeEventPos;
         private float _activeTimeLeft;
         private int _activeKind; // 0 = grocery, 1 = cat food, 2 = courier parcel
@@ -79,8 +87,7 @@ namespace OurWorld.World
             {
                 _activeTimeLeft -= Time.deltaTime;
                 float pulse = 1.0f + Mathf.Sin(Time.time * 4.5f) * 0.14f;
-                Transform ring = _activeEventGo.transform.Find("EventRing");
-                if (ring != null) ring.localScale = new Vector3(1.55f * pulse, 0.02f, 1.55f * pulse);
+                if (_activeRingTransform != null) _activeRingTransform.localScale = new Vector3(1.55f * pulse, 0.02f, 1.55f * pulse);
 
                 Vector3 diff = mode.ActiveWorldPosition - _activeEventPos;
                 diff.y = 0f;
@@ -145,6 +152,7 @@ namespace OurWorld.World
             ring.transform.SetParent(_activeEventGo.transform, false);
             ring.transform.localPosition = new Vector3(0f, 0.04f, 0f);
             ring.transform.localScale = new Vector3(1.55f, 0.02f, 1.55f);
+            _activeRingTransform = ring.transform;
             Destroy(ring.GetComponent<Collider>());
             Renderer rr = ring.GetComponent<Renderer>();
             if (rr != null) { rr.sharedMaterial = _ringMat; rr.shadowCastingMode = ShadowCastingMode.Off; }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OurWorld.CameraSystem;
+using OurWorld.Core;
 using OurWorld.Player;
 using UnityEngine;
 
@@ -210,7 +211,8 @@ namespace OurWorld.Vehicle
             if (_health <= 0.01f && !_warnedStalled && PlayerModeController.Instance != null)
             {
                 _warnedStalled = true;
-                PlayerModeController.Instance.RaiseStatusMessage("Araç ağır hasar aldı ve motoru bozuldu!");
+                bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(isEn ? "Vehicle heavily damaged and engine stalled!" : "Araç ağır hasar aldı ve motoru bozuldu!");
             }
         }
 
@@ -327,15 +329,16 @@ namespace OurWorld.Vehicle
         {
             if (!playerIsDriving || PlayerModeController.Instance == null) return;
 
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             if (_health <= 0.01f && !_warnedStalled)
             {
                 _warnedStalled = true;
-                PlayerModeController.Instance.RaiseStatusMessage("Motor ağır hasar gördü! Başka araca binebilir veya Tamirhane'ye çekebilirsin.");
+                PlayerModeController.Instance.RaiseStatusMessage(isEn ? "Engine stalled! Switch cars or repair at No:73 Auto Garage." : "Motor ağır hasar gördü! Başka araca binebilir veya Tamirhane'ye çekebilirsin.");
             }
             else if (_health < 35f && !_warnedCritical)
             {
                 _warnedCritical = true;
-                PlayerModeController.Instance.RaiseStatusMessage("Araç duman çıkarıyor! Tamirhane'ye uğrayıp ücretsiz onarabilirsin.");
+                PlayerModeController.Instance.RaiseStatusMessage(isEn ? "Engine smoking! Stop by No:73 Auto Garage for a free repair." : "Araç duman çıkarıyor! Tamirhane'ye uğrayıp ücretsiz onarabilirsin.");
             }
         }
 

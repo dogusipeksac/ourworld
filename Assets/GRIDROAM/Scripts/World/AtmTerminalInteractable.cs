@@ -43,14 +43,17 @@ namespace OurWorld.World
             {
                 _pendingService = -1;
                 data.lastAtmClaimPlayTimeSeconds = data.totalPlayTimeSeconds;
+                bool isEnAtm = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                 PlayerActionAnimator.Play(mode, transform, PlayerActionKind.AtmKeypad, onClimax: () =>
                 {
                     if (SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
                     SaveManager.Instance.AddMoney(75);
                     GameFeelAudio.PlayCoinChime();
                     GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.4f, new Color(0.28f, 0.92f, 0.56f), count: 12, spread: 0.5f);
-                    mode.RaiseStatusMessage($"{bankName}: Günlük mahalle geliri çekildi! (+75 ₺ · Bakiye: {SaveManager.Instance.Data.money} ₺)");
-                }, startStatus: $"{bankName}: Şifre giriliyor, nakit hazırlanıyor...");
+                    mode.RaiseStatusMessage(isEnAtm
+                        ? $"{bankName}: Daily neighborhood stipend withdrawn! (+75 ₺ · Balance: {SaveManager.Instance.Data.money} ₺)"
+                        : $"{bankName}: Günlük mahalle geliri çekildi! (+75 ₺ · Bakiye: {SaveManager.Instance.Data.money} ₺)");
+                }, startStatus: isEnAtm ? $"{bankName}: Entering PIN, dispensing cash..." : $"{bankName}: Şifre giriliyor, nakit hazırlanıyor...");
                 return;
             }
 
@@ -61,11 +64,12 @@ namespace OurWorld.World
                 SedanVehicleController targetCar = _pendingTargetCar;
                 _pendingService = -1;
                 _pendingTargetCar = null;
+                bool isEnConf = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                 PlayerActionAnimator.Play(mode, transform, PlayerActionKind.AtmKeypad, onClimax: () =>
                 {
                     if (SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
                     ExecutePaidService(mode, SaveManager.Instance.Data, confirmed, targetCar);
-                }, startStatus: $"{bankName}: İşlem onaylanıyor...");
+                }, startStatus: isEnConf ? $"{bankName}: Confirming transaction..." : $"{bankName}: İşlem onaylanıyor...");
                 return;
             }
 
@@ -75,26 +79,32 @@ namespace OurWorld.World
             _nextServicePreview = (_nextServicePreview + 1) % 2;
             _pendingConfirmExpiresAt = Time.time + ConfirmWindowSeconds;
             GameFeelAudio.PlayUiClick();
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
 
             if (_pendingService == 0)
             {
-                mode.RaiseStatusMessage($"{bankName} (Gelir: {remain} sn) · Kedilere Mama Bağışı (25 ₺ · +35 Enerji) — Onay için tekrar E bas.");
+                mode.RaiseStatusMessage(isEn
+                    ? $"{bankName} (Stipend: {remain}s) · Donate Cat Food (25 ₺ · +35 Energy) — Interact again to confirm."
+                    : $"{bankName} (Gelir: {remain} sn) · Kedilere Mama Bağışı (25 ₺ · +35 Enerji) — Onay için tekrar E bas.");
             }
             else
             {
                 _pendingTargetCar = ResolveServiceVehicle(mode);
-                string carLabel = _pendingTargetCar != null ? _pendingTargetCar.gameObject.name : "Araç bulunamadı";
-                mode.RaiseStatusMessage($"{bankName} (Gelir: {remain} sn) · '{carLabel}' Tamir+Yakıt (45 ₺) — Onay için tekrar E bas.");
+                string carLabel = _pendingTargetCar != null ? _pendingTargetCar.gameObject.name : (isEn ? "No car nearby" : "Araç bulunamadı");
+                mode.RaiseStatusMessage(isEn
+                    ? $"{bankName} (Stipend: {remain}s) · '{carLabel}' Repair+Fuel (45 ₺) — Interact again to confirm."
+                    : $"{bankName} (Gelir: {remain} sn) · '{carLabel}' Tamir+Yakıt (45 ₺) — Onay için tekrar E bas.");
             }
         }
 
         private void ExecutePaidService(PlayerModeController mode, SaveData data, int serviceIdx, SedanVehicleController targetCar)
         {
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             if (serviceIdx == 0)
             {
                 if (!SaveManager.Instance.TrySpend(25))
                 {
-                    mode.RaiseStatusMessage($"{bankName}: Yetersiz bakiye (25 ₺ gerekli · Bakiye: {data.money} ₺).");
+                    mode.RaiseStatusMessage(isEn ? $"{bankName}: Insufficient balance (25 ₺ needed · Balance: {data.money} ₺)." : $"{bankName}: Yetersiz bakiye (25 ₺ gerekli · Bakiye: {data.money} ₺).");
                     return;
                 }
                 if (PlayerNeedsController.Instance != null)
@@ -103,7 +113,7 @@ namespace OurWorld.World
                 }
                 GameFeelAudio.PlayCatMeow();
                 GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.35f, new Color(1.0f, 0.78f, 0.30f), count: 12, spread: 0.5f);
-                mode.RaiseStatusMessage($"{bankName}: Selman Sokağı kedilerine mama bağışı onaylandı! (-25 ₺ · +35 Enerji)");
+                mode.RaiseStatusMessage(isEn ? $"{bankName}: Street cat food donation confirmed! (-25 ₺ · +35 Energy)" : $"{bankName}: Selman Sokağı kedilerine mama bağışı onaylandı! (-25 ₺ · +35 Enerji)");
                 return;
             }
 
@@ -113,12 +123,12 @@ namespace OurWorld.World
             }
             if (targetCar == null)
             {
-                mode.RaiseStatusMessage($"{bankName}: Bakım uygulanacak uygun araç bulunamadı (ücret alınmadı).");
+                mode.RaiseStatusMessage(isEn ? $"{bankName}: No nearby vehicle found to service (no charge)." : $"{bankName}: Bakım uygulanacak uygun araç bulunamadı (ücret alınmadı).");
                 return;
             }
             if (!SaveManager.Instance.TrySpend(45))
             {
-                mode.RaiseStatusMessage($"{bankName}: Yetersiz bakiye (45 ₺ gerekli · Bakiye: {data.money} ₺).");
+                mode.RaiseStatusMessage(isEn ? $"{bankName}: Insufficient balance (45 ₺ needed · Balance: {data.money} ₺)." : $"{bankName}: Yetersiz bakiye (45 ₺ gerekli · Bakiye: {data.money} ₺).");
                 return;
             }
 
@@ -127,7 +137,7 @@ namespace OurWorld.World
             if (dmg != null) dmg.RepairFull();
             GameFeelAudio.PlayMilestoneFanfare();
             GameFeelAudio.SpawnBurst(targetCar.transform.position + Vector3.up * 1.2f, new Color(0.32f, 0.88f, 1.0f), count: 12, spread: 0.7f);
-            mode.RaiseStatusMessage($"{bankName}: '{targetCar.gameObject.name}' tamamen onarıldı & yakıt %100! (-45 ₺)");
+            mode.RaiseStatusMessage(isEn ? $"{bankName}: '{targetCar.gameObject.name}' fully repaired & 100% fuel! (-45 ₺)" : $"{bankName}: '{targetCar.gameObject.name}' tamamen onarıldı & yakıt %100! (-45 ₺)");
         }
 
         private SedanVehicleController ResolveServiceVehicle(PlayerModeController mode)

@@ -89,11 +89,12 @@ namespace OurWorld.Core
                 GameFeelAudio.PlayMilestoneFanfare();
                 if (PlayerModeController.Instance != null)
                 {
+                    bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                     string title = GetRankTitle(newRank);
                     int bonusPct = Mathf.RoundToInt((GetJobRewardMultiplier() - 1f) * 100f);
-                    string msg = bonusPct > 0
-                        ? $"Mahalle Saygınlığı Yükseldi: {title}! (İş geliri +%{bonusPct})"
-                        : $"Mahalle Saygınlığı Yükseldi: {title}!";
+                    string msg = isEn
+                        ? (bonusPct > 0 ? $"Reputation Rank Up: {title}! (Job Income +{bonusPct}%)" : $"Reputation Rank Up: {title}!")
+                        : (bonusPct > 0 ? $"Mahalle Saygınlığı Yükseldi: {title}! (İş geliri +%{bonusPct})" : $"Mahalle Saygınlığı Yükseldi: {title}!");
                     PlayerModeController.Instance.RaiseStatusMessage(msg);
                     GameFeelAudio.SpawnBurst(
                         PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 1.4f,
@@ -104,7 +105,8 @@ namespace OurWorld.Core
             }
             else if (!string.IsNullOrEmpty(toastPrefix) && PlayerModeController.Instance != null)
             {
-                PlayerModeController.Instance.RaiseStatusMessage($"{toastPrefix} (+{deltaXp} Saygınlık)");
+                bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(isEn ? $"{toastPrefix} (+{deltaXp} Reputation)" : $"{toastPrefix} (+{deltaXp} Saygınlık)");
             }
         }
     }

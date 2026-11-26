@@ -49,6 +49,34 @@ namespace OurWorld.Player
         public static int JacketColorCount => JacketColors.Length;
         public static Color GetJacketColor(int index) => JacketColors[Mathf.Clamp(index, 0, JacketColors.Length - 1)];
 
+        private static readonly Color[] PantsColors =
+        {
+            new Color(0.13f, 0.13f, 0.16f, 1f), // 0: Antrasit Klasik
+            new Color(0.16f, 0.25f, 0.40f, 1f), // 1: Koyu Denim
+            new Color(0.46f, 0.40f, 0.30f, 1f), // 2: Haki Keten
+            new Color(0.24f, 0.30f, 0.21f, 1f), // 3: Zeytin Kargo
+            new Color(0.36f, 0.15f, 0.18f, 1f), // 4: Bordo Chino
+            new Color(0.80f, 0.76f, 0.68f, 1f)  // 5: Krem Yazlık
+        };
+
+        private static readonly Color[] HairColors =
+        {
+            new Color(0.09f, 0.07f, 0.06f, 1f), // 0: Gece Siyahı
+            new Color(0.26f, 0.15f, 0.08f, 1f), // 1: Kestane Kahve
+            new Color(0.60f, 0.46f, 0.24f, 1f), // 2: Karamel Sarı
+            new Color(0.56f, 0.58f, 0.62f, 1f), // 3: Gümüş Kır
+            new Color(0.52f, 0.18f, 0.12f, 1f), // 4: Bakır Kızıl
+            new Color(0.12f, 0.24f, 0.44f, 1f)  // 5: Gece Mavisi
+        };
+
+        public static int PantsColorCount => PantsColors.Length;
+        public static Color GetPantsColor(int index) => PantsColors[Mathf.Clamp(index, 0, PantsColors.Length - 1)];
+        public static int HairColorCount => HairColors.Length;
+        public static Color GetHairColor(int index) => HairColors[Mathf.Clamp(index, 0, HairColors.Length - 1)];
+
+        private GameObject _sunglassesObj;
+        private GameObject _streetCapObj;
+
         private static AudioClip _sharedFootstepClip;
         private static AudioClip _sharedPunchHitClip;
         private static AudioClip _sharedHeavyHitClip;
@@ -154,8 +182,18 @@ namespace OurWorld.Player
             }
             if (SaveManager.Instance != null && SaveManager.Instance.Data != null)
             {
-                ApplyJacketColor(SaveManager.Instance.Data.playerJacketColorIndex);
+                ApplySavedAppearance();
             }
+        }
+
+        public void ApplySavedAppearance()
+        {
+            SaveData data = SaveManager.Instance != null ? SaveManager.Instance.Data : null;
+            if (data == null) return;
+            ApplyJacketColor(data.playerJacketColorIndex);
+            ApplyPantsColor(data.playerPantsColorIndex);
+            ApplyHairColor(data.playerHairColorIndex);
+            ApplyHeadAccessories(data.ownsSunglasses && data.equipSunglasses, data.ownsStreetCap && data.equipStreetCap);
         }
 
         private void OnDestroy()
@@ -173,9 +211,22 @@ namespace OurWorld.Player
 
         public void ApplyJacketColor(int colorIndex)
         {
+            ApplyMaterialTint("MAT_Char_Shirt", JacketColors[Mathf.Clamp(colorIndex, 0, JacketColors.Length - 1)]);
+        }
+
+        public void ApplyPantsColor(int colorIndex)
+        {
+            ApplyMaterialTint("MAT_Char_Pants", PantsColors[Mathf.Clamp(colorIndex, 0, PantsColors.Length - 1)]);
+        }
+
+        public void ApplyHairColor(int colorIndex)
+        {
+            ApplyMaterialTint("MAT_Char_Hair", HairColors[Mathf.Clamp(colorIndex, 0, HairColors.Length - 1)]);
+        }
+
+        private void ApplyMaterialTint(string materialToken, Color col)
+        {
             if (visualRoot == null) return;
-            int idx = Mathf.Clamp(colorIndex, 0, JacketColors.Length - 1);
-            Color col = JacketColors[idx];
             Renderer[] renderers = visualRoot.GetComponentsInChildren<Renderer>(true);
             for (int i = 0; i < renderers.Length; i++)
             {
@@ -185,7 +236,7 @@ namespace OurWorld.Player
                 bool changed = false;
                 for (int m = 0; m < mats.Length; m++)
                 {
-                    if (mats[m] != null && mats[m].name.Contains("MAT_Char_Shirt"))
+                    if (mats[m] != null && mats[m].name.Contains(materialToken))
                     {
                         if (mats[m].HasProperty(BaseColorId))
                         {
@@ -195,6 +246,99 @@ namespace OurWorld.Player
                     }
                 }
                 if (changed) r.materials = mats;
+            }
+        }
+
+        public void ApplyHeadAccessories(bool showSunglasses, bool showCap)
+        {
+            Transform headTf = humanoid != null ? humanoid.HeadPivot : null;
+            if (headTf == null && visualRoot != null)
+            {
+                foreach (Transform t in visualRoot.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.name == "Head") { headTf = t; break; }
+                }
+            }
+            if (headTf == null) return;
+
+            if (showSunglasses && _sunglassesObj == null)
+            {
+                _sunglassesObj = BuildSunglassesRig(headTf);
+            }
+            if (_sunglassesObj != null) _sunglassesObj.SetActive(showSunglasses);
+
+            if (showCap && _streetCapObj == null)
+            {
+                _streetCapObj = BuildStreetCapRig(headTf);
+            }
+            if (_streetCapObj != null) _streetCapObj.SetActive(showCap);
+        }
+
+        private static GameObject BuildSunglassesRig(Transform headTf)
+        {
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material lensMat = new Material(sh);
+            if (lensMat.HasProperty(BaseColorId)) lensMat.SetColor(BaseColorId, new Color(0.05f, 0.08f, 0.14f, 1f));
+            if (lensMat.HasProperty("_Smoothness")) lensMat.SetFloat("_Smoothness", 0.92f);
+            if (lensMat.HasProperty("_Metallic")) lensMat.SetFloat("_Metallic", 0.45f);
+
+            Material frameMat = new Material(sh);
+            if (frameMat.HasProperty(BaseColorId)) frameMat.SetColor(BaseColorId, new Color(0.86f, 0.70f, 0.26f, 1f));
+            if (frameMat.HasProperty("_Smoothness")) frameMat.SetFloat("_Smoothness", 0.85f);
+            if (frameMat.HasProperty("_Metallic")) frameMat.SetFloat("_Metallic", 0.80f);
+
+            GameObject root = new GameObject("Accessory_Sunglasses");
+            root.transform.SetParent(headTf, false);
+            root.transform.localPosition = new Vector3(0f, 0.122f, 0.105f);
+            root.transform.localRotation = Quaternion.identity;
+
+            CreateAccessoryPart("LensL", PrimitiveType.Cube, root.transform, new Vector3(-0.044f, 0f, 0.008f), new Vector3(0.068f, 0.038f, 0.014f), lensMat);
+            CreateAccessoryPart("LensR", PrimitiveType.Cube, root.transform, new Vector3(0.044f, 0f, 0.008f), new Vector3(0.068f, 0.038f, 0.014f), lensMat);
+            CreateAccessoryPart("Bridge", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.008f, 0.010f), new Vector3(0.034f, 0.009f, 0.012f), frameMat);
+            CreateAccessoryPart("TopBar", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.020f, 0.009f), new Vector3(0.158f, 0.008f, 0.012f), frameMat);
+            CreateAccessoryPart("ArmL", PrimitiveType.Cube, root.transform, new Vector3(-0.082f, 0.004f, -0.056f), new Vector3(0.008f, 0.010f, 0.132f), frameMat);
+            CreateAccessoryPart("ArmR", PrimitiveType.Cube, root.transform, new Vector3(0.082f, 0.004f, -0.056f), new Vector3(0.008f, 0.010f, 0.132f), frameMat);
+            return root;
+        }
+
+        private static GameObject BuildStreetCapRig(Transform headTf)
+        {
+            Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material capMat = new Material(sh);
+            if (capMat.HasProperty(BaseColorId)) capMat.SetColor(BaseColorId, new Color(0.10f, 0.24f, 0.48f, 1f));
+            if (capMat.HasProperty("_Smoothness")) capMat.SetFloat("_Smoothness", 0.25f);
+
+            Material accentMat = new Material(sh);
+            if (accentMat.HasProperty(BaseColorId)) accentMat.SetColor(BaseColorId, new Color(0.95f, 0.72f, 0.20f, 1f));
+            if (accentMat.HasProperty("_Smoothness")) accentMat.SetFloat("_Smoothness", 0.35f);
+
+            GameObject root = new GameObject("Accessory_StreetCap");
+            root.transform.SetParent(headTf, false);
+            root.transform.localPosition = new Vector3(0f, 0.175f, 0.008f);
+            root.transform.localRotation = Quaternion.Euler(-6f, 0f, 0f);
+
+            CreateAccessoryPart("Crown", PrimitiveType.Sphere, root.transform, new Vector3(0f, 0.010f, -0.012f), new Vector3(0.248f, 0.145f, 0.252f), capMat);
+            CreateAccessoryPart("Visor", PrimitiveType.Cube, root.transform, new Vector3(0f, -0.014f, 0.140f), new Vector3(0.195f, 0.014f, 0.115f), capMat, Quaternion.Euler(10f, 0f, 0f));
+            CreateAccessoryPart("Emblem", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.028f, 0.112f), new Vector3(0.056f, 0.026f, 0.012f), accentMat);
+            CreateAccessoryPart("TopButton", PrimitiveType.Sphere, root.transform, new Vector3(0f, 0.082f, -0.012f), new Vector3(0.026f, 0.014f, 0.026f), accentMat);
+            return root;
+        }
+
+        private static void CreateAccessoryPart(string name, PrimitiveType type, Transform parent, Vector3 localPos, Vector3 scale, Material mat, Quaternion? rot = null)
+        {
+            GameObject go = GameObject.CreatePrimitive(type);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = scale;
+            if (rot.HasValue) go.transform.localRotation = rot.Value;
+            Collider col = go.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+            Renderer r = go.GetComponent<Renderer>();
+            if (r != null)
+            {
+                r.sharedMaterial = mat;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
         }
 
@@ -216,7 +360,8 @@ namespace OurWorld.Player
             {
                 _punchCooldown = 0.48f;
                 CarryableProp.TryThrowHeldProp(transform.forward);
-                mode.RaiseStatusMessage("Eşyayı fırlattın!");
+                bool isEnThrow = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                mode.RaiseStatusMessage(isEnThrow ? "Threw the item!" : "Eşyayı fırlattın!");
                 return;
             }
             CarryableProp.DropHeldPropIfAny();

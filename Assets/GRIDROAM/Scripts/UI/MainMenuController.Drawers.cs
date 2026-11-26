@@ -7,6 +7,7 @@ using OurWorld.Input;
 using OurWorld.Jobs;
 using OurWorld.Missions;
 using OurWorld.Player;
+using OurWorld.Vehicle;
 using OurWorld.World;
 using UnityEngine;
 using UnityEngine.UI;
@@ -128,19 +129,49 @@ namespace OurWorld.UI
 
             CreateDrawerCloseButton(_districtsPanel.transform);
 
+            // Smooth vertical ScrollRect so all 11+ District cards (including Atlas AVM) scroll cleanly with zero overflow!
+            GameObject dScrollGo = new GameObject("DistrictsScroll", typeof(RectTransform));
+            dScrollGo.transform.SetParent(_districtsPanel.transform, false);
+            RectTransform dScRt = (RectTransform)dScrollGo.transform;
+            dScRt.anchorMin = Vector2.zero;
+            dScRt.anchorMax = Vector2.one;
+            dScRt.offsetMin = new Vector2(26f, 108f);
+            dScRt.offsetMax = new Vector2(-26f, -106f);
+            UnityEngine.UI.Image dScImg = dScrollGo.AddComponent<UnityEngine.UI.Image>();
+            dScImg.color = new Color(0f, 0f, 0f, 0f);
+            dScImg.raycastTarget = true;
+
+            ScrollRect dSr = dScrollGo.AddComponent<ScrollRect>();
+            dSr.horizontal = false;
+            dSr.vertical = true;
+            dSr.movementType = ScrollRect.MovementType.Elastic;
+            dSr.scrollSensitivity = 36f;
+
+            GameObject dVpGo = new GameObject("Viewport", typeof(RectTransform));
+            dVpGo.transform.SetParent(dScrollGo.transform, false);
+            StretchFull((RectTransform)dVpGo.transform, 0f, 0f);
+            dVpGo.AddComponent<RectMask2D>();
+            dSr.viewport = (RectTransform)dVpGo.transform;
+
             GameObject gridGo = new GameObject("DistrictGrid", typeof(RectTransform));
-            gridGo.transform.SetParent(_districtsPanel.transform, false);
+            gridGo.transform.SetParent(dVpGo.transform, false);
             RectTransform grt = (RectTransform)gridGo.transform;
-            grt.anchorMin = Vector2.zero;
-            grt.anchorMax = Vector2.one;
-            grt.offsetMin = new Vector2(30f, 114f);
-            grt.offsetMax = new Vector2(-30f, -112f);
+            grt.anchorMin = new Vector2(0f, 1f);
+            grt.anchorMax = new Vector2(1f, 1f);
+            grt.pivot = new Vector2(0.5f, 1f);
+            grt.anchoredPosition = Vector2.zero;
+            grt.sizeDelta = new Vector2(0f, 680f);
+            dSr.content = grt;
 
             GridLayoutGroup glg = gridGo.AddComponent<GridLayoutGroup>();
             glg.cellSize = new Vector2(322f, 102f);
-            glg.spacing = new Vector2(20f, 9f);
+            glg.spacing = new Vector2(18f, 10f);
+            glg.padding = new RectOffset(4, 4, 2, 12);
             glg.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             glg.constraintCount = 2;
+
+            ContentSizeFitter dCsf = gridGo.AddComponent<ContentSizeFitter>();
+            dCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             for (int i = 0; i < Districts.Length; i++)
             {
@@ -274,7 +305,11 @@ namespace OurWorld.UI
 
             // 3. Audio Volume Row
             GameObject volRow = CreateSettingRow(listGo.transform, "Row_Audio", 66f, out _setAudioCaption, "Ses Seviyesi");
-            BuildVolumeSlider(volRow.transform);
+            BuildPercentSlider(volRow.transform, "VolumeSlider", AudioListener.volume, out _volumeSlider, out _volumeValueText, HandleVolumeSliderChanged);
+
+            // 3b. Music & Radio Volume Row
+            GameObject musicRow = CreateSettingRow(listGo.transform, "Row_Music", 66f, out _setMusicCaption, "Müzik & Radyo");
+            BuildPercentSlider(musicRow.transform, "MusicSlider", TurkishCarRadio.MusicVolume, out _musicSlider, out _musicValueText, HandleMusicSliderChanged);
 
             // 4. Voiceover Row
             GameObject voiceRow = CreateSettingRow(listGo.transform, "Row_Voiceover", 66f, out _setVoiceCaption, "Seslendirme");
@@ -333,6 +368,45 @@ namespace OurWorld.UI
                 (_timeChipBgs[i], _timeChipTexts[i]) = CreateSegmentButton(
                     timeGrid.transform, $"Btn_Time_{i}", defaultTimeLabels[i],
                     () => SetPreviewTimePreset(presetHour));
+            }
+
+            // 6b. Weather Live Preview Row (Sunny / Overcast / Summer Shower)
+            GameObject weatherRow = CreateRoundedPanel("Row_Weather", listGo.transform, _roundedCardSprite,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(0f, 98f), CardSurface, addBorder: true);
+            weatherRow.AddComponent<LayoutElement>().preferredHeight = 98f;
+
+            _setWeatherCaption = CreateText("Caption", weatherRow.transform, "Hava Durumu (Canlı)", 18, FontStyle.Bold, TextSecondary, TextAnchor.MiddleLeft);
+            PlaceTopLeft(_setWeatherCaption.rectTransform, 20f, -10f, 520f, 26f);
+
+            GameObject weatherGrid = new GameObject("WeatherChips", typeof(RectTransform));
+            weatherGrid.transform.SetParent(weatherRow.transform, false);
+            RectTransform wrt = (RectTransform)weatherGrid.transform;
+            wrt.anchorMin = new Vector2(0f, 0f);
+            wrt.anchorMax = new Vector2(1f, 0f);
+            wrt.pivot = new Vector2(0.5f, 0f);
+            wrt.anchoredPosition = new Vector2(0f, 10f);
+            wrt.sizeDelta = new Vector2(-40f, 44f);
+
+            HorizontalLayoutGroup whlg = weatherGrid.AddComponent<HorizontalLayoutGroup>();
+            whlg.spacing = 10f;
+            whlg.childControlWidth = true;
+            whlg.childControlHeight = true;
+            whlg.childForceExpandWidth = true;
+            whlg.childForceExpandHeight = true;
+
+            string[] defaultWeatherLabels = { "Güneşli", "Bulutlu", "Yağmurlu" };
+            for (int i = 0; i < 3; i++)
+            {
+                NeighborhoodWeatherState state = (NeighborhoodWeatherState)i;
+                (_weatherChipBgs[i], _weatherChipTexts[i]) = CreateSegmentButton(
+                    weatherGrid.transform, $"Btn_Weather_{i}", defaultWeatherLabels[i],
+                    () =>
+                    {
+                        GameFeelAudio.PlayUiClick();
+                        NeighborhoodWeatherSystem.Instance?.SetWeather(state);
+                        RefreshSettingsUiState();
+                    });
             }
 
             // 7. FPS Telemetry Row
@@ -453,9 +527,15 @@ namespace OurWorld.UI
             return (img, txt);
         }
 
-        private void BuildVolumeSlider(Transform rowParent)
+        private void BuildPercentSlider(
+            Transform rowParent,
+            string sliderName,
+            float initialValue,
+            out UnityEngine.UI.Slider sliderOut,
+            out UnityEngine.UI.Text valueTextOut,
+            UnityEngine.Events.UnityAction<float> onChanged)
         {
-            GameObject sliderGo = new GameObject("VolumeSlider", typeof(RectTransform));
+            GameObject sliderGo = new GameObject(sliderName, typeof(RectTransform));
             sliderGo.transform.SetParent(rowParent, false);
             RectTransform srt = (RectTransform)sliderGo.transform;
             srt.anchorMin = new Vector2(1f, 0.5f);
@@ -498,18 +578,18 @@ namespace OurWorld.UI
             UnityEngine.UI.Image handleImg = handleGo.GetComponent<UnityEngine.UI.Image>();
             handleImg.raycastTarget = true;
 
-            _volumeSlider = sliderGo.AddComponent<UnityEngine.UI.Slider>();
-            _volumeSlider.minValue = 0f;
-            _volumeSlider.maxValue = 1f;
-            _volumeSlider.fillRect = (RectTransform)fillGo.transform;
-            _volumeSlider.handleRect = (RectTransform)handleGo.transform;
-            _volumeSlider.targetGraphic = handleImg;
-            _volumeSlider.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
-            _volumeSlider.SetValueWithoutNotify(AudioListener.volume);
-            _volumeSlider.onValueChanged.AddListener(HandleVolumeSliderChanged);
+            sliderOut = sliderGo.AddComponent<UnityEngine.UI.Slider>();
+            sliderOut.minValue = 0f;
+            sliderOut.maxValue = 1f;
+            sliderOut.fillRect = (RectTransform)fillGo.transform;
+            sliderOut.handleRect = (RectTransform)handleGo.transform;
+            sliderOut.targetGraphic = handleImg;
+            sliderOut.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
+            sliderOut.SetValueWithoutNotify(initialValue);
+            sliderOut.onValueChanged.AddListener(onChanged);
 
-            _volumeValueText = CreateText("VolumePct", rowParent, $"{Mathf.RoundToInt(AudioListener.volume * 100f)}%", 18, FontStyle.Bold, AccentTeal, TextAnchor.MiddleRight);
-            RectTransform vrt = _volumeValueText.rectTransform;
+            valueTextOut = CreateText($"{sliderName}Pct", rowParent, $"{Mathf.RoundToInt(initialValue * 100f)}%", 18, FontStyle.Bold, AccentTeal, TextAnchor.MiddleRight);
+            RectTransform vrt = valueTextOut.rectTransform;
             vrt.anchorMin = new Vector2(1f, 0.5f);
             vrt.anchorMax = new Vector2(1f, 0.5f);
             vrt.pivot = new Vector2(1f, 0.5f);

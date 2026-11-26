@@ -259,6 +259,18 @@ namespace OurWorld.UI
             return btn;
         }
 
+        public static Text CreateText(
+            string name,
+            Transform parent,
+            string content,
+            int fontSize,
+            FontStyle style,
+            Color color,
+            TextAnchor alignment = TextAnchor.MiddleLeft)
+        {
+            return CreateStretchText(name, parent, content, fontSize, style, color, alignment, 0f, 0f);
+        }
+
         public static Text CreateStretchText(
             string name,
             Transform parent,

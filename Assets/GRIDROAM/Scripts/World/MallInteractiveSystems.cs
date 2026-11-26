@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using OurWorld.Core;
 using OurWorld.Player;
 using OurWorld.UI;
+using OurWorld.Vehicle;
 using UnityEngine;
 
 namespace OurWorld.World
@@ -189,6 +190,7 @@ namespace OurWorld.World
 
         private void OnDestroy()
         {
+            TurkishCarRadio.SetMallAmbienceActive(false);
             if (_subscribed && PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.OnInteracted -= HandleInteracted;
@@ -284,6 +286,9 @@ namespace OurWorld.World
             float dx = p.x - MallCenter.x;
             float dz = p.z - MallCenter.z;
             float distSq = dx * dx + dz * dz;
+
+            bool insideMall = Mathf.Abs(dx) < 17.5f && Mathf.Abs(dz) < 16.5f && p.y >= -0.5f && p.y < 23.0f;
+            TurkishCarRadio.SetMallAmbienceActive(insideMall);
 
             float thresh = _interiorActive ? (InteriorActiveRadius + 8f) : InteriorActiveRadius;
             bool shouldBeActive = distSq <= thresh * thresh;
@@ -384,6 +389,7 @@ namespace OurWorld.World
                 int prize = score >= 7400 ? 48 : (score >= 4500 ? 24 : 14);
                 sm?.AddMoney(prize);
                 NeighborhoodReputation.AddReputation(12);
+                DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
                 GameFeelAudio.PlayMilestoneFanfare();
                 GameFeelAudio.SpawnBurst(trig.transform.position + Vector3.up * 1.4f, OurWorldUiKit.AccentGold, 10, 0.55f);
                 mode?.RaiseStatusMessage(isEn
@@ -523,7 +529,7 @@ namespace OurWorld.World
                 AccentColor = new Color(0.16f, 0.52f, 0.78f),
                 Items = new[]
                 {
-                    new MallShopItemDef { NameTr = "Polarize Güneş Gözlüğü", NameEn = "Polarized Sunglasses", DescTr = "+28 Saygınlık · Yaz Stili", DescEn = "+28 Reputation · Summer Style", Price = 60, ReputationXp = 28, SwatchColor = new Color(0.18f, 0.56f, 0.84f) },
+                    new MallShopItemDef { NameTr = "Polarize Güneş Gözlüğü", NameEn = "Polarized Sunglasses", DescTr = "3D Gözlük Takılır! · +28 Saygınlık", DescEn = "Equips 3D Sunglasses! · +28 Reputation", Price = 60, ReputationXp = 28, SpecialUpgradeId = "sunglasses", SwatchColor = new Color(0.18f, 0.56f, 0.84f) },
                     new MallShopItemDef { NameTr = "Klasik Çelik Saat", NameEn = "Classic Steel Watch", DescTr = "+45 Saygınlık · Prestij", DescEn = "+45 Reputation · Prestige", Price = 95, ReputationXp = 45, SwatchColor = new Color(0.86f, 0.70f, 0.26f) }
                 }
             };
@@ -573,7 +579,7 @@ namespace OurWorld.World
                 {
                     new MallShopItemDef { NameTr = "Pro Koşu Ayakkabısı (Kalıcı)", NameEn = "Pro Running Shoes (Permanent)", DescTr = "Kalıcı hızlı koşu yükseltmesi! · +30 XP", DescEn = "Permanent sprint upgrade! · +30 XP", Price = 120, ReputationXp = 30, SpecialUpgradeId = "running_shoes", SwatchColor = new Color(0.14f, 0.78f, 0.70f) },
                     new MallShopItemDef { NameTr = "İstanbul Denim Kombin", NameEn = "Istanbul Denim Outfit", DescTr = "+32 Saygınlık · Yeni Sezon", DescEn = "+32 Reputation · New Season", Price = 65, ReputationXp = 32, SwatchColor = new Color(0.18f, 0.38f, 0.76f) },
-                    new MallShopItemDef { NameTr = "Spor Şapka & Çanta", NameEn = "Street Cap & Backpack", DescTr = "+20 Saygınlık · +15 Enerji", DescEn = "+20 Reputation · +15 Energy", Price = 45, EnergyRestore = 15f, ReputationXp = 20, SwatchColor = new Color(0.86f, 0.56f, 0.18f) },
+                    new MallShopItemDef { NameTr = "Spor Şapka & Çanta", NameEn = "Street Cap & Backpack", DescTr = "3D Şapka Takılır! · +20 Saygınlık · +15 Enerji", DescEn = "Equips 3D Cap! · +20 Reputation · +15 Energy", Price = 45, EnergyRestore = 15f, ReputationXp = 20, SpecialUpgradeId = "street_cap", SwatchColor = new Color(0.86f, 0.56f, 0.18f) },
                     new MallShopItemDef { NameTr = "Kışlık Kaşkol & Eldiven", NameEn = "Winter Scarf & Gloves", DescTr = "+18 Saygınlık · +10 Enerji", DescEn = "+18 Reputation · +10 Energy", Price = 35, EnergyRestore = 10f, ReputationXp = 18, SwatchColor = new Color(0.68f, 0.22f, 0.26f) }
                 }
             };

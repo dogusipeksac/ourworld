@@ -66,12 +66,24 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
 
+            bool raining = CurrentWeather == NeighborhoodWeatherState.SummerShower;
+            bool sheltered = IsPlayerIndoors();
+
             if (_cachedMainCam == null) _cachedMainCam = Camera.main;
             Camera cam = _cachedMainCam;
             if (cam != null && _rainPs != null)
             {
                 Vector3 target = cam.transform.position + cam.transform.forward * 7f + Vector3.up * 11f;
                 _rainPs.transform.position = target;
+
+                // Stop rain particles whenever player is inside a house or enclosed floors 0..3 of Atlas AVM!
+                float desiredRate = (raining && !sheltered) ? 95f : 0f;
+                if (!Mathf.Approximately(_rainEmission.rateOverTime.constant, desiredRate))
+                {
+                    _rainEmission.rateOverTime = desiredRate;
+                    if (desiredRate > 0f && !_rainPs.isPlaying) _rainPs.Play();
+                    else if (desiredRate <= 0f && sheltered && _rainPs.particleCount > 0) _rainPs.Clear();
+                }
             }
 
             _stateTimer -= dt;
@@ -82,9 +94,9 @@ namespace OurWorld.World
 
             if (_rainAudioSource != null)
             {
-                bool raining = CurrentWeather == NeighborhoodWeatherState.SummerShower;
-                float targetRainVol = raining ? 0.11f : 0f;
-                _rainAudioSource.volume = Mathf.MoveTowards(_rainAudioSource.volume, targetRainVol, dt * 0.06f);
+                // Muffle rain gently when indoors so roof ambience feels cozy instead of loud outdoor downpour
+                float targetRainVol = raining ? (sheltered ? 0.032f : 0.11f) : 0f;
+                _rainAudioSource.volume = Mathf.MoveTowards(_rainAudioSource.volume, targetRainVol, dt * 0.08f);
                 if (raining && !_rainAudioSource.isPlaying)
                 {
                     _rainAudioSource.Play();
@@ -94,6 +106,16 @@ namespace OurWorld.World
                     _rainAudioSource.Stop();
                 }
             }
+        }
+
+        private static bool IsPlayerIndoors()
+        {
+            if (InteriorZone.IsPlayerInsideAny) return true;
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode == null) return false;
+            Vector3 p = mode.ActiveWorldPosition;
+            // Hamidiye Atlas AVM enclosed levels 0..3 (Y < 17.8m; open-air 4th floor Rooftop Terrace stays outdoors!)
+            return p.x >= -133.6f && p.x <= -98.4f && p.z >= -50.6f && p.z <= -17.4f && p.y < 17.8f;
         }
 
         private void AdvanceWeatherState()

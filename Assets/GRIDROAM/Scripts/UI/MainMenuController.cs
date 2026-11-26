@@ -288,6 +288,18 @@ namespace OurWorld.UI
                 SpawnYaw = 0f,
                 PreviewCamPos = new Vector3(-134.0f, 11.5f, -72.0f),
                 PreviewLookAt = new Vector3(-116.0f, 9.5f, -38.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_otogaleri",
+                NameTr = "Hamidiye Oto Galeri (Yeni)",
+                NameEn = "Hamidiye Auto Gallery (New)",
+                TagTr = "5 Satın Alınabilir Araç · Kişisel Garaj",
+                TagEn = "5 Ownable Vehicles · Personal Garage",
+                SpawnPos = new Vector3(-115.0f, 0.12f, 52.5f),
+                SpawnYaw = 0f,
+                PreviewCamPos = new Vector3(-128.0f, 6.2f, 51.0f),
+                PreviewLookAt = new Vector3(-115.0f, 2.2f, 72.0f)
             }
         };
 
@@ -509,6 +521,9 @@ namespace OurWorld.UI
         private UnityEngine.UI.Text _setAudioCaption;
         private UnityEngine.UI.Slider _volumeSlider;
         private UnityEngine.UI.Text _volumeValueText;
+        private UnityEngine.UI.Text _setMusicCaption;
+        private UnityEngine.UI.Slider _musicSlider;
+        private UnityEngine.UI.Text _musicValueText;
         private UnityEngine.UI.Text _setVoiceCaption;
         private UnityEngine.UI.Image _voiceOffBg;
         private UnityEngine.UI.Text _voiceOffText;
@@ -535,6 +550,9 @@ namespace OurWorld.UI
         private readonly UnityEngine.UI.Image[] _timeChipBgs = new UnityEngine.UI.Image[4];
         private readonly UnityEngine.UI.Text[] _timeChipTexts = new UnityEngine.UI.Text[4];
         private static readonly float[] TimePresetHours = { 9.0f, 13.0f, 18.75f, 21.5f };
+        private UnityEngine.UI.Text _setWeatherCaption;
+        private readonly UnityEngine.UI.Image[] _weatherChipBgs = new UnityEngine.UI.Image[3];
+        private readonly UnityEngine.UI.Text[] _weatherChipTexts = new UnityEngine.UI.Text[3];
         private UnityEngine.UI.Text _setFpsCaption;
         private UnityEngine.UI.Image _fpsOffBg;
         private UnityEngine.UI.Text _fpsOffText;

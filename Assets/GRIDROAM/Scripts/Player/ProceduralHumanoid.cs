@@ -56,6 +56,8 @@ namespace OurWorld.Player
         [SerializeField] private bool isSitting;
         [SerializeField] private bool isDrivingSeat;
 
+        public Transform HeadPivot => head;
+
         private const float WalkSpeedRef = 2.25f;
         private const float RunSpeedRef = 4.25f;
         private const float WaveDuration = 1.5f;

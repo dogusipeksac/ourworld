@@ -157,7 +157,7 @@ namespace OurWorld.World
                 if (_puttingDown)
                 {
                     Drop(Vector3.zero);
-                    mode.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    mode.RaiseStatusMessage(LocalizationService.IsEnglish ? $"Placed {propLabel} down." : $"{propLabel} yere bırakıldı.");
                     return;
                 }
                 if (_attached)
@@ -235,7 +235,7 @@ namespace OurWorld.World
                 {
                     PlayerModeController m = _mode;
                     Drop(Vector3.zero);
-                    if (m != null) m.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    if (m != null) m.RaiseStatusMessage(LocalizationService.IsEnglish ? $"Placed {propLabel} down." : $"{propLabel} yere bırakıldı.");
                     return false;
                 }
                 return true;
@@ -297,7 +297,7 @@ namespace OurWorld.World
                     PlayerModeController m = _mode;
                     rig.BeginCarryReleaseFade(left, right, 1f);
                     Drop(Vector3.zero);
-                    if (m != null) m.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    if (m != null) m.RaiseStatusMessage(LocalizationService.IsEnglish ? $"Placed {propLabel} down." : $"{propLabel} yere bırakıldı.");
                     return 0f;
                 }
                 return 1f;
@@ -348,7 +348,9 @@ namespace OurWorld.World
                     SetCollidersEnabled(false);
                     _attached = true;
                     GameFeelAudio.PlayDoorLatch();
-                    if (_mode != null) _mode.RaiseStatusMessage($"{propLabel} eline alındı · Bırak: E · Fırlat: Sol Tık / V");
+                    if (_mode != null) _mode.RaiseStatusMessage(LocalizationService.IsEnglish
+                        ? $"Picked up {propLabel} · Drop: E · Throw: Left Click / V"
+                        : $"{propLabel} eline alındı · Bırak: E · Fırlat: Sol Tık / V");
                 }
 
                 float lift = Mathf.SmoothStep(0f, 1f, (elapsed - ReachDuration) / LiftDuration);
@@ -505,7 +507,7 @@ namespace OurWorld.World
                 {
                     PlayerModeController m = _mode;
                     Drop(Vector3.zero);
-                    if (m != null) m.RaiseStatusMessage($"{propLabel} yere bırakıldı.");
+                    if (m != null) m.RaiseStatusMessage(LocalizationService.IsEnglish ? $"Placed {propLabel} down." : $"{propLabel} yere bırakıldı.");
                 }
                 return;
             }

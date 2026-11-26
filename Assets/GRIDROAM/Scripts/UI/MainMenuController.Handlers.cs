@@ -7,6 +7,7 @@ using OurWorld.Input;
 using OurWorld.Jobs;
 using OurWorld.Missions;
 using OurWorld.Player;
+using OurWorld.Vehicle;
 using OurWorld.World;
 using UnityEngine;
 using UnityEngine.UI;
@@ -87,6 +88,16 @@ namespace OurWorld.UI
             if (_volumeValueText != null)
             {
                 _volumeValueText.text = $"{Mathf.RoundToInt(clamped * 100f)}%";
+            }
+        }
+
+        private void HandleMusicSliderChanged(float value)
+        {
+            float clamped = Mathf.Clamp01(value);
+            TurkishCarRadio.SetMusicVolume(clamped);
+            if (_musicValueText != null)
+            {
+                _musicValueText.text = $"{Mathf.RoundToInt(clamped * 100f)}%";
             }
         }
 
@@ -431,6 +442,9 @@ namespace OurWorld.UI
 
             if (_volumeSlider != null) _volumeSlider.SetValueWithoutNotify(AudioListener.volume);
             if (_volumeValueText != null) _volumeValueText.text = $"{Mathf.RoundToInt(AudioListener.volume * 100f)}%";
+            if (_setMusicCaption != null) _setMusicCaption.text = isEn ? "Music & Radio" : "Müzik & Radyo";
+            if (_musicSlider != null) _musicSlider.SetValueWithoutNotify(TurkishCarRadio.MusicVolume);
+            if (_musicValueText != null) _musicValueText.text = $"{Mathf.RoundToInt(TurkishCarRadio.MusicVolume * 100f)}%";
 
             bool voiceOn = VoiceoverManager.Enabled;
             SetSegColor(_voiceOffBg, !voiceOn);
@@ -454,6 +468,15 @@ namespace OurWorld.UI
             for (int i = 0; i < 4; i++)
             {
                 SetSegColor(_timeChipBgs[i], i == activeTimeIdx);
+            }
+
+            int activeWeatherIdx = NeighborhoodWeatherSystem.Instance != null ? (int)NeighborhoodWeatherSystem.Instance.CurrentWeather : 0;
+            if (_setWeatherCaption != null) _setWeatherCaption.text = isEn ? "Weather (Live Preview)" : "Hava Durumu (Canlı)";
+            string[] wLabels = isEn ? new[] { "Sunny", "Cloudy", "Rain" } : new[] { "Güneşli", "Bulutlu", "Yağmurlu" };
+            for (int i = 0; i < 3; i++)
+            {
+                if (_weatherChipTexts[i] != null) _weatherChipTexts[i].text = wLabels[i];
+                SetSegColor(_weatherChipBgs[i], i == activeWeatherIdx);
             }
 
             bool fpsOn = _hud != null && _hud.IsTelemetryVisible;

@@ -78,6 +78,16 @@ namespace OurWorld.UI
         private Button _tabFeedbackButton;
         private Text _tabFeedbackLabel;
 
+        // Runtime-built Map Landmark Pins + Fast Travel / Car Valet bar
+        private readonly System.Collections.Generic.List<(RectTransform rt, Text lbl, string tr, string en, Vector3 pos)> _mapLandmarkPins
+            = new System.Collections.Generic.List<(RectTransform, Text, string, string, Vector3)>();
+        private Button _fastTravelBtn;
+        private Text _fastTravelLabel;
+        private Button _callCarBtn;
+        private Text _callCarLabel;
+        private Text _statsDailyBtnLabel;
+        private Text _statsStyleBtnLabel;
+
         private static readonly Color ActiveTabColor = OurWorldUiKit.AccentTeal;
         private static readonly Color InactiveTabColor = OurWorldUiKit.SurfaceBg;
         private static readonly Vector3 DefaultGasStationWorldPos = new Vector3(-84.5f, 0.04f, 12.0f);
@@ -176,6 +186,8 @@ namespace OurWorld.UI
             if (tabJobsButton != null) tabJobsButton.onClick.AddListener(() => SelectTab(1));
             if (tabStatsButton != null) tabStatsButton.onClick.AddListener(() => SelectTab(2));
             BuildFeedbackTab();
+            BuildMapLandmarkPinsAndFastTravel();
+            BuildStatsQuickActions();
             if (closeButton != null) closeButton.onClick.AddListener(Close);
             if (languageButton != null)
             {
@@ -587,6 +599,206 @@ namespace OurWorld.UI
             {
                 clearWaypointButton.interactable = HasCustomWaypoint;
             }
+            if (_fastTravelBtn != null)
+            {
+                _fastTravelBtn.interactable = HasCustomWaypoint;
+            }
+            for (int i = 0; i < _mapLandmarkPins.Count; i++)
+            {
+                var pin = _mapLandmarkPins[i];
+                if (pin.rt != null) pin.rt.anchoredPosition = WorldToViewportAnchored(pin.pos);
+            }
+        }
+
+        private void BuildMapLandmarkPinsAndFastTravel()
+        {
+            if (mapViewportRect == null || mapTabRoot == null) return;
+            OurWorldUiKit.EnsureInitialized();
+
+            // Clickable landmark badges directly on the Phone Map (covers all runtime-added regions!)
+            (string tr, string en, Vector3 pos, Color col)[] landmarks =
+            {
+                ("Atlas AVM",  "Atlas Mall",   new Vector3(-116f, 0.2f, -58f), new Color(0.97f, 0.75f, 0.24f)),
+                ("Oto Galeri", "Auto Gallery", new Vector3(-115f, 0.2f,  56f), new Color(0.24f, 0.90f, 0.84f)),
+                ("Çiftlik",    "Aydos Farm",   new Vector3( 148f, 0.2f,   0f), new Color(0.32f, 0.80f, 0.44f)),
+                ("Gölet",      "Lake Pier",    new Vector3(-164f, 0.2f,   0f), new Color(0.22f, 0.76f, 0.96f)),
+                ("Saat Kulesi","Clock Tower",  new Vector3(   0f, 0.2f, 136f), new Color(0.96f, 0.56f, 0.28f)),
+                ("Havadis Sk.","Havadis St.",  new Vector3( -16f, 0.2f, 186f), new Color(0.14f, 0.78f, 0.70f)),
+                ("Kadife Sk.", "Kadife St.",   new Vector3( -12f, 0.2f,-186f), new Color(0.14f, 0.78f, 0.70f)),
+                ("Spor",       "Sports",       new Vector3( -14f, 0.2f, -29f), new Color(0.92f, 0.44f, 0.36f)),
+                ("Evim No:48", "Home No:48",   new Vector3( -62f, 0.2f,   4f), new Color(0.82f, 0.88f, 0.96f))
+            };
+
+            for (int i = 0; i < landmarks.Length; i++)
+            {
+                var lm = landmarks[i];
+                Button pinBtn = OurWorldUiKit.CreatePillButton(
+                    $"MapLandmarkPin_{i}", mapViewportRect, lm.tr, 13,
+                    new Color(0.05f, 0.08f, 0.13f, 0.90f), lm.col, lm.col, out Text pinLbl, () =>
+                    {
+                        SetCustomWaypoint(lm.pos);
+                        GameFeelAudio.PlayUiClick();
+                    });
+                RectTransform prt = (RectTransform)pinBtn.transform;
+                prt.anchorMin = new Vector2(0.5f, 0.5f);
+                prt.anchorMax = new Vector2(0.5f, 0.5f);
+                prt.pivot = new Vector2(0.5f, 0.5f);
+                prt.sizeDelta = new Vector2(102f, 24f);
+                pinLbl.rectTransform.offsetMin = new Vector2(6f, 0f);
+                pinLbl.rectTransform.offsetMax = new Vector2(-6f, 0f);
+                _mapLandmarkPins.Add((prt, pinLbl, lm.tr, lm.en, lm.pos));
+            }
+
+            // Bottom utility bar on Map tab: Fast Travel (Taxi 25 TL) + Summon Personal Car (Valet 15 TL)
+            GameObject actionBar = new GameObject("MapTravelValetBar", typeof(RectTransform));
+            actionBar.transform.SetParent(mapTabRoot.transform, false);
+            RectTransform art = (RectTransform)actionBar.transform;
+            art.anchorMin = new Vector2(0f, 0f);
+            art.anchorMax = new Vector2(0.68f, 0f);
+            art.pivot = new Vector2(0f, 0f);
+            art.anchoredPosition = new Vector2(18f, 14f);
+            art.sizeDelta = new Vector2(-18f, 44f);
+
+            HorizontalLayoutGroup hlg = actionBar.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 12f;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = true;
+            hlg.childForceExpandHeight = true;
+
+            _fastTravelBtn = OurWorldUiKit.CreatePillButton("Btn_FastTravelTaxi", actionBar.transform,
+                "Taksiyle Git (25 ₺)", 16, OurWorldUiKit.SurfaceActive, OurWorldUiKit.AccentGold, OurWorldUiKit.AccentTeal,
+                out _fastTravelLabel, HandleFastTravelToWaypoint);
+
+            _callCarBtn = OurWorldUiKit.CreatePillButton("Btn_CallMyCar", actionBar.transform,
+                "Arabamı Çağır · Vale (15 ₺)", 16, OurWorldUiKit.SurfaceSoft, OurWorldUiKit.TextPrimary, OurWorldUiKit.BorderSubtle,
+                out _callCarLabel, HandleCallPersonalCar);
+        }
+
+        private void BuildStatsQuickActions()
+        {
+            if (statsTabRoot == null) return;
+            OurWorldUiKit.EnsureInitialized();
+
+            GameObject bar = new GameObject("StatsQuickActionsBar", typeof(RectTransform));
+            bar.transform.SetParent(statsTabRoot.transform, false);
+            RectTransform brt = (RectTransform)bar.transform;
+            brt.anchorMin = new Vector2(0f, 0f);
+            brt.anchorMax = new Vector2(1f, 0f);
+            brt.pivot = new Vector2(0.5f, 0f);
+            brt.anchoredPosition = new Vector2(0f, 14f);
+            brt.sizeDelta = new Vector2(-48f, 48f);
+
+            HorizontalLayoutGroup hlg = bar.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 14f;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = true;
+            hlg.childForceExpandHeight = true;
+
+            OurWorldUiKit.CreatePillButton("Btn_OpenDailyQuests", bar.transform,
+                "★ Günlük Görevler & Başarımlar", 17, OurWorldUiKit.AccentGold, OurWorldUiKit.InkDark, Color.clear,
+                out _statsDailyBtnLabel, () =>
+                {
+                    GameFeelAudio.PlayUiClick();
+                    Close();
+                    DailyQuestsOverlay.EnsureInstance().Show(0);
+                });
+
+            OurWorldUiKit.CreatePillButton("Btn_OpenStyleStudio", bar.transform,
+                "Stil & Aksesuarlar (Gözlük/Şapka)", 17, OurWorldUiKit.SurfaceActive, OurWorldUiKit.TextPrimary, OurWorldUiKit.AccentTeal,
+                out _statsStyleBtnLabel, () =>
+                {
+                    GameFeelAudio.PlayUiClick();
+                    Close();
+                    BarberAndStylePanel.Instance?.Show();
+                });
+        }
+
+        private void HandleFastTravelToWaypoint()
+        {
+            if (!HasCustomWaypoint) return;
+            PlayerModeController mode = PlayerModeController.Instance;
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+            if (mode == null || mode.FootController == null) return;
+
+            SaveManager sm = SaveManager.Instance;
+            if (sm != null && !sm.TrySpend(25))
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn ? "Fast Travel Taxi requires 25 ₺!" : "Taksiyle hızlı seyahat için 25 ₺ gerekli!");
+                return;
+            }
+
+            Vector3 dest = new Vector3(CustomWaypointPosition.x, 0.25f, CustomWaypointPosition.z);
+            if (mode.IsDriving && mode.CurrentVehicle != null)
+            {
+                mode.CurrentVehicle.TeleportAndReset(dest + Vector3.up * 0.2f, mode.CurrentVehicle.transform.rotation);
+            }
+            else
+            {
+                mode.FootController.TeleportTo(dest, mode.FootController.transform.rotation);
+            }
+
+            ClearCustomWaypoint();
+            GameFeelAudio.PlayCoinChime();
+            mode.RaiseStatusMessage(isEn ? "Arrived via Fast Travel Taxi (-25 ₺)" : "Taksiyle hedefe ulaştın (-25 ₺)");
+            Close();
+        }
+
+        private void HandleCallPersonalCar()
+        {
+            PlayerModeController mode = PlayerModeController.Instance;
+            bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+            if (mode == null || mode.FootController == null) return;
+
+            if (mode.IsDriving)
+            {
+                mode.RaiseStatusMessage(isEn ? "You are already inside a vehicle!" : "Zaten bir aracın içindesin!");
+                return;
+            }
+
+            // Do not summon a car indoors or inside Atlas AVM
+            Vector3 p = mode.ActiveWorldPosition;
+            if (InteriorZone.IsPlayerInsideAny || (p.x >= -134f && p.x <= -98f && p.z >= -51f && p.z <= -17f))
+            {
+                mode.RaiseStatusMessage(isEn ? "Step outside to summon your car!" : "Arabanı çağırmak için dışarı çık!");
+                return;
+            }
+
+            SedanVehicleController targetCar = null;
+            if (_cachedVehicles != null)
+            {
+                for (int i = 0; i < _cachedVehicles.Length; i++)
+                {
+                    if (_cachedVehicles[i] != null && _cachedVehicles[i].name.IndexOf("Player", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        targetCar = _cachedVehicles[i];
+                        break;
+                    }
+                }
+                if (targetCar == null && _cachedVehicles.Length > 0) targetCar = _cachedVehicles[0];
+            }
+            if (targetCar == null)
+            {
+                mode.RaiseStatusMessage(isEn ? "No car available to summon." : "Çağrılacak araç bulunamadı.");
+                return;
+            }
+
+            SaveManager sm = SaveManager.Instance;
+            if (sm != null && !sm.TrySpend(15))
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn ? "Car Valet costs 15 ₺!" : "Vale hizmeti 15 ₺!");
+                return;
+            }
+
+            Vector3 spawnPos = p + mode.FootController.transform.forward * 4.5f;
+            spawnPos.y = 0.35f;
+            targetCar.TeleportAndReset(spawnPos, Quaternion.Euler(0f, mode.FootController.transform.eulerAngles.y, 0f));
+            GameFeelAudio.PlayCoinChime();
+            mode.RaiseStatusMessage(isEn ? "Valet delivered your car right ahead! (-15 ₺)" : "Vale arabanı hemen önüne getirdi! (-15 ₺)");
+            Close();
         }
 
         public void RefreshAllTexts()
@@ -608,6 +820,15 @@ namespace OurWorld.UI
 
             if (clearWaypointLabel != null) clearWaypointLabel.text = LocalizationService.Tr("ui.phone.clear_wp", "İşareti Kaldır");
             if (mapHintLabel != null) mapHintLabel.text = LocalizationService.Tr("ui.phone.map_hint", "Haritaya dokunarak özel hedef işaretleyebilirsin.");
+
+            bool isEnMap = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+            for (int i = 0; i < _mapLandmarkPins.Count; i++)
+            {
+                var pin = _mapLandmarkPins[i];
+                if (pin.lbl != null) pin.lbl.text = isEnMap ? pin.en : pin.tr;
+            }
+            if (_fastTravelLabel != null) _fastTravelLabel.text = isEnMap ? "Taxi Fast Travel (25 ₺)" : "Taksiyle Git (25 ₺)";
+            if (_callCarLabel != null) _callCarLabel.text = isEnMap ? "Call My Car · Valet (15 ₺)" : "Arabamı Çağır · Vale (15 ₺)";
             if (mapLegendText != null)
             {
                 mapLegendText.text = LocalizationService.Tr(
@@ -718,6 +939,17 @@ namespace OurWorld.UI
                 {
                     statValueTexts[i].text = values[i];
                 }
+            }
+
+            if (_statsDailyBtnLabel != null)
+            {
+                int ready = DailyQuestAndAchievementSystem.GetUnclaimedReadyCount();
+                string badge = ready > 0 ? $" ({ready}!)" : string.Empty;
+                _statsDailyBtnLabel.text = (isEn ? "★ Daily Quests & Achievements" : "★ Günlük Görevler & Başarımlar") + badge;
+            }
+            if (_statsStyleBtnLabel != null)
+            {
+                _statsStyleBtnLabel.text = isEn ? "Style & 3D Accessories" : "Stil & Aksesuarlar (Gözlük/Şapka)";
             }
         }
 

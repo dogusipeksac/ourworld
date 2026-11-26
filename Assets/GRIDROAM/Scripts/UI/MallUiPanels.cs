@@ -503,8 +503,21 @@ namespace OurWorld.UI
                         sm.Data.invTomatoes += 2;
                         sm.Data.invStrawberries += 2;
                         break;
+                    case "sunglasses":
+                        sm.Data.ownsSunglasses = true;
+                        sm.Data.equipSunglasses = true;
+                        mode?.FootController?.ApplySavedAppearance();
+                        break;
+                    case "street_cap":
+                        sm.Data.ownsStreetCap = true;
+                        sm.Data.equipStreetCap = true;
+                        mode?.FootController?.ApplySavedAppearance();
+                        break;
                 }
+                sm.Save();
             }
+
+            DailyQuestAndAchievementSystem.RecordMallPurchase();
 
             if (item.ReputationXp > 0)
             {
@@ -543,6 +556,8 @@ namespace OurWorld.UI
             if (d == null) return false;
             if (upgradeId == "running_shoes") return d.hasRunningShoes;
             if (upgradeId == "turbo_kit") return d.hasTurboKit;
+            if (upgradeId == "sunglasses") return d.ownsSunglasses;
+            if (upgradeId == "street_cap") return d.ownsStreetCap;
             return false;
         }
 

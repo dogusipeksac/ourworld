@@ -125,9 +125,12 @@ namespace OurWorld.Vehicle
         private bool _steeringWheelCached;
         private bool _wheelVisualsSynced;
 
-        // Phase 2 Tuning & Car Wash state
+        // Phase 2 Tuning & Car Wash state + Phase 4 Oto Galeri vehicle spec
         private float _tuningTurboMult = 1.0f;
+        private float _dealershipTorqueMult = 1.0f;
         private float _tuningBrakeMult = 1.0f;
+        private Vector3 _baseBodyScale = Vector3.one;
+        private bool _baseBodyScaleCached;
         private GameObject _spoilerObj;
         private GameObject _roofRackObj;
 
@@ -279,6 +282,7 @@ namespace OurWorld.Vehicle
 
             _tuningTurboMult = data.carHasTurboUpgrade ? 1.24f : 1.0f;
             _tuningBrakeMult = data.carHasSportSuspension ? 1.28f : 1.0f;
+            ApplyDealershipChassisFromId(data.activeOwnedVehicleId);
             if (data.carHasSportSuspension)
             {
                 baseRearSidewaysStiffness = 2.15f;
@@ -384,6 +388,45 @@ namespace OurWorld.Vehicle
             else if (_roofRackObj != null)
             {
                 _roofRackObj.SetActive(false);
+            }
+        }
+
+        public void ApplyDealershipChassisFromId(string vehicleId)
+        {
+            if (bodyVisualRoot != null && !_baseBodyScaleCached)
+            {
+                _baseBodyScale = bodyVisualRoot.localScale;
+                _baseBodyScaleCached = true;
+            }
+
+            Vector3 stance = Vector3.one;
+            switch (vehicleId)
+            {
+                case "car_aydos_suv":
+                    _dealershipTorqueMult = 1.14f;
+                    stance = new Vector3(1.04f, 1.14f, 1.02f);
+                    break;
+                case "car_hamidiye_pickup":
+                    _dealershipTorqueMult = 1.18f;
+                    stance = new Vector3(1.06f, 1.08f, 1.08f);
+                    break;
+                case "car_bogaz_coupe":
+                    _dealershipTorqueMult = 1.28f;
+                    stance = new Vector3(1.05f, 0.91f, 1.02f);
+                    break;
+                case "car_turkuaz_gt":
+                    _dealershipTorqueMult = 1.42f;
+                    stance = new Vector3(1.09f, 0.88f, 1.05f);
+                    break;
+                default:
+                    _dealershipTorqueMult = 1.0f;
+                    stance = Vector3.one;
+                    break;
+            }
+
+            if (bodyVisualRoot != null && _baseBodyScaleCached)
+            {
+                bodyVisualRoot.localScale = Vector3.Scale(_baseBodyScale, stance);
             }
         }
 
@@ -771,6 +814,41 @@ namespace OurWorld.Vehicle
             return Mathf.Lerp(200f, 140f, Mathf.InverseLerp(6200f, redlineRpm, rpm));
         }
 
+        public void TriggerHorn()
+        {
+            if (GameFeelAudio.PlayCarHorn())
+            {
+                StartleNearbyPedestriansFromHorn();
+            }
+        }
+
+        public void ToggleHeadlights()
+        {
+            _headlightsManualOverride = true;
+            _headlightsManualState = !_lastHeadlightOnVisual;
+            UpdateHeadlightState();
+            GameFeelAudio.PlayUiClick();
+            if (PlayerModeController.Instance != null)
+            {
+                bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(_headlightsManualState
+                    ? (isEn ? "Headlights turned on." : "Farlar açıldı.")
+                    : (isEn ? "Headlights turned off." : "Farlar kapatıldı."));
+            }
+        }
+
+        public string CycleCarRadio()
+        {
+            string station = TurkishCarRadio.CycleStation();
+            GameFeelAudio.PlayUiClick();
+            if (PlayerModeController.Instance != null)
+            {
+                bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(isEn ? $"Car Radio: {station}" : $"Araç Radyosu: {station}");
+            }
+            return station;
+        }
+
         private void Update()
         {
             if (!_isPlayerDriving || _inputLocked || Keyboard.current == null)
@@ -780,32 +858,17 @@ namespace OurWorld.Vehicle
 
             if (Keyboard.current.hKey.wasPressedThisFrame)
             {
-                if (GameFeelAudio.PlayCarHorn())
-                {
-                    StartleNearbyPedestriansFromHorn();
-                }
+                TriggerHorn();
             }
 
             if (Keyboard.current.lKey.wasPressedThisFrame)
             {
-                _headlightsManualOverride = true;
-                _headlightsManualState = !_lastHeadlightOnVisual;
-                UpdateHeadlightState();
-                GameFeelAudio.PlayUiClick();
-                if (PlayerModeController.Instance != null)
-                {
-                    PlayerModeController.Instance.RaiseStatusMessage(_headlightsManualState ? "Farlar açıldı." : "Farlar kapatıldı.");
-                }
+                ToggleHeadlights();
             }
 
             if (Keyboard.current.rKey.wasPressedThisFrame)
             {
-                string station = TurkishCarRadio.CycleStation();
-                GameFeelAudio.PlayUiClick();
-                if (PlayerModeController.Instance != null)
-                {
-                    PlayerModeController.Instance.RaiseStatusMessage($"Araç Radyosu: {station}");
-                }
+                CycleCarRadio();
             }
         }
 
@@ -868,7 +931,8 @@ namespace OurWorld.Vehicle
                     _damageSystem.RepairFull();
                     if (PlayerModeController.Instance != null)
                     {
-                        PlayerModeController.Instance.RaiseStatusMessage("No:73 Oto Tamir: Araç tamamen onarıldı!");
+                        bool isEnRep = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(isEnRep ? "No:73 Auto Garage: Vehicle fully repaired!" : "No:73 Oto Tamir: Araç tamamen onarıldı!");
                     }
                 }
             }
@@ -1064,7 +1128,7 @@ namespace OurWorld.Vehicle
             float damageTorqueMult = _damageSystem != null ? _damageSystem.EngineTorqueMultiplier : 1f;
             if (!parked && hasFuel && damageTorqueMult > 0.01f && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
             {
-                float engineTorque = EvaluateEngineTorque(EngineRpm) * damageTorqueMult * _tuningTurboMult;
+                float engineTorque = EvaluateEngineTorque(EngineRpm) * damageTorqueMult * _tuningTurboMult * _dealershipTorqueMult;
                 if (SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasTurboKit)
                 {
                     engineTorque *= 1.28f;
@@ -1210,7 +1274,8 @@ namespace OurWorld.Vehicle
                         _wasNitroEmptyWarned = true;
                         if (PlayerModeController.Instance != null)
                         {
-                            PlayerModeController.Instance.RaiseStatusMessage("Nitro bitti — Drift yaparak hızla doldur!");
+                            bool isEnNitro = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(isEnNitro ? "Nitro empty — drift to recharge quickly!" : "Nitro bitti — Drift yaparak hızla doldur!");
                         }
                     }
                     _nitroCharge = Mathf.Min(1f, _nitroCharge + dt * 0.11f);

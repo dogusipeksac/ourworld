@@ -73,10 +73,13 @@ namespace OurWorld.World
         private void PerformAbdest(PlayerModeController mode)
         {
             if (PlayerActionAnimator.IsBusyOn(mode)) return;
+            bool en = LocalizationService.IsEnglish;
 
             if (Time.time - _lastAbdestTime < 8f && _hasAbdest)
             {
-                mode.RaiseStatusMessage("Abdestin zaten taze. Camiye girip safa durabilirsin.");
+                mode.RaiseStatusMessage(en
+                    ? "Your ablution is already fresh. You may enter the mosque to pray."
+                    : "Abdestin zaten taze. Camiye girip safa durabilirsin.");
                 return;
             }
 
@@ -88,8 +91,10 @@ namespace OurWorld.World
                 {
                     PlayerNeedsController.Instance.RestoreEnergy(15f);
                 }
-                mode.RaiseStatusMessage("Şadırvanda abdest aldın, gönlün ferahladı! (+15 Enerji)");
-            }, startStatus: "Şadırvanda abdest alınıyor (eller, yüz, kollar)...");
+                mode.RaiseStatusMessage(en
+                    ? "Took ablution at the courtyard fountain, feeling refreshed! (+15 Energy)"
+                    : "Şadırvanda abdest aldın, gönlün ferahladı! (+15 Enerji)");
+            }, startStatus: en ? "Taking ablution at the fountain..." : "Şadırvanda abdest alınıyor (eller, yüz, kollar)...");
         }
 
         private void StartPrayer(PlayerModeController mode)
@@ -142,7 +147,7 @@ namespace OurWorld.World
 
                 if (showMessage)
                 {
-                    _prayingMode.RaiseStatusMessage("Namazdan kalktın.");
+                    _prayingMode.RaiseStatusMessage(LocalizationService.IsEnglish ? "Stepped out of prayer." : "Namazdan kalktın.");
                 }
             }
 
@@ -206,28 +211,30 @@ namespace OurWorld.World
                 humanoid.SetLocomotion(0f, true, 0f);
             }
 
+            bool en = LocalizationService.IsEnglish;
+
             // 1. İftitah Tekbiri (Raising hands respectfully beside ears)
             if (humanoid != null) humanoid.SetPrayerPose(5, 0f);
             GameFeelAudio.PlayPrayerChime();
             string tekbirMsg = _hasAbdest
-                ? "Allâhu Ekber · İftitah Tekbiri... (İptal: E / Esc)"
-                : "Allâhu Ekber · İftitah Tekbiri (İstersen avludaki şadırvandan abdest alabilirsin)";
+                ? (en ? "Allahu Akbar · Opening Takbir... (Cancel: E / Esc)" : "Allâhu Ekber · İftitah Tekbiri... (İptal: E / Esc)")
+                : (en ? "Allahu Akbar · Opening Takbir (You can also take ablution at the courtyard fountain)" : "Allâhu Ekber · İftitah Tekbiri (İstersen avludaki şadırvandan abdest alabilirsin)");
             mode.RaiseStatusMessage(tekbirMsg);
             yield return new WaitForSeconds(1.25f);
 
             // 2. Kıyam (Standing upright with right hand folded over left over abdomen)
             if (humanoid != null) humanoid.SetPrayerPose(1, 0f);
-            mode.RaiseStatusMessage("Kıyam · Sübhâneke ve Fâtiha okunuyor...");
+            mode.RaiseStatusMessage(en ? "Qiyam · Reciting Al-Fatiha..." : "Kıyam · Sübhâneke ve Fâtiha okunuyor...");
             yield return new WaitForSeconds(2.3f);
 
             // 3. Rükû (Crisp 90° flat back bow, both palms grasping knees)
             if (humanoid != null) humanoid.SetPrayerPose(2, 0f);
-            mode.RaiseStatusMessage("Rükû · Sübhâne Rabbiye'l-azîm...");
+            mode.RaiseStatusMessage(en ? "Ruku · Bowing in reverence..." : "Rükû · Sübhâne Rabbiye'l-azîm...");
             yield return new WaitForSeconds(2.1f);
 
             // 4. Kavme (Upright rise from Rükû with arms relaxed cleanly at sides)
             if (humanoid != null) humanoid.SetPrayerPose(6, 0f);
-            mode.RaiseStatusMessage("Semiallâhu limen hamideh · Rabbenâ leke'l-hamd...");
+            mode.RaiseStatusMessage(en ? "Qawmah · Rising upright..." : "Semiallâhu limen hamideh · Rabbenâ leke'l-hamd...");
             yield return new WaitForSeconds(1.2f);
 
             // 4b. Smooth knee-first descent before prostration (prevents stiff dive straight from standing to carpet)
@@ -236,31 +243,31 @@ namespace OurWorld.World
 
             // 5. First Secde (7-point prostration: forehead, palms, knees & toes on carpet)
             if (humanoid != null) humanoid.SetPrayerPose(3, 0f);
-            mode.RaiseStatusMessage("Secde · Sübhâne Rabbiye'l-a'lâ...");
+            mode.RaiseStatusMessage(en ? "Sujud · Prostration..." : "Secde · Sübhâne Rabbiye'l-a'lâ...");
             yield return new WaitForSeconds(2.2f);
 
             // 6. Celse (Calm kneeling sit back on heels between secdes)
             if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
-            mode.RaiseStatusMessage("Celse · İki secde arası oturuş...");
+            mode.RaiseStatusMessage(en ? "Jalsa · Brief pause seated..." : "Celse · İki secde arası oturuş...");
             yield return new WaitForSeconds(1.1f);
 
             // 7. Second Secde
             if (humanoid != null) humanoid.SetPrayerPose(3, 0f);
-            mode.RaiseStatusMessage("İkinci Secde · Sübhâne Rabbiye'l-a'lâ...");
+            mode.RaiseStatusMessage(en ? "Second Sujud · Prostration..." : "İkinci Secde · Sübhâne Rabbiye'l-a'lâ...");
             yield return new WaitForSeconds(2.2f);
 
             // 8. Ka'de / Tahiyyat (Seated prayer, palms on thighs)
             if (humanoid != null) humanoid.SetPrayerPose(4, 0f);
-            mode.RaiseStatusMessage("Tahiyyat · Ettehiyyâtü lillâhi ve's-salevâtü ve't-tayyibât...");
+            mode.RaiseStatusMessage(en ? "Tashahhud · Seated supplication..." : "Tahiyyat · Ettehiyyâtü lillâhi ve's-salevâtü ve't-tayyibât...");
             yield return new WaitForSeconds(2.0f);
 
             // 9. Selam to the right, then to the left
             if (humanoid != null) humanoid.SetPrayerPose(4, 64f);
-            mode.RaiseStatusMessage("Esselâmü aleyküm ve rahmetullah (Sağa selam)...");
+            mode.RaiseStatusMessage(en ? "Assalamu Alaikum wa Rahmatullah (Right)..." : "Esselâmü aleyküm ve rahmetullah (Sağa selam)...");
             yield return new WaitForSeconds(1.2f);
 
             if (humanoid != null) humanoid.SetPrayerPose(4, -64f);
-            mode.RaiseStatusMessage("Esselâmü aleyküm ve rahmetullah (Sola selam)...");
+            mode.RaiseStatusMessage(en ? "Assalamu Alaikum wa Rahmatullah (Left)..." : "Esselâmü aleyküm ve rahmetullah (Sola selam)...");
             yield return new WaitForSeconds(1.2f);
 
             // Return head forward and stand up calmly before giving movement back
@@ -280,7 +287,7 @@ namespace OurWorld.World
                 PlayerNeedsController.Instance.RestoreEnergy(100f);
             }
 
-            mode.RaiseStatusMessage("Allah kabul etsin! Gönlün huzurla doldu. (%100 Enerji)");
+            mode.RaiseStatusMessage(en ? "May your prayer be accepted! Filled with peace. (100% Energy)" : "Allah kabul etsin! Gönlün huzurla doldu. (%100 Enerji)");
 
             _prayerRoutine = null;
             _prayingMode = null;

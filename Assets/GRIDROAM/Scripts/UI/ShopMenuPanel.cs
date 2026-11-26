@@ -280,11 +280,12 @@ namespace OurWorld.UI
             ShopOffer offer = offers[index];
             SaveData data = SaveManager.Instance.Data;
 
+            bool en = LocalizationService.IsEnglish;
             if (offer.Kind == ShopOfferKind.RunningShoes && data.hasRunningShoes)
             {
                 if (PlayerModeController.Instance != null)
                 {
-                    PlayerModeController.Instance.RaiseStatusMessage("Koşu ayakkabısına zaten sahipsin!");
+                    PlayerModeController.Instance.RaiseStatusMessage(en ? "You already own the running shoes!" : "Koşu ayakkabısına zaten sahipsin!");
                 }
                 return;
             }
@@ -292,7 +293,7 @@ namespace OurWorld.UI
             {
                 if (PlayerModeController.Instance != null)
                 {
-                    PlayerModeController.Instance.RaiseStatusMessage("Turbo Motor Kiti aracında zaten takılı!");
+                    PlayerModeController.Instance.RaiseStatusMessage(en ? "Turbo Engine Kit is already installed on your car!" : "Turbo Motor Kiti aracında zaten takılı!");
                 }
                 return;
             }
@@ -312,7 +313,7 @@ namespace OurWorld.UI
                 GameFeelAudio.SpawnBurst(PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 1.25f, new Color(0.98f, 0.82f, 0.28f), count: 10, spread: 0.45f);
             }
 
-            string feedback = "Satın alındı!";
+            string feedback = en ? "Purchased!" : "Satın alındı!";
             bool triggerConsumeAnim = false;
             switch (offer.Kind)
             {
@@ -323,7 +324,7 @@ namespace OurWorld.UI
                         PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot)
                     {
                         triggerConsumeAnim = true;
-                        feedback = "Raftan alınıyor...";
+                        feedback = en ? "Picking off the shelf..." : "Raftan alınıyor...";
                     }
                     else
                     {
@@ -331,20 +332,20 @@ namespace OurWorld.UI
                         {
                             PlayerNeedsController.Instance.RestoreEnergy(offer.Param);
                         }
-                        feedback = $"Afiyet olsun! +{Mathf.RoundToInt(offer.Param)} Enerji";
+                        feedback = en ? $"Enjoy! +{Mathf.RoundToInt(offer.Param)} Energy" : $"Afiyet olsun! +{Mathf.RoundToInt(offer.Param)} Enerji";
                     }
                     break;
 
                 case ShopOfferKind.RunningShoes:
                     data.hasRunningShoes = true;
                     SaveManager.Instance.Save();
-                    feedback = "Koşu Ayakkabısı alındı! Koşma hızın kalıcı olarak +%22 arttı.";
+                    feedback = en ? "Running Shoes purchased! Sprint speed permanently +22%." : "Koşu Ayakkabısı alındı! Koşma hızın kalıcı olarak +%22 arttı.";
                     break;
 
                 case ShopOfferKind.TurboKit:
                     data.hasTurboKit = true;
                     SaveManager.Instance.Save();
-                    feedback = "Turbo Motor Kiti takıldı! Araç tork ve hızı kalıcı olarak +%28 arttı.";
+                    feedback = en ? "Turbo Engine Kit installed! Car torque & speed permanently +28%." : "Turbo Motor Kiti takıldı! Araç tork ve hızı kalıcı olarak +%28 arttı.";
                     break;
 
                 case ShopOfferKind.JacketColor:
@@ -355,7 +356,7 @@ namespace OurWorld.UI
                     {
                         PlayerModeController.Instance.FootController.ApplyJacketColor(colorIdx);
                     }
-                    feedback = "Yeni ceketin üzerine giyildi! Harika görünüyor.";
+                    feedback = en ? "Equipped your new jacket! Looking sharp." : "Yeni ceketin üzerine giyildi! Harika görünüyor.";
                     break;
 
                 case ShopOfferKind.FuelCan:
@@ -369,7 +370,7 @@ namespace OurWorld.UI
                     }
                     data.missionSedanFuel = 1f;
                     SaveManager.Instance.Save();
-                    feedback = "Sedan yakıt deposu %100 dolduruldu!";
+                    feedback = en ? "Sedan fuel tank refilled to 100%!" : "Sedan yakıt deposu %100 dolduruldu!";
                     break;
             }
 

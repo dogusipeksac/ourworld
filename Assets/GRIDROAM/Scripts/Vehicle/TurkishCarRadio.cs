@@ -1,26 +1,60 @@
 using System;
+using OurWorld.Core;
 using UnityEngine;
 
 namespace OurWorld.Vehicle
 {
     /// <summary>
-    /// Procedural Turkish Car Radio (R key while driving):
+    /// Procedural Turkish Car Radio (R key while driving) + soft Hamidiye Atlas AVM Lounge Ambience:
     /// Synthesizes 3 distinct zero-asset musical radio stations live via OnAudioFilterRead:
     ///   0 = Kapalı (Off)
     ///   1 = 92.4 Sultanbeyli FM (Anadolu Hicaz Bağlama Lo-Fi Groove)
     ///   2 = 98.8 Boğaz Synth (Gece Sürüşü Retro Beat)
     ///   3 = 104.2 Mahalle Chill (Yavaş İstanbul Akorları)
+    /// Also provides subtle warm jazz-lounge ambient chords while walking inside Atlas AVM!
     /// </summary>
     public class TurkishCarRadio : MonoBehaviour
     {
+        private const string PrefMusicVolumeKey = "OurWorld_MusicVolume";
         public static TurkishCarRadio Instance { get; private set; }
 
-        private static readonly string[] StationNames =
+        private static float _musicVolume = -1f;
+        public static float MusicVolume
+        {
+            get
+            {
+                if (_musicVolume < 0f)
+                {
+                    _musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(PrefMusicVolumeKey, 0.85f));
+                }
+                return _musicVolume;
+            }
+        }
+
+        public static void SetMusicVolume(float value)
+        {
+            _musicVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(PrefMusicVolumeKey, _musicVolume);
+            if (Instance != null)
+            {
+                Instance._musicVolScale = _musicVolume;
+            }
+        }
+
+        private static readonly string[] StationNamesTr =
         {
             "Radyo Kapalı",
             "92.4 Sultanbeyli FM · Anadolu Hicaz",
             "98.8 Boğaz Synth · Gece Sürüşü",
             "104.2 Mahalle Chill · İstanbul Akorları"
+        };
+
+        private static readonly string[] StationNamesEn =
+        {
+            "Radio Off",
+            "92.4 Sultanbeyli FM · Anatolian Hicaz",
+            "98.8 Bosphorus Synth · Night Drive",
+            "104.2 Mahalle Chill · Istanbul Chords"
         };
 
         // Hicaz makam scale frequencies (D4, Eb4, F#4, G4, A4, Bb4, C5, D5)
@@ -33,10 +67,15 @@ namespace OurWorld.Vehicle
         // Chill chord roots (A3, F3, C4, G3)
         private static readonly double[] ChillRoots = { 220.0, 174.61, 261.63, 196.0 };
 
+        // Soft Mall Lounge progression (C4, A3, F3, G3)
+        private static readonly double[] MallLoungeRoots = { 261.63, 220.0, 174.61, 196.0 };
+
         private AudioSource _source;
         private AudioClip _carrier;
         private volatile int _stationIndex;
         private volatile bool _isDrivingActive;
+        private volatile bool _isMallAmbienceActive;
+        private volatile float _musicVolScale = 0.85f;
         private volatile float _sampleRate = 44100f;
 
         // Audio-thread synth state
@@ -64,6 +103,7 @@ namespace OurWorld.Vehicle
                 return;
             }
             Instance = this;
+            _musicVolScale = MusicVolume;
 
             int sr = AudioSettings.outputSampleRate;
             if (sr <= 0) sr = 44100;
@@ -91,11 +131,18 @@ namespace OurWorld.Vehicle
             inst._isDrivingActive = driving;
         }
 
+        public static void SetMallAmbienceActive(bool insideMall)
+        {
+            if (!insideMall && Instance == null) return;
+            TurkishCarRadio inst = EnsureInstance();
+            inst._isMallAmbienceActive = insideMall;
+        }
+
         public static string CycleStation()
         {
             TurkishCarRadio inst = EnsureInstance();
-            inst._stationIndex = (inst._stationIndex + 1) % StationNames.Length;
-            return StationNames[inst._stationIndex];
+            inst._stationIndex = (inst._stationIndex + 1) % StationNamesTr.Length;
+            return LocalizationService.IsEnglish ? StationNamesEn[inst._stationIndex] : StationNamesTr[inst._stationIndex];
         }
 
         private void OnAudioFilterRead(float[] data, int channels)
@@ -103,7 +150,10 @@ namespace OurWorld.Vehicle
             if (data == null || data.Length == 0 || channels <= 0) return;
 
             int station = _stationIndex;
-            float targetGain = (_isDrivingActive && station > 0) ? 0.14f : 0f;
+            bool playingCarRadio = _isDrivingActive && station > 0;
+            bool playingMallLounge = !playingCarRadio && _isMallAmbienceActive;
+            float vol = _musicVolScale;
+            float targetGain = playingCarRadio ? (0.14f * vol) : (playingMallLounge ? (0.048f * vol) : 0f);
             float sr = _sampleRate < 8000f ? 44100f : _sampleRate;
             int frames = data.Length / channels;
 
@@ -120,7 +170,24 @@ namespace OurWorld.Vehicle
                 _beatClock += 1.0 / sr;
                 float sample = 0f;
 
-                if (station == 1)
+                if (playingMallLounge)
+                {
+                    // Gentle warm Hamidiye Atlas AVM atrium lounge chords
+                    double barDur = 3.2;
+                    int bar = (int)(_beatClock / barDur) % MallLoungeRoots.Length;
+                    double barFrac = (_beatClock % barDur) / barDur;
+                    double root = MallLoungeRoots[bar];
+                    double third = (bar == 1) ? root * 1.1892 : root * 1.2599; // Am7 vs Cmaj7/Fmaj7/G6
+                    double fifth = root * 1.4983;
+
+                    _padPhase1 += (2.0 * Math.PI * root) / sr;
+                    _padPhase2 += (2.0 * Math.PI * third) / sr;
+                    _melPhase += (2.0 * Math.PI * fifth) / sr;
+                    double bell = Math.Sin(_melPhase * 2.0) * Math.Exp(-barFrac * 3.8) * 0.14;
+                    double swell = 0.50 + 0.50 * Math.Sin(barFrac * Math.PI);
+                    sample = (float)((Math.Sin(_padPhase1) * 0.42 + Math.Sin(_padPhase2) * 0.30 + Math.Sin(_melPhase) * 0.24) * swell + bell);
+                }
+                else if (station == 1)
                 {
                     // 92.4 Sultanbeyli FM: Anadolu Hicaz plucked baglama melody + warm drone
                     double stepDur = 0.28;

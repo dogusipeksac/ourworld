@@ -136,7 +136,10 @@ namespace OurWorld.World
 
             if (PlayerModeController.Instance != null)
             {
-                PlayerModeController.Instance.RaiseStatusMessage($"GOOOOL!! Mahalle maçında şahane gol! (+35 ₺ · Toplam Gol: {totalGoals})");
+                bool isEnGoal = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
+                PlayerModeController.Instance.RaiseStatusMessage(isEnGoal
+                    ? $"GOAAAL!! Brilliant street match goal! (+35 ₺ · Total Goals: {totalGoals})"
+                    : $"GOOOOL!! Mahalle maçında şahane gol! (+35 ₺ · Toplam Gol: {totalGoals})");
             }
 
             yield return new WaitForSeconds(2.4f);

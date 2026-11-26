@@ -231,6 +231,7 @@ namespace OurWorld.UI
                     : "Hey! Az önce yaptığını unutmadım... Ne istiyorsun?")
                 : citizen.GetSmartGreetingLine(isEn);
 
+            DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
             ShowPanel(opening);
         }
 
@@ -266,6 +267,7 @@ namespace OurWorld.UI
             }
 
             string opening = BuildLivingNpcSmartGreeting(IsEnglish);
+            DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
             ShowPanel(opening);
         }
 

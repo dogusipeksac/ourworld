@@ -12,6 +12,12 @@ namespace OurWorld.World
     [RequireComponent(typeof(BoxCollider))]
     public class InteriorZone : MonoBehaviour
     {
+        private static int _activeIndoorZoneCount;
+        public static bool IsPlayerInsideAny => _activeIndoorZoneCount > 0;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticIndoorCount() => _activeIndoorZoneCount = 0;
+
         [SerializeField] private Light[] interiorLights;
         [SerializeField] private float indoorCameraMaxDistance = 2.2f;
 
@@ -72,6 +78,7 @@ namespace OurWorld.World
             if (_playerInside)
             {
                 _playerInside = false;
+                _activeIndoorZoneCount = Mathf.Max(0, _activeIndoorZoneCount - 1);
                 SetLightsEnabled(false);
                 if (_cameraRig != null)
                 {
@@ -102,6 +109,7 @@ namespace OurWorld.World
             if (insideNow != _playerInside)
             {
                 _playerInside = insideNow;
+                _activeIndoorZoneCount = Mathf.Max(0, _activeIndoorZoneCount + (_playerInside ? 1 : -1));
                 SetLightsEnabled(_playerInside);
 
                 if (_cameraRig == null && Time.time >= _nextCamRigLookupTime)

@@ -749,12 +749,13 @@ namespace OurWorld.Jobs
                     if (carUnusable && Time.time - _lastTaxiWarningTime > 6f)
                     {
                         _lastTaxiWarningTime = Time.time;
+                        bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                         if (dmg != null && dmg.IsStalled)
-                            NotifyToast("Araç ağır hasarlı — No:73 Oto Tamir'de veya ATM'den onar ya da başka bir araca bin!");
+                            NotifyToast(isEn ? "Vehicle stalled — repair at No:73 Auto Garage or ATM, or switch cars!" : "Araç ağır hasarlı — No:73 Oto Tamir'de veya ATM'den onar ya da başka bir araca bin!");
                         else if (car.Fuel <= 0.01f)
-                            NotifyToast("Yakıt bitti — Seyyid Kutup benzin pompasından yakıt al ya da başka bir araca bin!");
+                            NotifyToast(isEn ? "Out of fuel — refuel at a gas pump or switch cars!" : "Yakıt bitti — Seyyid Kutup benzin pompasından yakıt al ya da başka bir araca bin!");
                         else
-                            NotifyToast("Araç devrilmiş — inip başka bir araca geçebilirsin.");
+                            NotifyToast(isEn ? "Vehicle flipped — step out and switch cars." : "Araç devrilmiş — inip başka bir araca geçebilirsin.");
                     }
 
                     Vector3 diff = car.transform.position - _taxiPickupPos;

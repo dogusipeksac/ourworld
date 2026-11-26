@@ -403,7 +403,10 @@ namespace OurWorld.Player
             float distSq = (transform.position - _shopOrigin).sqrMagnitude;
             if (distSq > MaxLeaveDistance * MaxLeaveDistance)
             {
-                ClearCart(silent: false, message: "Hüseyin Abi: Komşu elindekileri kasadan geçirmeden çıktın, rafa geri bıraktın!");
+                bool enLeave = LocalizationService.IsEnglish;
+                ClearCart(silent: false, message: enLeave
+                    ? "Hüseyin Abi: Neighbor, you walked out before checking out — items returned to the shelf!"
+                    : "Hüseyin Abi: Komşu elindekileri kasadan geçirmeden çıktın, rafa geri bıraktın!");
             }
         }
 
@@ -479,11 +482,14 @@ namespace OurWorld.Player
 
         public bool TryAddItem(PlayerModeController mode, ShopCartItem item, Vector3 shelfWorldPos)
         {
+            bool en = LocalizationService.IsEnglish;
             if (_items.Count >= MaxCartItems)
             {
                 if (mode != null)
                 {
-                    mode.RaiseStatusMessage($"Elin dolu ({ActiveSummary}) — Önce Kasa Bandına (Hüseyin Abi) götürüp öde!");
+                    mode.RaiseStatusMessage(en
+                        ? $"Hands full ({ActiveSummary}) — Take them to the Checkout Counter (Hüseyin Abi) first!"
+                        : $"Elin dolu ({ActiveSummary}) — Önce Kasa Bandına (Hüseyin Abi) götürüp öde!");
                 }
                 return false;
             }
@@ -504,7 +510,9 @@ namespace OurWorld.Player
 
             if (mode != null)
             {
-                mode.RaiseStatusMessage($"{item.Name} ({item.Price} ₺) elinde — Kasa Bandına (Hüseyin Abi) götürüp E ile öde! (Toplam: {TotalPrice} ₺)");
+                mode.RaiseStatusMessage(en
+                    ? $"Holding {item.Name} ({item.Price} ₺) — Bring to Checkout (Hüseyin Abi) and press E! (Total: {TotalPrice} ₺)"
+                    : $"{item.Name} ({item.Price} ₺) elinde — Kasa Bandına (Hüseyin Abi) götürüp E ile öde! (Toplam: {TotalPrice} ₺)");
             }
             return true;
         }
@@ -516,10 +524,13 @@ namespace OurWorld.Player
                 return;
             }
 
+            bool en = LocalizationService.IsEnglish;
             int total = TotalPrice;
             if (SaveManager.Instance.Data.money < total)
             {
-                mode.RaiseStatusMessage($"Yetersiz bakiye! ({total} ₺ gerekli · Bakiye: {SaveManager.Instance.Data.money} ₺) — Ürünler rafa bırakıldı.");
+                mode.RaiseStatusMessage(en
+                    ? $"Insufficient funds! ({total} ₺ needed · Balance: {SaveManager.Instance.Data.money} ₺) — Items returned to shelf."
+                    : $"Yetersiz bakiye! ({total} ₺ gerekli · Bakiye: {SaveManager.Instance.Data.money} ₺) — Ürünler rafa bırakıldı.");
                 ClearCart(silent: true);
                 return;
             }
@@ -536,7 +547,7 @@ namespace OurWorld.Player
             {
                 if (SaveManager.Instance == null || !SaveManager.Instance.TrySpend(total))
                 {
-                    mode.RaiseStatusMessage("Ödeme tamamlanamadı.");
+                    mode.RaiseStatusMessage(en ? "Payment could not be completed." : "Ödeme tamamlanamadı.");
                     return;
                 }
 
@@ -571,11 +582,15 @@ namespace OurWorld.Player
                     {
                         PlayerNeedsController.Instance.RestoreEnergy(pendingEnergy);
                     }
-                    mode.RaiseStatusMessage($"Kasada ödendi (-{total} ₺) · Hayırlı olsun komşu!");
+                    mode.RaiseStatusMessage(en
+                        ? $"Paid at checkout (-{total} ₺) · Enjoy, neighbor!"
+                        : $"Kasada ödendi (-{total} ₺) · Hayırlı olsun komşu!");
                 }
                 else
                 {
-                    mode.RaiseStatusMessage($"Kasada ödendi (-{total} ₺) · {pendingLabel} afiyetle tüketiliyor!");
+                    mode.RaiseStatusMessage(en
+                        ? $"Paid at checkout (-{total} ₺) · Enjoying {pendingLabel}!"
+                        : $"Kasada ödendi (-{total} ₺) · {pendingLabel} afiyetle tüketiliyor!");
                 }
             }, onFinished: () =>
             {
@@ -594,7 +609,7 @@ namespace OurWorld.Player
                 {
                     PlayerNeedsController.Instance.RestoreEnergy(pendingEnergy);
                 }
-            }, startStatus: $"Kasada ödeme yapılıyor ({total} ₺)...");
+            }, startStatus: en ? $"Paying at checkout ({total} ₺)..." : $"Kasada ödeme yapılıyor ({total} ₺)...");
         }
 
         public static void ApplyNonEnergyEffect(PlayerModeController mode, ShopCartItem item)

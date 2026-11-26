@@ -32,7 +32,7 @@
       "valueType": "STRING"
     },
     "update_ios_latest_version_code": {
-      "defaultValue": { "value": "1" },
+      "defaultValue": { "value": "10" },
       "description": "App Store'daki en güncel iOS buildNumber",
       "valueType": "NUMBER"
     },
@@ -47,8 +47,8 @@
       "valueType": "BOOLEAN"
     },
     "update_ios_store_url": {
-      "defaultValue": { "value": "https://apps.apple.com/search?term=OurWorld" },
-      "description": "OurWorld App Store mağaza bağlantısı (App Store ID çıkınca idXXXXXXXXXX ile güncelle)",
+      "defaultValue": { "value": "https://apps.apple.com/app/id6838324963" },
+      "description": "OurWorld App Store mağaza bağlantısı",
       "valueType": "STRING"
     },
     "update_title_tr": {
