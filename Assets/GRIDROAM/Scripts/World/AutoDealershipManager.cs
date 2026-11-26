@@ -338,8 +338,11 @@ namespace OurWorld.World
             Material pantsM = MakeMat(sh, new Color(0.11f, 0.12f, 0.15f), 0.18f, 0f);
             Material hairM = MakeMat(sh, new Color(0.18f, 0.14f, 0.12f), 0.28f, 0f);
             ProceduralHumanoid manager = ProceduralHumanoid.Build(root.transform, skinM, suitM, pantsM, tireMat, hairM, 1.80f);
+            manager.name = "NPC_OtoGaleri_KemalBey";
             manager.transform.localPosition = new Vector3(0f, 0.14f, -1.05f);
             manager.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(manager.gameObject, radius: 0.34f, height: 1.80f, centerY: 0.90f);
+            manager.gameObject.AddComponent<SmartStoryNpcPresence>().Initialize("npc_otogaleri_kemal");
 
             // Interactive Dealership Trigger
             GameObject trigGo = new GameObject("OtoGaleri_Trigger");
@@ -372,6 +375,9 @@ namespace OurWorld.World
             GameObject carRoot = new GameObject("DisplayCar");
             carRoot.transform.SetParent(parent, false);
             carRoot.transform.localScale = Vector3.Scale(new Vector3(0.76f, 0.76f, 0.76f), car.DisplayScale);
+            // Solid rotating showroom car body + kinematic Rigidbody so players cannot walk through display cars!
+            WorldPhysicsSolidifier.EnsureBoxCollider(carRoot, new Vector3(0f, 0.72f, 0f), new Vector3(1.90f, 1.28f, 4.28f));
+            WorldPhysicsSolidifier.EnsureKinematicRigidbody(carRoot);
 
             // Lower body + Cabin + Hood + Wheels
             Part("Chassis", PrimitiveType.Cube, carRoot.transform, new Vector3(0f, 0.52f, 0f), new Vector3(1.88f, 0.58f, 4.25f), paint, false);

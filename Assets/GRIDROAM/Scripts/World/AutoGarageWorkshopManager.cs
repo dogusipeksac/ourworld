@@ -349,12 +349,16 @@ namespace OurWorld.World
             GameObject liftObj = OurWorldModelLibrary.InstantiateModel("OW_HydraulicCarLift", root, LiftBayWorldPos, Quaternion.identity);
             if (liftObj != null)
             {
+                // Solid twin steel lift columns (keeps center bay open for cars while preventing column clipping!)
+                WorldPhysicsSolidifier.EnsureBoxCollider(liftObj, new Vector3(-1.48f, 1.45f, 0f), new Vector3(0.32f, 2.90f, 0.42f));
+                WorldPhysicsSolidifier.EnsureBoxCollider(liftObj, new Vector3( 1.48f, 1.45f, 0f), new Vector3(0.32f, 2.90f, 0.42f));
                 _liftCarriage = OurWorldModelLibrary.FindPart(liftObj.transform, "LiftCarriage");
                 if (_liftCarriage != null) _carriageBaseY = _liftCarriage.localPosition.y;
             }
 
             // Blender OW_GarageToolStation!
-            OurWorldModelLibrary.InstantiateModel("OW_GarageToolStation", root, new Vector3(32.1f, 0.05f, 11.4f), Quaternion.Euler(0f, 35f, 0f));
+            GameObject toolStation = OurWorldModelLibrary.InstantiateModel("OW_GarageToolStation", root, new Vector3(32.1f, 0.05f, 11.4f), Quaternion.Euler(0f, 35f, 0f));
+            WorldPhysicsSolidifier.EnsureSolidBoundsCollider(toolStation, minSize: 0.35f, shrinkXZ: 0.92f);
 
             // Sleek Blender OW_CustomerCar sitting cleanly on the hydraulic lift runners!
             _customerCarRoot = new GameObject("CustomerCarOnLift");
@@ -407,7 +411,7 @@ namespace OurWorld.World
             modBoard.transform.position = ModBoardWorldPos;
             CreateBox("PostL", modBoard.transform, new Vector3(-0.95f, 1.05f, 0f), new Vector3(0.14f, 2.1f, 0.14f), darkMat, collider: true);
             CreateBox("PostR", modBoard.transform, new Vector3( 0.95f, 1.05f, 0f), new Vector3(0.14f, 2.1f, 0.14f), darkMat, collider: true);
-            CreateBox("Board", modBoard.transform, new Vector3(0f, 1.50f, 0f), new Vector3(2.10f, 1.05f, 0.12f), blueMat, collider: false);
+            CreateBox("Board", modBoard.transform, new Vector3(0f, 1.50f, 0f), new Vector3(2.10f, 1.05f, 0.12f), blueMat, collider: true);
             CreateBox("TopTrim", modBoard.transform, new Vector3(0f, 2.08f, 0f), new Vector3(2.22f, 0.14f, 0.20f), stripeMat, collider: false);
 
             GameObject txtObj = new GameObject("ModBoardText");

@@ -117,22 +117,25 @@ namespace OurWorld.World
                 ? _cachedCam.transform.position
                 : (PlayerModeController.Instance != null ? PlayerModeController.Instance.ActiveWorldPosition : Vector3.zero);
 
-            // 1. Gently drift all 3D cumulus cloud clusters across the Istanbul sky
+            // 1. Gently drift all 3D cumulus cloud clusters along the unified Istanbul wind field
             NeighborhoodWeatherState weather = NeighborhoodWeatherSystem.Instance != null
                 ? NeighborhoodWeatherSystem.Instance.CurrentWeather
                 : NeighborhoodWeatherState.Clear;
-            float windMul = weather == NeighborhoodWeatherState.SummerShower ? 2.1f
-                : (weather == NeighborhoodWeatherState.BreezyOvercast ? 1.55f : 1.0f);
+            float windMul = (0.85f + IstanbulLivingSoundscape.WindStrength01 * 1.45f) *
+                            (weather == NeighborhoodWeatherState.SummerShower ? 1.25f : 1.0f);
+            Vector3 windDir = IstanbulLivingSoundscape.WindDirection;
 
             for (int i = 0; i < _clouds.Count; i++)
             {
                 CloudCluster c = _clouds[i];
                 if (c.Root == null) continue;
                 Vector3 p = c.Root.position;
-                p.x += c.Speed * windMul * dt;
-                p.z += c.Speed * 0.22f * windMul * dt;
+                p.x += c.Speed * windDir.x * windMul * dt;
+                p.z += c.Speed * windDir.z * windMul * dt;
                 if (p.x > 440f) p.x = -440f;
+                else if (p.x < -440f) p.x = 440f;
                 if (p.z > 440f) p.z = -440f;
+                else if (p.z < -440f) p.z = 440f;
                 p.y = c.BaseY + Mathf.Sin(Time.time * 0.18f + c.BobPhase) * 0.8f;
                 c.Root.position = p;
             }

@@ -48,6 +48,12 @@ namespace OurWorld.Missions
             Instance = this;
             _initialPosition = transform.position;
             _initialRotation = transform.rotation;
+            Rigidbody rb = GetComponent<Rigidbody>();
+            if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.interpolation = RigidbodyInterpolation.None;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         }
 
         private void Start()
@@ -210,10 +216,11 @@ namespace OurWorld.Missions
             Vector3 dir = toTarget / distToWp;
             Quaternion desiredRot = Quaternion.LookRotation(dir, Vector3.up);
             float angleDiff = Quaternion.Angle(transform.rotation, desiredRot);
-            transform.rotation = Quaternion.Slerp(transform.rotation, desiredRot, Time.deltaTime * turnSpeed);
+            Quaternion nextRot = Quaternion.Slerp(transform.rotation, desiredRot, Time.deltaTime * turnSpeed);
 
             float targetSpeed = angleDiff > 18f || distToWp < 12f ? cornerSpeedMs : cruiseSpeedMs;
-            transform.position += dir * (targetSpeed * Time.deltaTime);
+            Vector3 nextPos = transform.position + dir * (targetSpeed * Time.deltaTime);
+            transform.SetPositionAndRotation(nextPos, nextRot);
         }
 
         private void ArriveAndDropPackage()

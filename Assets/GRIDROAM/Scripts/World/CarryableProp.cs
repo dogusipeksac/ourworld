@@ -560,13 +560,24 @@ namespace OurWorld.World
                 : -cp.normal;
             bool heavy = relSpeed >= 6.5f || _carryHeaviness >= 0.55f;
 
-            // 1. Thrown prop strikes a pedestrian -> physical stagger/knockdown & witness reaction!
+            // 1. Thrown prop strikes a pedestrian (TownPedestrian OR LivingNeighborhoodPopulator citizen) -> physical stagger/knockdown & witness reaction!
             TownPedestrian ped = other.GetComponentInParent<TownPedestrian>();
             if (ped != null)
             {
                 _lastPropHitTime = Time.time;
                 _thrownImpactExpiry = 0f;
                 ped.OnPunchedByPlayer(transform.position, hitDir, heavy ? 2 : 1);
+                NeighborhoodConsequenceSystem.EnsureInstance().PlayWoodThud(0.64f);
+                VisualEffectsManager.SpawnCombatImpact(cp.point, hitDir, heavy, new Color(1.0f, 0.72f, 0.24f));
+                return;
+            }
+
+            LivingNpcColliderBridge living = other.GetComponentInParent<LivingNpcColliderBridge>();
+            if (living != null)
+            {
+                _lastPropHitTime = Time.time;
+                _thrownImpactExpiry = 0f;
+                living.NotifyHitByThrownProp(cp.point, hitDir * relSpeed, propLabel);
                 NeighborhoodConsequenceSystem.EnsureInstance().PlayWoodThud(0.64f);
                 VisualEffectsManager.SpawnCombatImpact(cp.point, hitDir, heavy, new Color(1.0f, 0.72f, 0.24f));
                 return;
@@ -592,12 +603,13 @@ namespace OurWorld.World
                 return;
             }
 
-            // 3. Thrown prop slams into shop windows, doors, poles, or walls (ignore flat ground bounces)
+            // 3. Thrown prop slams into shop windows, doors, poles, dynamic props, or walls (ignore flat ground bounces)
             if (cp.normal.y < 0.72f)
             {
                 _lastPropHitTime = Time.time;
                 PlayerFootController foot = PlayerModeController.Instance != null ? PlayerModeController.Instance.FootController : null;
                 NeighborhoodConsequenceSystem.EnsureInstance().HandleWorldObjectHit(other, cp.point, hitDir, heavy, foot);
+                NpcWorldAwareness.NotifyPropImpact(cp.point, foot != null ? foot.transform.position : transform.position, propLabel);
             }
         }
 

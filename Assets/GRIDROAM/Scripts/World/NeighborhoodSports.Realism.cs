@@ -315,6 +315,7 @@ namespace OurWorld.World
             p.Box(trimMat, new Vector3(0f, height + 0.02f, 0f), new Vector3(width + 0.04f, 0.045f, 0.07f));
             p.Box(trimMat, new Vector3(0f, 0.025f, 0f), new Vector3(width + 0.04f, 0.05f, 0.07f));
             p.Emit(board, "BoardPanel", shadows: false);
+            AddCollider(board, "AdBoardCollider", new Vector3(0f, height * 0.5f, 0f), new Vector3(width, height, 0.12f));
 
             Transform letters = Child(board, "BoardText", new Vector3(0f, height * 0.5f, -0.034f));
             TextMesh tm = letters.gameObject.AddComponent<TextMesh>();
@@ -414,6 +415,7 @@ namespace OurWorld.World
                 parts.Rod(postMat, _cylinder, new Vector3(px, -localPos.y, 0f), new Vector3(px, -height * 0.5f, 0f), 0.055f);
             }
             parts.Emit(sign, "DigitalScoreboardCabinet", shadows: false);
+            AddCollider(sign, "ScoreboardCollider", new Vector3(0f, -localPos.y * 0.5f, 0f), new Vector3(width * 0.85f, localPos.y + height * 0.5f, 0.24f));
 
             Transform letters = Child(sign, "ScoreboardText", new Vector3(0f, 0f, -0.078f));
             TextMesh text = letters.gameObject.AddComponent<TextMesh>();
@@ -655,6 +657,7 @@ namespace OurWorld.World
                 }
             }
             p.Emit(rack, "BallRackParts", shadows: false);
+            AddCollider(rack, "BallRackCollider", new Vector3(0f, 0.48f, 0f), new Vector3(w, 0.96f, 0.42f));
         }
 
         private void AddBeachUmbrella(Transform parent, Vector3 localPos, Shader shader, Material poleMat, Color primary, Color stripe)
@@ -674,6 +677,7 @@ namespace OurWorld.World
                 p.Add(i % 2 == 0 ? m1 : m2, _cube, pos, rot, new Vector3(0.68f, 0.035f, 1.32f));
             }
             p.Emit(umb, "UmbrellaParts", shadows: true);
+            WorldPhysicsSolidifier.EnsureTrunkCollider(umb.gameObject, radius: 0.16f, height: 2.4f);
         }
     }
 }

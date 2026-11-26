@@ -52,9 +52,31 @@ namespace OurWorld.World
             public Texture2D Normal;
         }
 
+        private struct WettableMatEntry
+        {
+            public Material Mat;
+            public Color DryColor;
+            public float DrySmoothness;
+            public float WetSmoothness;
+            public float WetDarkenMul;
+        }
+
+        private struct RainPuddleSpot
+        {
+            public Vector3 Center;
+            public float Radius;
+            public GameObject Go;
+        }
+
         private readonly Dictionary<SurfaceClass, PbrTexSet> _textures = new Dictionary<SurfaceClass, PbrTexSet>(8);
         private readonly Dictionary<string, Material> _upgradedMatCache = new Dictionary<string, Material>(64);
         private readonly List<Material> _ownedMaterials = new List<Material>(64);
+        private readonly List<WettableMatEntry> _wettableMats = new List<WettableMatEntry>(32);
+        private readonly List<RainPuddleSpot> _rainPuddles = new List<RainPuddleSpot>(18);
+        private Material _puddleMat;
+        private Texture2D _puddleTex;
+        private float _appliedWetness = -1f;
+        private bool _puddlesVisible;
         private readonly List<Transform> _fountainStreams = new List<Transform>(4);
         private readonly List<Renderer> _festoonBulbs = new List<Renderer>(64);
         private Material _festoonLitMat;
@@ -93,6 +115,7 @@ namespace OurWorld.World
             LoadPolyHavenTextures();
             UpgradeWorldSurfaceMaterials();
             BuildIstanbulStreetscapeHeroProps();
+            BuildRainPuddles();
             ConfigureAtmosphericDepth();
 
             if (PlayerModeController.Instance != null)
@@ -113,7 +136,10 @@ namespace OurWorld.World
             {
                 if (_ownedMaterials[i] != null) Destroy(_ownedMaterials[i]);
             }
+            if (_puddleTex != null) Destroy(_puddleTex);
             _ownedMaterials.Clear();
+            _wettableMats.Clear();
+            _rainPuddles.Clear();
             _upgradedMatCache.Clear();
             if (Instance == this) Instance = null;
         }
@@ -133,10 +159,11 @@ namespace OurWorld.World
                 }
             }
 
-            // Sync festoon cafe string lights & subtle atmospheric depth to time of day
+            // Sync festoon cafe string lights, rain-wet PBR gloss, puddles & subtle atmospheric depth
             if (Time.frameCount % 12 == 0)
             {
                 UpdateAtmosphereAndFestoonLights();
+                UpdateRainWetnessAndPuddles();
             }
         }
 
@@ -448,9 +475,32 @@ namespace OurWorld.World
                 }
             }
 
+            float drySmooth = cls == SurfaceClass.Asphalt ? 0.24f : (cls == SurfaceClass.Cobblestone ? 0.28f : 0.16f);
             if (m.HasProperty(SmoothnessId))
             {
-                m.SetFloat(SmoothnessId, cls == SurfaceClass.Asphalt ? 0.24f : (cls == SurfaceClass.Cobblestone ? 0.28f : 0.16f));
+                m.SetFloat(SmoothnessId, drySmooth);
+            }
+
+            if (cls == SurfaceClass.Asphalt || cls == SurfaceClass.Cobblestone ||
+                cls == SurfaceClass.WoodPlanks || cls == SurfaceClass.RoofTiles || cls == SurfaceClass.Sand)
+            {
+                float wetSmooth = cls switch
+                {
+                    SurfaceClass.Asphalt => 0.86f,
+                    SurfaceClass.Cobblestone => 0.82f,
+                    SurfaceClass.WoodPlanks => 0.72f,
+                    SurfaceClass.RoofTiles => 0.68f,
+                    _ => 0.44f
+                };
+                float wetDarken = cls == SurfaceClass.Asphalt ? 0.70f : (cls == SurfaceClass.Cobblestone ? 0.75f : 0.80f);
+                _wettableMats.Add(new WettableMatEntry
+                {
+                    Mat = m,
+                    DryColor = lifted,
+                    DrySmoothness = drySmooth,
+                    WetSmoothness = wetSmooth,
+                    WetDarkenMul = wetDarken
+                });
             }
 
             _upgradedMatCache[key] = m;
@@ -530,6 +580,9 @@ namespace OurWorld.World
                         OurWorldModelLibrary.TintMaterialByKeyword(set, "TerracottaWarm", new Color(0.11f, 0.56f, 0.60f));
                     }
 
+                    // Solid center bistro table + umbrella pole collider (keeps left/right chair sit zones clear!)
+                    WorldPhysicsSolidifier.EnsureBoxCollider(set, new Vector3(0f, 0.52f, 0f), new Vector3(0.92f, 1.04f, 0.92f));
+
                     // Hot Turkish Tea interactable on the table
                     InteractableTrigger teaTrig = set.AddComponent<InteractableTrigger>();
                     teaTrig.Configure(InteractableKind.InspectObject, ts.id, "ui.btn.interact", 2.6f);
@@ -605,6 +658,7 @@ namespace OurWorld.World
                 GameObject bench = OurWorldModelLibrary.InstantiateModel("OW_ParkBench", root, bn.pos, Quaternion.Euler(0f, bn.yaw, 0f), Vector3.one);
                 if (bench != null)
                 {
+                    WorldPhysicsSolidifier.EnsureBoxCollider(bench, new Vector3(0f, 0.46f, -0.04f), new Vector3(1.82f, 0.92f, 0.66f));
                     GameObject seatGo = new GameObject($"CC0BenchSeat_{i}");
                     seatGo.transform.SetParent(bench.transform, false);
                     seatGo.transform.localPosition = new Vector3(0f, 0.48f, 0f);
@@ -653,7 +707,8 @@ namespace OurWorld.World
             {
                 var tr = trees[i];
                 string model = tr.cypress ? "OW_CypressTree" : "OW_PlaneTree";
-                OurWorldModelLibrary.InstantiateModel(model, root, tr.pos, Quaternion.Euler(0f, i * 47f, 0f), Vector3.one * tr.scale);
+                GameObject treeGo = OurWorldModelLibrary.InstantiateModel(model, root, tr.pos, Quaternion.Euler(0f, i * 47f, 0f), Vector3.one * tr.scale);
+                WorldPhysicsSolidifier.EnsureTrunkCollider(treeGo, radius: tr.cypress ? 0.36f : 0.46f, height: 3.4f);
             }
 
             // F. 14 Carved Travertine Tulip & Lavender Flower Planters!
@@ -676,7 +731,8 @@ namespace OurWorld.World
             };
             for (int i = 0; i < planters.Length; i++)
             {
-                OurWorldModelLibrary.InstantiateModel("OW_FlowerPlanter", root, planters[i].pos, Quaternion.Euler(0f, planters[i].yaw, 0f), Vector3.one);
+                GameObject plGo = OurWorldModelLibrary.InstantiateModel("OW_FlowerPlanter", root, planters[i].pos, Quaternion.Euler(0f, planters[i].yaw, 0f), Vector3.one);
+                WorldPhysicsSolidifier.EnsureBoxCollider(plGo, new Vector3(0f, 0.36f, 0f), new Vector3(1.62f, 0.72f, 0.80f));
             }
 
             // G. Decorative Striped Turkish Shop Awnings (Tente) & Brass Lanterns on Tea Garden Posts!
@@ -697,10 +753,9 @@ namespace OurWorld.World
             };
             for (int i = 0; i < lanternSpots.Length; i++)
             {
-                // Timber post supporting festoon wire + hanging brass lantern
+                // Timber post supporting festoon wire + hanging brass lantern (keep solid CapsuleCollider!)
                 GameObject post = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 post.name = $"FestoonPost_{i}";
-                Destroy(post.GetComponent<Collider>());
                 post.transform.SetParent(root, false);
                 post.transform.position = new Vector3(lanternSpots[i].x, lanternSpots[i].y * 0.56f, lanternSpots[i].z);
                 post.transform.localScale = new Vector3(0.11f, lanternSpots[i].y * 0.58f, 0.11f);
@@ -801,6 +856,168 @@ namespace OurWorld.World
                     if (_festoonBulbs[i] != null) _festoonBulbs[i].sharedMaterial = target;
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns true if worldPos is currently inside a rain-formed street puddle (Wetness01 > 0.22).
+        /// </summary>
+        public static bool IsPositionInPuddle(Vector3 worldPos)
+        {
+            if (Instance == null || !Instance._puddlesVisible) return false;
+            var list = Instance._rainPuddles;
+            for (int i = 0; i < list.Count; i++)
+            {
+                Vector3 d = worldPos - list[i].Center;
+                if (Mathf.Abs(d.y) > 0.85f) continue;
+                float r = list[i].Radius;
+                if (d.x * d.x + d.z * d.z <= r * r) return true;
+            }
+            return false;
+        }
+
+        private void BuildRainPuddles()
+        {
+            _puddleTex = BuildPuddleTexture(64);
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
+            _puddleMat = new Material(lit);
+            if (_puddleMat.HasProperty(BaseMapId)) _puddleMat.SetTexture(BaseMapId, _puddleTex);
+            if (_puddleMat.HasProperty(MainTexId)) _puddleMat.SetTexture(MainTexId, _puddleTex);
+            if (_puddleMat.HasProperty("_Surface")) _puddleMat.SetFloat("_Surface", 1f);
+            if (_puddleMat.HasProperty("_Blend")) _puddleMat.SetFloat("_Blend", 0f);
+            if (_puddleMat.HasProperty("_ZWrite")) _puddleMat.SetFloat("_ZWrite", 0f);
+            if (_puddleMat.HasProperty("_Metallic")) _puddleMat.SetFloat("_Metallic", 0.14f);
+            if (_puddleMat.HasProperty(SmoothnessId)) _puddleMat.SetFloat(SmoothnessId, 0.96f);
+            _puddleMat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+            _puddleMat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+            _puddleMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            _puddleMat.renderQueue = (int)RenderQueue.Transparent - 15;
+            _puddleMat.SetColor(BaseColorId, new Color(0.24f, 0.31f, 0.38f, 0f));
+            _ownedMaterials.Add(_puddleMat);
+
+            Transform puddleRoot = new GameObject("Istanbul_RainPuddles").transform;
+            puddleRoot.SetParent(transform, false);
+
+            GameObject tmpQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Mesh quadMesh = tmpQuad.GetComponent<MeshFilter>().sharedMesh;
+            Destroy(tmpQuad);
+
+            // Grounded rain puddle depressions along main Istanbul avenues, plazas & sidewalks
+            (Vector2 xz, float radius, float stretch)[] spots =
+            {
+                (new Vector2(2.5f, 10.5f), 2.3f, 1.35f),
+                (new Vector2(-6.2f, 4.0f), 1.9f, 1.25f),
+                (new Vector2(12.5f, -3.5f), 2.5f, 1.40f),
+                (new Vector2(-18.0f, 14.5f), 2.1f, 1.20f),
+                (new Vector2(21.0f, 18.0f), 2.4f, 1.30f),
+                (new Vector2(-14.5f, -18.5f), 2.2f, 1.35f),
+                (new Vector2(8.0f, -26.0f), 2.0f, 1.25f),
+                (new Vector2(-34.0f, 6.5f), 2.6f, 1.45f),
+                (new Vector2(30.5f, 8.0f), 2.1f, 1.20f),
+                (new Vector2(-52.0f, -12.0f), 2.5f, 1.35f),
+                (new Vector2(-78.0f, 12.0f), 2.7f, 1.40f),
+                (new Vector2(-95.0f, -24.0f), 2.3f, 1.25f),
+                (new Vector2(18.0f, 42.0f), 2.4f, 1.30f),
+                (new Vector2(-22.0f, 44.0f), 2.2f, 1.25f),
+                (new Vector2(46.0f, -14.0f), 2.4f, 1.30f),
+                (new Vector2(-142.0f, -4.0f), 2.6f, 1.35f)
+            };
+
+            for (int i = 0; i < spots.Length; i++)
+            {
+                Vector3 probe = new Vector3(spots[i].xz.x, 2.2f, spots[i].xz.y);
+                if (!Physics.Raycast(probe, Vector3.down, out RaycastHit hit, 3.2f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) ||
+                    hit.normal.y < 0.94f || hit.point.y > 0.65f)
+                {
+                    continue;
+                }
+                float groundY = hit.point.y + 0.024f;
+
+                GameObject go = new GameObject($"RainPuddle_{i:00}");
+                go.transform.SetParent(puddleRoot, false);
+                go.transform.SetPositionAndRotation(
+                    new Vector3(spots[i].xz.x, groundY, spots[i].xz.y),
+                    Quaternion.Euler(90f, (i * 47f) % 360f, 0f));
+                go.transform.localScale = new Vector3(spots[i].radius * 2f * spots[i].stretch, spots[i].radius * 2f, 1f);
+                go.AddComponent<MeshFilter>().sharedMesh = quadMesh;
+                MeshRenderer mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = _puddleMat;
+                mr.shadowCastingMode = ShadowCastingMode.Off;
+                mr.receiveShadows = true;
+                go.SetActive(false);
+
+                _rainPuddles.Add(new RainPuddleSpot
+                {
+                    Center = new Vector3(spots[i].xz.x, groundY, spots[i].xz.y),
+                    Radius = spots[i].radius * 0.92f,
+                    Go = go
+                });
+            }
+        }
+
+        private void UpdateRainWetnessAndPuddles()
+        {
+            float wet = NeighborhoodWeatherSystem.Instance != null ? NeighborhoodWeatherSystem.Instance.Wetness01 : 0f;
+            if (Mathf.Abs(wet - _appliedWetness) < 0.015f) return;
+            _appliedWetness = wet;
+
+            for (int i = 0; i < _wettableMats.Count; i++)
+            {
+                WettableMatEntry e = _wettableMats[i];
+                if (e.Mat == null) continue;
+                float dark = Mathf.Lerp(1f, e.WetDarkenMul, wet);
+                Color c = new Color(e.DryColor.r * dark, e.DryColor.g * dark, e.DryColor.b * dark, 1f);
+                if (e.Mat.HasProperty(BaseColorId)) e.Mat.SetColor(BaseColorId, c);
+                if (e.Mat.HasProperty(ColorId)) e.Mat.SetColor(ColorId, c);
+                if (e.Mat.HasProperty(SmoothnessId))
+                {
+                    e.Mat.SetFloat(SmoothnessId, Mathf.Lerp(e.DrySmoothness, e.WetSmoothness, wet));
+                }
+            }
+
+            bool showPuddles = wet > 0.22f;
+            if (showPuddles != _puddlesVisible)
+            {
+                _puddlesVisible = showPuddles;
+                for (int i = 0; i < _rainPuddles.Count; i++)
+                {
+                    if (_rainPuddles[i].Go != null) _rainPuddles[i].Go.SetActive(showPuddles);
+                }
+            }
+
+            if (showPuddles && _puddleMat != null)
+            {
+                float alpha = Mathf.InverseLerp(0.22f, 0.85f, wet) * 0.56f;
+                float nightF = DayNightCycle.Instance != null ? DayNightCycle.Instance.NightFactor : 0f;
+                Color skyTint = Color.Lerp(new Color(0.32f, 0.42f, 0.52f, alpha), new Color(0.14f, 0.20f, 0.30f, alpha * 1.15f), nightF);
+                _puddleMat.SetColor(BaseColorId, skyTint);
+            }
+        }
+
+        private static Texture2D BuildPuddleTexture(int size)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "ProceduralRainPuddle",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear
+            };
+            Color[] px = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (y / (float)(size - 1)) * 2f - 1f;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (x / (float)(size - 1)) * 2f - 1f;
+                    float ang = Mathf.Atan2(ny, nx);
+                    float organicEdge = 0.84f + 0.10f * Mathf.Sin(ang * 3f + 0.6f) + 0.06f * Mathf.Cos(ang * 5f - 1.1f);
+                    float r = Mathf.Sqrt(nx * nx + ny * ny) / organicEdge;
+                    float a = 1f - Mathf.SmoothStep(0.58f, 1.0f, r);
+                    px[y * size + x] = new Color(1f, 1f, 1f, a);
+                }
+            }
+            tex.SetPixels(px);
+            tex.Apply(false, true);
+            return tex;
         }
 
         private void HandleThemePropInteracted(InteractableTrigger trig)

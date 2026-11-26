@@ -154,6 +154,7 @@ namespace OurWorld.World
             _stateTimer = Random.Range(1.5f, 4.5f);
             _animSeed = Random.Range(0f, 50f);
             _isCurious = (Mathf.Abs(Mathf.RoundToInt(_homePos.x * 7f + _homePos.z * 13f)) % 3) != 0;
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(gameObject, radius: 0.17f, height: 0.38f, centerY: 0.19f);
             BindModel();
             ApplyFurColor();
         }
@@ -507,15 +508,48 @@ namespace OurWorld.World
 
             float distance = _currentSpeed * dt;
             if (distance < 0.0001f) return true;
-            if (Physics.SphereCast(transform.position + Vector3.up * 0.17f, 0.08f, transform.forward, out _,
-                    distance + 0.23f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+
+            // Cat-to-cat separation so neighborhood cats never clip inside each other
+            Vector3 stepDir = transform.forward;
+            for (int i = 0; i < AllCats.Count; i++)
             {
-                _currentSpeed = 0f;
-                return false;
+                StreetCatController other = AllCats[i];
+                if (other == null || other == this) continue;
+                Vector3 away = transform.position - other.transform.position;
+                away.y = 0f;
+                float dSq = away.sqrMagnitude;
+                if (dSq > 0.001f && dSq < 0.65f * 0.65f)
+                {
+                    stepDir += (away / Mathf.Sqrt(dSq)) * 0.75f;
+                }
+            }
+            stepDir.y = 0f;
+            if (stepDir.sqrMagnitude > 0.001f) stepDir.Normalize();
+            else stepDir = transform.forward;
+
+            // Wall-slide check ignoring own collider so cats smoothly walk around walls, benches & cars
+            if (Physics.SphereCast(transform.position + Vector3.up * 0.20f, 0.14f, stepDir, out RaycastHit wallHit,
+                    distance + 0.24f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                wallHit.collider != null && !wallHit.collider.transform.IsChildOf(transform) && wallHit.normal.y < 0.68f)
+            {
+                Vector3 slide = Vector3.ProjectOnPlane(stepDir, wallHit.normal);
+                slide.y = 0f;
+                if (slide.sqrMagnitude > 0.04f &&
+                    !(Physics.SphereCast(transform.position + Vector3.up * 0.20f, 0.13f, slide.normalized, out RaycastHit sHit,
+                        distance + 0.22f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                      sHit.collider != null && !sHit.collider.transform.IsChildOf(transform) && sHit.normal.y < 0.68f))
+                {
+                    stepDir = slide.normalized;
+                }
+                else
+                {
+                    _currentSpeed = 0f;
+                    return false;
+                }
             }
 
-            Vector3 next = transform.position + transform.forward * distance;
-            if (!Physics.Raycast(next + Vector3.up * 0.25f, Vector3.down, out RaycastHit ground, 0.43f,
+            Vector3 next = transform.position + stepDir * distance;
+            if (!Physics.Raycast(next + Vector3.up * 0.28f, Vector3.down, out RaycastHit ground, 0.50f,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || ground.normal.y < 0.72f)
             {
                 _currentSpeed = 0f;

@@ -138,6 +138,8 @@ namespace OurWorld.World
                 // Vertical glowing EAS status/alarm LED strip
                 GameObject led = GateBox("AlarmLedStrip", post, new Vector3(0f, 0.80f, 0.15f), new Vector3(0.045f, 1.34f, 0.025f), standbyLedMat);
                 leds[i] = led.GetComponent<Renderer>();
+                // Slim solid collider on side pedestal (leaves doorway center walk-through wide open!)
+                WorldPhysicsSolidifier.EnsureBoxCollider(post.gameObject, new Vector3(0f, 0.78f, 0f), new Vector3(0.18f, 1.56f, 0.34f));
             }
 
             BoxCollider trigCol = gateRoot.AddComponent<BoxCollider>();
@@ -275,6 +277,7 @@ namespace OurWorld.World
             {
                 _alarmAudio.PlayOneShot(_alarmClip, 0.72f);
             }
+            NpcWorldAwareness.NotifyStoreAlarm(mode.FootController.transform.position, shopLabel);
 
             PlayerFootController foot = mode.FootController;
             mode.SetModalLock(this, true);
@@ -405,6 +408,7 @@ namespace OurWorld.World
             _guardHumanoid = ProceduralHumanoid.Build(null, skin, uniform, pants, shoes, hair, 1.84f);
             _guardObj = _guardHumanoid.gameObject;
             _guardObj.name = "OurWorld_StoreSecurityGuard";
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(_guardObj, radius: 0.32f, height: 1.84f, centerY: 0.92f);
             DontDestroyOnLoad(_guardObj);
 
             // Gold security badge on chest + dark security cap on head

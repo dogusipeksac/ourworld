@@ -46,6 +46,7 @@ namespace OurWorld.World
         private AudioClip _whistleClip;
 
         private float _heatScore;
+        public float CurrentHeat => _heatScore;
         private float _lastOffenseTime = -99f;
         private float _lastVandalFineTime = -99f;
         private float _lastCarFineTime = -99f;
@@ -367,6 +368,18 @@ namespace OurWorld.World
                 PlayWoodThud(heavy ? 0.65f : 0.48f);
                 VisualEffectsManager.SpawnCombatImpact(hitPoint, strikeDir, heavy, new Color(0.92f, 0.78f, 0.46f));
                 VisualEffectsManager.SpawnFootDust(hitPoint, heavyLanding: heavy);
+                return true;
+            }
+
+            // 1b. Dynamic world street props (Trash Cans, Wooden Crates, Oil Barrels, Tool Carts, Tyres) -> physically send tumbling!
+            DynamicWorldProp dynProp = hitCol.GetComponentInParent<DynamicWorldProp>();
+            if (dynProp != null)
+            {
+                Vector3 punchImpulse = (strikeDir.normalized * (heavy ? 7.8f : 4.6f) + Vector3.up * (heavy ? 2.4f : 1.15f)) *
+                                       Mathf.Clamp(dynProp.MassKg * 0.48f, 5f, 24f);
+                dynProp.ApplyPunchOrCrashImpulse(punchImpulse, hitPoint, heavy);
+                VisualEffectsManager.SpawnCombatImpact(hitPoint, strikeDir, heavy, new Color(0.92f, 0.80f, 0.50f));
+                NpcWorldAwareness.NotifyPropImpact(hitPoint, player != null ? player.transform.position : hitPoint, dynProp.gameObject.name);
                 return true;
             }
 

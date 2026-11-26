@@ -209,6 +209,7 @@ namespace OurWorld.World
             GameFeelAudio.PlayCoinChime();
             GameFeelAudio.SpawnBurst(burstPos + Vector3.up * 0.5f, new Color(0.28f, 0.92f, 0.85f), count: 12, spread: 0.65f);
             NeighborhoodReputation.AddReputation(25);
+            NpcWorldAwareness.NotifyGoodDeed(burstPos, "street_event");
         }
 
         private void ClearActiveEvent()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OurWorld.Core;
+using OurWorld.Player;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -247,6 +248,14 @@ namespace OurWorld.World
                 }
             }
 
+            // Responsive per-frame lighting & vignette updates during lightning flashes or low-HP heartbeat pulses
+            float lightningNow = NeighborhoodWeatherSystem.Instance != null ? NeighborhoodWeatherSystem.Instance.LightningFlash01 : 0f;
+            float hpPulseNow = PlayerPhysiologyFeel.LowHealthPulse01;
+            if (lightningNow > 0.01f || hpPulseNow > 0.01f)
+            {
+                ApplyLightingImmediate(forceNightToggle: false);
+            }
+
             float hoursDelta = dt / Mathf.Max(5f, realSecondsPerGameHour);
             _currentHour = Mathf.Repeat(_currentHour + hoursDelta, 24f);
 
@@ -331,6 +340,13 @@ namespace OurWorld.World
                 : NeighborhoodWeatherState.Clear;
             float rainMood = weather == NeighborhoodWeatherState.SummerShower ? 1f
                 : (weather == NeighborhoodWeatherState.BreezyOvercast ? 0.5f : 0f);
+            bool underwater = PlayerModeController.Instance != null &&
+                              PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot &&
+                              PlayerModeController.Instance.FootController != null &&
+                              PlayerModeController.Instance.FootController.IsUnderwater;
+            float hpPulse = PlayerPhysiologyFeel.LowHealthPulse01;
+            float fatigue = PlayerPhysiologyFeel.FatigueMood01;
+            float lightning = NeighborhoodWeatherSystem.Instance != null ? NeighborhoodWeatherSystem.Instance.LightningFlash01 : 0f;
 
             if (_volColorAdj != null)
             {
@@ -339,10 +355,19 @@ namespace OurWorld.World
                 float daySat = Mathf.Lerp(Mathf.Lerp(Mathf.Max(_daySaturation, 12f), 19f, golden), 4f, rainMood);
                 Color dayTint = Color.Lerp(Color.Lerp(_dayColorFilter, new Color(1.00f, 0.94f, 0.85f), golden), new Color(0.92f, 0.96f, 1.00f), rainMood);
 
-                _volColorAdj.postExposure.Override(Mathf.Lerp(dayExp, 0.30f, nightFactor));
-                _volColorAdj.contrast.Override(Mathf.Lerp(dayCon, 6f, nightFactor));
-                _volColorAdj.saturation.Override(Mathf.Lerp(daySat, 16f, nightFactor));
-                _volColorAdj.colorFilter.Override(Color.Lerp(dayTint, new Color(0.95f, 0.97f, 1.00f), nightFactor));
+                float finalExp = Mathf.Lerp(dayExp, 0.30f, nightFactor) + lightning * 0.42f - (underwater ? 0.16f : 0f);
+                float finalCon = Mathf.Lerp(dayCon, 6f, nightFactor) + (underwater ? 4f : 0f);
+                float finalSat = Mathf.Lerp(daySat, 16f, nightFactor) - fatigue * 24f + (underwater ? 8f : 0f);
+                Color finalTint = Color.Lerp(dayTint, new Color(0.95f, 0.97f, 1.00f), nightFactor);
+                if (underwater)
+                {
+                    finalTint = Color.Lerp(finalTint, new Color(0.56f, 0.88f, 0.96f), 0.62f);
+                }
+
+                _volColorAdj.postExposure.Override(finalExp);
+                _volColorAdj.contrast.Override(finalCon);
+                _volColorAdj.saturation.Override(finalSat);
+                _volColorAdj.colorFilter.Override(finalTint);
             }
 
             if (_volWhiteBalance != null)
@@ -350,13 +375,21 @@ namespace OurWorld.World
                 _volWhiteBalance.active = true;
                 float temp = Mathf.Lerp(Mathf.Lerp(5f, 20f, golden), -14f, rainMood);
                 temp = Mathf.Lerp(temp, -6f, nightFactor);
+                if (underwater) temp = -26f;
                 _volWhiteBalance.temperature.Override(temp);
                 _volWhiteBalance.tint.Override(Mathf.Lerp(2f, 6f, golden) * (1f - nightFactor));
             }
 
             if (_volVignette != null)
             {
-                _volVignette.intensity.Override(Mathf.Lerp(Mathf.Lerp(_dayVignetteIntensity, 0.24f, golden), 0.10f, nightFactor));
+                float baseVig = Mathf.Lerp(Mathf.Lerp(_dayVignetteIntensity, 0.24f, golden), 0.10f, nightFactor);
+                if (underwater) baseVig = Mathf.Max(baseVig, 0.34f);
+                float finalVig = Mathf.Clamp(baseVig + hpPulse * 0.26f + fatigue * 0.08f, 0f, 0.52f);
+                _volVignette.intensity.Override(finalVig);
+                Color vigCol = underwater
+                    ? new Color(0.04f, 0.22f, 0.30f)
+                    : Color.Lerp(Color.black, new Color(0.46f, 0.04f, 0.06f), Mathf.Clamp01(hpPulse * 1.15f));
+                _volVignette.color.Override(vigCol);
             }
 
             if (_volLiftGammaGain != null)
@@ -401,12 +434,18 @@ namespace OurWorld.World
                 NightFactor = 0f;
             }
 
+            float lightningFlash = NeighborhoodWeatherSystem.Instance != null ? NeighborhoodWeatherSystem.Instance.LightningFlash01 : 0f;
+            bool isUnderwater = PlayerModeController.Instance != null &&
+                                PlayerModeController.Instance.CurrentMode == ControlMode.OnFoot &&
+                                PlayerModeController.Instance.FootController != null &&
+                                PlayerModeController.Instance.FootController.IsUnderwater;
+
             if (_sunLight != null)
             {
                 float azimuth = sunAzimuthYaw + (_currentHour / 24f) * 36f;
                 _sunLight.transform.rotation = Quaternion.Euler(sample.SunPitch, azimuth, 0f);
-                _sunLight.color = sample.SunColor;
-                _sunLight.intensity = sample.SunIntensity;
+                _sunLight.color = Color.Lerp(sample.SunColor, new Color(0.86f, 0.92f, 1.0f), lightningFlash * 0.72f);
+                _sunLight.intensity = sample.SunIntensity + lightningFlash * 1.45f;
                 _sunLight.shadowStrength = Mathf.Lerp(0.76f, 0.22f, NightFactor);
             }
 
@@ -416,17 +455,25 @@ namespace OurWorld.World
             RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.36f, 0.45f, 0.65f), new Color(0.62f, 0.74f, 0.88f), dayFactor) * sample.AmbientIntensity;
             RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.34f, 0.35f, 0.45f), new Color(0.54f, 0.53f, 0.50f), dayFactor) * sample.AmbientIntensity;
             RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.24f, 0.25f, 0.33f), new Color(0.28f, 0.24f, 0.20f), dayFactor) * sample.AmbientIntensity;
-            RenderSettings.ambientIntensity = sample.AmbientIntensity;
-            RenderSettings.fogColor = sample.FogColor;
+            RenderSettings.ambientIntensity = sample.AmbientIntensity + lightningFlash * 0.35f;
             float rainMistMul = NeighborhoodWeatherSystem.Instance != null &&
                                 NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower
                 ? 1.26f : 1.0f;
-            RenderSettings.fogDensity = Mathf.Lerp(_baseDayFogDensity, 0.00115f, NightFactor) * rainMistMul;
+            if (isUnderwater)
+            {
+                RenderSettings.fogColor = new Color(0.08f, 0.38f, 0.48f);
+                RenderSettings.fogDensity = 0.044f;
+            }
+            else
+            {
+                RenderSettings.fogColor = Color.Lerp(sample.FogColor, new Color(0.74f, 0.82f, 0.94f), lightningFlash * 0.45f);
+                RenderSettings.fogDensity = Mathf.Lerp(_baseDayFogDensity, 0.00115f, NightFactor) * rainMistMul;
+            }
             RenderSettings.reflectionIntensity = Mathf.Lerp(_baseDayReflectionIntensity, 0.46f, NightFactor);
 
             if (_runtimeSkybox != null && _runtimeSkybox.HasProperty(ExposureId))
             {
-                _runtimeSkybox.SetFloat(ExposureId, sample.SkyExposure);
+                _runtimeSkybox.SetFloat(ExposureId, sample.SkyExposure + lightningFlash * 0.65f);
             }
 
             ApplyNightVolumeGrading(NightFactor);

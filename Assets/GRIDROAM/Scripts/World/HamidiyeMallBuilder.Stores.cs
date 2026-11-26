@@ -619,15 +619,19 @@ namespace OurWorld.World
                     sh.shirt, sh.lines);
                 if (hum == null || _handler == null) continue;
 
+                int shopperIdx = _handler.Strollers.Count;
+                hum.gameObject.AddComponent<MallShopperColliderBridge>().Configure(shopperIdx);
                 _handler.Strollers.Add(new MallStrollingShopper
                 {
                     DisplayName = sh.name,
                     Root = hum.transform,
+                    Rb = hum.GetComponent<Rigidbody>(),
                     Humanoid = hum,
                     LocalWaypoints = sh.route,
                     TargetIdx = 1 % sh.route.Length,
                     Speed = Random.Range(1.35f, 1.85f),
                     PauseTimer = Random.Range(0.2f, 2.0f),
+                    LastProgressPos = hum.transform.position,
                     IsFighter = (i % 2 == 0)
                 });
             }

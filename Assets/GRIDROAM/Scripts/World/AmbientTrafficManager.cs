@@ -44,19 +44,42 @@ namespace OurWorld.World
         private class ActiveAgent
         {
             public GameObject Go;
+            public Rigidbody Rb;
             public int WaypointIndex;
             public float TargetCruiseSpeed;
             public float CurrentSpeed;
+            public float PrevSpeed;
             public float BlockedByPlayerSeconds;
             public float HornCooldown;
             public List<Renderer> HeadlightRenderers;
+            public List<Renderer> TaillightRenderers;
+            public List<Transform> WheelTransforms;
+            public Transform BodyVisual;
+            public float BodyPitch;
+            public float RainSprayTimer;
             public bool LastNightLightState;
+            public bool LastBrakingLightState;
             public bool LightsInit;
         }
 
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
         private MaterialPropertyBlock _lightMpb;
         public IReadOnlyList<TrafficStopLine> StopLines => stopLines;
+        public int ActiveVehicleCount => _activeAgents.Count;
+
+        public bool TryGetActiveVehicleState(int index, out Vector3 worldPos, out Vector3 forward, out float speedMs)
+        {
+            worldPos = Vector3.zero;
+            forward = Vector3.forward;
+            speedMs = 0f;
+            if (index < 0 || index >= _activeAgents.Count) return false;
+            ActiveAgent a = _activeAgents[index];
+            if (a == null || a.Go == null || !a.Go.activeInHierarchy) return false;
+            worldPos = a.Go.transform.position;
+            forward = a.Go.transform.forward;
+            speedMs = a.CurrentSpeed;
+            return true;
+        }
 
         private readonly RaycastHit[] _castHits = new RaycastHit[8];
         private SimpleObjectPool _pool;
@@ -267,17 +290,18 @@ namespace OurWorld.World
 
                 Vector3 dir = toTarget / remaining;
                 Quaternion desiredRot = Quaternion.LookRotation(dir, Vector3.up);
-                agent.Go.transform.rotation = Quaternion.Slerp(agent.Go.transform.rotation, desiredRot, dt * 5f);
+                Quaternion nextRot = Quaternion.Slerp(agent.Go.transform.rotation, desiredRot, dt * 5f);
 
                 bool redLight = ShouldStopForTrafficLight(agent.Go.transform.position, dir);
-                bool obstacle = HasForwardObstacle(agent.Go.transform, dir, out bool blockedByPlayer);
+                float dynStopDist = Mathf.Clamp(obstacleStopDistance + agent.CurrentSpeed * 0.42f, 7.5f, 13.5f);
+                bool obstacle = HasForwardObstacle(agent.Go.transform, dir, dynStopDist, out bool blockedByPlayer, out bool blockedByPedOrAnimal);
                 bool mustStop = redLight || obstacle;
 
                 if (agent.HornCooldown > 0f) agent.HornCooldown -= dt;
                 if (!redLight && blockedByPlayer && distToPlayer < 14f)
                 {
                     agent.BlockedByPlayerSeconds += dt;
-                    if (agent.BlockedByPlayerSeconds >= 1.65f && agent.HornCooldown <= 0f)
+                    if (agent.BlockedByPlayerSeconds >= 1.45f && agent.HornCooldown <= 0f)
                     {
                         agent.HornCooldown = 5.5f;
                         agent.BlockedByPlayerSeconds = 0.4f;
@@ -312,13 +336,57 @@ namespace OurWorld.World
                 }
 
                 float desiredSpeed = mustStop ? 0f : agent.TargetCruiseSpeed;
-                float accel = mustStop ? 18f : 7.5f;
+                float accel = mustStop ? (blockedByPedOrAnimal ? 24f : 18f) : 7.5f;
+                agent.PrevSpeed = agent.CurrentSpeed;
                 agent.CurrentSpeed = Mathf.MoveTowards(agent.CurrentSpeed, desiredSpeed, accel * dt);
 
+                bool brakingNow = mustStop || (agent.PrevSpeed - agent.CurrentSpeed) > 0.35f * dt;
+                UpdateAgentBrakeLights(agent, brakingNow, isNight);
+
+                // Spin all 4 wheel meshes proportional to real forward travel speed
+                if (agent.WheelTransforms != null && agent.CurrentSpeed > 0.05f)
+                {
+                    float spinDeg = (agent.CurrentSpeed * dt / 0.34f) * Mathf.Rad2Deg;
+                    for (int w = 0; w < agent.WheelTransforms.Count; w++)
+                    {
+                        if (agent.WheelTransforms[w] != null)
+                        {
+                            agent.WheelTransforms[w].Rotate(spinDeg, 0f, 0f, Space.Self);
+                        }
+                    }
+                }
+
+                // Subtle braking nose-dive & acceleration squat on AI car chassis
+                if (agent.BodyVisual != null)
+                {
+                    float longAccel = (agent.CurrentSpeed - agent.PrevSpeed) / Mathf.Max(0.001f, dt);
+                    float targetPitch = Mathf.Clamp(-longAccel * 0.22f, -2.4f, 2.2f);
+                    agent.BodyPitch = Mathf.Lerp(agent.BodyPitch, targetPitch, 1f - Mathf.Exp(-9f * dt));
+                    agent.BodyVisual.localRotation = Quaternion.Euler(agent.BodyPitch, 0f, 0f);
+                }
+
+                // Wet rain tire spray behind moving AI cars during summer showers
+                if (agent.CurrentSpeed > 4.2f && distToPlayer < 48f &&
+                    NeighborhoodWeatherSystem.Instance != null &&
+                    NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower)
+                {
+                    agent.RainSprayTimer -= dt;
+                    if (agent.RainSprayTimer <= 0f)
+                    {
+                        agent.RainSprayTimer = 0.22f;
+                        Vector3 rearSpray = agent.Go.transform.TransformPoint(new Vector3(0f, 0.16f, -1.65f));
+                        VisualEffectsManager.SpawnWaterSplash(rearSpray, bigDive: false);
+                    }
+                }
+
+                Vector3 nextPos = agent.Go.transform.position;
                 if (agent.CurrentSpeed > 0.01f)
                 {
-                    agent.Go.transform.position += dir * (agent.CurrentSpeed * dt);
+                    nextPos += dir * (agent.CurrentSpeed * dt);
                 }
+
+                // Kinematic Rigidbody attached (isKinematic=true, ContinuousSpeculative) moves smoothly in Update() via transform sync
+                agent.Go.transform.SetPositionAndRotation(nextPos, nextRot);
             }
 
             _spawnCheckTimer -= dt;
@@ -378,6 +446,10 @@ namespace OurWorld.World
             if (agent.HeadlightRenderers == null)
             {
                 agent.HeadlightRenderers = new List<Renderer>(4);
+                agent.TaillightRenderers = new List<Renderer>(4);
+                agent.WheelTransforms = new List<Transform>(4);
+                agent.BodyVisual = agent.Go.transform.Find("VisualRoot") ?? agent.Go.transform.Find("Body");
+
                 Renderer[] rends = agent.Go.GetComponentsInChildren<Renderer>(true);
                 for (int r = 0; r < rends.Length; r++)
                 {
@@ -386,6 +458,24 @@ namespace OurWorld.World
                     if (n.IndexOf("Headlight", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         agent.HeadlightRenderers.Add(rends[r]);
+                    }
+                    else if (n.IndexOf("Taillight", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                             n.IndexOf("BrakeLight", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        agent.TaillightRenderers.Add(rends[r]);
+                    }
+                }
+
+                Transform[] allT = agent.Go.GetComponentsInChildren<Transform>(true);
+                for (int t = 0; t < allT.Length; t++)
+                {
+                    if (allT[t] == null || allT[t] == agent.Go.transform) continue;
+                    string n = allT[t].name;
+                    if (n.IndexOf("Wheel", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                        n.IndexOf("Steering", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        allT[t].GetComponent<WheelCollider>() == null)
+                    {
+                        agent.WheelTransforms.Add(allT[t]);
                     }
                 }
             }
@@ -413,19 +503,52 @@ namespace OurWorld.World
                 _lightMpb.SetColor(EmissionColorId, col);
                 rend.SetPropertyBlock(_lightMpb);
             }
+            UpdateAgentBrakeLights(agent, agent.LastBrakingLightState, isNight, force: true);
         }
 
-        private bool HasForwardObstacle(Transform selfTr, Vector3 dir, out bool blockedByPlayer)
+        private void UpdateAgentBrakeLights(ActiveAgent agent, bool braking, bool isNight, bool force = false)
+        {
+            if (agent == null || agent.TaillightRenderers == null || agent.TaillightRenderers.Count == 0) return;
+            if (!force && agent.LastBrakingLightState == braking) return;
+            agent.LastBrakingLightState = braking;
+
+            if (_lightMpb == null) _lightMpb = new MaterialPropertyBlock();
+            Color tailCol = braking
+                ? new Color(1.0f, 0.10f, 0.06f) * 4.6f
+                : (isNight ? new Color(0.95f, 0.12f, 0.08f) * 1.35f : Color.black);
+            for (int r = 0; r < agent.TaillightRenderers.Count; r++)
+            {
+                Renderer rend = agent.TaillightRenderers[r];
+                if (rend == null) continue;
+                if (braking || isNight)
+                {
+                    Material[] mats = rend.sharedMaterials;
+                    for (int m = 0; m < mats.Length; m++)
+                    {
+                        if (mats[m] != null && !mats[m].IsKeywordEnabled("_EMISSION"))
+                        {
+                            mats[m].EnableKeyword("_EMISSION");
+                        }
+                    }
+                }
+                rend.GetPropertyBlock(_lightMpb);
+                _lightMpb.SetColor(EmissionColorId, tailCol);
+                rend.SetPropertyBlock(_lightMpb);
+            }
+        }
+
+        private bool HasForwardObstacle(Transform selfTr, Vector3 dir, float castDistance, out bool blockedByPlayer, out bool blockedByPedOrAnimal)
         {
             blockedByPlayer = false;
-            Vector3 origin = selfTr.position + Vector3.up * 0.75f + dir * 2.15f;
+            blockedByPedOrAnimal = false;
+            Vector3 origin = selfTr.position + Vector3.up * 0.72f + dir * 2.15f;
             int count = Physics.SphereCastNonAlloc(
                 origin,
-                0.85f,
+                0.96f,
                 dir,
                 _castHits,
-                obstacleStopDistance,
-                ~0,
+                castDistance,
+                Physics.DefaultRaycastLayers,
                 QueryTriggerInteraction.Ignore);
 
             bool anyBlocked = false;
@@ -438,15 +561,24 @@ namespace OurWorld.World
                 }
 
                 // Ignore flat ground/road colliders
-                if (_castHits[i].normal.y > 0.78f)
+                if (_castHits[i].normal.y > 0.76f)
                 {
                     continue;
                 }
 
                 anyBlocked = true;
-                if (hitTr.GetComponentInParent<PlayerFootController>() != null)
+                if (hitTr.GetComponentInParent<PlayerFootController>() != null ||
+                    hitTr.GetComponentInParent<BicycleController>() != null)
                 {
                     blockedByPlayer = true;
+                    blockedByPedOrAnimal = true;
+                }
+                else if (hitTr.GetComponentInParent<TownPedestrian>() != null ||
+                         hitTr.GetComponentInParent<LivingNpcColliderBridge>() != null ||
+                         hitTr.GetComponentInParent<StreetCatController>() != null ||
+                         hitTr.GetComponentInParent<FarmAnimalController>() != null)
+                {
+                    blockedByPedOrAnimal = true;
                 }
                 else
                 {
@@ -489,6 +621,7 @@ namespace OurWorld.World
                 Quaternion rot = dir.sqrMagnitude > 0.01f ? Quaternion.LookRotation(dir.normalized, Vector3.up) : Quaternion.identity;
 
                 GameObject go = _pool.Get(wp.position, rot);
+                Rigidbody trafficRb = WorldPhysicsSolidifier.EnsureKinematicRigidbody(go);
                 InteractableTrigger trig = go.GetComponent<InteractableTrigger>();
                 if (trig == null)
                 {
@@ -503,6 +636,7 @@ namespace OurWorld.World
                 _activeAgents.Add(new ActiveAgent
                 {
                     Go = go,
+                    Rb = trafficRb,
                     WaypointIndex = nextIdx,
                     TargetCruiseSpeed = cruise,
                     CurrentSpeed = cruise * 0.5f

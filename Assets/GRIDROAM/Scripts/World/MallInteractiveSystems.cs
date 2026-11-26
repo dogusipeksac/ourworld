@@ -144,11 +144,17 @@ namespace OurWorld.World
     {
         public string DisplayName;
         public Transform Root;
+        public Rigidbody Rb;
         public ProceduralHumanoid Humanoid;
         public Vector3[] LocalWaypoints;
         public int TargetIdx;
         public float Speed;
         public float PauseTimer;
+        public float BumpCooldown;
+        public float AlertCooldown;
+        public Vector3 StumbleVel;
+        public Vector3 LastProgressPos;
+        public float StuckTimer;
         public bool IsFighter;
         public float HitCooldown;
         public float FightTimer;
@@ -209,10 +215,12 @@ namespace OurWorld.World
                 PlayerModeController.Instance.OnInteracted += HandleInteracted;
                 _subscribed = true;
             }
+            NpcWorldAwareness.OnStoreAlarmTriggered += HandleStoreAlarmForShoppers;
         }
 
         private void OnDestroy()
         {
+            NpcWorldAwareness.OnStoreAlarmTriggered -= HandleStoreAlarmForShoppers;
             if (ActiveInstance == this) ActiveInstance = null;
             TurkishCarRadio.SetMallAmbienceActive(false);
             if (_subscribed && PlayerModeController.Instance != null)
@@ -261,6 +269,48 @@ namespace OurWorld.World
             }
 
             UpdateStrollingShoppers(dt);
+        }
+
+        public void OnShopperBumpedByPlayer(int shopperIdx, Vector3 playerPos, Vector3 playerVelocity)
+        {
+            if (!_interiorActive || shopperIdx < 0 || shopperIdx >= Strollers.Count) return;
+            MallStrollingShopper s = Strollers[shopperIdx];
+            if (s == null || s.Root == null || s.Humanoid == null || s.BumpCooldown > 0f) return;
+            s.BumpCooldown = 2.4f;
+            Vector3 away = s.Root.position - playerPos;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.001f) away = playerVelocity;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.001f ? away.normalized : s.Root.right;
+            s.StumbleVel = away * 1.9f;
+            s.PauseTimer = Mathf.Max(s.PauseTimer, 1.25f);
+            s.Humanoid.PlayStartled(0.62f, playerPos);
+            bool en = LocalizationService.IsEnglish;
+            NpcSpeechBubbleManager.Say(s.Root, s.DisplayName, en ? "Excuse me! Careful in the corridor!" : "Pardon! AVM koridorunda biraz yavaş!", 2.4f, NpcBubbleMood.Alert, 2.0f);
+        }
+
+        private void HandleStoreAlarmForShoppers(Vector3 alarmPos, string storeName)
+        {
+            if (!_interiorActive) return;
+            bool en = LocalizationService.IsEnglish;
+            int spoke = 0;
+            for (int i = 0; i < Strollers.Count; i++)
+            {
+                MallStrollingShopper s = Strollers[i];
+                if (s == null || s.Root == null || s.AlertCooldown > 0f) continue;
+                Vector3 d = alarmPos - s.Root.position;
+                if (Mathf.Abs(d.y) > 2.6f) continue;
+                d.y = 0f;
+                if (d.sqrMagnitude > 22f * 22f) continue;
+                s.AlertCooldown = 8f;
+                s.PauseTimer = Mathf.Max(s.PauseTimer, 2.4f);
+                s.Humanoid?.PlayStartled(0.70f, alarmPos);
+                if (spoke < 2)
+                {
+                    spoke++;
+                    NpcSpeechBubbleManager.Say(s.Root, s.DisplayName, en ? "Whoa, the store security alarm went off!" : "Eyvah, mağaza alarmı çaldı!", 2.8f, NpcBubbleMood.Alert, 2.0f);
+                }
+            }
         }
 
         public static void CalmAllShoppers()
@@ -338,6 +388,19 @@ namespace OurWorld.World
                 if (s == null || s.Root == null || s.LocalWaypoints == null || s.LocalWaypoints.Length < 2) continue;
 
                 if (s.HitCooldown > 0f) s.HitCooldown -= dt;
+                if (s.BumpCooldown > 0f) s.BumpCooldown -= dt;
+                if (s.AlertCooldown > 0f) s.AlertCooldown -= dt;
+
+                if (s.StumbleVel.sqrMagnitude > 0.01f)
+                {
+                    Vector3 sRef = s.StumbleVel.normalized;
+                    float floorY = s.Root.position.y;
+                    NpcSmartNavigation.MoveActorSafely(s.Root, s.Rb, s.StumbleVel * dt, ref sRef, false, bodyRadius: 0.28f, clampWorldBounds: false);
+                    Vector3 fixY = s.Root.position;
+                    fixY.y = floorY;
+                    s.Root.position = fixY;
+                    s.StumbleVel = Vector3.MoveTowards(s.StumbleVel, Vector3.zero, 10f * dt);
+                }
 
                 // Retaliating mall shopper fights back!
                 if (s.FightTimer > 0f)
@@ -399,9 +462,20 @@ namespace OurWorld.World
                     }
                 }
 
-                // Stop politely when player talks nearby or modal is open
+                // Stop politely when player talks nearby or modal is open, with natural eye contact
                 Vector3 toPlayer = playerPos - s.Root.position;
-                bool playerClose = Mathf.Abs(toPlayer.y) < 2.0f && (toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z) < 2.2f;
+                bool sameFloorPlayer = Mathf.Abs(toPlayer.y) < 2.2f;
+                float pFlatSq = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
+                if (sameFloorPlayer && pFlatSq < 36f)
+                {
+                    s.Humanoid?.SetLookAtPoint(true, playerPos + Vector3.up * 1.55f);
+                }
+                else
+                {
+                    s.Humanoid?.SetLookAtPoint(false, Vector3.zero);
+                }
+
+                bool playerClose = sameFloorPlayer && pFlatSq < 1.85f;
                 if (modalOpen || playerClose || s.PauseTimer > 0f)
                 {
                     if (s.PauseTimer > 0f) s.PauseTimer -= dt;
@@ -413,7 +487,7 @@ namespace OurWorld.World
                 Vector3 delta = target - s.Root.localPosition;
                 delta.y = 0f;
                 float dist = delta.magnitude;
-                if (dist < 0.35f)
+                if (dist < 0.45f)
                 {
                     s.TargetIdx = (s.TargetIdx + 1) % s.LocalWaypoints.Length;
                     s.PauseTimer = Random.Range(1.2f, 3.2f); // Pause to window-shop!
@@ -421,11 +495,55 @@ namespace OurWorld.World
                     continue;
                 }
 
-                Vector3 dir = delta / dist;
-                s.Root.localPosition += dir * (s.Speed * dt);
-                Quaternion desired = Quaternion.LookRotation(dir, Vector3.up);
-                s.Root.localRotation = Quaternion.Slerp(s.Root.localRotation, desired, dt * 6f);
+                Vector3 worldDir = s.Root.parent != null
+                    ? s.Root.parent.TransformDirection(delta / dist)
+                    : (delta / dist);
+                worldDir.y = 0f;
+                if (worldDir.sqrMagnitude > 0.001f) worldDir.Normalize();
+
+                Vector3 smartDir = NpcSmartNavigation.ComputeSmartSteering(s.Root, worldDir, probeDistance: 1.85f, bodyRadius: 0.28f, avoidPlayer: true, avoidNeighbors: false);
+                // Separation from other shoppers on the same floor
+                for (int j = 0; j < Strollers.Count; j++)
+                {
+                    if (j == i) continue;
+                    MallStrollingShopper other = Strollers[j];
+                    if (other == null || other.Root == null) continue;
+                    Vector3 away = s.Root.position - other.Root.position;
+                    if (Mathf.Abs(away.y) > 2.0f) continue;
+                    away.y = 0f;
+                    float oSq = away.sqrMagnitude;
+                    if (oSq > 0.001f && oSq < 1.25f * 1.25f)
+                    {
+                        float oD = Mathf.Sqrt(oSq);
+                        smartDir += (away / oD) * Mathf.InverseLerp(1.25f, 0.45f, oD);
+                    }
+                }
+                smartDir.y = 0f;
+                if (smartDir.sqrMagnitude > 0.001f) smartDir.Normalize();
+                else smartDir = worldDir;
+
+                float keepFloorY = s.Root.position.y;
+                Vector3 moveRef = smartDir;
+                NpcSmartNavigation.MoveActorSafely(s.Root, s.Rb, smartDir * (s.Speed * dt), ref moveRef, false, bodyRadius: 0.28f, clampWorldBounds: false);
+                Vector3 clampedPos = s.Root.position;
+                clampedPos.y = keepFloorY;
+                s.Root.position = clampedPos;
+
+                Quaternion desired = Quaternion.LookRotation(smartDir, Vector3.up);
+                s.Root.rotation = Quaternion.Slerp(s.Root.rotation, desired, dt * 6.5f);
                 s.Humanoid?.SetLocomotion(s.Speed * 0.55f, true, 0f);
+
+                s.StuckTimer += dt;
+                if (s.StuckTimer >= 2.0f)
+                {
+                    float movedSq = (s.Root.position - s.LastProgressPos).sqrMagnitude;
+                    s.LastProgressPos = s.Root.position;
+                    s.StuckTimer = 0f;
+                    if (movedSq < 0.08f)
+                    {
+                        s.TargetIdx = (s.TargetIdx + 1) % s.LocalWaypoints.Length;
+                    }
+                }
             }
         }
 

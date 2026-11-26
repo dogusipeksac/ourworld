@@ -274,6 +274,7 @@ namespace OurWorld.World
             {
                 _sofaObj = OurWorldModelLibrary.InstantiateModel("OW_HomeLuxurySofaSet", transform,
                     new Vector3(-69.2f, 0.11f, 12.8f), Quaternion.Euler(0f, 180f, 0f), Vector3.one * 0.90f);
+                WorldPhysicsSolidifier.EnsureSolidBoundsCollider(_sofaObj, minSize: 0.35f, shrinkXZ: 0.90f);
                 if (fx && _sofaObj != null) GameFeelAudio.SpawnBurst(_sofaObj.transform.position + Vector3.up, new Color(0.16f, 0.80f, 0.76f), 14, 0.8f);
             }
 
@@ -281,6 +282,7 @@ namespace OurWorld.World
             {
                 _mediaObj = OurWorldModelLibrary.InstantiateModel("OW_HomeMediaAndConsole", transform,
                     new Vector3(-66.0f, 0.11f, 14.4f), Quaternion.Euler(0f, 180f, 0f), Vector3.one * 0.88f);
+                WorldPhysicsSolidifier.EnsureSolidBoundsCollider(_mediaObj, minSize: 0.30f, shrinkXZ: 0.92f);
                 if (fx && _mediaObj != null) GameFeelAudio.SpawnBurst(_mediaObj.transform.position + Vector3.up, new Color(0.28f, 0.72f, 0.96f), 14, 0.8f);
             }
 
@@ -290,6 +292,7 @@ namespace OurWorld.World
                     new Vector3(-64.9f, 0.11f, 10.6f), Quaternion.Euler(0f, -90f, 0f), Vector3.one * 0.90f);
                 if (_aquariumObj != null)
                 {
+                    WorldPhysicsSolidifier.EnsureSolidBoundsCollider(_aquariumObj, minSize: 0.30f, shrinkXZ: 0.92f);
                     _fishA = OurWorldModelLibrary.FindPart(_aquariumObj.transform, "FishSwimmerA");
                     _fishB = OurWorldModelLibrary.FindPart(_aquariumObj.transform, "FishSwimmerB");
                     if (fx) GameFeelAudio.SpawnBurst(_aquariumObj.transform.position + Vector3.up, new Color(0.20f, 0.88f, 0.98f), 14, 0.7f);
@@ -302,6 +305,7 @@ namespace OurWorld.World
                     BackyardMangalWorldPos, Quaternion.Euler(0f, 180f, 0f), Vector3.one);
                 if (_mangalObj != null)
                 {
+                    WorldPhysicsSolidifier.EnsureSolidBoundsCollider(_mangalObj, minSize: 0.35f, shrinkXZ: 0.90f);
                     InteractableTrigger mTrig = _mangalObj.AddComponent<InteractableTrigger>();
                     mTrig.Configure(InteractableKind.HomeMangal, "no48_backyard_mangal", "ui.btn.talk", 3.6f);
                     mTrig.SetCustomPrompt(IsEn ? "Grill Fish / Brew Tea · Mangal" : "Balık Pişir / Semaver Çay · Mangal");
@@ -334,7 +338,6 @@ namespace OurWorld.World
                     p.transform.SetParent(_lanternsObj.transform, false);
                     p.transform.position = posts[i] + new Vector3(0f, 1.35f, 0f);
                     p.transform.localScale = new Vector3(0.12f, 1.35f, 0.12f);
-                    Destroy(p.GetComponent<Collider>());
                     p.GetComponent<MeshRenderer>().sharedMaterial = postMat;
 
                     GameObject b = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -364,6 +367,7 @@ namespace OurWorld.World
             {
                 _farmLoungeObj = OurWorldModelLibrary.InstantiateModel("OW_HomeLuxurySofaSet", transform,
                     new Vector3(172.0f, 0.22f, -5.0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.85f);
+                WorldPhysicsSolidifier.EnsureSolidBoundsCollider(_farmLoungeObj, minSize: 0.35f, shrinkXZ: 0.90f);
                 if (fx && _farmLoungeObj != null) GameFeelAudio.SpawnBurst(_farmLoungeObj.transform.position + Vector3.up, new Color(0.96f, 0.78f, 0.28f), 16, 0.9f);
             }
         }
@@ -386,14 +390,12 @@ namespace OurWorld.World
             post.transform.SetParent(stand.transform, false);
             post.transform.localPosition = new Vector3(0f, 0.95f, 0f);
             post.transform.localScale = new Vector3(0.14f, 0.95f, 0.14f);
-            Destroy(post.GetComponent<Collider>());
             post.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
 
             GameObject panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
             panel.transform.SetParent(stand.transform, false);
             panel.transform.localPosition = new Vector3(0f, 1.78f, 0f);
             panel.transform.localScale = new Vector3(1.85f, 0.92f, 0.10f);
-            Destroy(panel.GetComponent<Collider>());
             panel.GetComponent<MeshRenderer>().sharedMaterial = boardMat;
 
             GameObject txt = new GameObject("DecorText");

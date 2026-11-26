@@ -270,6 +270,51 @@ namespace OurWorld.World
             UpdateRider();
         }
 
+        private void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            if (hit == null || hit.collider == null) return;
+            float absSpd = Mathf.Abs(_speed);
+            if (absSpd < 0.8f) return;
+
+            Vector3 pushDir = new Vector3(hit.moveDirection.x, 0f, hit.moveDirection.z);
+            if (pushDir.sqrMagnitude < 0.001f) pushDir = transform.forward;
+            pushDir.y = 0f;
+            if (pushDir.sqrMagnitude > 0.001f) pushDir.Normalize();
+
+            // Physically push dynamic street props on bike/motorcycle contact
+            Rigidbody rb = hit.collider.attachedRigidbody;
+            if (rb != null && !rb.isKinematic && rb.mass <= 150f)
+            {
+                rb.WakeUp();
+                rb.AddForceAtPosition(pushDir * (absSpd * Mathf.Clamp(rb.mass * 0.45f, 6f, 28f)), hit.point, ForceMode.Impulse);
+            }
+
+            DynamicWorldProp dynProp = hit.collider.GetComponentInParent<DynamicWorldProp>();
+            if (dynProp != null)
+            {
+                dynProp.ApplyPunchOrCrashImpulse(pushDir * (absSpd * 3.8f) + Vector3.up * 1.4f, hit.point, absSpd > 6f);
+            }
+
+            if (absSpd < 2.2f) return;
+            float kmh = absSpd * 3.6f;
+            Vector3 bikeVel = transform.forward * _speed;
+
+            TownPedestrian ped = hit.collider.GetComponentInParent<TownPedestrian>();
+            if (ped != null)
+            {
+                if (kmh >= 16f) ped.OnHitByVehicle(transform.position, bikeVel, kmh * 0.85f);
+                else ped.OnBumpedByPlayer(transform.position, bikeVel);
+                return;
+            }
+
+            LivingNpcColliderBridge living = hit.collider.GetComponentInParent<LivingNpcColliderBridge>();
+            if (living != null)
+            {
+                if (kmh >= 16f) living.NotifyHitByVehicle(transform.position, bikeVel, kmh * 0.85f);
+                else living.NotifyBumpedByPlayer(transform.position, bikeVel);
+            }
+        }
+
         private void UpdateRider()
         {
             // The rider shares the bicycle's lean and yaw while the normal foot collider is disabled.

@@ -78,6 +78,11 @@ namespace OurWorld.Player
         private GameObject _streetCapObj;
 
         private static AudioClip _sharedFootstepClip;
+        private static AudioClip _sharedFootstepGrassClip;
+        private static AudioClip _sharedFootstepSandClip;
+        private static AudioClip _sharedFootstepWoodClip;
+        private static AudioClip _sharedFootstepIndoorClip;
+        private static AudioClip _sharedFootstepWetClip;
         private static AudioClip _sharedPunchHitClip;
         private static AudioClip _sharedHeavyHitClip;
         private static AudioClip _sharedPunchWhooshClip;
@@ -104,6 +109,8 @@ namespace OurWorld.Player
         private float _pivotDustCooldown;
         private float _rainWetness01;
         private bool _warnedRainSoaked;
+        private int _wetShoeStepsRemaining;
+        private bool _nextFootprintRight;
         private float _drownTickTimer;
         private GroundSurfaceKind _groundSurface = GroundSurfaceKind.Stone;
         private float _punchCooldown;
@@ -135,6 +142,8 @@ namespace OurWorld.Player
         public bool IsSwimming => _isSwimming;
         public bool IsUnderwater => _isUnderwater;
         public float SwimOxygen01 => _swimOxygen01;
+        public float RainWetness01 => _rainWetness01;
+        public bool IsRainSoaked => _rainWetness01 > 0.50f;
 
         public void ConfigureVisuals(Transform root, Animator animator = null, ProceduralHumanoid proceduralHumanoid = null)
         {
@@ -912,6 +921,26 @@ namespace OurWorld.Player
             {
                 _sharedFootstepClip = BuildProceduralFootstepClip(44100);
             }
+            if (_sharedFootstepGrassClip == null)
+            {
+                _sharedFootstepGrassClip = BuildGrassFootstepClip(44100);
+            }
+            if (_sharedFootstepSandClip == null)
+            {
+                _sharedFootstepSandClip = BuildSandFootstepClip(44100);
+            }
+            if (_sharedFootstepWoodClip == null)
+            {
+                _sharedFootstepWoodClip = BuildWoodFootstepClip(44100);
+            }
+            if (_sharedFootstepIndoorClip == null)
+            {
+                _sharedFootstepIndoorClip = BuildIndoorFootstepClip(44100);
+            }
+            if (_sharedFootstepWetClip == null)
+            {
+                _sharedFootstepWetClip = BuildWetFootstepClip(44100);
+            }
             if (_sharedPunchHitClip == null)
             {
                 _sharedPunchHitClip = BuildProceduralPunchClip(44100, isHit: true, heavy: false);
@@ -1011,6 +1040,117 @@ namespace OurWorld.Player
             return clip;
         }
 
+        private static AudioClip BuildGrassFootstepClip(int sampleRate)
+        {
+            int n = Mathf.RoundToInt(sampleRate * 0.085f);
+            float[] data = new float[n];
+            System.Random rng = new System.Random(9031);
+            float lp1 = 0f, lp2 = 0f;
+            double ph = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / n;
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.16f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 6.5f);
+                float w = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp1 += 0.34f * (w - lp1);
+                lp2 += 0.09f * (lp1 - lp2);
+                float rustle = (lp1 - lp2 * 0.8f) * 0.92f;
+                ph += (2.0 * Math.PI * Mathf.Lerp(88f, 42f, t)) / sampleRate;
+                float softThump = (float)Math.Sin(ph) * Mathf.Exp(-t * 12f) * 0.36f;
+                data[i] = Mathf.Clamp((rustle + softThump) * env, -1f, 1f);
+            }
+            AudioClip c = AudioClip.Create("Footstep_Grass", n, 1, sampleRate, false);
+            c.SetData(data, 0);
+            return c;
+        }
+
+        private static AudioClip BuildSandFootstepClip(int sampleRate)
+        {
+            int n = Mathf.RoundToInt(sampleRate * 0.105f);
+            float[] data = new float[n];
+            System.Random rng = new System.Random(9049);
+            float lp = 0f, prev = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / n;
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.20f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 5.2f);
+                float w = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.52f * (w - lp);
+                float crunch = (lp - prev * 0.55f) * (0.72f + 0.28f * Mathf.Sin(t * 95f));
+                prev = lp;
+                data[i] = Mathf.Clamp(crunch * env * 0.88f, -1f, 1f);
+            }
+            AudioClip c = AudioClip.Create("Footstep_Sand", n, 1, sampleRate, false);
+            c.SetData(data, 0);
+            return c;
+        }
+
+        private static AudioClip BuildWoodFootstepClip(int sampleRate)
+        {
+            int n = Mathf.RoundToInt(sampleRate * 0.075f);
+            float[] data = new float[n];
+            System.Random rng = new System.Random(9067);
+            double ph1 = 0.0, ph2 = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / n;
+                float env = Mathf.Exp(-t * 10.5f);
+                // Hollow timber board resonance (175 Hz + 312 Hz)
+                ph1 += (2.0 * Math.PI * Mathf.Lerp(192f, 148f, t)) / sampleRate;
+                ph2 += (2.0 * Math.PI * 318.0) / sampleRate;
+                float knock = (float)(Math.Sin(ph1) * 0.62 + Math.Sin(ph2) * 0.34);
+                float tap = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-t * 28f) * 0.32f;
+                data[i] = Mathf.Clamp((knock + tap) * env, -1f, 1f);
+            }
+            AudioClip c = AudioClip.Create("Footstep_Wood", n, 1, sampleRate, false);
+            c.SetData(data, 0);
+            return c;
+        }
+
+        private static AudioClip BuildIndoorFootstepClip(int sampleRate)
+        {
+            int n = Mathf.RoundToInt(sampleRate * 0.068f);
+            float[] data = new float[n];
+            System.Random rng = new System.Random(9091);
+            double ph = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / n;
+                float clickEnv = Mathf.Exp(-t * 22f);
+                float tailEnv = Mathf.Exp(-t * 9f) * 0.22f;
+                ph += (2.0 * Math.PI * Mathf.Lerp(620f, 260f, t)) / sampleRate;
+                float heel = (float)Math.Sin(ph) * clickEnv * 0.58f;
+                float crisp = (float)(rng.NextDouble() * 2.0 - 1.0) * (clickEnv * 0.52f + tailEnv);
+                data[i] = Mathf.Clamp(heel + crisp, -1f, 1f);
+            }
+            AudioClip c = AudioClip.Create("Footstep_Indoor", n, 1, sampleRate, false);
+            c.SetData(data, 0);
+            return c;
+        }
+
+        private static AudioClip BuildWetFootstepClip(int sampleRate)
+        {
+            int n = Mathf.RoundToInt(sampleRate * 0.115f);
+            float[] data = new float[n];
+            System.Random rng = new System.Random(9109);
+            float lp1 = 0f, lp2 = 0f;
+            double ph = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / n;
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.14f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 6.2f);
+                float w = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp1 += 0.36f * (w - lp1);
+                lp2 += 0.11f * (lp1 - lp2);
+                ph += (2.0 * Math.PI * Mathf.Lerp(420f, 160f, t)) / sampleRate;
+                float squelch = (lp1 - lp2 * 0.6f) * 0.92f + (float)Math.Sin(ph) * Mathf.Exp(-t * 16f) * 0.32f;
+                data[i] = Mathf.Clamp(squelch * env, -1f, 1f);
+            }
+            AudioClip c = AudioClip.Create("Footstep_Wet", n, 1, sampleRate, false);
+            c.SetData(data, 0);
+            return c;
+        }
+
         private void SampleGroundSurface()
         {
             if (Physics.Raycast(transform.position + Vector3.up * 0.25f, Vector3.down, out RaycastHit hit, 0.72f,
@@ -1065,40 +1205,144 @@ namespace OurWorld.Player
             }
 
             SampleGroundSurface();
+            bool inPuddle = _groundSurface != GroundSurfaceKind.Indoor && IstanbulThemeOverhaul.IsPositionInPuddle(transform.position);
+            float roadWet = NeighborhoodWeatherSystem.Instance != null ? NeighborhoodWeatherSystem.Instance.Wetness01 : 0f;
+            bool wetGround = inPuddle || (_groundSurface != GroundSurfaceKind.Indoor && (_rainWetness01 > 0.35f || roadWet > 0.52f));
+
+            if (inPuddle || _rainWetness01 > 0.55f)
+            {
+                _wetShoeStepsRemaining = Mathf.Max(_wetShoeStepsRemaining, inPuddle ? 9 : 6);
+            }
+
+            AudioClip clip = _sharedFootstepClip;
             float pitchBase = 1.0f;
             float volMult = 1.0f;
-            switch (_groundSurface)
+            if (inPuddle && _sharedFootstepWetClip != null)
             {
-                case GroundSurfaceKind.Grass: pitchBase = 0.84f; volMult = 0.78f; break;
-                case GroundSurfaceKind.Sand: pitchBase = 0.76f; volMult = 0.82f; break;
-                case GroundSurfaceKind.Wood: pitchBase = 0.90f; volMult = 1.05f; break;
-                case GroundSurfaceKind.Indoor: pitchBase = 1.12f; volMult = 0.86f; break;
+                clip = _sharedFootstepWetClip;
+                pitchBase = 1.02f;
+                volMult = 1.18f;
+            }
+            else if (wetGround && _sharedFootstepWetClip != null)
+            {
+                clip = _sharedFootstepWetClip;
+                pitchBase = 0.94f;
+                volMult = 0.92f;
+            }
+            else
+            {
+                switch (_groundSurface)
+                {
+                    case GroundSurfaceKind.Grass:
+                        clip = _sharedFootstepGrassClip ?? _sharedFootstepClip;
+                        pitchBase = 0.98f;
+                        volMult = 0.86f;
+                        break;
+                    case GroundSurfaceKind.Sand:
+                        clip = _sharedFootstepSandClip ?? _sharedFootstepClip;
+                        pitchBase = 1.00f;
+                        volMult = 0.92f;
+                        break;
+                    case GroundSurfaceKind.Wood:
+                        clip = _sharedFootstepWoodClip ?? _sharedFootstepClip;
+                        pitchBase = 0.98f;
+                        volMult = 1.08f;
+                        break;
+                    case GroundSurfaceKind.Indoor:
+                        clip = _sharedFootstepIndoorClip ?? _sharedFootstepClip;
+                        pitchBase = 1.02f;
+                        volMult = 0.84f;
+                        break;
+                }
             }
 
-            float vol = Mathf.Lerp(0.10f, 0.24f, Mathf.Clamp01(runBlend)) * volMult;
-            bool wetSteps = _rainWetness01 > 0.35f && _groundSurface != GroundSurfaceKind.Indoor;
-            _footstepAudio.pitch = pitchBase * (wetSteps ? 0.90f : 1.0f) * UnityEngine.Random.Range(0.93f, 1.07f);
-            _footstepAudio.PlayOneShot(_sharedFootstepClip, vol);
+            float vol = Mathf.Lerp(0.11f, 0.26f, Mathf.Clamp01(runBlend)) * volMult;
+            _footstepAudio.pitch = pitchBase * UnityEngine.Random.Range(0.92f, 1.08f);
+            _footstepAudio.PlayOneShot(clip, vol);
 
-            if (wetSteps && runBlend > 0.25f && !_isSwimming && _controller.isGrounded)
+            if (!_isSwimming && _controller.isGrounded)
             {
-                VisualEffectsManager.SpawnWaterSplash(transform.position + Vector3.up * 0.04f, bigDive: false);
-            }
-            else if (runBlend > 0.52f && !_isSwimming && _controller.isGrounded && _groundSurface != GroundSurfaceKind.Indoor)
-            {
-                VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: false, tintOverride: GetSurfaceDustTint(_groundSurface));
+                _nextFootprintRight = !_nextFootprintRight;
+                if (inPuddle || (wetGround && runBlend > 0.22f))
+                {
+                    VisualEffectsManager.SpawnWaterSplash(transform.position + Vector3.up * 0.04f, bigDive: false);
+                }
+                else if (runBlend > 0.50f && _groundSurface != GroundSurfaceKind.Indoor)
+                {
+                    VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: false, tintOverride: GetSurfaceDustTint(_groundSurface));
+                }
+
+                // Leave crisp fading footprints on sand or when shoes are wet on dry pavements / marble floors!
+                if (_groundSurface == GroundSurfaceKind.Sand)
+                {
+                    WorldRealismAtmosphere.SpawnFootprint(transform.position, transform.forward, _nextFootprintRight, isWet: false, alpha: 0.42f);
+                }
+                else if (_wetShoeStepsRemaining > 0 && !inPuddle)
+                {
+                    float wetAlpha = Mathf.Lerp(0.14f, 0.46f, _wetShoeStepsRemaining / 9f);
+                    WorldRealismAtmosphere.SpawnFootprint(transform.position, transform.forward, _nextFootprintRight, isWet: true, alpha: wetAlpha);
+                    _wetShoeStepsRemaining--;
+                }
             }
         }
 
         private void OnControllerColliderHit(ControllerColliderHit hit)
         {
             if (hit == null || hit.collider == null || _isSwimming || _isVaulting) return;
-            if (_currentSpeed < 3.05f) return;
+
+            // 1. Physical CharacterController -> Dynamic Rigidbody pushing (crates, trash cans, cones, barrels, tyres, damacanas, footballs)
+            Rigidbody body = hit.collider.attachedRigidbody;
+            if (body != null && !body.isKinematic && hit.moveDirection.y > -0.35f)
+            {
+                Vector3 pushDir = new Vector3(hit.moveDirection.x, 0f, hit.moveDirection.z);
+                if (pushDir.sqrMagnitude > 0.001f)
+                {
+                    pushDir.Normalize();
+                    // Never shove parked cars (mass > 150 kg) on foot — only realistic movable props!
+                    if (body.mass <= 120f)
+                    {
+                        float pushSpd = Mathf.Clamp(_currentSpeed * 0.92f, 0.85f, 4.6f);
+                        float massFactor = Mathf.Clamp(22f / Mathf.Max(4f, body.mass), 0.35f, 1.35f);
+                        body.WakeUp();
+                        body.AddForceAtPosition(pushDir * (pushSpd * massFactor * body.mass * 0.36f), hit.point, ForceMode.Impulse);
+                    }
+                }
+            }
+
+            // 2. If hitting a kinematic-until-touched DynamicWorldProp, wake & nudge it realistically!
+            if (_currentSpeed >= 1.4f)
+            {
+                DynamicWorldProp dynProp = hit.collider.GetComponentInParent<DynamicWorldProp>();
+                if (dynProp != null && dynProp.Body != null && dynProp.Body.isKinematic)
+                {
+                    Vector3 pushDir = new Vector3(hit.moveDirection.x, 0f, hit.moveDirection.z);
+                    if (pushDir.sqrMagnitude > 0.001f)
+                    {
+                        dynProp.ApplyNudge(pushDir.normalized * Mathf.Clamp(_currentSpeed, 1.5f, 4.5f), hit.point);
+                    }
+                }
+            }
+
+            if (_currentSpeed < 2.85f) return;
 
             TownPedestrian ped = hit.collider.GetComponentInParent<TownPedestrian>();
             if (ped != null)
             {
                 ped.OnBumpedByPlayer(transform.position, _planarVelocity);
+                return;
+            }
+
+            LivingNpcColliderBridge livingNpc = hit.collider.GetComponentInParent<LivingNpcColliderBridge>();
+            if (livingNpc != null)
+            {
+                livingNpc.NotifyBumpedByPlayer(transform.position, _planarVelocity);
+                return;
+            }
+
+            MallShopperColliderBridge shopper = hit.collider.GetComponentInParent<MallShopperColliderBridge>();
+            if (shopper != null)
+            {
+                shopper.NotifyBumpedByPlayer(transform.position, _planarVelocity);
             }
         }
 
@@ -1397,6 +1641,7 @@ namespace OurWorld.Player
             {
                 _waterSurfaceY = surfaceY;
                 _rainWetness01 = 1f;
+                _wetShoeStepsRemaining = 10;
                 _coyoteTimer = 0f;
                 _jumpBufferTimer = 0f;
                 _planarVelocity = Vector3.zero;
@@ -1405,6 +1650,7 @@ namespace OurWorld.Player
                 bool diveHeld = InputHub.Instance != null && InputHub.Instance.JumpHeld;
 
                 _isUnderwater = diveHeld && (surfaceY - floorY) >= 1.15f;
+                if (_cameraRig != null) _cameraRig.SetFootStrideMotion(0f, _isUnderwater);
                 if (_isUnderwater)
                 {
                     _swimOxygen01 = Mathf.Max(0f, _swimOxygen01 - dt * 0.11f); // ~9 seconds underwater breath
@@ -1625,6 +1871,7 @@ namespace OurWorld.Player
                     ? Mathf.InverseLerp(walkSpeed + 0.15f, Mathf.Max(walkSpeed + 0.5f, effectiveRunSpeed), actualSpeed)
                     : 0f;
                 _cameraRig.SetSprintMotion(sprintMotion);
+                _cameraRig.SetFootStrideMotion(_controller.isGrounded && !autoApproach ? actualSpeed : 0f, _isUnderwater);
             }
 
             if (characterAnimator != null)

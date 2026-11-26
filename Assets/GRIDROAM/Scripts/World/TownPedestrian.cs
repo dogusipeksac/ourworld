@@ -18,7 +18,10 @@ namespace OurWorld.World
         ConfrontPlayer = 5,
         Fleeing = 6,
         KnockedDown = 7,
-        FollowingPlayer = 8
+        FollowingPlayer = 8,
+        SeekingRainShelter = 9,
+        DailyActivity = 10,
+        HelpingVictim = 11
     }
 
     /// <summary>
@@ -35,7 +38,6 @@ namespace OurWorld.World
     public class TownPedestrian : MonoBehaviour
     {
         public static readonly List<TownPedestrian> ActiveCitizens = new List<TownPedestrian>(48);
-        private static readonly RaycastHit[] WallHits = new RaycastHit[8];
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => ActiveCitizens.Clear();
@@ -190,6 +192,21 @@ namespace OurWorld.World
         private float _rainShieldWeight;
         private bool _rainShieldActive;
 
+        // Smart shelter, daily micro-activities, victim aid & stuck recovery
+        private Rigidbody _rb;
+        private Vector3 _rainShelterTarget;
+        private bool _hasRainShelter;
+        private bool _atRainShelter;
+        private float _activityTimer;
+        private float _activityCooldown;
+        private Vector3 _activityLookTarget;
+        private bool _activityCheckingPhone;
+        private TownPedestrian _helpingVictim;
+        private float _helpTimer;
+        private float _eventReactCooldown;
+        private Vector3 _lastProgressPos;
+        private float _stuckTimer;
+
         // Startled / combat / vehicle-impact ballistic state
         private float _startledCooldown;
         private float _hitCooldown;
@@ -214,7 +231,7 @@ namespace OurWorld.World
         public int FriendshipTier => _friendshipPoints >= 60 ? 3 : (_friendshipPoints >= 30 ? 2 : (_friendshipPoints >= 10 ? 1 : 0));
         public bool IsBusyOrPanicking =>
             _occupiedSeat != null || _knockdownTimer > 0f || _isAirborne || _fleeTimer > 0f ||
-            _followPlayerTimer > 0f ||
+            _followPlayerTimer > 0f || _helpTimer > 0f || _activityTimer > 0f ||
             _brainState == CitizenBrainState.ChattingWithNeighbor || _brainState == CitizenBrainState.ConfrontPlayer;
 
         public void AddFriendship(int delta)
@@ -747,9 +764,21 @@ namespace OurWorld.World
 
         private void Awake()
         {
-            Rigidbody rb = GetComponent<Rigidbody>();
-            rb.isKinematic = true;
-            rb.useGravity = false;
+            _rb = GetComponent<Rigidbody>();
+            if (_rb != null)
+            {
+                _rb.isKinematic = true;
+                _rb.useGravity = false;
+                _rb.interpolation = RigidbodyInterpolation.None;
+                _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            }
+            CapsuleCollider cap = GetComponent<CapsuleCollider>();
+            if (cap != null)
+            {
+                cap.isTrigger = false;
+                if (cap.radius < 0.25f) cap.radius = 0.32f;
+                if (cap.height < 1.5f) cap.height = 1.78f;
+            }
 
             if (humanoid == null)
             {
@@ -761,6 +790,8 @@ namespace OurWorld.World
             _playerGreetCooldown = Random.Range(4f, 12f);
             _socialChatCooldown = Random.Range(6f, 18f);
             _curiosityCooldown = Random.Range(8f, 20f);
+            _activityCooldown = Random.Range(10f, 24f);
+            _lastProgressPos = transform.position;
 
             // Realistic neighborhood variety: ~45% of non-vendor citizens will stand up and fight back if assaulted!
             if (!isBrave && string.IsNullOrEmpty(vendorShopId))
@@ -776,6 +807,10 @@ namespace OurWorld.World
             NpcWorldAwareness.OnViolenceOccurred += HandleViolenceWitnessed;
             NpcWorldAwareness.OnHornHeard += HandleHornHeard;
             NpcWorldAwareness.OnSportHighlight += HandleSportHighlight;
+            NpcWorldAwareness.OnCarAlarmSounded += HandleCarAlarmHeard;
+            NpcWorldAwareness.OnPropImpactOccurred += HandlePropImpactHeard;
+            NpcWorldAwareness.OnRecklessDriving += HandleRecklessDrivingWitnessed;
+            NpcWorldAwareness.OnGoodDeedWitnessed += HandleGoodDeedWitnessed;
         }
 
         private void OnDisable()
@@ -784,6 +819,10 @@ namespace OurWorld.World
             NpcWorldAwareness.OnViolenceOccurred -= HandleViolenceWitnessed;
             NpcWorldAwareness.OnHornHeard -= HandleHornHeard;
             NpcWorldAwareness.OnSportHighlight -= HandleSportHighlight;
+            NpcWorldAwareness.OnCarAlarmSounded -= HandleCarAlarmHeard;
+            NpcWorldAwareness.OnPropImpactOccurred -= HandlePropImpactHeard;
+            NpcWorldAwareness.OnRecklessDriving -= HandleRecklessDrivingWitnessed;
+            NpcWorldAwareness.OnGoodDeedWitnessed -= HandleGoodDeedWitnessed;
             EndNeighborChat();
             ReleaseBenchIfSeated();
         }
@@ -810,6 +849,15 @@ namespace OurWorld.World
                 string shout = isEn ? "Hey! Don't cause trouble in our neighborhood!" : "Hey! Mahallede olay çıkarma, dur bakalım!";
                 NpcSpeechBubbleManager.Say(transform, citizenName, shout, 3.4f, NpcBubbleMood.Alert);
             }
+            else if (victim != null && victim._knockdownTimer > 1.2f && dist <= 13.5f && Random.value < 0.42f)
+            {
+                // Compassionate neighbor rushes over to check on the fallen victim!
+                _helpingVictim = victim;
+                _helpTimer = 5.5f;
+                _brainState = CitizenBrainState.HelpingVictim;
+                string helpShout = isEn ? "Neighbor, are you okay?! Hang on!" : "Komşu iyi misin?! Hemen geliyorum!";
+                NpcSpeechBubbleManager.Say(transform, citizenName, helpShout, 3.2f, NpcBubbleMood.Alert);
+            }
             else
             {
                 Vector3 away = transform.position - attackerPos;
@@ -820,6 +868,83 @@ namespace OurWorld.World
                 if (humanoid != null) humanoid.PlayStartled(0.85f);
                 string panic = isEn ? "Whoa! A fight — get back!" : "Ayy! Kavga var, uzaklaşın!";
                 NpcSpeechBubbleManager.Say(transform, citizenName, panic, 3.0f, NpcBubbleMood.Alert);
+            }
+        }
+
+        private void HandleCarAlarmHeard(Vector3 alarmPos)
+        {
+            if (IsBusyOrPanicking || _eventReactCooldown > 0f) return;
+            Vector3 d = alarmPos - transform.position;
+            d.y = 0f;
+            if (d.sqrMagnitude > 22f * 22f) return;
+
+            _eventReactCooldown = 11f;
+            _watchTargetPos = alarmPos;
+            _watchTimer = 2.8f;
+            _watchingCat = false;
+            _brainState = CitizenBrainState.WatchingInterest;
+            BeginSmoothFace(d, 0.3f);
+            humanoid?.PlayStartled(0.62f, alarmPos);
+            if (d.sqrMagnitude <= 15f * 15f && Random.value < 0.55f)
+            {
+                string line = IsEnglish ? "Hey! Whose car alarm is going off?!" : "Kimin arabasının alarmı ötüyor öyle?!";
+                NpcSpeechBubbleManager.Say(transform, citizenName, line, 2.8f, NpcBubbleMood.Alert);
+            }
+        }
+
+        private void HandlePropImpactHeard(Vector3 impactPos, Vector3 throwerPos, string propLabel)
+        {
+            if (IsBusyOrPanicking || _eventReactCooldown > 0f) return;
+            Vector3 d = impactPos - transform.position;
+            d.y = 0f;
+            if (d.sqrMagnitude > 12f * 12f) return;
+
+            _eventReactCooldown = 8f;
+            BeginSmoothFace(d, 0.25f);
+            _idleTimer = Mathf.Max(_idleTimer, 1.8f);
+            humanoid?.PlayStartled(0.75f, impactPos);
+            if (d.sqrMagnitude <= 9.5f * 9.5f)
+            {
+                string line = IsEnglish ? "Whoa! Watch what you're throwing!" : "Hop! Dikkat etsene, kafamıza gelecekti!";
+                NpcSpeechBubbleManager.Say(transform, citizenName, line, 2.8f, NpcBubbleMood.Alert);
+            }
+        }
+
+        private void HandleRecklessDrivingWitnessed(Vector3 carPos, Vector3 carForward, float speedKmh)
+        {
+            if (IsBusyOrPanicking || _eventReactCooldown > 0f) return;
+            Vector3 toMe = transform.position - carPos;
+            toMe.y = 0f;
+            if (toMe.sqrMagnitude > 14f * 14f) return;
+
+            _eventReactCooldown = 9f;
+            BeginSmoothFace(-toMe, 0.25f);
+            humanoid?.PlayStartled(0.72f, carPos);
+            if (Random.value < 0.50f)
+            {
+                string line = IsEnglish
+                    ? "Slow down! This is a residential street!"
+                    : "Yavaş ol kardeşim, mahalle arası burası!";
+                NpcSpeechBubbleManager.Say(transform, citizenName, line, 2.8f, NpcBubbleMood.Alert);
+            }
+        }
+
+        private void HandleGoodDeedWitnessed(Vector3 deedPos, string deedTag)
+        {
+            if (IsBusyOrPanicking || _eventReactCooldown > 0f || _grudgeTimer > 0f) return;
+            Vector3 d = deedPos - transform.position;
+            d.y = 0f;
+            if (d.sqrMagnitude > 16f * 16f) return;
+
+            _eventReactCooldown = 14f;
+            BeginSmoothFace(d, 0.3f);
+            humanoid?.PlayWave();
+            if (Random.value < 0.65f)
+            {
+                string line = IsEnglish
+                    ? "Way to go, Deniz! Best neighbor in Hamidiye!"
+                    : "Helal olsun Deniz! Mahallemizin gururusun!";
+                NpcSpeechBubbleManager.Say(transform, citizenName, line, 3.0f, NpcBubbleMood.Friendly);
             }
         }
 
@@ -1039,6 +1164,8 @@ namespace OurWorld.World
             if (_curiosityCooldown > 0f) _curiosityCooldown -= dt;
             if (_rainSpeechCooldown > 0f) _rainSpeechCooldown -= dt;
             if (_grudgeTimer > 0f) _grudgeTimer -= dt;
+            if (_activityCooldown > 0f) _activityCooldown -= dt;
+            if (_eventReactCooldown > 0f) _eventReactCooldown -= dt;
 
             // 1. Seated bench state machine (walk to bench -> turn -> sit -> seated -> stand up smoothly)
             if (_occupiedSeat != null)
@@ -1152,6 +1279,20 @@ namespace OurWorld.World
                 return;
             }
 
+            // 9c. Compassionate Neighbor Helping a Fallen Victim!
+            if (_helpTimer > 0f)
+            {
+                UpdateHelpingVictim(dt);
+                return;
+            }
+
+            // 9d. Realistic Daily Micro-Activity (Checking smartphone / Window-shopping / Fountain stop)!
+            if (_activityTimer > 0f)
+            {
+                UpdateDailyActivity(dt);
+                return;
+            }
+
             // Periodic Smart Brain Evaluation (staggered, distance-culled within 48 m)
             _brainThinkTimer -= dt;
             if (_brainThinkTimer <= 0f)
@@ -1160,7 +1301,7 @@ namespace OurWorld.World
                 EvaluateSmartBrain();
             }
 
-            // Check approaching player vehicle for yield / smooth side-step / startled pose
+            // Check approaching player/traffic/bicycle vehicle for yield / smooth side-step / startled pose
             bool yieldingToCar = EvaluateApproachingCar();
             if (_sidestepTimer > 0f)
             {
@@ -1170,6 +1311,28 @@ namespace OurWorld.World
 
             bool isRaining = IsRaining();
             bool isNight = IsNightTime();
+
+            // Intelligent Rain Shelter Seeking: jog to nearest awning/gazebo/portico and wait out the shower!
+            if (isRaining && waypoints != null && waypoints.Length >= 2)
+            {
+                if (!_hasRainShelter && NpcSmartNavigation.TryFindNearestRainShelter(transform.position, 22f, out Vector3 shelter))
+                {
+                    _rainShelterTarget = shelter;
+                    _hasRainShelter = true;
+                    _atRainShelter = false;
+                }
+                if (_hasRainShelter)
+                {
+                    UpdateRainShelterBehavior(dt, yieldingToCar);
+                    return;
+                }
+            }
+            else if (_hasRainShelter)
+            {
+                _hasRainShelter = false;
+                _atRainShelter = false;
+            }
+
             _brainState = isRaining ? CitizenBrainState.RainHurry : CitizenBrainState.Patrol;
 
             UpdateHeadEyeContact();
@@ -1232,6 +1395,19 @@ namespace OurWorld.World
                         desiredSpeed = effectiveWalkSpeed * Mathf.Lerp(0.35f, 1f, facingDot);
                         Vector3 moveDir = transform.forward;
                         MoveSafely(moveDir * (_currentSpeed * dt), ref moveDir, false);
+
+                        // Stuck detector: if pinned behind a parked car/crowd for > 1.7s, smoothly advance waypoint
+                        _stuckTimer += dt;
+                        if (_stuckTimer >= 1.7f)
+                        {
+                            float movedSq = (transform.position - _lastProgressPos).sqrMagnitude;
+                            _lastProgressPos = transform.position;
+                            _stuckTimer = 0f;
+                            if (movedSq < 0.08f && _currentSpeed > 0.35f)
+                            {
+                                AdvanceScheduleWaypoint(isRaining, isNight);
+                            }
+                        }
                     }
                 }
             }
@@ -1428,133 +1604,145 @@ namespace OurWorld.World
 
         private void MoveSafely(Vector3 displacement, ref Vector3 persistentDir, bool steerPersistentDir)
         {
-            displacement.y = 0f;
-            float dist = displacement.magnitude;
-            if (dist < 0.0001f) return;
-
-            Vector3 dir = displacement / dist;
-            Vector3 castOrigin = transform.position + Vector3.up * 0.92f;
-            float checkDist = dist + 0.42f;
-            int hitCount = Physics.SphereCastNonAlloc(castOrigin, 0.34f, dir, WallHits, checkDist, ~0, QueryTriggerInteraction.Ignore);
-
-            bool blocked = false;
-            RaycastHit closest = default;
-            float bestDist = float.MaxValue;
-            for (int i = 0; i < hitCount; i++)
-            {
-                RaycastHit h = WallHits[i];
-                if (h.collider == null) continue;
-                if (h.collider.transform.IsChildOf(transform)) continue;
-                if (h.normal.y > 0.62f) continue; // Ignore flat ground & curbs
-                if (h.collider.GetComponentInParent<TownPedestrian>() != null) continue;
-                if (h.collider.GetComponentInParent<PlayerFootController>() != null) continue;
-
-                if (h.distance < bestDist)
-                {
-                    bestDist = h.distance;
-                    closest = h;
-                    blocked = true;
-                }
-            }
-
-            Vector3 finalMove = displacement;
-            if (blocked)
-            {
-                Vector3 flatNormal = closest.normal;
-                flatNormal.y = 0f;
-                if (flatNormal.sqrMagnitude > 0.001f)
-                {
-                    flatNormal.Normalize();
-                    Vector3 slideDir = Vector3.ProjectOnPlane(dir, flatNormal);
-                    if (slideDir.sqrMagnitude < 0.04f)
-                    {
-                        Vector3 rightTangent = Vector3.Cross(Vector3.up, flatNormal).normalized;
-                        slideDir = Vector3.Dot(rightTangent, transform.right) >= 0f ? rightTangent : -rightTangent;
-                    }
-                    else
-                    {
-                        slideDir.Normalize();
-                    }
-
-                    // Verify slide direction isn't also immediately blocked by a corner
-                    int slideHits = Physics.SphereCastNonAlloc(castOrigin, 0.30f, slideDir, WallHits, dist + 0.30f, ~0, QueryTriggerInteraction.Ignore);
-                    bool slideBlocked = false;
-                    for (int i = 0; i < slideHits; i++)
-                    {
-                        RaycastHit sh = WallHits[i];
-                        if (sh.collider == null || sh.collider.transform.IsChildOf(transform) || sh.normal.y > 0.62f) continue;
-                        if (sh.collider.GetComponentInParent<TownPedestrian>() != null || sh.collider.GetComponentInParent<PlayerFootController>() != null) continue;
-                        slideBlocked = true;
-                        break;
-                    }
-
-                    if (!slideBlocked)
-                    {
-                        finalMove = slideDir * dist;
-                        if (steerPersistentDir)
-                        {
-                            persistentDir = slideDir;
-                        }
-                    }
-                    else
-                    {
-                        // Cornered: reverse smoothly away from the wall
-                        finalMove = flatNormal * (dist * 0.5f);
-                        if (steerPersistentDir)
-                        {
-                            persistentDir = flatNormal;
-                        }
-                    }
-                }
-                else
-                {
-                    finalMove = Vector3.zero;
-                }
-            }
-
-            Vector3 nextPos = transform.position + finalMove;
-            nextPos.x = Mathf.Clamp(nextPos.x, -245f, 245f);
-            nextPos.z = Mathf.Clamp(nextPos.z, -245f, 245f);
-            transform.position = nextPos;
+            NpcSmartNavigation.MoveActorSafely(
+                transform,
+                _rb,
+                displacement,
+                ref persistentDir,
+                steerPersistentDir,
+                bodyRadius: 0.32f,
+                lowHeight: 0.44f,
+                highHeight: 1.08f,
+                clampWorldBounds: true);
         }
 
         private Vector3 ApplyPersonalSpaceAvoidance(Vector3 desiredDir)
         {
-            Vector3 steer = desiredDir;
+            return NpcSmartNavigation.ComputeSmartSteering(
+                transform,
+                desiredDir,
+                probeDistance: 2.25f,
+                bodyRadius: 0.32f,
+                avoidPlayer: true,
+                avoidNeighbors: true);
+        }
 
-            // Smoothly step around the player on foot so NPCs never walk straight through Deniz!
-            PlayerModeController mode = PlayerModeController.Instance;
-            if (mode != null && !mode.IsDriving)
+        private void UpdateRainShelterBehavior(float dt, bool yieldingToCar)
+        {
+            _brainState = CitizenBrainState.SeekingRainShelter;
+            Vector3 toShelter = _rainShelterTarget - transform.position;
+            toShelter.y = 0f;
+            float dist = toShelter.magnitude;
+
+            if (dist <= 1.25f || _atRainShelter)
             {
-                Vector3 awayPlayer = transform.position - mode.ActiveWorldPosition;
-                awayPlayer.y = 0f;
-                float pDistSq = awayPlayer.sqrMagnitude;
-                if (pDistSq > 0.001f && pDistSq < 1.85f * 1.85f)
-                {
-                    float pDist = Mathf.Sqrt(pDistSq);
-                    float weight = Mathf.InverseLerp(1.85f, 0.55f, pDist) * 1.45f;
-                    steer += (awayPlayer / pDist) * weight;
-                }
+                _atRainShelter = true;
+                _currentSpeed = Mathf.MoveTowards(_currentSpeed, 0f, 6.0f * dt);
+                UpdateRainShieldPose(dt, false); // Sheltered dry under roof/awning!
+                UpdateHeadEyeContact();
+                bool turning = UpdateSmoothFace(dt);
+                if (humanoid != null) humanoid.SetLocomotion(turning ? 0.45f : 0f, true, 0f);
+                return;
             }
 
-            // Smoothly step around neighboring pedestrians!
-            for (int i = 0; i < ActiveCitizens.Count; i++)
+            if (yieldingToCar)
             {
-                TownPedestrian other = ActiveCitizens[i];
-                if (other == null || other == this) continue;
-                Vector3 away = transform.position - other.transform.position;
-                away.y = 0f;
-                float dSq = away.sqrMagnitude;
-                if (dSq > 0.001f && dSq < 1.35f * 1.35f)
-                {
-                    float d = Mathf.Sqrt(dSq);
-                    float w = Mathf.InverseLerp(1.35f, 0.45f, d) * 1.25f;
-                    steer += (away / d) * w;
-                }
+                _currentSpeed = Mathf.MoveTowards(_currentSpeed, 0f, 6.0f * dt);
+                UpdateRainShieldPose(dt, true);
+                if (humanoid != null) humanoid.SetLocomotion(0f, true, 0f);
+                return;
             }
 
-            steer.y = 0f;
-            return steer.sqrMagnitude > 0.001f ? steer.normalized : desiredDir;
+            Vector3 smartDir = ApplyPersonalSpaceAvoidance(toShelter / dist);
+            Quaternion targetRot = Quaternion.LookRotation(smartDir, Vector3.up);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 1f - Mathf.Exp(-8.5f * dt));
+            float runSpd = Mathf.Max(walkSpeed * 1.95f, 2.75f);
+            _currentSpeed = Mathf.MoveTowards(_currentSpeed, runSpd, 5.5f * dt);
+            Vector3 moveDir = transform.forward;
+            MoveSafely(moveDir * (_currentSpeed * dt), ref moveDir, false);
+            UpdateRainShieldPose(dt, true);
+            if (humanoid != null) humanoid.SetLocomotion(_currentSpeed, true, 0f, moveDir);
+        }
+
+        private void UpdateDailyActivity(float dt)
+        {
+            _brainState = CitizenBrainState.DailyActivity;
+            _activityTimer -= dt;
+            if (IsRaining() || _activityTimer <= 0f)
+            {
+                _activityTimer = 0f;
+                ClearDualHandPose();
+                _brainState = CitizenBrainState.Patrol;
+                return;
+            }
+
+            Vector3 toTarget = _activityLookTarget - transform.position;
+            toTarget.y = 0f;
+            bool turning = false;
+            if (toTarget.sqrMagnitude > 0.04f)
+            {
+                BeginSmoothFace(toTarget, 0.25f);
+                turning = UpdateSmoothFace(dt);
+            }
+
+            _currentSpeed = Mathf.MoveTowards(_currentSpeed, 0f, 6f * dt);
+            if (humanoid != null)
+            {
+                humanoid.SetLocomotion(turning ? 0.45f : 0f, true, 0f);
+                if (_activityCheckingPhone)
+                {
+                    // Realistic smartphone-checking posture: right hand raised in front of chest, head glancing down!
+                    Vector3 phonePos = transform.position + transform.forward * 0.34f + transform.right * 0.08f + Vector3.up * 1.18f;
+                    humanoid.SetDualHandAction(true, Vector3.zero, phonePos, 0f, 0.85f, 16f, 0f, 0f);
+                    humanoid.SetLookAtPoint(true, phonePos);
+                }
+                else
+                {
+                    humanoid.SetLookAtPoint(true, _activityLookTarget);
+                }
+            }
+        }
+
+        private void UpdateHelpingVictim(float dt)
+        {
+            _brainState = CitizenBrainState.HelpingVictim;
+            _helpTimer -= dt;
+            if (_helpingVictim == null || _helpTimer <= 0f || !_helpingVictim.gameObject.activeInHierarchy)
+            {
+                _helpingVictim = null;
+                _helpTimer = 0f;
+                ClearDualHandPose();
+                _brainState = CitizenBrainState.Patrol;
+                return;
+            }
+
+            Vector3 toVictim = _helpingVictim.transform.position - transform.position;
+            toVictim.y = 0f;
+            float dist = toVictim.magnitude;
+            if (dist > 1.55f)
+            {
+                Vector3 dir = ApplyPersonalSpaceAvoidance(toVictim / dist);
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir, Vector3.up), 1f - Mathf.Exp(-9f * dt));
+                _currentSpeed = Mathf.MoveTowards(_currentSpeed, 3.4f, 6.5f * dt);
+                Vector3 moveDir = transform.forward;
+                MoveSafely(moveDir * (_currentSpeed * dt), ref moveDir, false);
+                if (humanoid != null) humanoid.SetLocomotion(_currentSpeed, true, 0f, moveDir);
+            }
+            else
+            {
+                _currentSpeed = Mathf.MoveTowards(_currentSpeed, 0f, 7f * dt);
+                if (toVictim.sqrMagnitude > 0.01f)
+                {
+                    transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toVictim.normalized, Vector3.up), 1f - Mathf.Exp(-8f * dt));
+                }
+                if (humanoid != null)
+                {
+                    humanoid.SetLocomotion(0f, true, 0f);
+                    humanoid.SetLookAtPoint(true, _helpingVictim.transform.position + Vector3.up * 0.55f);
+                    Vector3 reach = _helpingVictim.transform.position + Vector3.up * 0.65f;
+                    humanoid.SetDualHandAction(true, Vector3.zero, reach, 0f, 0.72f, 18f, 12f, 0.06f);
+                }
+            }
         }
 
         private void UpdateHeadEyeContact()
@@ -1602,13 +1790,19 @@ namespace OurWorld.World
                 return;
             }
 
-            // 2. Spontaneous Reputation / Time Greeting to Player passing close by!
-            if (_playerGreetCooldown <= 0f && _grudgeTimer <= 0f && !mode.IsDriving && playerDistSq <= 6.2f * 6.2f)
+            // 2. Spontaneous Reputation / Player-Context / Time Greeting to Player passing close by!
+            if (_playerGreetCooldown <= 0f && _grudgeTimer <= 0f && playerDistSq <= 6.8f * 6.8f)
             {
-                _playerGreetCooldown = Random.Range(24f, 42f);
-                if (Random.value < 0.45f)
+                _playerGreetCooldown = Random.Range(22f, 38f);
+                if (Random.value < 0.52f)
                 {
                     if (humanoid != null) humanoid.PlayWave();
+                    if (Random.value < 0.55f &&
+                        NpcSmartNavigation.TryGetPlayerContextRemark(isEn, out string ctxLine, out NpcBubbleMood ctxMood))
+                    {
+                        NpcSpeechBubbleManager.Say(transform, citizenName, ctxLine, 3.3f, ctxMood);
+                        return;
+                    }
                     string greet = BuildPassingGreeting(isEn);
                     NpcSpeechBubbleManager.Say(transform, citizenName, greet, 3.2f, NpcBubbleMood.Friendly);
                     return;
@@ -1665,6 +1859,35 @@ namespace OurWorld.World
                     _brainState = CitizenBrainState.WatchingInterest;
                     string catMsg = isEn ? "Aww, pspsps! Cute little kitty!" : "Pisi pisi, gel bakalım ne tatlısın sen!";
                     NpcSpeechBubbleManager.Say(transform, citizenName, catMsg, 3.2f, NpcBubbleMood.Weather);
+                    return;
+                }
+            }
+
+            // 5. Realistic Daily Urban Micro-Activity (Window-shopping / bakery stop / checking smartphone!)
+            if (_activityCooldown <= 0f && !IsRaining() && waypoints != null && waypoints.Length >= 2 && playerDistSq <= 26f * 26f && Random.value < 0.16f)
+            {
+                _activityCooldown = Random.Range(28f, 50f);
+                if (NpcSmartNavigation.TryFindNearbyInterestSpot(transform.position, 6.5f, out Vector3 facePt, out string trLine, out string enLine))
+                {
+                    _activityCheckingPhone = false;
+                    _activityLookTarget = facePt;
+                    _activityTimer = Random.Range(3.4f, 5.2f);
+                    _brainState = CitizenBrainState.DailyActivity;
+                    NpcSpeechBubbleManager.Say(transform, citizenName, isEn ? enLine : trLine, 3.0f, NpcBubbleMood.Friendly);
+                }
+                else
+                {
+                    _activityCheckingPhone = true;
+                    _activityLookTarget = transform.position + transform.forward * 2f;
+                    _activityTimer = Random.Range(3.0f, 4.6f);
+                    _brainState = CitizenBrainState.DailyActivity;
+                    if (Random.value < 0.55f)
+                    {
+                        string[] phoneTr = { "Bir mesaj gelmiş, bakalım...", "Hava durumu ne diyor acaba?", "Saat kaç olmuş, geç kalmayayım." };
+                        string[] phoneEn = { "Got a message, let me check...", "Checking the weather forecast...", "Better check the time." };
+                        string pLine = isEn ? phoneEn[Random.Range(0, phoneEn.Length)] : phoneTr[Random.Range(0, phoneTr.Length)];
+                        NpcSpeechBubbleManager.Say(transform, citizenName, pLine, 2.8f, NpcBubbleMood.Friendly);
+                    }
                 }
             }
         }
@@ -2032,61 +2255,37 @@ namespace OurWorld.World
 
         private bool EvaluateApproachingCar()
         {
-            PlayerModeController mode = PlayerModeController.Instance;
-            if (mode == null || !mode.IsDriving || mode.CurrentVehicle == null)
-            {
-                return false;
-            }
+            ApproachingVehicleInfo threat = NpcSmartNavigation.DetectApproachingVehicle(transform.position, transform.forward);
+            if (!threat.Detected) return false;
 
-            SedanVehicleController car = mode.CurrentVehicle;
-            Vector3 toPed = transform.position - car.transform.position;
+            Vector3 toPed = transform.position - threat.VehiclePos;
             toPed.y = 0f;
-            float dist = toPed.magnitude;
-            if (dist > 13.5f || dist < 0.05f) return false;
+            float absLateral = Mathf.Abs(threat.LateralOffset);
 
-            float carKmh = car.SpeedKmh;
-            Vector3 carMoveDir = car.ForwardSpeedMs < -0.5f ? -car.transform.forward : car.transform.forward;
-            carMoveDir.y = 0f;
-            if (carMoveDir.sqrMagnitude < 0.001f) carMoveDir = Vector3.forward;
-            else carMoveDir.Normalize();
-
-            Vector3 carRight = Vector3.Cross(Vector3.up, carMoveDir).normalized;
-            float forwardDist = Vector3.Dot(toPed, carMoveDir);
-            float lateralOffset = Vector3.Dot(toPed, carRight);
-            float absLateral = Mathf.Abs(lateralOffset);
-
-            float detectRange = Mathf.Clamp(4.8f + carKmh * 0.16f, 4.8f, 12.5f);
-            bool approachingInPath = carKmh > 2.2f && forwardDist > 0.35f && forwardDist <= detectRange && absLateral <= 2.65f;
-            bool blockingInFront = dist <= 3.6f && Vector3.Dot(transform.forward, -toPed / dist) > 0.35f;
-
-            if (!approachingInPath && !blockingInFront) return false;
-
-            // Smoothly turn and watch the approaching vehicle (never snap or teleport!)
+            // Smoothly turn and watch the approaching player car, bicycle, or AI traffic vehicle!
             BeginSmoothFace(-toPed, 0.35f);
             if (humanoid != null)
             {
-                humanoid.SetLookAtPoint(true, car.transform.position + Vector3.up * 1.25f);
+                humanoid.SetLookAtPoint(true, threat.VehiclePos + Vector3.up * 1.25f);
             }
 
-            if (approachingInPath)
+            if (threat.SpeedKmh > 2.2f)
             {
-                // Startled arms-up pose ONLY when the vehicle is fast and close
-                bool fastAndClose = carKmh >= 18f && dist <= 7.5f && absLateral <= 2.15f;
-                if (fastAndClose && humanoid != null && _startledCooldown <= 0f)
+                if (threat.Urgent && humanoid != null && _startledCooldown <= 0f)
                 {
                     humanoid.PlayStartled(0.85f);
                     _startledCooldown = 3.0f;
                 }
 
-                // Smoothly side-step perpendicular out of the vehicle's lane
-                if (absLateral < 2.35f && _carSidestepCooldown <= 0f)
+                // Smoothly side-step perpendicular out of the oncoming vehicle's lane
+                if (absLateral < 2.40f && _carSidestepCooldown <= 0f)
                 {
                     float sideSign = absLateral > 0.12f
-                        ? (lateralOffset >= 0f ? 1f : -1f)
-                        : (Vector3.Dot(transform.right, carRight) >= 0f ? 1f : -1f);
-                    _sidestepDir = carRight * sideSign;
-                    _sidestepDuration = fastAndClose ? 0.65f : 0.80f;
-                    _sidestepPeakSpeed = fastAndClose ? 3.2f : 1.85f;
+                        ? (threat.LateralOffset >= 0f ? 1f : -1f)
+                        : (Vector3.Dot(transform.right, threat.VehicleRight) >= 0f ? 1f : -1f);
+                    _sidestepDir = threat.VehicleRight * sideSign;
+                    _sidestepDuration = threat.Urgent ? 0.65f : 0.80f;
+                    _sidestepPeakSpeed = threat.Urgent ? 3.25f : 1.90f;
                     _sidestepTimer = _sidestepDuration;
                     _carSidestepCooldown = 1.4f;
                 }

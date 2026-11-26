@@ -209,6 +209,22 @@ namespace OurWorld.World
                 return;
             }
 
+            LivingNpcColliderBridge living = other.GetComponentInParent<LivingNpcColliderBridge>();
+            if (living != null && speed >= 5.0f)
+            {
+                _lastBallIncidentTime = Time.time;
+                living.NotifyHitByThrownProp(cp.point, collision.relativeVelocity, en ? "Football" : "Futbol Topu");
+                return;
+            }
+
+            DynamicWorldProp dynProp = other.GetComponentInParent<DynamicWorldProp>();
+            if (dynProp != null && speed >= 4.8f)
+            {
+                _lastBallIncidentTime = Time.time;
+                dynProp.ApplyPunchOrCrashImpulse(-cp.normal * (speed * 2.4f) + Vector3.up * 0.9f, cp.point, speed > 9f);
+                return;
+            }
+
             // Shop window / vitrin ball strike -> loud glass thump!
             string nLow = other.gameObject.name.ToLowerInvariant();
             if (speed >= 5.8f && (nLow.Contains("glass") || nLow.Contains("window") || nLow.Contains("vitrin")))

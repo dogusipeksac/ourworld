@@ -23,6 +23,8 @@ namespace OurWorld.World
         public static NeighborhoodWeatherSystem Instance { get; private set; }
 
         public NeighborhoodWeatherState CurrentWeather { get; private set; } = NeighborhoodWeatherState.Clear;
+        public float Wetness01 { get; private set; }
+        public float LightningFlash01 { get; private set; }
 
         private ParticleSystem _rainPs;
         private ParticleSystem.EmissionModule _rainEmission;
@@ -31,6 +33,9 @@ namespace OurWorld.World
         private AudioClip _rainClip;
         private Camera _cachedMainCam;
         private float _stateTimer = 210f; // Start with 3.5 minutes of calm, quiet sunny weather
+        private float _lightningCooldown = 14f;
+        private float _secondFlashTimer;
+        private bool _secondFlashPending;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -69,12 +74,64 @@ namespace OurWorld.World
             bool raining = CurrentWeather == NeighborhoodWeatherState.SummerShower;
             bool sheltered = IsPlayerIndoors();
 
+            // Smooth physical road/surface wetness buildup & sunlight evaporation
+            bool isNight = DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
+            if (raining)
+            {
+                Wetness01 = Mathf.Min(1f, Wetness01 + dt * 0.058f);
+            }
+            else
+            {
+                float dryRate = CurrentWeather == NeighborhoodWeatherState.BreezyOvercast
+                    ? 0.014f
+                    : (isNight ? 0.012f : 0.028f);
+                Wetness01 = Mathf.Max(0f, Wetness01 - dt * dryRate);
+            }
+
+            // Atmospheric summer sheet lightning + realistic speed-of-sound thunder delay
+            if (LightningFlash01 > 0f)
+            {
+                LightningFlash01 = Mathf.MoveTowards(LightningFlash01, 0f, dt * 6.8f);
+            }
+            if (_secondFlashPending)
+            {
+                _secondFlashTimer -= dt;
+                if (_secondFlashTimer <= 0f)
+                {
+                    _secondFlashPending = false;
+                    LightningFlash01 = Mathf.Max(LightningFlash01, 0.72f);
+                }
+            }
+            if (raining)
+            {
+                _lightningCooldown -= dt;
+                if (_lightningCooldown <= 0f)
+                {
+                    _lightningCooldown = Random.Range(16f, 29f);
+                    LightningFlash01 = Random.Range(0.75f, 1.0f);
+                    _secondFlashPending = true;
+                    _secondFlashTimer = Random.Range(0.11f, 0.19f);
+                    float distDelay = Random.Range(1.15f, 2.75f);
+                    IstanbulLivingSoundscape.PlayThunderAfterDelay(distDelay, Mathf.InverseLerp(3.0f, 0.9f, distDelay));
+                }
+            }
+            else
+            {
+                _lightningCooldown = Mathf.Min(_lightningCooldown, 9f);
+                _secondFlashPending = false;
+            }
+
             if (_cachedMainCam == null) _cachedMainCam = Camera.main;
             Camera cam = _cachedMainCam;
             if (cam != null && _rainPs != null)
             {
                 Vector3 target = cam.transform.position + cam.transform.forward * 7f + Vector3.up * 11f;
                 _rainPs.transform.position = target;
+
+                // Slant rain streaks slightly along live Istanbul wind gusts
+                Vector3 wDir = IstanbulLivingSoundscape.WindDirection;
+                float slant = 8f + IstanbulLivingSoundscape.WindStrength01 * 11f;
+                _rainPs.transform.rotation = Quaternion.Euler(90f + wDir.z * slant, 0f, -wDir.x * slant);
 
                 // Stop rain particles whenever player is inside a house or enclosed floors 0..3 of Atlas AVM!
                 float desiredRate = (raining && !sheltered) ? 95f : 0f;

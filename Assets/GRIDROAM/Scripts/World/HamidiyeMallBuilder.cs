@@ -634,6 +634,9 @@ namespace OurWorld.World
             Collider[] cols = hum.GetComponentsInChildren<Collider>(true);
             for (int c = 0; c < cols.Length; c++) Destroy(cols[c]);
 
+            // Give EVERY Mall NPC & Shopper a clean CapsuleCollider + kinematic Rigidbody so players never walk through them!
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(hum.gameObject, radius: 0.29f, height: 1.76f, centerY: 0.88f);
+
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Sprites/Default");
             if (lit != null)
             {
@@ -651,6 +654,12 @@ namespace OurWorld.World
 
             InteractableTrigger trig = hum.gameObject.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.TownCitizen, npcId, "ui.btn.chat", 2.75f);
+
+            // Give stationary store cashiers, baristas & info staff smart eye contact, greeting & alarm reactions!
+            if (parent == null || parent.name != "AVM_StrollingShoppers")
+            {
+                hum.gameObject.AddComponent<SmartStoryNpcPresence>().Initialize(npcId, displayName, displayName);
+            }
 
             if (_handler != null)
             {
@@ -676,7 +685,7 @@ namespace OurWorld.World
             bench.localRotation = Quaternion.Euler(0f, yaw, 0f);
 
             Box("SeatPlank", bench, new Vector3(0f, 0.45f, 0f), new Vector3(2.2f, 0.12f, 0.65f), _woodWarm, col: true, shadows: false);
-            Box("BackRest",  bench, new Vector3(0f, 0.82f, -0.28f), new Vector3(2.2f, 0.56f, 0.10f), _woodWarm, col: false, shadows: false);
+            Box("BackRest",  bench, new Vector3(0f, 0.82f, -0.28f), new Vector3(2.2f, 0.56f, 0.10f), _woodWarm, col: true, shadows: false);
             Box("LegL",      bench, new Vector3(-0.92f, 0.22f, 0f), new Vector3(0.12f, 0.44f, 0.56f), _darkFrame, col: false, shadows: false);
             Box("LegR",      bench, new Vector3( 0.92f, 0.22f, 0f), new Vector3(0.12f, 0.44f, 0.56f), _darkFrame, col: false, shadows: false);
 
@@ -697,7 +706,7 @@ namespace OurWorld.World
             set.localPosition = localPos;
 
             Box("TableTop", set, new Vector3(0f, 0.78f, 0f), new Vector3(1.38f, 0.08f, 1.38f), _woodWarm, col: true, shadows: false);
-            Cylinder("TableLeg", set, new Vector3(0f, 0.39f, 0f), new Vector3(0.16f, 0.39f, 0.16f), _darkFrame, col: false, shadows: false);
+            Cylinder("TableLeg", set, new Vector3(0f, 0.39f, 0f), new Vector3(0.16f, 0.39f, 0.16f), _darkFrame, col: true, shadows: false);
 
             Material cm = chairMat ?? _tealAccent;
             // Unscaled ChairRoot pivot (prevents squashing ChairBack & SitPoint under a flat Cube scale!)
@@ -707,7 +716,7 @@ namespace OurWorld.World
             chairRoot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
             Box("ChairSeat", chairRoot.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.54f, 0.06f, 0.52f), cm, col: true, shadows: false);
-            Box("ChairBack", chairRoot.transform, new Vector3(0f, 0.72f, -0.23f), new Vector3(0.52f, 0.48f, 0.07f), cm, col: false, shadows: false);
+            Box("ChairBack", chairRoot.transform, new Vector3(0f, 0.72f, -0.23f), new Vector3(0.52f, 0.48f, 0.07f), cm, col: true, shadows: false);
             Box("LegFL", chairRoot.transform, new Vector3(-0.21f, 0.22f,  0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
             Box("LegFR", chairRoot.transform, new Vector3( 0.21f, 0.22f,  0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
             Box("LegBL", chairRoot.transform, new Vector3(-0.21f, 0.22f, -0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
@@ -731,7 +740,7 @@ namespace OurWorld.World
             seat.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
             Box("Cushion", seat, new Vector3(0f, 0.42f, 0f), new Vector3(0.90f, 0.22f, 0.74f), _cinemaRed, col: true, shadows: false);
-            Box("Back",    seat, new Vector3(0f, 0.88f, -0.32f), new Vector3(0.90f, 0.82f, 0.18f), _cinemaRed, col: false, shadows: false);
+            Box("Back",    seat, new Vector3(0f, 0.88f, -0.32f), new Vector3(0.90f, 0.82f, 0.18f), _cinemaRed, col: true, shadows: false);
 
             GameObject sp = new GameObject("SitPoint");
             sp.transform.SetParent(seat, false);

@@ -9,6 +9,14 @@ using UnityEngine.InputSystem;
 
 namespace OurWorld.Vehicle
 {
+    public enum VehicleRoadSurface
+    {
+        Asphalt = 0,
+        Cobblestone = 1,
+        OffroadGrass = 2,
+        Sand = 3
+    }
+
     [Serializable]
     public class AxleInfo
     {
@@ -104,7 +112,8 @@ namespace OurWorld.Vehicle
         private OurWorld.CameraSystem.ThirdPersonCameraRig _cachedCamRig;
         private bool _nitroVisualActive;
 
-        // Real-world detail state: car alarm, water hydro-lock flooding, rain spray, driver crash cooldown
+        // Real-world detail state: car alarm, water hydro-lock flooding, rain spray, driver crash cooldown,
+        // road surface feel, progressive dirt accumulation, turn signals / emergency hazards, and tire skid marks
         private float _alarmTimer;
         private float _alarmPulseTimer;
         private bool _alarmFlashOn;
@@ -113,6 +122,20 @@ namespace OurWorld.Vehicle
         private float _waterFloodTimer;
         private float _wetSprayTimer;
         private float _driverCrashHurtCooldown;
+        private EngineAudio _engineAudio;
+        private float _surfaceSampleTimer;
+        private float _skidMarkTimer;
+        private float _offroadDustTimer;
+        private float _dirtiness01;
+        private float _appliedDirtiness = -1f;
+        private int _manualSignalState; // -1 = left, 0 = off, +1 = right, 2 = 4-way hazards
+        private bool _signalTurnEngaged;
+        private float _blinkerTimer;
+        private bool _blinkerPhaseOn;
+        private bool _blinkerWasActive;
+        private readonly List<Renderer> _leftSignalRenderers = new List<Renderer>(4);
+        private readonly List<Renderer> _rightSignalRenderers = new List<Renderer>(4);
+        private readonly List<Renderer> _paintBodyRenderers = new List<Renderer>(8);
 
         private readonly List<Renderer> _headlightRenderers = new List<Renderer>();
         private readonly List<Renderer> _taillightRenderers = new List<Renderer>();
@@ -173,6 +196,10 @@ namespace OurWorld.Vehicle
         public bool AreHeadlightsOn => _lastHeadlightOnVisual;
         public bool IsEngineFlooded => _waterFloodTimer > 0f;
         public bool IsAlarmActive => _alarmTimer > 0f;
+        public VehicleRoadSurface CurrentRoadSurface { get; private set; } = VehicleRoadSurface.Asphalt;
+        public bool IsRoadWet { get; private set; }
+        public float Dirtiness01 => _dirtiness01;
+        public bool HazardLightsActive => _manualSignalState == 2 || IsAutoEmergencyHazards();
         public float SpeedKmh => _rb != null ? _rb.linearVelocity.magnitude * 3.6f : 0f;
         public float ForwardSpeedMs => _rb != null ? Vector3.Dot(_rb.linearVelocity, transform.forward) : 0f;
         public Transform BodyVisualRoot => bodyVisualRoot;
@@ -252,6 +279,7 @@ namespace OurWorld.Vehicle
         {
             _rb = GetComponent<Rigidbody>();
             _selfTrigger = GetComponent<InteractableTrigger>();
+            _engineAudio = GetComponent<EngineAudio>();
             _damageSystem = GetComponent<VehicleDamageSystem>();
             if (_damageSystem == null)
             {
@@ -296,6 +324,7 @@ namespace OurWorld.Vehicle
                 _alarmFlashOn = true;
                 _alarmHighTone = true;
                 AlertNearbyWitnessesToAlarm();
+                NpcWorldAwareness.NotifyCarAlarm(transform.position);
             }
         }
 
@@ -507,6 +536,8 @@ namespace OurWorld.Vehicle
 
         public void SparklePolishClean()
         {
+            _dirtiness01 = 0f;
+            _appliedDirtiness = -1f;
             if (_damageSystem != null)
             {
                 _damageSystem.RepairFull();
@@ -648,6 +679,9 @@ namespace OurWorld.Vehicle
                 _taillightRenderers.Clear();
                 _taillightBaseEmissions.Clear();
                 _reverseRenderers.Clear();
+                _leftSignalRenderers.Clear();
+                _rightSignalRenderers.Clear();
+                _paintBodyRenderers.Clear();
 
                 Renderer[] renderers = bodyVisualRoot.GetComponentsInChildren<Renderer>(true);
                 foreach (Renderer r in renderers)
@@ -656,6 +690,10 @@ namespace OurWorld.Vehicle
                     if (objName == "Placeholder_HeadlightL" || objName == "Placeholder_HeadlightR" || objName == "Car_Headlights")
                     {
                         _headlightRenderers.Add(r);
+                        float localX = bodyVisualRoot.InverseTransformPoint(r.bounds.center).x;
+                        if (objName.EndsWith("L", StringComparison.Ordinal) || localX < -0.15f) _leftSignalRenderers.Add(r);
+                        else if (objName.EndsWith("R", StringComparison.Ordinal) || localX > 0.15f) _rightSignalRenderers.Add(r);
+                        else { _leftSignalRenderers.Add(r); _rightSignalRenderers.Add(r); }
                     }
                     else if (objName == "Placeholder_TaillightL" || objName == "Placeholder_TaillightR" || objName == "Car_Taillights")
                     {
@@ -666,10 +704,20 @@ namespace OurWorld.Vehicle
                             baseEm = r.sharedMaterial.GetColor(EmissionColorId);
                         }
                         _taillightBaseEmissions.Add(baseEm);
+                        float localX = bodyVisualRoot.InverseTransformPoint(r.bounds.center).x;
+                        if (objName.EndsWith("L", StringComparison.Ordinal) || localX < -0.15f) _leftSignalRenderers.Add(r);
+                        else if (objName.EndsWith("R", StringComparison.Ordinal) || localX > 0.15f) _rightSignalRenderers.Add(r);
+                        else { _leftSignalRenderers.Add(r); _rightSignalRenderers.Add(r); }
                     }
                     else if (objName == "Placeholder_ReverseL" || objName == "Placeholder_ReverseR" || objName == "Car_ReverseLights")
                     {
                         _reverseRenderers.Add(r);
+                    }
+                    else if (r.sharedMaterial != null &&
+                             (r.sharedMaterial.name.IndexOf("Paint", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                              r.sharedMaterial.name.IndexOf("Body", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        _paintBodyRenderers.Add(r);
                     }
                 }
             }
@@ -788,6 +836,11 @@ namespace OurWorld.Vehicle
             {
                 CarryableProp.DropHeldPropIfAny();
                 SilenceCarAlarm();
+                if (_engineAudio == null) _engineAudio = GetComponent<EngineAudio>();
+                if (fuel > 0.01f && _waterFloodTimer <= 0f && (_damageSystem == null || !_damageSystem.IsStalled))
+                {
+                    _engineAudio?.PlayIgnitionStart();
+                }
             }
             UpdateSeatedDriverVisibility();
 
@@ -993,6 +1046,53 @@ namespace OurWorld.Vehicle
             {
                 CycleCarRadio();
             }
+
+            if (Keyboard.current.zKey.wasPressedThisFrame)
+            {
+                ToggleTurnSignal(-1);
+            }
+            else if (Keyboard.current.cKey.wasPressedThisFrame)
+            {
+                ToggleTurnSignal(1);
+            }
+            else if (Keyboard.current.xKey.wasPressedThisFrame)
+            {
+                ToggleTurnSignal(2);
+            }
+        }
+
+        private bool IsAutoEmergencyHazards()
+        {
+            return _waterFloodTimer > 0f || (_damageSystem != null && (_damageSystem.IsStalled || _damageSystem.Health < 28f));
+        }
+
+        public void ToggleTurnSignal(int mode)
+        {
+            _manualSignalState = (_manualSignalState == mode) ? 0 : mode;
+            _signalTurnEngaged = false;
+            _blinkerTimer = 0f;
+            _blinkerPhaseOn = false;
+            bool en = LocalizationService.IsEnglish;
+            if (_manualSignalState == 0)
+            {
+                RestoreLightsAfterBlinker();
+            }
+            else if (PlayerModeController.Instance != null)
+            {
+                string msg = _manualSignalState == -1
+                    ? (en ? "◀ Left turn signal ON" : "◀ Sol sinyal açık")
+                    : (_manualSignalState == 1
+                        ? (en ? "▶ Right turn signal ON" : "▶ Sağ sinyal açık")
+                        : (en ? "⚠ Hazard flashers ON" : "⚠ Dörtlü flaşörler açık"));
+                PlayerModeController.Instance.RaiseStatusMessage(msg);
+            }
+        }
+
+        private void RestoreLightsAfterBlinker()
+        {
+            _headlightsInitialized = false;
+            _lastBrakingVisual = !IsBraking;
+            UpdateHeadlightState();
         }
 
         private void ApplyAlarmStrobeVisuals(bool on)
@@ -1272,6 +1372,7 @@ namespace OurWorld.Vehicle
                     {
                         if (_cachedCamRig == null) _cachedCamRig = FindAnyObjectByType<OurWorld.CameraSystem.ThirdPersonCameraRig>();
                         _cachedCamRig?.AddFovImpulse(1.25f);
+                        _engineAudio?.PlayGearShiftClick(upshift: true);
                         Vector3 shiftExhaust = transform.TransformPoint(new Vector3(-0.42f, 0.30f, -2.28f));
                         VisualEffectsManager.SpawnNitroExhaust(shiftExhaust, -transform.forward, isNitro: false);
                     }
@@ -1283,12 +1384,44 @@ namespace OurWorld.Vehicle
                     _shiftCooldown = shiftDuration + 0.30f;
                     activeGearRatio = gearRatios[CurrentGear - 1];
                     _shiftPitchKick = -0.85f;
+                    if (_isPlayerDriving)
+                    {
+                        _engineAudio?.PlayGearShiftClick(upshift: false);
+                    }
                 }
             }
 
-            // Real-world water flooding / hydro-lock + wet rain road physics!
+            // Real-world water flooding / hydro-lock + wet rain road physics + surface texture & puddle splash!
+            float roadWetness = NeighborhoodWeatherSystem.Instance != null ? NeighborhoodWeatherSystem.Instance.Wetness01 : 0f;
             bool isRaining = NeighborhoodWeatherSystem.Instance != null &&
                              NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower;
+            bool inPuddle = IstanbulThemeOverhaul.IsPositionInPuddle(transform.position);
+            IsRoadWet = isRaining || roadWetness > 0.35f || inPuddle;
+
+            _surfaceSampleTimer -= dt;
+            if (_surfaceSampleTimer <= 0f)
+            {
+                _surfaceSampleTimer = 0.22f;
+                SampleVehicleRoadSurface();
+            }
+
+            // Gradual realistic paint dirt accumulation off-road or in rain (cleaned at Aydos Oto Yıkama!)
+            if (_isPlayerDriving && speedKmh > 14f)
+            {
+                float dirtRate = CurrentRoadSurface == VehicleRoadSurface.OffroadGrass || CurrentRoadSurface == VehicleRoadSurface.Sand
+                    ? 0.018f
+                    : (IsRoadWet ? 0.0055f : 0f);
+                if (dirtRate > 0f && _dirtiness01 < 1f)
+                {
+                    _dirtiness01 = Mathf.Min(1f, _dirtiness01 + dirtRate * dt);
+                    if (_dirtiness01 - _appliedDirtiness >= 0.08f)
+                    {
+                        _appliedDirtiness = _dirtiness01;
+                        ApplyPaintDirtinessVisual();
+                    }
+                }
+            }
+
             bool inWater = WaterZone.TrySampleWater(transform.position, out float waterSurfY, out _);
             float waterDepth = inWater ? (waterSurfY - transform.position.y) : 0f;
 
@@ -1340,16 +1473,32 @@ namespace OurWorld.Vehicle
                 }
             }
 
-            if (isRaining && !inWater && _isPlayerDriving && speedKmh > 22f)
+            if ((isRaining || inPuddle) && !inWater && _isPlayerDriving && speedKmh > (inPuddle ? 10f : 22f))
             {
                 _wetSprayTimer -= dt;
                 if (_wetSprayTimer <= 0f)
                 {
-                    _wetSprayTimer = 0.14f;
+                    _wetSprayTimer = inPuddle ? 0.09f : 0.14f;
                     Vector3 rearL = transform.TransformPoint(new Vector3(-0.82f, 0.14f, -1.45f));
                     Vector3 rearR = transform.TransformPoint(new Vector3( 0.82f, 0.14f, -1.45f));
-                    VisualEffectsManager.SpawnWaterSplash(rearL, bigDive: false);
-                    VisualEffectsManager.SpawnWaterSplash(rearR, bigDive: false);
+                    VisualEffectsManager.SpawnWaterSplash(rearL, bigDive: inPuddle && speedKmh > 32f);
+                    VisualEffectsManager.SpawnWaterSplash(rearR, bigDive: inPuddle && speedKmh > 32f);
+                }
+            }
+
+            // Off-road dirt/sand wheel dust plumes
+            if ((CurrentRoadSurface == VehicleRoadSurface.OffroadGrass || CurrentRoadSurface == VehicleRoadSurface.Sand) &&
+                !inWater && _isPlayerDriving && speedKmh > 16f)
+            {
+                _offroadDustTimer -= dt;
+                if (_offroadDustTimer <= 0f)
+                {
+                    _offroadDustTimer = 0.12f;
+                    Color dustCol = CurrentRoadSurface == VehicleRoadSurface.Sand
+                        ? new Color(0.92f, 0.82f, 0.58f, 1f)
+                        : new Color(0.54f, 0.48f, 0.36f, 1f);
+                    VisualEffectsManager.SpawnFootDust(transform.TransformPoint(new Vector3(-0.82f, 0.06f, -1.38f)), false, dustCol);
+                    VisualEffectsManager.SpawnFootDust(transform.TransformPoint(new Vector3( 0.82f, 0.06f, -1.38f)), false, dustCol);
                 }
             }
 
@@ -1374,8 +1523,9 @@ namespace OurWorld.Vehicle
                 engineBrakeTorque = 18f + rpmNorm * 130f;
             }
 
-            float rainGripMult = isRaining ? 0.78f : 1.0f;
-            float targetRearStiffness = ((!parked && handbrake) ? handbrakeRearSidewaysStiffness : baseRearSidewaysStiffness) * rainGripMult;
+            float rainGripMult = IsRoadWet ? 0.80f : 1.0f;
+            float offroadGripMult = (CurrentRoadSurface == VehicleRoadSurface.OffroadGrass || CurrentRoadSurface == VehicleRoadSurface.Sand) ? 0.78f : 1.0f;
+            float targetRearStiffness = ((!parked && handbrake) ? handbrakeRearSidewaysStiffness : baseRearSidewaysStiffness) * rainGripMult * offroadGripMult;
             float stiffnessRate = targetRearStiffness < _currentRearSidewaysStiffness ? 12f : 4.5f;
             _currentRearSidewaysStiffness = Mathf.MoveTowards(_currentRearSidewaysStiffness, targetRearStiffness, stiffnessRate * dt);
 
@@ -1473,6 +1623,30 @@ namespace OurWorld.Vehicle
                         Vector3 rearR = transform.TransformPoint(new Vector3( 0.82f, 0.14f, -1.32f));
                         VisualEffectsManager.SpawnTireSmoke(rearL, _rb.linearVelocity, smokeIntensity);
                         VisualEffectsManager.SpawnTireSmoke(rearR, _rb.linearVelocity, smokeIntensity);
+                    }
+                }
+
+                // Lay realistic pooled tire skid marks / off-road ruts beneath rear wheels when drifting or hard-braking
+                bool wantSkidMarks = (maxRearSlip > 0.28f && speedKmh > 14f) ||
+                                     (handbrake && speedKmh > 14f) ||
+                                     (serviceBrake > 0.72f && speedKmh > 38f);
+                if (wantSkidMarks && !inWater)
+                {
+                    _skidMarkTimer -= dt;
+                    if (_skidMarkTimer <= 0f)
+                    {
+                        _skidMarkTimer = 0.065f;
+                        Color skidCol = CurrentRoadSurface == VehicleRoadSurface.Sand
+                            ? new Color(0.58f, 0.48f, 0.32f, 0.46f)
+                            : (CurrentRoadSurface == VehicleRoadSurface.OffroadGrass
+                                ? new Color(0.22f, 0.18f, 0.12f, 0.48f)
+                                : new Color(0.06f, 0.06f, 0.07f, IsRoadWet ? 0.34f : 0.56f));
+                        Vector3 travelFwd = _rb.linearVelocity.sqrMagnitude > 1f ? _rb.linearVelocity.normalized : transform.forward;
+                        float segLen = Mathf.Clamp(_rb.linearVelocity.magnitude * 0.085f, 0.48f, 1.35f);
+                        Vector3 wheelL = transform.TransformPoint(new Vector3(-0.82f, 0.02f, -1.34f));
+                        Vector3 wheelR = transform.TransformPoint(new Vector3( 0.82f, 0.02f, -1.34f));
+                        WorldRealismAtmosphere.SpawnSkidMark(wheelL, travelFwd, 0.24f, segLen, skidCol);
+                        WorldRealismAtmosphere.SpawnSkidMark(wheelR, travelFwd, 0.24f, segLen, skidCol);
                     }
                 }
                 if (effectiveThrottle > 0.65f && speedKmh < 38f)
@@ -1573,8 +1747,16 @@ namespace OurWorld.Vehicle
             UpdateBodyRollPitch(vel, dt);
         }
 
+        private float _lastRecklessAlertTime = -10f;
+
         private void CheckPedestrianSweep(float speedKmh)
         {
+            if (_isPlayerDriving && speedKmh >= 66f && Time.time - _lastRecklessAlertTime > 4.5f)
+            {
+                _lastRecklessAlertTime = Time.time;
+                NpcWorldAwareness.NotifyRecklessDriving(transform.position, transform.forward, speedKmh);
+            }
+
             Vector3 boxCenter = transform.TransformPoint(new Vector3(0f, 0.85f, 0.15f));
             Vector3 halfExtents = new Vector3(1.06f, 0.85f, 2.38f);
             int count = Physics.OverlapBoxNonAlloc(boxCenter, halfExtents, _pedOverlapBuffer, transform.rotation, ~0, QueryTriggerInteraction.Ignore);
@@ -1582,14 +1764,39 @@ namespace OurWorld.Vehicle
             {
                 Collider col = _pedOverlapBuffer[i];
                 if (col == null) continue;
-                TownPedestrian ped = col.GetComponentInParent<TownPedestrian>();
-                if (ped == null) continue;
 
-                ped.OnHitByVehicle(transform.position, _rb.linearVelocity, speedKmh);
-                if (_damageSystem != null)
+                TownPedestrian ped = col.GetComponentInParent<TownPedestrian>();
+                if (ped != null)
                 {
-                    Vector3 hitPt = col.ClosestPoint(transform.position + transform.forward * 1.8f + Vector3.up * 0.75f);
-                    _damageSystem.ApplyPedestrianHitFeedback(hitPt, -transform.forward, speedKmh, _isPlayerDriving);
+                    ped.OnHitByVehicle(transform.position, _rb.linearVelocity, speedKmh);
+                    if (_damageSystem != null)
+                    {
+                        Vector3 hitPt = col.ClosestPoint(transform.position + transform.forward * 1.8f + Vector3.up * 0.75f);
+                        _damageSystem.ApplyPedestrianHitFeedback(hitPt, -transform.forward, speedKmh, _isPlayerDriving);
+                    }
+                    continue;
+                }
+
+                LivingNpcColliderBridge living = col.GetComponentInParent<LivingNpcColliderBridge>();
+                if (living != null)
+                {
+                    living.NotifyHitByVehicle(transform.position, _rb.linearVelocity, speedKmh);
+                    if (_damageSystem != null)
+                    {
+                        Vector3 hitPt = col.ClosestPoint(transform.position + transform.forward * 1.8f + Vector3.up * 0.75f);
+                        _damageSystem.ApplyPedestrianHitFeedback(hitPt, -transform.forward, speedKmh, _isPlayerDriving);
+                    }
+                    continue;
+                }
+
+                // Wake kinematic-until-hit DynamicWorldProps on car collision so parked props fly cleanly!
+                DynamicWorldProp dynProp = col.GetComponentInParent<DynamicWorldProp>();
+                if (dynProp != null && speedKmh >= 6f)
+                {
+                    Vector3 hitPt = col.ClosestPoint(transform.position + transform.forward * 1.8f + Vector3.up * 0.55f);
+                    Vector3 impulse = (_rb.linearVelocity * 0.75f + Vector3.up * Mathf.Clamp(speedKmh * 0.08f, 1.2f, 4.5f)) *
+                                      Mathf.Clamp(dynProp.MassKg * 0.55f, 8f, 32f);
+                    dynProp.ApplyPunchOrCrashImpulse(impulse, hitPt, speedKmh >= 24f);
                 }
             }
         }
@@ -1686,6 +1893,74 @@ namespace OurWorld.Vehicle
             _bodyRoll = Mathf.Lerp(_bodyRoll, targetRoll, blend);
 
             bodyVisualRoot.localRotation = Quaternion.Euler(_bodyPitch, 0f, _bodyRoll);
+
+            if (_isPlayerDriving)
+            {
+                if (_cachedCamRig == null) _cachedCamRig = FindAnyObjectByType<OurWorld.CameraSystem.ThirdPersonCameraRig>();
+                if (_cachedCamRig != null)
+                {
+                    float speedNorm = Mathf.InverseLerp(8f, 85f, currentVel.magnitude * 3.6f);
+                    float latG = Mathf.Clamp(latAccel / 9.81f, -1.4f, 1.4f);
+                    float roughness = CurrentRoadSurface switch
+                    {
+                        VehicleRoadSurface.OffroadGrass => 0.78f * speedNorm,
+                        VehicleRoadSurface.Sand => 0.66f * speedNorm,
+                        VehicleRoadSurface.Cobblestone => 0.44f * speedNorm,
+                        _ => 0.08f * speedNorm
+                    };
+                    _cachedCamRig.SetDrivingDynamics(latG, roughness);
+                }
+            }
+        }
+
+        private void SampleVehicleRoadSurface()
+        {
+            if (axleInfos != null)
+            {
+                for (int i = 0; i < axleInfos.Count; i++)
+                {
+                    WheelCollider wc = axleInfos[i].leftWheel != null ? axleInfos[i].leftWheel : axleInfos[i].rightWheel;
+                    if (wc != null && wc.GetGroundHit(out WheelHit hit) && hit.collider != null)
+                    {
+                        string n = hit.collider.gameObject.name.ToLowerInvariant();
+                        if (n.Contains("sand") || n.Contains("beach") || n.Contains("shore"))
+                        {
+                            CurrentRoadSurface = VehicleRoadSurface.Sand;
+                            return;
+                        }
+                        if (n.Contains("grass") || n.Contains("meadow") || n.Contains("lawn") || n.Contains("park") ||
+                            n.Contains("farm") || n.Contains("hill") || n.Contains("turf") || n.Contains("valley"))
+                        {
+                            CurrentRoadSurface = VehicleRoadSurface.OffroadGrass;
+                            return;
+                        }
+                        if (n.Contains("parke") || n.Contains("cobble") || n.Contains("plaza") ||
+                            n.Contains("sidewalk") || n.Contains("promenade") || n.Contains("pavement"))
+                        {
+                            CurrentRoadSurface = VehicleRoadSurface.Cobblestone;
+                            return;
+                        }
+                        CurrentRoadSurface = VehicleRoadSurface.Asphalt;
+                        return;
+                    }
+                }
+            }
+            CurrentRoadSurface = VehicleRoadSurface.Asphalt;
+        }
+
+        private void ApplyPaintDirtinessVisual()
+        {
+            float gloss = Mathf.Lerp(0.84f, 0.32f, _dirtiness01);
+            for (int i = 0; i < _paintBodyRenderers.Count; i++)
+            {
+                Renderer r = _paintBodyRenderers[i];
+                if (r == null) continue;
+                Material m = r.material;
+                if (m != null && m.HasProperty("_Smoothness"))
+                {
+                    m.SetFloat("_Smoothness", gloss);
+                }
+            }
         }
 
         private void UpdateLightVisuals()
@@ -1726,6 +2001,91 @@ namespace OurWorld.Vehicle
                     _mpb.SetColor(EmissionColorId, revColor);
                     r.SetPropertyBlock(_mpb);
                 }
+            }
+
+            UpdateTurnAndHazardFlashers();
+        }
+
+        private void UpdateTurnAndHazardFlashers()
+        {
+            // Auto-cancel manual left/right signal once driver completes turn & straightens steering wheel
+            if ((_manualSignalState == -1 || _manualSignalState == 1) && _isPlayerDriving)
+            {
+                float steerSign = _manualSignalState;
+                if (_currentSteerAngle * steerSign > 13f) _signalTurnEngaged = true;
+                else if (_signalTurnEngaged && Mathf.Abs(_currentSteerAngle) < 4.5f)
+                {
+                    _manualSignalState = 0;
+                    _signalTurnEngaged = false;
+                    RestoreLightsAfterBlinker();
+                }
+            }
+
+            int activeSignal = IsAutoEmergencyHazards() ? 2 : _manualSignalState;
+            if (activeSignal == 0)
+            {
+                if (_blinkerWasActive)
+                {
+                    _blinkerWasActive = false;
+                    _blinkerPhaseOn = false;
+                    RestoreLightsAfterBlinker();
+                }
+                return;
+            }
+
+            _blinkerWasActive = true;
+            _blinkerTimer -= Time.deltaTime;
+            if (_blinkerTimer <= 0f)
+            {
+                _blinkerTimer = 0.42f;
+                _blinkerPhaseOn = !_blinkerPhaseOn;
+                if (_isPlayerDriving)
+                {
+                    IstanbulLivingSoundscape.PlayBlinkerClick(_blinkerPhaseOn);
+                }
+
+                Color amberCol = _blinkerPhaseOn ? new Color(1.0f, 0.58f, 0.04f) * 4.4f : Color.black;
+                if (activeSignal == -1 || activeSignal == 2)
+                {
+                    ApplySignalGroup(_leftSignalRenderers, _blinkerPhaseOn, amberCol);
+                }
+                if (activeSignal == 1 || activeSignal == 2)
+                {
+                    ApplySignalGroup(_rightSignalRenderers, _blinkerPhaseOn, amberCol);
+                }
+            }
+        }
+
+        private void ApplySignalGroup(List<Renderer> group, bool on, Color amberEmission)
+        {
+            if (group == null || group.Count == 0) return;
+            for (int i = 0; i < group.Count; i++)
+            {
+                Renderer r = group[i];
+                if (r == null) continue;
+                r.GetPropertyBlock(_mpb);
+                if (on)
+                {
+                    _mpb.SetColor(EmissionColorId, amberEmission);
+                }
+                else
+                {
+                    bool isHead = _headlightRenderers.Contains(r);
+                    int tailIdx = _taillightRenderers.IndexOf(r);
+                    if (isHead)
+                    {
+                        _mpb.SetColor(EmissionColorId, _lastHeadlightOnVisual ? new Color(1.0f, 0.92f, 0.70f) * 4.5f : Color.black);
+                    }
+                    else if (tailIdx >= 0 && tailIdx < _taillightBaseEmissions.Count)
+                    {
+                        _mpb.SetColor(EmissionColorId, _taillightBaseEmissions[tailIdx] * (IsBraking ? 4f : 1f));
+                    }
+                    else
+                    {
+                        _mpb.SetColor(EmissionColorId, Color.black);
+                    }
+                }
+                r.SetPropertyBlock(_mpb);
             }
         }
 

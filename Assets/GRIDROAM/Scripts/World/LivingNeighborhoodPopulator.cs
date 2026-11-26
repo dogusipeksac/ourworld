@@ -30,6 +30,7 @@ namespace OurWorld.World
         {
             public string InteractableId;
             public GameObject Root;
+            public Rigidbody Rb;
             public ProceduralHumanoid Humanoid;
             public NpcRole Role;
             public string DisplayName;
@@ -46,6 +47,19 @@ namespace OurWorld.World
             public LivingNpc Partner;
             public bool LookingAtPlayer;
 
+            // Smart dodging, weather, bump & stuck recovery state
+            public float BumpCooldown;
+            public float VehicleHitCooldown;
+            public float SidestepTimer;
+            public float SidestepDuration;
+            public float SidestepPeakSpeed;
+            public Vector3 SidestepDir;
+            public float CarDodgeCooldown;
+            public float EventReactCooldown;
+            public bool RainShieldActive;
+            public Vector3 LastProgressPos;
+            public float StuckTimer;
+
             // Street-fight & retaliation combat state
             public bool IsFighter;
             public float HitCooldown;
@@ -59,6 +73,8 @@ namespace OurWorld.World
             public int HitCount;
             public Vector3 StumbleVel;
             public Vector3 FleeDir;
+            public Vector3 AirVel;
+            public bool IsAirborne;
         }
 
         private sealed class FlockPigeon
@@ -87,6 +103,7 @@ namespace OurWorld.World
             public string Kind; // "cat", "dog", "goat"
             public string DisplayName;
             public Transform Root;
+            public Rigidbody Rb;
             public SkeletalClipPlayer Skel;
             public Transform HeadBone;
             public Vector3 HomePos;
@@ -232,11 +249,25 @@ namespace OurWorld.World
                 _subscribed = true;
             }
 
+            NpcWorldAwareness.OnViolenceOccurred += HandleWorldViolenceForLivingNpcs;
+            NpcWorldAwareness.OnHornHeard += HandleWorldHornForLivingNpcs;
+            NpcWorldAwareness.OnCarAlarmSounded += HandleWorldAlarmForLivingNpcs;
+            NpcWorldAwareness.OnPropImpactOccurred += HandleWorldPropImpactForLivingNpcs;
+            NpcWorldAwareness.OnRecklessDriving += HandleWorldRecklessDrivingForLivingNpcs;
+            NpcWorldAwareness.OnGoodDeedWitnessed += HandleWorldGoodDeedForLivingNpcs;
+
             Debug.Log($"[LivingNeighborhoodPopulator] Spawned {_npcs.Count} living NPCs and {SpawnedAnimalCount} rigged animals (Pigeons={_pigeons.Count}, Cats/Dogs/Goats={_animals.Count}, Swans={_swans.Count}).");
         }
 
         private void OnDestroy()
         {
+            NpcWorldAwareness.OnViolenceOccurred -= HandleWorldViolenceForLivingNpcs;
+            NpcWorldAwareness.OnHornHeard -= HandleWorldHornForLivingNpcs;
+            NpcWorldAwareness.OnCarAlarmSounded -= HandleWorldAlarmForLivingNpcs;
+            NpcWorldAwareness.OnPropImpactOccurred -= HandleWorldPropImpactForLivingNpcs;
+            NpcWorldAwareness.OnRecklessDriving -= HandleWorldRecklessDrivingForLivingNpcs;
+            NpcWorldAwareness.OnGoodDeedWitnessed -= HandleWorldGoodDeedForLivingNpcs;
+
             if (_subscribed && PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.OnInteracted -= HandleLivingAnimalInteracted;
@@ -484,6 +515,11 @@ namespace OurWorld.World
                     CreateChairPart($"Leg_{ix}_{iz}", chair.transform, new Vector3(lx[ix], 0.22f, lz[iz]), new Vector3(0.042f, 0.44f, 0.042f), _teaChairFrameMat);
                 }
             }
+
+            // Solid chair collider so players, vehicles & NPCs never clip through tea garden chairs!
+            BoxCollider chairCol = chair.AddComponent<BoxCollider>();
+            chairCol.center = new Vector3(0f, 0.46f, -0.02f);
+            chairCol.size = new Vector3(0.50f, 0.90f, 0.48f);
         }
 
         private static void CreateChairPart(string name, Transform parent, Vector3 localPos, Vector3 scale, Material mat)
@@ -529,9 +565,27 @@ namespace OurWorld.World
             float heightScale = UnityEngine.Random.Range(0.92f, 1.07f);
             hum.transform.localScale = Vector3.one * heightScale;
 
-            // Remove any stray colliders so NPCs never block cars or player movement
+            // Replace any stray template colliders with one clean CapsuleCollider + kinematic Rigidbody
+            // so players, cars, bikes, footballs & thrown props physically collide with ALL 68 living NPCs!
             Collider[] cols = hum.GetComponentsInChildren<Collider>(true);
             for (int c = 0; c < cols.Length; c++) Destroy(cols[c]);
+
+            CapsuleCollider bodyCap = hum.gameObject.AddComponent<CapsuleCollider>();
+            if (role == NpcRole.SeatedTeaGuest)
+            {
+                bodyCap.radius = 0.28f;
+                bodyCap.height = 1.24f;
+                bodyCap.center = new Vector3(0f, 0.48f, 0f);
+            }
+            else
+            {
+                bodyCap.radius = 0.29f;
+                bodyCap.height = 1.76f;
+                bodyCap.center = new Vector3(0f, 0.88f, 0f);
+            }
+            Rigidbody npcRb = WorldPhysicsSolidifier.EnsureKinematicRigidbody(hum.gameObject);
+            int listIdx = _npcs.Count;
+            hum.gameObject.AddComponent<LivingNpcColliderBridge>().Configure(listIdx);
 
             // Apply distinctive neighborhood outfit color
             Renderer[] rends = hum.GetComponentsInChildren<Renderer>(true);
@@ -565,6 +619,7 @@ namespace OurWorld.World
             {
                 InteractableId = npcTriggerId,
                 Root = hum.gameObject,
+                Rb = npcRb,
                 Humanoid = hum,
                 Role = role,
                 DisplayName = displayName,
@@ -580,9 +635,269 @@ namespace OurWorld.World
                     ? UnityEngine.Random.Range(5f, 12f)
                     : (role == NpcRole.Vendor ? UnityEngine.Random.Range(8f, 15f) : 0f),
                 LookRetarget = UnityEngine.Random.Range(2f, 5f),
+                LastProgressPos = startPos,
                 IsFighter = (role == NpcRole.Stroller || role == NpcRole.Jogger || role == NpcRole.Spectator) &&
                             ((index * 37 + 11) % 100) < 46
             });
+        }
+
+        public void OnLivingNpcBumpedByPlayer(int idx, Vector3 playerPos, Vector3 playerVelocity)
+        {
+            if (idx < 0 || idx >= _npcs.Count) return;
+            LivingNpc npc = _npcs[idx];
+            if (npc == null || npc.Root == null || npc.Humanoid == null) return;
+            if (npc.BumpCooldown > 0f || npc.KnockdownTimer > 0f || npc.IsAirborne || npc.Role == NpcRole.SeatedTeaGuest) return;
+            npc.BumpCooldown = 2.5f;
+
+            Vector3 away = npc.Root.transform.position - playerPos;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.001f) away = playerVelocity;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.001f ? away.normalized : npc.Root.transform.right;
+
+            npc.StumbleVel = away * 2.2f;
+            npc.PauseTimer = Mathf.Max(npc.PauseTimer, 1.3f);
+            npc.Humanoid.PlayStartled(0.65f, playerPos);
+
+            bool en = LocalizationService.IsEnglish;
+            string[] tr = { "Hop, önüne baksana komşu!", "Pardon?! Biraz yavaş ol!", "Az kalsın deviriyordun!" };
+            string[] enL = { "Whoa, watch it neighbor!", "Easy there, slow down!", "Hey, careful!" };
+            string line = en ? enL[UnityEngine.Random.Range(0, enL.Length)] : tr[UnityEngine.Random.Range(0, tr.Length)];
+            NpcSpeechBubbleManager.Say(npc.Root.transform, npc.DisplayName, line, 2.4f, NpcBubbleMood.Alert, 2.08f);
+        }
+
+        public void OnLivingNpcHitByVehicle(int idx, Vector3 carPos, Vector3 carVelocity, float speedKmh)
+        {
+            if (idx < 0 || idx >= _npcs.Count) return;
+            LivingNpc npc = _npcs[idx];
+            if (npc == null || npc.Root == null || npc.Humanoid == null) return;
+            if (npc.VehicleHitCooldown > 0f) return;
+
+            npc.VehicleHitCooldown = 0.75f;
+            npc.HitCooldown = 1.0f;
+            npc.FightTimer = 0f;
+            npc.PendingPunchTimer = 0f;
+
+            if (npc.Role == NpcRole.SeatedTeaGuest)
+            {
+                npc.Role = NpcRole.Stroller;
+                npc.Humanoid.SetSitting(false, driving: false);
+            }
+
+            Vector3 impactDir = carVelocity;
+            impactDir.y = 0f;
+            Vector3 away = npc.Root.transform.position - carPos;
+            away.y = 0f;
+            if (impactDir.sqrMagnitude < 0.04f) impactDir = away;
+            else if (away.sqrMagnitude > 0.01f) impactDir = impactDir.normalized * 0.72f + away.normalized * 0.28f;
+            impactDir = impactDir.sqrMagnitude > 0.001f ? impactDir.normalized : Vector3.forward;
+
+            float horizSpd = Mathf.Clamp(speedKmh * 0.34f, 5.2f, 17.5f);
+            float upSpd = Mathf.Clamp(speedKmh * 0.13f, 2.2f, 7.0f);
+            npc.AirVel = impactDir * horizSpd + Vector3.up * upSpd;
+            npc.IsAirborne = true;
+            npc.StumbleVel = Vector3.zero;
+            float downDur = Mathf.Clamp(3.2f + speedKmh * 0.04f, 3.4f, 5.6f);
+            npc.KnockdownTimer = downDur;
+            npc.FleeTimer = 6.5f;
+            npc.FleeDir = impactDir;
+
+            npc.Root.transform.rotation = Quaternion.LookRotation(-impactDir, Vector3.up);
+            npc.Humanoid.PlayKnockdown(downDur);
+
+            bool en = LocalizationService.IsEnglish;
+            NpcSpeechBubbleManager.Say(npc.Root.transform, npc.DisplayName, en ? "Watch the road!!" : "Önüne baksana!!", 3.2f, NpcBubbleMood.Alert, 2.08f);
+            NpcWorldAwareness.NotifyViolence(npc.Root.transform.position, carPos, null);
+
+            if (speedKmh >= 8f)
+            {
+                NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                    NeighborhoodOffenseKind.HitPedestrianWithCar,
+                    npc.Root.transform.position,
+                    npc.DisplayName,
+                    repPenalty: 18,
+                    immediateFineTl: 75,
+                    heatDelta: 1.75f);
+            }
+        }
+
+        public void OnLivingNpcHitByProp(int idx, Vector3 impactPos, Vector3 impactVelocity, string propLabel)
+        {
+            if (idx < 0 || idx >= _npcs.Count) return;
+            LivingNpc npc = _npcs[idx];
+            if (npc == null || npc.Root == null || npc.Humanoid == null || npc.HitCooldown > 0f) return;
+
+            npc.HitCooldown = 0.55f;
+            Vector3 pushDir = impactVelocity;
+            pushDir.y = 0f;
+            if (pushDir.sqrMagnitude < 0.01f) pushDir = npc.Root.transform.position - impactPos;
+            pushDir.y = 0f;
+            pushDir = pushDir.sqrMagnitude > 0.001f ? pushDir.normalized : Vector3.forward;
+
+            npc.StumbleVel = pushDir * 3.8f;
+            npc.Humanoid.PlayHitReact();
+            bool en = LocalizationService.IsEnglish;
+            string line = en ? "Ow!! Why did you throw that at me?!" : "Ah!! Niye eşya fırlatıyorsun kafama?!";
+            NpcSpeechBubbleManager.Say(npc.Root.transform, npc.DisplayName, line, 2.8f, NpcBubbleMood.Alert, 2.08f);
+            NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                NeighborhoodOffenseKind.AssaultCitizen,
+                npc.Root.transform.position,
+                npc.DisplayName,
+                repPenalty: 10,
+                immediateFineTl: 0,
+                heatDelta: 0.9f);
+        }
+
+        private void HandleWorldViolenceForLivingNpcs(Vector3 incidentPos, Vector3 attackerPos, TownPedestrian victim)
+        {
+            bool en = LocalizationService.IsEnglish;
+            int reacted = 0;
+            for (int i = 0; i < _npcs.Count; i++)
+            {
+                LivingNpc n = _npcs[i];
+                if (n == null || n.Root == null || !n.Root.activeInHierarchy || n.KnockdownTimer > 0f || n.IsAirborne) continue;
+                if (n.FightTimer > 0f || n.FleeTimer > 0f) continue;
+                Vector3 d = n.Root.transform.position - incidentPos;
+                d.y = 0f;
+                if (d.sqrMagnitude > 14.5f * 14.5f) continue;
+
+                if (n.Role == NpcRole.Stroller || n.Role == NpcRole.Jogger)
+                {
+                    if (n.IsFighter && d.sqrMagnitude <= 10.5f * 10.5f && reacted < 1)
+                    {
+                        n.FightTimer = 7.5f;
+                        n.PunchCooldown = 0.9f;
+                        reacted++;
+                        NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Hey! Stop fighting on our street!" : "Hey! Mahallede olay çıkarma, dur!", 2.8f, NpcBubbleMood.Alert, 2.08f);
+                    }
+                    else
+                    {
+                        Vector3 away = n.Root.transform.position - attackerPos;
+                        away.y = 0f;
+                        n.FleeDir = away.sqrMagnitude > 0.01f ? away.normalized : n.Root.transform.forward;
+                        n.FleeTimer = UnityEngine.Random.Range(4.0f, 6.2f);
+                        n.Humanoid?.PlayStartled(0.8f);
+                        if (reacted < 2)
+                        {
+                            reacted++;
+                            NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Whoa, a fight! Back up!" : "Ayy kavga var, kaçın!", 2.6f, NpcBubbleMood.Alert, 2.08f);
+                        }
+                    }
+                }
+                else
+                {
+                    n.Humanoid?.PlayStartled(0.7f, incidentPos);
+                }
+            }
+        }
+
+        private void HandleWorldHornForLivingNpcs(Vector3 carPos, Vector3 carFwd)
+        {
+            Vector3 rightOfCar = Vector3.Cross(Vector3.up, carFwd).normalized;
+            bool en = LocalizationService.IsEnglish;
+            for (int i = 0; i < _npcs.Count; i++)
+            {
+                LivingNpc n = _npcs[i];
+                if (n == null || n.Root == null || !n.Root.activeInHierarchy || n.Role == NpcRole.SeatedTeaGuest || n.Role == NpcRole.Vendor) continue;
+                if (n.KnockdownTimer > 0f || n.IsAirborne || n.FleeTimer > 0f || n.CarDodgeCooldown > 0f) continue;
+                Vector3 toMe = n.Root.transform.position - carPos;
+                toMe.y = 0f;
+                if (toMe.sqrMagnitude > 13f * 13f) continue;
+
+                float side = Vector3.Dot(toMe, rightOfCar) >= 0f ? 1f : -1f;
+                n.SidestepDir = rightOfCar * side;
+                n.SidestepPeakSpeed = 3.0f;
+                n.SidestepDuration = 0.78f;
+                n.SidestepTimer = 0.78f;
+                n.CarDodgeCooldown = 1.4f;
+                n.Humanoid?.PlayStartled(0.78f, carPos);
+                if (toMe.sqrMagnitude < 9f * 9f && _globalBubbleCooldown <= 0f)
+                {
+                    _globalBubbleCooldown = 3.0f;
+                    NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Alright, moving aside!" : "Tamam tamam, kenara çekiliyorum!", 2.4f, NpcBubbleMood.Alert, 2.08f);
+                }
+            }
+        }
+
+        private void HandleWorldAlarmForLivingNpcs(Vector3 alarmPos)
+        {
+            bool en = LocalizationService.IsEnglish;
+            for (int i = 0; i < _npcs.Count; i++)
+            {
+                LivingNpc n = _npcs[i];
+                if (n == null || n.Root == null || !n.Root.activeInHierarchy || n.EventReactCooldown > 0f) continue;
+                Vector3 d = alarmPos - n.Root.transform.position;
+                d.y = 0f;
+                if (d.sqrMagnitude > 20f * 20f) continue;
+                n.EventReactCooldown = 10f;
+                n.PauseTimer = Mathf.Max(n.PauseTimer, 2.2f);
+                n.Humanoid?.SetLookAtPoint(true, alarmPos + Vector3.up * 1.0f);
+                if (d.sqrMagnitude < 14f * 14f && _globalBubbleCooldown <= 0f)
+                {
+                    _globalBubbleCooldown = 4.0f;
+                    NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Hear that car alarm?!" : "Araba alarmı çalıyor, ne oldu acaba?!", 2.8f, NpcBubbleMood.Alert, 2.08f);
+                }
+            }
+        }
+
+        private void HandleWorldPropImpactForLivingNpcs(Vector3 impactPos, Vector3 throwerPos, string propLabel)
+        {
+            bool en = LocalizationService.IsEnglish;
+            for (int i = 0; i < _npcs.Count; i++)
+            {
+                LivingNpc n = _npcs[i];
+                if (n == null || n.Root == null || !n.Root.activeInHierarchy || n.EventReactCooldown > 0f) continue;
+                Vector3 d = impactPos - n.Root.transform.position;
+                d.y = 0f;
+                if (d.sqrMagnitude > 11f * 11f) continue;
+                n.EventReactCooldown = 8f;
+                n.Humanoid?.PlayStartled(0.72f, impactPos);
+                if (d.sqrMagnitude < 8.5f * 8.5f && _globalBubbleCooldown <= 0f)
+                {
+                    _globalBubbleCooldown = 3.2f;
+                    NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Hey, careful! Don't break stuff!" : "Hop! Dikkat etsene, kıracaksın!", 2.6f, NpcBubbleMood.Alert, 2.08f);
+                }
+            }
+        }
+
+        private void HandleWorldRecklessDrivingForLivingNpcs(Vector3 carPos, Vector3 carFwd, float speedKmh)
+        {
+            bool en = LocalizationService.IsEnglish;
+            for (int i = 0; i < _npcs.Count; i++)
+            {
+                LivingNpc n = _npcs[i];
+                if (n == null || n.Root == null || !n.Root.activeInHierarchy || n.EventReactCooldown > 0f) continue;
+                Vector3 d = n.Root.transform.position - carPos;
+                d.y = 0f;
+                if (d.sqrMagnitude > 13.5f * 13.5f) continue;
+                n.EventReactCooldown = 9f;
+                n.Humanoid?.PlayStartled(0.70f, carPos);
+                if (_globalBubbleCooldown <= 0f)
+                {
+                    _globalBubbleCooldown = 3.5f;
+                    NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Slow down! Kids play around here!" : "Yavaş sür kardeşim, mahalle burası!", 2.8f, NpcBubbleMood.Alert, 2.08f);
+                }
+            }
+        }
+
+        private void HandleWorldGoodDeedForLivingNpcs(Vector3 deedPos, string deedTag)
+        {
+            bool en = LocalizationService.IsEnglish;
+            for (int i = 0; i < _npcs.Count; i++)
+            {
+                LivingNpc n = _npcs[i];
+                if (n == null || n.Root == null || !n.Root.activeInHierarchy || n.EventReactCooldown > 0f) continue;
+                Vector3 d = deedPos - n.Root.transform.position;
+                d.y = 0f;
+                if (d.sqrMagnitude > 16f * 16f) continue;
+                n.EventReactCooldown = 12f;
+                if (n.Role != NpcRole.SeatedTeaGuest) n.Humanoid?.PlayWave();
+                if (_globalBubbleCooldown <= 0f)
+                {
+                    _globalBubbleCooldown = 4.2f;
+                    NpcSpeechBubbleManager.Say(n.Root.transform, n.DisplayName, en ? "Nice job Deniz, proud of you!" : "Bravo Deniz, mahallemizin gururusun!", 3.0f, NpcBubbleMood.Friendly, 2.08f);
+                }
+            }
         }
 
         public static void CalmAllAngryNpcs()
@@ -976,6 +1291,7 @@ namespace OurWorld.World
                 if (!skel.Initialize("OW_StreetCat", i % 2 == 0 ? "Sit" : "Idle", i * 0.7f)) skel = null;
 
                 string id = $"living_cat_{i}";
+                WorldPhysicsSolidifier.EnsureKinematicActorPhysics(cat, radius: 0.16f, height: 0.36f, centerY: 0.18f);
                 InteractableTrigger trig = cat.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.4f);
                 trig.SetCustomPrompt($"{c.name} Kedisini Sev (+12 Enerji)", $"Pet {c.name} the Cat (+12 Energy)");
@@ -986,6 +1302,7 @@ namespace OurWorld.World
                     Kind = "cat",
                     DisplayName = c.name,
                     Root = cat.transform,
+                    Rb = cat.GetComponent<Rigidbody>(),
                     Skel = skel,
                     HeadBone = skel != null ? skel.FindBone("Head", "Neck3", "Neck") : null,
                     HomePos = c.pos,
@@ -1027,6 +1344,8 @@ namespace OurWorld.World
                 if (!skel.Initialize("OW_StreetDog", "Idle", i * 0.9f)) skel = null;
 
                 string id = $"living_dog_{i}";
+                // OW_StreetDog is scaled 0.28x, so divide collider dimensions by 0.28 so world capsule is ~0.26m radius x 0.72m tall
+                WorldPhysicsSolidifier.EnsureKinematicActorPhysics(dog, radius: 0.92f, height: 2.55f, centerY: 1.28f);
                 InteractableTrigger trig = dog.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.6f);
                 trig.SetCustomPrompt($"{d.name} Köpeğini Sev (+15 Enerji · Dost Ol)", $"Pet {d.name} the Dog (+15 Energy · Befriend)");
@@ -1037,6 +1356,7 @@ namespace OurWorld.World
                     Kind = "dog",
                     DisplayName = d.name,
                     Root = dog.transform,
+                    Rb = dog.GetComponent<Rigidbody>(),
                     Skel = skel,
                     HeadBone = skel != null ? skel.FindBone("Head", "Neck3", "Neck") : null,
                     HomePos = d.pos,
@@ -1097,6 +1417,7 @@ namespace OurWorld.World
                 if (!skel.Initialize("OW_FarmGoat", i % 2 == 0 ? "Eating" : "Idle", i * 0.8f)) skel = null;
 
                 string id = $"living_goat_{i}";
+                WorldPhysicsSolidifier.EnsureKinematicActorPhysics(goat, radius: 0.34f, height: 0.88f, centerY: 0.44f);
                 InteractableTrigger trig = goat.AddComponent<InteractableTrigger>();
                 trig.Configure(InteractableKind.InspectObject, id, "ui.btn.interact", 2.8f);
                 trig.SetCustomPrompt($"{goatNames[i]} Keçisini Sev & Peynir Al (+45 ₺)", $"Pet {goatNames[i]} the Goat & Collect Cheese (+45 ₺)");
@@ -1107,6 +1428,7 @@ namespace OurWorld.World
                     Kind = "goat",
                     DisplayName = goatNames[i],
                     Root = goat.transform,
+                    Rb = goat.GetComponent<Rigidbody>(),
                     Skel = skel,
                     HeadBone = skel != null ? skel.FindBone("Head", "Neck3", "Neck") : null,
                     HomePos = penCenter,
@@ -1174,25 +1496,60 @@ namespace OurWorld.World
                 }
                 if (!npc.Root.activeSelf) npc.Root.SetActive(true);
 
-                // Tier 2 LOD (32-78 m): update only 1/3 of frames (unless actively in combat/fleeing!)
-                bool inCombat = npc.FightTimer > 0f || npc.FleeTimer > 0f || npc.KnockdownTimer > 0f || npc.StumbleVel.sqrMagnitude > 0.01f;
-                bool farLod = !inCombat && distSq > 32f * 32f;
+                // Tier 2 LOD (32-78 m): update only 1/3 of frames (unless actively in combat/fleeing/dodging!)
+                bool inCombat = npc.IsAirborne || npc.FightTimer > 0f || npc.FleeTimer > 0f || npc.KnockdownTimer > 0f || npc.StumbleVel.sqrMagnitude > 0.01f;
+                bool farLod = !inCombat && npc.SidestepTimer <= 0f && distSq > 32f * 32f;
                 if (farLod && ((frame + i) % 3 != 0)) continue;
                 float stepDt = farLod ? dt * 3f : dt;
 
                 if (npc.HitCooldown > 0f) npc.HitCooldown -= stepDt;
+                if (npc.BumpCooldown > 0f) npc.BumpCooldown -= stepDt;
+                if (npc.VehicleHitCooldown > 0f) npc.VehicleHitCooldown -= stepDt;
+                if (npc.CarDodgeCooldown > 0f) npc.CarDodgeCooldown -= stepDt;
+                if (npc.EventReactCooldown > 0f) npc.EventReactCooldown -= stepDt;
+
+                // Ballistic air-launch after vehicle impact
+                if (npc.IsAirborne)
+                {
+                    npc.AirVel.y -= 21f * stepDt;
+                    Vector3 nextAir = pos + npc.AirVel * stepDt;
+                    nextAir.x = Mathf.Clamp(nextAir.x, -245f, 245f);
+                    nextAir.z = Mathf.Clamp(nextAir.z, -245f, 245f);
+                    if (nextAir.y <= 0.04f)
+                    {
+                        nextAir.y = 0.04f;
+                        if (npc.AirVel.y < -3.4f)
+                        {
+                            npc.AirVel.y = -npc.AirVel.y * 0.28f;
+                            npc.AirVel.x *= 0.62f;
+                            npc.AirVel.z *= 0.62f;
+                        }
+                        else
+                        {
+                            npc.IsAirborne = false;
+                            npc.StumbleVel = new Vector3(npc.AirVel.x * 0.5f, 0f, npc.AirVel.z * 0.5f);
+                            npc.AirVel = Vector3.zero;
+                        }
+                    }
+                    npc.Root.transform.position = nextAir;
+                    if (npc.KnockdownTimer > 0f) npc.KnockdownTimer -= stepDt;
+                    npc.Humanoid.SetLocomotion(0f, grounded: false, verticalVelocity: npc.AirVel.y);
+                    continue;
+                }
 
                 // Combat state machine (stumble -> knockdown -> flee / chase & punch back!)
                 if (inCombat)
                 {
+                    if (npc.RainShieldActive)
+                    {
+                        npc.RainShieldActive = false;
+                        npc.Humanoid.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+                    }
                     if (npc.StumbleVel.sqrMagnitude > 0.01f)
                     {
-                        Vector3 step = npc.StumbleVel * stepDt;
-                        if (!Physics.Raycast(pos + Vector3.up * 0.9f, npc.StumbleVel.normalized, step.magnitude + 0.45f, ~0, QueryTriggerInteraction.Ignore))
-                        {
-                            pos += step;
-                            npc.Root.transform.position = pos;
-                        }
+                        Vector3 dRef = npc.StumbleVel.normalized;
+                        NpcSmartNavigation.MoveActorSafely(npc.Root.transform, npc.Rb, npc.StumbleVel * stepDt, ref dRef, false, bodyRadius: 0.29f);
+                        pos = npc.Root.transform.position;
                         npc.StumbleVel = Vector3.MoveTowards(npc.StumbleVel, Vector3.zero, 10.5f * stepDt);
                     }
 
@@ -1207,13 +1564,8 @@ namespace OurWorld.World
                     {
                         npc.FleeTimer -= stepDt;
                         Vector3 fDir = npc.FleeDir.sqrMagnitude > 0.01f ? npc.FleeDir : npc.Root.transform.forward;
-                        if (Physics.Raycast(pos + Vector3.up * 0.9f, fDir, 0.95f, ~0, QueryTriggerInteraction.Ignore))
-                        {
-                            fDir = Quaternion.Euler(0f, 75f, 0f) * fDir;
-                            npc.FleeDir = fDir;
-                        }
-                        pos += fDir * (4.4f * stepDt);
-                        npc.Root.transform.position = pos;
+                        NpcSmartNavigation.MoveActorSafely(npc.Root.transform, npc.Rb, fDir * (4.4f * stepDt), ref fDir, true, bodyRadius: 0.29f);
+                        npc.FleeDir = fDir;
                         npc.Root.transform.rotation = Quaternion.Slerp(npc.Root.transform.rotation, Quaternion.LookRotation(fDir, Vector3.up), 1f - Mathf.Exp(-10f * stepDt));
                         npc.Humanoid.SetLocomotion(4.4f, true, 0f, fDir, sampleGround: false);
                         continue;
@@ -1255,17 +1607,10 @@ namespace OurWorld.World
 
                             if (pDist > 1.70f)
                             {
-                                Vector3 chaseDir = toPlayer / pDist;
-                                if (!Physics.Raycast(pos + Vector3.up * 0.9f, chaseDir, 0.85f, ~0, QueryTriggerInteraction.Ignore))
-                                {
-                                    pos += chaseDir * (3.65f * stepDt);
-                                    npc.Root.transform.position = pos;
-                                    npc.Humanoid.SetLocomotion(3.65f, true, 0f, chaseDir, sampleGround: false);
-                                }
-                                else
-                                {
-                                    npc.Humanoid.SetLocomotion(0f, true, 0f);
-                                }
+                                Vector3 chaseDir = NpcSmartNavigation.ComputeSmartSteering(npc.Root.transform, toPlayer / pDist, probeDistance: 1.6f, bodyRadius: 0.29f, avoidPlayer: false, avoidNeighbors: false);
+                                Vector3 moveRef = chaseDir;
+                                bool moved = NpcSmartNavigation.MoveActorSafely(npc.Root.transform, npc.Rb, chaseDir * (3.65f * stepDt), ref moveRef, false, bodyRadius: 0.29f);
+                                npc.Humanoid.SetLocomotion(moved ? 3.65f : 0f, true, 0f, chaseDir, sampleGround: false);
                             }
                             else
                             {
@@ -1293,11 +1638,62 @@ namespace OurWorld.World
                     }
                 }
 
+                // Active sidestep dodge away from approaching car/bike/horn
+                if (npc.SidestepTimer > 0f)
+                {
+                    npc.SidestepTimer = Mathf.Max(0f, npc.SidestepTimer - stepDt);
+                    float u = 1f - Mathf.Clamp01(npc.SidestepTimer / Mathf.Max(0.1f, npc.SidestepDuration));
+                    float stepSpd = npc.SidestepPeakSpeed * Mathf.Sin(u * Mathf.PI);
+                    Vector3 sDir = npc.SidestepDir.sqrMagnitude > 0.001f ? npc.SidestepDir : npc.Root.transform.right;
+                    if (stepSpd > 0.02f)
+                    {
+                        Vector3 dRef = sDir;
+                        NpcSmartNavigation.MoveActorSafely(npc.Root.transform, npc.Rb, sDir * (stepSpd * stepDt), ref dRef, false, bodyRadius: 0.29f);
+                    }
+                    npc.Humanoid.SetLocomotion(stepSpd, true, 0f, sDir, sampleGround: false);
+                    continue;
+                }
+
+                bool isRaining = NeighborhoodWeatherSystem.Instance != null &&
+                                 NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower;
+
                 if (npc.Role == NpcRole.Stroller || npc.Role == NpcRole.Jogger)
                 {
                     if (npc.Route != null && npc.Route.Length >= 2)
                     {
-                        if (npc.PauseTimer > 0f)
+                        // Real-time vehicle/traffic/bicycle threat avoidance (checks player car, bike & AI traffic!)
+                        bool yieldingToVeh = false;
+                        if (!farLod)
+                        {
+                            ApproachingVehicleInfo threat = NpcSmartNavigation.DetectApproachingVehicle(pos, npc.Root.transform.forward);
+                            if (threat.Detected)
+                            {
+                                yieldingToVeh = true;
+                                Vector3 toVeh = threat.VehiclePos - pos;
+                                toVeh.y = 0f;
+                                if (toVeh.sqrMagnitude > 0.04f)
+                                {
+                                    npc.Root.transform.rotation = Quaternion.Slerp(npc.Root.transform.rotation, Quaternion.LookRotation(toVeh.normalized, Vector3.up), 1f - Mathf.Exp(-10f * stepDt));
+                                }
+                                npc.Humanoid.SetLookAtPoint(true, threat.VehiclePos + Vector3.up * 1.2f);
+                                if (threat.SpeedKmh > 2.5f && Mathf.Abs(threat.LateralOffset) < 2.35f && npc.CarDodgeCooldown <= 0f)
+                                {
+                                    float side = Mathf.Abs(threat.LateralOffset) > 0.12f ? (threat.LateralOffset >= 0f ? 1f : -1f) : 1f;
+                                    npc.SidestepDir = threat.VehicleRight * side;
+                                    npc.SidestepDuration = threat.Urgent ? 0.65f : 0.78f;
+                                    npc.SidestepPeakSpeed = threat.Urgent ? 3.1f : 1.85f;
+                                    npc.SidestepTimer = npc.SidestepDuration;
+                                    npc.CarDodgeCooldown = 1.5f;
+                                    if (threat.Urgent) npc.Humanoid.PlayStartled(0.8f, threat.VehiclePos);
+                                }
+                            }
+                        }
+
+                        if (yieldingToVeh)
+                        {
+                            npc.Humanoid.SetLocomotion(0f, true, 0f);
+                        }
+                        else if (npc.PauseTimer > 0f && !isRaining)
                         {
                             npc.PauseTimer -= stepDt;
                             npc.Humanoid.SetLocomotion(0f, true, 0f);
@@ -1317,33 +1713,77 @@ namespace OurWorld.World
                             Vector3 delta = target - pos;
                             delta.y = 0f;
                             float d = delta.magnitude;
-                            if (d < 0.45f)
+                            if (d < 0.55f)
                             {
                                 npc.WaypointIdx = (npc.WaypointIdx + 1) % npc.Route.Length;
-                                npc.PauseTimer = npc.Role == NpcRole.Jogger ? 0.1f : UnityEngine.Random.Range(0.4f, 1.8f);
+                                npc.PauseTimer = isRaining ? 0f : (npc.Role == NpcRole.Jogger ? 0.1f : UnityEngine.Random.Range(0.4f, 1.8f));
                             }
                             else
                             {
-                                Vector3 dir = delta / d;
-                                // Smart personal-space avoidance around the player so living NPCs politely step around Deniz!
-                                if (distSq > 0.01f && distSq < 1.95f * 1.95f)
+                                Vector3 baseDir = delta / d;
+                                // Smart 5-whisker obstacle avoidance + right-hand sidewalk passing when within 34m!
+                                Vector3 dir = !farLod
+                                    ? NpcSmartNavigation.ComputeSmartSteering(npc.Root.transform, baseDir, probeDistance: 2.0f, bodyRadius: 0.29f, avoidPlayer: true, avoidNeighbors: true)
+                                    : baseDir;
+
+                                // Polite separation from sibling LivingNPCs so strollers never clip through each other
+                                if (!farLod)
                                 {
-                                    Vector3 away = pos - playerPos;
-                                    away.y = 0f;
-                                    float awayMag = away.magnitude;
-                                    if (awayMag > 0.01f)
+                                    for (int j = 0; j < _npcs.Count; j++)
                                     {
-                                        float w = Mathf.InverseLerp(1.95f, 0.60f, awayMag) * 1.45f;
-                                        Vector3 steered = dir + (away / awayMag) * w;
-                                        steered.y = 0f;
-                                        if (steered.sqrMagnitude > 0.001f) dir = steered.normalized;
+                                        if (j == i) continue;
+                                        LivingNpc other = _npcs[j];
+                                        if (other == null || other.Root == null || !other.Root.activeInHierarchy) continue;
+                                        Vector3 away = pos - other.Root.transform.position;
+                                        if (Mathf.Abs(away.y) > 1.8f) continue;
+                                        away.y = 0f;
+                                        float oSq = away.sqrMagnitude;
+                                        if (oSq > 0.001f && oSq < 1.25f * 1.25f)
+                                        {
+                                            float oDist = Mathf.Sqrt(oSq);
+                                            dir += (away / oDist) * (Mathf.InverseLerp(1.25f, 0.48f, oDist) * 1.15f);
+                                        }
+                                    }
+                                    dir.y = 0f;
+                                    if (dir.sqrMagnitude > 0.001f) dir.Normalize();
+                                    else dir = baseDir;
+                                }
+
+                                float moveSpd = isRaining ? Mathf.Max(npc.Speed * 1.55f, 2.55f) : npc.Speed;
+                                Vector3 moveRef = dir;
+                                NpcSmartNavigation.MoveActorSafely(npc.Root.transform, npc.Rb, dir * (moveSpd * stepDt), ref moveRef, false, bodyRadius: 0.29f);
+                                Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
+                                npc.Root.transform.rotation = Quaternion.Slerp(npc.Root.transform.rotation, rot, 1f - Mathf.Exp(-7.5f * stepDt));
+                                npc.Humanoid.SetLocomotion(moveSpd, true, 0f, dir, sampleGround: false);
+
+                                // Stuck detector so nobody ever walks in place behind a parked car or tree
+                                npc.StuckTimer += stepDt;
+                                if (npc.StuckTimer >= 2.0f)
+                                {
+                                    float movedSq = (npc.Root.transform.position - npc.LastProgressPos).sqrMagnitude;
+                                    npc.LastProgressPos = npc.Root.transform.position;
+                                    npc.StuckTimer = 0f;
+                                    if (movedSq < 0.09f)
+                                    {
+                                        npc.WaypointIdx = (npc.WaypointIdx + 1) % npc.Route.Length;
                                     }
                                 }
-                                pos += dir * (npc.Speed * stepDt);
-                                npc.Root.transform.position = pos;
-                                Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
-                                npc.Root.transform.rotation = Quaternion.Slerp(npc.Root.transform.rotation, rot, 1f - Mathf.Exp(-7f * stepDt));
-                                npc.Humanoid.SetLocomotion(npc.Speed, true, 0f, dir, sampleGround: false);
+
+                                // Raise hand to shield head during Istanbul summer rain
+                                if (isRaining && !farLod)
+                                {
+                                    Vector3 headBase = npc.Humanoid.HeadTransform != null
+                                        ? npc.Humanoid.HeadTransform.position
+                                        : npc.Root.transform.position + Vector3.up * 1.56f;
+                                    Vector3 shieldHand = headBase + Vector3.up * 0.20f + npc.Root.transform.forward * 0.14f;
+                                    npc.Humanoid.SetDualHandAction(true, Vector3.zero, shieldHand, 0f, 0.80f, 10f, 8f, 0.01f);
+                                    npc.RainShieldActive = true;
+                                }
+                                else if (npc.RainShieldActive)
+                                {
+                                    npc.RainShieldActive = false;
+                                    npc.Humanoid.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
+                                }
                             }
                         }
                     }
@@ -1466,7 +1906,24 @@ namespace OurWorld.World
 
         private static string ChooseReactiveLine(LivingNpc npc)
         {
-            // React dynamically to player's sports trophies or time of day!
+            bool isEn = LocalizationService.IsEnglish;
+
+            // 1. Live player context awareness (carrying prop, rain-soaked, low health, sunglasses/cap, new car!)
+            if (UnityEngine.Random.value < 0.48f &&
+                NpcSmartNavigation.TryGetPlayerContextRemark(isEn, out string ctxLine, out _))
+            {
+                return ctxLine;
+            }
+
+            // 2. React dynamically to rain
+            if (NeighborhoodWeatherSystem.Instance != null &&
+                NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower &&
+                UnityEngine.Random.value < 0.60f)
+            {
+                return isEn ? "Sudden Istanbul shower! Better grab an umbrella!" : "İstanbul yaz yağmuru bastırdı, ıslanma komşu!";
+            }
+
+            // 3. React dynamically to player's sports trophies or time of day!
             SaveData save = SaveManager.Instance != null ? SaveManager.Instance.Data : null;
             if (save != null && UnityEngine.Random.value < 0.35f)
             {
@@ -1481,14 +1938,16 @@ namespace OurWorld.World
             float hr = DayNightCycle.Instance != null ? DayNightCycle.Instance.CurrentHour : 11f;
             if ((hr >= 19.5f || hr < 5.5f) && UnityEngine.Random.value < 0.35f)
             {
-                return "İyi akşamlar komşu, ışıklar yanınca mahalle bir başka güzel!";
+                return isEn
+                    ? "Good evening neighbor, Hamidiye glows beautifully under the night lights!"
+                    : "İyi akşamlar komşu, ışıklar yanınca mahalle bir başka güzel!";
             }
 
             if (npc.Lines != null && npc.Lines.Length > 0)
             {
                 return npc.Lines[UnityEngine.Random.Range(0, npc.Lines.Length)];
             }
-            return "Merhaba komşu!";
+            return isEn ? "Hello neighbor!" : "Merhaba komşu!";
         }
 
         private void UpdatePigeonFlocks(float dt, Vector3 playerPos, bool playerFast)
@@ -1808,15 +2267,19 @@ namespace OurWorld.World
                     }
 
                     a.CurrentSpeed = Mathf.Lerp(a.CurrentSpeed, desiredSpd, 1f - Mathf.Exp(-7.5f * dt));
-                    bool blocked = a.CurrentSpeed > 0.1f && distSq < 32f * 32f && ((frame + i) % 3 == 0) &&
-                                   IsPathBlockedByObstacle(a.Root, pos, a.Root.forward, 0.72f, 0.24f);
-                    if (blocked)
+                    if (a.CurrentSpeed > 0.02f)
                     {
-                        a.CurrentSpeed = 0f;
-                    }
-                    else if (a.CurrentSpeed > 0.02f)
-                    {
-                        a.Root.position = pos + a.Root.forward * (a.CurrentSpeed * dt);
+                        Vector3 fDir = a.Root.forward;
+                        bool moved = NpcSmartNavigation.MoveActorSafely(
+                            a.Root,
+                            a.Rb,
+                            fDir * (a.CurrentSpeed * dt),
+                            ref fDir,
+                            false,
+                            bodyRadius: 0.24f,
+                            lowHeight: 0.34f,
+                            highHeight: 0.34f);
+                        if (!moved) a.CurrentSpeed = 0f;
                     }
 
                     if (a.CurrentSpeed > 0.14f)
@@ -1831,6 +2294,31 @@ namespace OurWorld.World
                         a.Skel?.PlayClip("Idle", 0.28f, 1.0f);
                     }
                     continue;
+                }
+
+                // Curious food-scent approach: if player carries food in Backpack and walks calmly, street dogs & cats notice!
+                bool hasBackpackFood = PlayerBackpackInventory.Instance != null && PlayerBackpackInventory.Instance.TotalItemCount > 0;
+                if (!playerFast && !a.Walking && hasBackpackFood && a.ReactCooldown <= 0f &&
+                    (a.Kind == "dog" || a.Kind == "cat") && distSq > 2.0f * 2.0f && distSq < 6.0f * 6.0f)
+                {
+                    float d = Mathf.Sqrt(distSq);
+                    Vector3 sniffSpot = playerPos - (toPlayer / d) * 1.45f;
+                    Vector3 fromHome = sniffSpot - a.HomePos;
+                    fromHome.y = 0f;
+                    if (fromHome.sqrMagnitude <= (a.WanderRadius + 3.0f) * (a.WanderRadius + 3.0f))
+                    {
+                        sniffSpot.y = a.HomePos.y;
+                        a.TargetPos = sniffSpot;
+                        a.Walking = true;
+                        a.Sitting = false;
+                        a.Retreating = false;
+                        a.StateTimer = 3.2f;
+                        a.ReactCooldown = 14f;
+                        if (a.Kind == "cat" && UnityEngine.Random.value < 0.45f)
+                        {
+                            GameFeelAudio.PlayCatMeow();
+                        }
+                    }
                 }
 
                 // Approaching player reactions for rigged cats & goats (cautious retreat from fast player, curious approach for goats)
@@ -1903,42 +2391,72 @@ namespace OurWorld.World
                     else
                     {
                         Vector3 dir = delta / dist;
-                        float turnRate = a.Retreating ? 9.5f : 6.5f;
-                        a.Root.rotation = Quaternion.Slerp(a.Root.rotation, Quaternion.LookRotation(dir, Vector3.up), 1f - Mathf.Exp(-turnRate * dt));
+                        // Animal-to-animal separation so dogs, cats & goats never clip inside each other!
+                        Vector3 steerDir = dir;
+                        for (int j = 0; j < _animals.Count; j++)
+                        {
+                            if (j == i) continue;
+                            LivingAnimal other = _animals[j];
+                            if (other == null || other.Root == null) continue;
+                            Vector3 awayA = pos - other.Root.position;
+                            awayA.y = 0f;
+                            float aSq = awayA.sqrMagnitude;
+                            if (aSq > 0.001f && aSq < 0.95f * 0.95f)
+                            {
+                                float aDist = Mathf.Sqrt(aSq);
+                                steerDir += (awayA / aDist) * Mathf.InverseLerp(0.95f, 0.35f, aDist);
+                            }
+                        }
+                        steerDir.y = 0f;
+                        if (steerDir.sqrMagnitude > 0.001f) steerDir.Normalize();
+                        else steerDir = dir;
 
-                        float alignDot = Vector3.Dot(a.Root.forward, dir);
+                        float turnRate = a.Retreating ? 9.5f : 6.5f;
+                        a.Root.rotation = Quaternion.Slerp(a.Root.rotation, Quaternion.LookRotation(steerDir, Vector3.up), 1f - Mathf.Exp(-turnRate * dt));
+
+                        float alignDot = Vector3.Dot(a.Root.forward, steerDir);
                         float alignGate = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.25f, 0.90f, alignDot));
                         float arriveGate = Mathf.Clamp01((dist - 0.16f) / 0.65f);
                         float maxSpd = a.WalkSpeed * (a.Retreating ? 1.38f : 1f);
                         float desiredSpd = maxSpd * alignGate * arriveGate;
                         a.CurrentSpeed = Mathf.Lerp(a.CurrentSpeed, desiredSpd, 1f - Mathf.Exp(-7.5f * dt));
 
-                        // Throttled short obstacle guard so wandering animals don't walk through walls/fences/benches
-                        if (a.CurrentSpeed > 0.1f && distSq < 32f * 32f && ((frame + i) % 3 == 0) &&
-                            IsPathBlockedByObstacle(a.Root, pos, a.Root.forward, 0.65f, 0.22f))
-                        {
-                            a.Walking = false;
-                            a.Retreating = false;
-                            a.CurrentSpeed = 0f;
-                            a.StateTimer = UnityEngine.Random.Range(1.2f, 2.8f);
-                            a.Skel?.PlayClip("Idle", 0.26f, 1.0f);
-                            continue;
-                        }
-
                         if (a.CurrentSpeed > 0.02f)
                         {
-                            Vector3 nextPos = pos + a.Root.forward * (a.CurrentSpeed * dt);
+                            Vector3 stepDir = a.Root.forward;
+                            float rad = a.Kind == "goat" ? 0.30f : (a.Kind == "dog" ? 0.24f : 0.16f);
+                            bool moved = NpcSmartNavigation.MoveActorSafely(
+                                a.Root,
+                                a.Rb,
+                                stepDir * (a.CurrentSpeed * dt),
+                                ref stepDir,
+                                false,
+                                bodyRadius: rad,
+                                lowHeight: rad + 0.12f,
+                                highHeight: rad + 0.12f);
+
+                            if (!moved)
+                            {
+                                a.Walking = false;
+                                a.Retreating = false;
+                                a.CurrentSpeed = 0f;
+                                a.StateTimer = UnityEngine.Random.Range(1.2f, 2.4f);
+                                a.Skel?.PlayClip("Idle", 0.26f, 1.0f);
+                                continue;
+                            }
+
                             if (a.Kind == "goat")
                             {
+                                Vector3 nextPos = a.Root.position;
                                 Vector3 offsetHome = nextPos - a.HomePos;
                                 offsetHome.y = 0f;
                                 if (offsetHome.sqrMagnitude > a.WanderRadius * a.WanderRadius)
                                 {
                                     nextPos = a.HomePos + offsetHome.normalized * a.WanderRadius;
-                                    nextPos.y = pos.y;
+                                    nextPos.y = a.HomePos.y;
+                                    a.Root.position = nextPos;
                                 }
                             }
-                            a.Root.position = nextPos;
                         }
 
                         if (a.CurrentSpeed > 0.12f)

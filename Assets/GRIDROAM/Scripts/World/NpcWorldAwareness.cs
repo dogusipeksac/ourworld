@@ -18,6 +18,11 @@ namespace OurWorld.World
         public static event Action<Vector3, Vector3, TownPedestrian> OnViolenceOccurred;
         public static event Action<Vector3, Vector3> OnHornHeard;
         public static event Action<Vector3> OnSportHighlight;
+        public static event Action<Vector3> OnCarAlarmSounded;
+        public static event Action<Vector3, Vector3, string> OnPropImpactOccurred;
+        public static event Action<Vector3, Vector3, float> OnRecklessDriving;
+        public static event Action<Vector3, string> OnGoodDeedWitnessed;
+        public static event Action<Vector3, string> OnStoreAlarmTriggered;
 
         private float _storyAttachTimer = 0.8f;
 
@@ -38,6 +43,31 @@ namespace OurWorld.World
         public static void NotifySportHighlight(Vector3 arenaPos)
         {
             OnSportHighlight?.Invoke(arenaPos);
+        }
+
+        public static void NotifyCarAlarm(Vector3 alarmPos)
+        {
+            OnCarAlarmSounded?.Invoke(alarmPos);
+        }
+
+        public static void NotifyPropImpact(Vector3 impactPos, Vector3 throwerPos, string propLabel)
+        {
+            OnPropImpactOccurred?.Invoke(impactPos, throwerPos, propLabel ?? string.Empty);
+        }
+
+        public static void NotifyRecklessDriving(Vector3 carPos, Vector3 carForward, float speedKmh)
+        {
+            OnRecklessDriving?.Invoke(carPos, carForward, speedKmh);
+        }
+
+        public static void NotifyGoodDeed(Vector3 pos, string deedTag = "")
+        {
+            OnGoodDeedWitnessed?.Invoke(pos, deedTag ?? string.Empty);
+        }
+
+        public static void NotifyStoreAlarm(Vector3 pos, string storeName)
+        {
+            OnStoreAlarmTriggered?.Invoke(pos, storeName ?? string.Empty);
         }
 
         private void OnEnable()
@@ -102,10 +132,14 @@ namespace OurWorld.World
     public sealed class SmartStoryNpcPresence : MonoBehaviour
     {
         private string _anchorId;
+        private string _customNameTr;
+        private string _customNameEn;
         private ProceduralHumanoid _humanoid;
         private Quaternion _homeRotation;
         private float _checkTimer;
         private float _greetCooldown;
+        private float _alertReactCooldown;
+        private float _idleGestureTimer;
 
         private static readonly Dictionary<string, (string tr, string en)> SpeakerLookup =
             new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
@@ -121,15 +155,77 @@ namespace OurWorld.World
                 ["npc_avukat_tarik"] = ("Avukat Tarık", "Lawyer Tarık"),
                 ["npc_coach_kerem"] = ("Antrenör Kerem", "Coach Kerem"),
                 ["npc_electrician_hasan"] = ("Usta Hasan", "Master Hasan"),
-                ["npc_journalist_defne"] = ("Gazeteci Defne", "Journalist Defne")
+                ["npc_journalist_defne"] = ("Gazeteci Defne", "Journalist Defne"),
+                ["npc_otogaleri_kemal"] = ("Kemal Bey", "Mr. Kemal"),
+                ["npc_usta_haluk"] = ("Usta Haluk", "Master Haluk")
             };
 
-        public void Initialize(string anchorId)
+        public void Initialize(string anchorId, string customNameTr = null, string customNameEn = null)
         {
             _anchorId = anchorId ?? string.Empty;
+            _customNameTr = customNameTr;
+            _customNameEn = customNameEn;
             _humanoid = GetComponentInChildren<ProceduralHumanoid>(true);
             _homeRotation = transform.rotation;
             _checkTimer = UnityEngine.Random.Range(0.2f, 0.8f);
+            _idleGestureTimer = UnityEngine.Random.Range(8f, 18f);
+            // Guarantee Story NPCs are physically solid (kinematic Rigidbody + CapsuleCollider)
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(gameObject, radius: 0.34f, height: 1.78f, centerY: 0.89f);
+        }
+
+        private void OnEnable()
+        {
+            NpcWorldAwareness.OnViolenceOccurred += HandleNearbyAlert;
+            NpcWorldAwareness.OnCarAlarmSounded += HandleCarAlarmHeard;
+            NpcWorldAwareness.OnStoreAlarmTriggered += HandleStoreAlarmHeard;
+        }
+
+        private void OnDisable()
+        {
+            NpcWorldAwareness.OnViolenceOccurred -= HandleNearbyAlert;
+            NpcWorldAwareness.OnCarAlarmSounded -= HandleCarAlarmHeard;
+            NpcWorldAwareness.OnStoreAlarmTriggered -= HandleStoreAlarmHeard;
+        }
+
+        private void HandleNearbyAlert(Vector3 incidentPos, Vector3 attackerPos, TownPedestrian victim)
+        {
+            if (_alertReactCooldown > 0f) return;
+            Vector3 d = incidentPos - transform.position;
+            d.y = 0f;
+            if (d.sqrMagnitude > 16f * 16f) return;
+            _alertReactCooldown = 8f;
+            if (d.sqrMagnitude > 0.05f) transform.rotation = Quaternion.LookRotation(d.normalized, Vector3.up);
+            _humanoid?.PlayStartled(0.75f, incidentPos);
+            bool isEn = LocalizationService.IsEnglish;
+            string line = isEn ? "Whoa! Calm down out there — keep the peace!" : "Hey! Ne oluyor orada, sakin olun komşular!";
+            NpcSpeechBubbleManager.Say(transform, GetSpeakerName(isEn), line, 3.0f, NpcBubbleMood.Alert);
+        }
+
+        private void HandleCarAlarmHeard(Vector3 alarmPos)
+        {
+            if (_alertReactCooldown > 0f) return;
+            Vector3 d = alarmPos - transform.position;
+            d.y = 0f;
+            if (d.sqrMagnitude > 22f * 22f) return;
+            _alertReactCooldown = 9f;
+            _humanoid?.SetLookAtPoint(true, alarmPos + Vector3.up * 1.0f);
+            bool isEn = LocalizationService.IsEnglish;
+            string line = isEn ? "Someone's car alarm is going off again!" : "Kimin arabasının alarmı ötüyor yine?!";
+            NpcSpeechBubbleManager.Say(transform, GetSpeakerName(isEn), line, 2.8f, NpcBubbleMood.Alert);
+        }
+
+        private void HandleStoreAlarmHeard(Vector3 alarmPos, string storeName)
+        {
+            if (_alertReactCooldown > 0f) return;
+            Vector3 d = alarmPos - transform.position;
+            if (Mathf.Abs(d.y) > 3.2f) return;
+            d.y = 0f;
+            if (d.sqrMagnitude > 22f * 22f) return;
+            _alertReactCooldown = 7f;
+            _humanoid?.PlayStartled(0.7f, alarmPos);
+            bool isEn = LocalizationService.IsEnglish;
+            string line = isEn ? "Security alarm! Did someone forget to pay?" : "Güvenlik alarmı çaldı! Biri ödeme yapmadan mı çıktı?!";
+            NpcSpeechBubbleManager.Say(transform, GetSpeakerName(isEn), line, 3.0f, NpcBubbleMood.Alert);
         }
 
         private void Update()
@@ -137,6 +233,7 @@ namespace OurWorld.World
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
             if (_greetCooldown > 0f) _greetCooldown -= dt;
+            if (_alertReactCooldown > 0f) _alertReactCooldown -= dt;
 
             PlayerModeController mode = PlayerModeController.Instance;
             if (mode == null || mode.IsModalLocked) return;
@@ -170,6 +267,15 @@ namespace OurWorld.World
             {
                 if (_humanoid != null) _humanoid.SetLookAtPoint(false, Vector3.zero);
                 transform.rotation = Quaternion.Slerp(transform.rotation, _homeRotation, 1f - Mathf.Exp(-2.2f * dt));
+                _idleGestureTimer -= dt;
+                if (_idleGestureTimer <= 0f)
+                {
+                    _idleGestureTimer = UnityEngine.Random.Range(11f, 22f);
+                    if (_humanoid != null && distSq <= 35f * 35f)
+                    {
+                        _humanoid.SetTalking(true, 1.8f);
+                    }
+                }
             }
         }
 
@@ -198,8 +304,29 @@ namespace OurWorld.World
             }
             else if (dist <= 5.8f)
             {
-                _greetCooldown = 28f;
+                _greetCooldown = 26f;
                 if (_humanoid != null) _humanoid.PlayWave();
+
+                // Smart situational remark when Deniz is carrying props, soaked, low health, wearing accessories, etc.
+                if (UnityEngine.Random.value < 0.55f &&
+                    NpcSmartNavigation.TryGetPlayerContextRemark(isEn, out string ctxRemark, out NpcBubbleMood ctxMood))
+                {
+                    NpcSpeechBubbleManager.Say(transform, speakerName, ctxRemark, 3.4f, ctxMood);
+                    return;
+                }
+
+                // Weather commentary during Istanbul summer showers
+                if (NeighborhoodWeatherSystem.Instance != null &&
+                    NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower &&
+                    UnityEngine.Random.value < 0.65f)
+                {
+                    string rainGreet = isEn
+                        ? "Quite the Istanbul shower today, Deniz! Step inside out of the rain!"
+                        : "Yağmur güzel yağıyor Deniz! Islanma, gel şöyle çatı altına!";
+                    NpcSpeechBubbleManager.Say(transform, speakerName, rainGreet, 3.3f, NpcBubbleMood.Weather);
+                    return;
+                }
+
                 float h = DayNightCycle.Instance != null ? DayNightCycle.Instance.CurrentHour : 12f;
                 string greet;
                 if (isEn)
@@ -222,6 +349,9 @@ namespace OurWorld.World
 
         private string GetSpeakerName(bool isEn)
         {
+            if (isEn && !string.IsNullOrEmpty(_customNameEn)) return _customNameEn;
+            if (!isEn && !string.IsNullOrEmpty(_customNameTr)) return _customNameTr;
+            if (!string.IsNullOrEmpty(_customNameTr)) return _customNameTr;
             if (SpeakerLookup.TryGetValue(_anchorId, out var pair))
             {
                 return isEn ? pair.en : pair.tr;

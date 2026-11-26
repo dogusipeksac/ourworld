@@ -22,6 +22,7 @@ namespace OurWorld.World
         private Vector3 _pastureCenter;
         private Vector2 _pastureHalfSize;
         private InteractableTrigger _trigger;
+        private Rigidbody _rb;
 
         private static readonly float[] QuadOffsets = { 0.25f, 0.75f, 0.00f, 0.50f };
 
@@ -196,6 +197,10 @@ namespace OurWorld.World
             _tailFlickCooldown = Random.Range(2.2f, 5.5f);
 
             BuildProceduralAnimalMesh(kind, variantSeed);
+            float colR = kind == FarmAnimalKind.Cow ? 0.56f : (kind == FarmAnimalKind.Sheep ? 0.38f : 0.20f);
+            float colH = kind == FarmAnimalKind.Cow ? 1.45f : (kind == FarmAnimalKind.Sheep ? 0.92f : 0.44f);
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(gameObject, radius: colR, height: colH, centerY: colH * 0.5f);
+            _rb = GetComponent<Rigidbody>();
             PickNextRoamTarget();
             RefreshReadyVisualsAndPrompt();
         }
@@ -316,6 +321,25 @@ namespace OurWorld.World
                 else
                 {
                     Vector3 dir = to / dist;
+                    // Herd separation so cows, sheep & chickens never walk inside each other!
+                    float minSep = _kind == FarmAnimalKind.Cow ? 1.55f : (_kind == FarmAnimalKind.Sheep ? 1.05f : 0.65f);
+                    float minSepSq = minSep * minSep;
+                    for (int a = 0; a < AllAnimals.Count; a++)
+                    {
+                        FarmAnimalController other = AllAnimals[a];
+                        if (other == null || other == this) continue;
+                        Vector3 away = transform.position - other.transform.position;
+                        away.y = 0f;
+                        float oSq = away.sqrMagnitude;
+                        if (oSq > 0.001f && oSq < minSepSq)
+                        {
+                            float oDist = Mathf.Sqrt(oSq);
+                            dir += (away / oDist) * Mathf.InverseLerp(minSep, minSep * 0.35f, oDist) * 1.2f;
+                        }
+                    }
+                    dir.y = 0f;
+                    if (dir.sqrMagnitude > 0.001f) dir.Normalize();
+
                     Quaternion targetRot = Quaternion.LookRotation(dir, Vector3.up);
                     float alignDot = Vector3.Dot(transform.forward, dir);
                     float turnRate = _kind == FarmAnimalKind.Chicken ? 7.5f : (_kind == FarmAnimalKind.Sheep ? 5.8f : 4.5f);
@@ -336,12 +360,33 @@ namespace OurWorld.World
             if (_currentMoveSpeed > 0.005f)
             {
                 Vector3 prevPos = transform.position;
-                Vector3 nextPos = ClampInsidePasture(prevPos + transform.forward * (_currentMoveSpeed * dt));
-                nextPos.y = prevPos.y;
-                transform.position = nextPos;
-                Vector3 moved = nextPos - prevPos;
-                moved.y = 0f;
-                actualSpeed = moved.magnitude / dt;
+                Vector3 stepDir = transform.forward;
+                float bodyRad = _kind == FarmAnimalKind.Cow ? 0.52f : (_kind == FarmAnimalKind.Sheep ? 0.34f : 0.18f);
+                float castH = _kind == FarmAnimalKind.Cow ? 0.78f : (_kind == FarmAnimalKind.Sheep ? 0.50f : 0.25f);
+                bool moved = NpcSmartNavigation.MoveActorSafely(
+                    transform,
+                    _rb,
+                    stepDir * (_currentMoveSpeed * dt),
+                    ref stepDir,
+                    false,
+                    bodyRadius: bodyRad,
+                    lowHeight: castH,
+                    highHeight: castH);
+
+                if (!moved)
+                {
+                    _idleTimer = Random.Range(1.0f, 2.2f);
+                    _currentMoveSpeed = 0f;
+                }
+                else
+                {
+                    Vector3 clamped = ClampInsidePasture(transform.position);
+                    clamped.y = prevPos.y;
+                    transform.position = clamped;
+                    Vector3 deltaMoved = clamped - prevPos;
+                    deltaMoved.y = 0f;
+                    actualSpeed = deltaMoved.magnitude / dt;
+                }
             }
             bool walking = actualSpeed > 0.08f;
 

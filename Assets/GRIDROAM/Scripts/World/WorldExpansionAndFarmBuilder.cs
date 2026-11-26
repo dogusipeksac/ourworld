@@ -1423,6 +1423,7 @@ namespace OurWorld.World
             GameObject dog = new GameObject("ShepherdDog_Karabas");
             dog.transform.SetParent(parent, false);
             dog.transform.position = pos;
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(dog, radius: 0.30f, height: 0.78f, centerY: 0.39f);
             _shepherdDog = dog.transform;
             _dogHome = pos;
             _shepherdLegs.Clear();
@@ -1495,8 +1496,8 @@ namespace OurWorld.World
             for (int p = 0; p < 4; p++)
             {
                 float px = -170f - p * 4.0f;
-                CreateCylinder($"PierPilingN_{p}", lakeRoot, new Vector3(px, -0.52f,  1.95f), new Vector3(0.22f, 1.42f, 0.22f), _woodTimberMat, collider: false);
-                CreateCylinder($"PierPilingS_{p}", lakeRoot, new Vector3(px, -0.52f, -1.95f), new Vector3(0.22f, 1.42f, 0.22f), _woodTimberMat, collider: false);
+                CreateCylinder($"PierPilingN_{p}", lakeRoot, new Vector3(px, -0.52f,  1.95f), new Vector3(0.22f, 1.42f, 0.22f), _woodTimberMat, collider: true);
+                CreateCylinder($"PierPilingS_{p}", lakeRoot, new Vector3(px, -0.52f, -1.95f), new Vector3(0.22f, 1.42f, 0.22f), _woodTimberMat, collider: true);
             }
             SpawnFarmLantern(lakeRoot, new Vector3(-182.2f, 0.44f,  1.8f));
             SpawnFarmLantern(lakeRoot, new Vector3(-182.2f, 0.44f, -1.8f));
@@ -1674,8 +1675,8 @@ namespace OurWorld.World
             for (int i = 0; i < posts.Length; i++) CreateBox("Post", g, posts[i], new Vector3(0.18f, 2.9f, 0.18f), _woodTimberMat, collider: true);
             CreateBox("Roof", g, new Vector3(0f, 3.12f, 0f), new Vector3(5.6f, 0.28f, 5.6f), _roofTileMat, collider: false);
             CreateBox("Table", g, new Vector3(0f, 0.72f, 0f), new Vector3(1.5f, 0.12f, 1.0f), _woodTimberMat, collider: true);
-            CreateBox("BenchN", g, new Vector3(0f, 0.45f,  1.2f), new Vector3(1.8f, 0.12f, 0.45f), _woodLightMat, collider: false);
-            CreateBox("BenchS", g, new Vector3(0f, 0.45f, -1.2f), new Vector3(1.8f, 0.12f, 0.45f), _woodLightMat, collider: false);
+            CreateBox("BenchN", g, new Vector3(0f, 0.45f,  1.2f), new Vector3(1.8f, 0.12f, 0.45f), _woodLightMat, collider: true);
+            CreateBox("BenchS", g, new Vector3(0f, 0.45f, -1.2f), new Vector3(1.8f, 0.12f, 0.45f), _woodLightMat, collider: true);
         }
 
         private void SpawnPineTree(Transform parent, Vector3 pos, float scale)
@@ -1684,7 +1685,7 @@ namespace OurWorld.World
             t.SetParent(parent, false);
             t.position = pos;
             t.localScale = Vector3.one * scale;
-            CreateCylinder("Trunk", t, new Vector3(0f, 1.3f, 0f), new Vector3(0.45f, 1.3f, 0.45f), _woodTimberMat, collider: false);
+            CreateCylinder("Trunk", t, new Vector3(0f, 1.3f, 0f), new Vector3(0.45f, 1.3f, 0.45f), _woodTimberMat, collider: true);
             CreateSphere("Tier1", t, new Vector3(0f, 2.7f, 0f), new Vector3(2.9f, 2.0f, 2.9f), _pineDarkMat);
             CreateSphere("Tier2", t, new Vector3(0f, 4.1f, 0f), new Vector3(2.2f, 1.8f, 2.2f), _leafBrightMat);
             CreateSphere("Tier3", t, new Vector3(0f, 5.2f, 0f), new Vector3(1.3f, 1.4f, 1.3f), _pineDarkMat);
@@ -1696,7 +1697,7 @@ namespace OurWorld.World
             t.SetParent(parent, false);
             t.position = pos;
             t.localScale = Vector3.one * scale;
-            CreateCylinder("Trunk", t, new Vector3(0f, 1.4f, 0f), new Vector3(0.42f, 1.4f, 0.42f), _woodTimberMat, collider: false);
+            CreateCylinder("Trunk", t, new Vector3(0f, 1.4f, 0f), new Vector3(0.42f, 1.4f, 0.42f), _woodTimberMat, collider: true);
             CreateSphere("CrownA", t, new Vector3(0f, 3.2f, 0f), new Vector3(3.1f, 2.2f, 3.1f), _blossomPinkMat);
             CreateSphere("CrownB", t, new Vector3(0.8f, 3.7f, 0.5f), new Vector3(2.0f, 1.7f, 2.0f), _blossomPinkMat);
             CreateSphere("CrownC", t, new Vector3(-0.7f, 3.5f, -0.5f), new Vector3(1.9f, 1.6f, 1.9f), _blossomPinkMat);
@@ -1707,7 +1708,7 @@ namespace OurWorld.World
             Transform fb = new GameObject("ScenicFlowerBed").transform;
             fb.SetParent(parent, false);
             fb.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
-            CreateBox("PlanterBorder", fb, new Vector3(0f, 0.16f, 0f), new Vector3(3.6f, 0.32f, 1.2f), _stonePathMat, collider: false);
+            CreateBox("PlanterBorder", fb, new Vector3(0f, 0.16f, 0f), new Vector3(3.6f, 0.32f, 1.2f), _stonePathMat, collider: true);
             CreateBox("PlanterSoil", fb, new Vector3(0f, 0.28f, 0f), new Vector3(3.2f, 0.12f, 0.9f), _wetSoilMat, collider: false);
             Material[] fMats = { _flowerRedMat, _flowerYellowMat, _flowerPurpleMat };
             for (int i = 0; i < 6; i++)
@@ -1723,7 +1724,7 @@ namespace OurWorld.World
             Transform l = new GameObject("FarmLanternPost").transform;
             l.SetParent(parent, false);
             l.position = pos;
-            CreateCylinder("Post", l, new Vector3(0f, 2.2f, 0f), new Vector3(0.16f, 2.2f, 0.16f), _woodTimberMat, collider: false);
+            CreateCylinder("Post", l, new Vector3(0f, 2.2f, 0f), new Vector3(0.16f, 2.2f, 0.16f), _woodTimberMat, collider: true);
             CreateBox("Arm", l, new Vector3(0f, 4.25f, 0.35f), new Vector3(0.12f, 0.12f, 0.8f), _woodTimberMat, collider: false);
             SpawnHangingLantern(l, new Vector3(0f, 4.0f, 0.65f));
         }
@@ -1761,7 +1762,7 @@ namespace OurWorld.World
             Transform s = new GameObject($"Sign_{text}").transform;
             s.SetParent(parent, false);
             s.SetPositionAndRotation(pos, Quaternion.Euler(0f, yaw, 0f));
-            CreateCylinder("Post", s, new Vector3(0f, 1.05f, 0f), new Vector3(0.14f, 1.05f, 0.14f), postMat, collider: false);
+            CreateCylinder("Post", s, new Vector3(0f, 1.05f, 0f), new Vector3(0.14f, 1.05f, 0.14f), postMat, collider: true);
             Material bm = MakeMat(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default"), "MAT_SignBoard", boardCol, 0.25f);
             CreateBox("Board", s, new Vector3(0f, 2.0f, 0f), new Vector3(2.8f, 0.65f, 0.10f), bm, collider: false);
             GameObject to = new GameObject("Label");

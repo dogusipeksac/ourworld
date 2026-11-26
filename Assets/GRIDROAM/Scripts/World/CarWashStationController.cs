@@ -193,6 +193,10 @@ namespace OurWorld.World
             GameObject gantry = OurWorldModelLibrary.InstantiateModel("OW_CarWashGantry", root, Vector3.zero, Quaternion.identity);
             if (gantry != null)
             {
+                // Solid twin gantry side pillars + overhead beam (leaves center drive-through tunnel clear for vehicles!)
+                WorldPhysicsSolidifier.EnsureBoxCollider(gantry, new Vector3(-2.18f, 1.65f, 0f), new Vector3(0.46f, 3.30f, 1.55f));
+                WorldPhysicsSolidifier.EnsureBoxCollider(gantry, new Vector3( 2.18f, 1.65f, 0f), new Vector3(0.46f, 3.30f, 1.55f));
+                WorldPhysicsSolidifier.EnsureBoxCollider(gantry, new Vector3( 0.00f, 3.30f, 0f), new Vector3(4.80f, 0.52f, 1.55f));
                 _brushL = OurWorldModelLibrary.FindPart(gantry.transform, "BrushRollerL");
                 _brushR = OurWorldModelLibrary.FindPart(gantry.transform, "BrushRollerR");
                 _brushTop = OurWorldModelLibrary.FindPart(gantry.transform, "TopBrushRoller");

@@ -153,7 +153,8 @@ namespace OurWorld.World
             diveRoot.transform.position = PoolCenter + new Vector3(-7.6f, 1.38f, 0.0f);
             diveRoot.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
 
-            OurWorldModelLibrary.InstantiateModel("OW_DivingBoard", diveRoot.transform, Vector3.zero, Quaternion.identity, Vector3.one);
+            GameObject diveBoard = OurWorldModelLibrary.InstantiateModel("OW_DivingBoard", diveRoot.transform, Vector3.zero, Quaternion.identity, Vector3.one);
+            WorldPhysicsSolidifier.EnsureSolidBoundsCollider(diveBoard, minSize: 0.30f, shrinkXZ: 0.92f);
 
             AcrobaticDivingBoard diving = diveRoot.AddComponent<AcrobaticDivingBoard>();
             diving.ConfigurePool(PoolCenter, waterY: 1.18f);

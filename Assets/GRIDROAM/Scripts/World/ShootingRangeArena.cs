@@ -383,7 +383,8 @@ namespace OurWorld.World
             for (int i = 0; i < treeSpots.Length; i++)
             {
                 string model = (i % 2 == 0) ? "OW_CypressTree" : "OW_PlaneTree";
-                OurWorldModelLibrary.InstantiateModel(model, root.transform, treeSpots[i], Quaternion.Euler(0f, i * 67f, 0f), Vector3.one * (i % 2 == 0 ? 1.15f : 0.95f), removeColliders: true);
+                GameObject treeGo = OurWorldModelLibrary.InstantiateModel(model, root.transform, treeSpots[i], Quaternion.Euler(0f, i * 67f, 0f), Vector3.one * (i % 2 == 0 ? 1.15f : 0.95f), removeColliders: true);
+                WorldPhysicsSolidifier.EnsureTrunkCollider(treeGo, radius: i % 2 == 0 ? 0.36f : 0.45f, height: 3.4f);
             }
 
             // 6. Range Instructor NPC ("Usta Haluk") at the Armory Counter
@@ -437,6 +438,8 @@ namespace OurWorld.World
             _instructorHum.transform.localPosition = new Vector3(-10.4f, 0.12f, 2.35f);
             _instructorHum.transform.localRotation = Quaternion.Euler(0f, 165f, 0f);
             _instructorHead = _instructorHum.HeadTransform;
+            WorldPhysicsSolidifier.EnsureKinematicActorPhysics(_instructorHum.gameObject, radius: 0.34f, height: 1.82f, centerY: 0.91f);
+            _instructorHum.gameObject.AddComponent<SmartStoryNpcPresence>().Initialize("npc_usta_haluk", "Usta Haluk", "Master Haluk");
             CreateSignLabel(_instructorHum.transform, "Usta Haluk\n<size=20>Poligon Eğitmeni</size>", new Vector3(0f, 2.18f, 0f), 180f, new Vector2(2.2f, 0.55f), 28, new Color(1.0f, 0.90f, 0.42f));
         }
 

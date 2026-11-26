@@ -60,7 +60,8 @@ namespace OurWorld.CameraSystem
         private float? _sportLockedYaw;
         private float _timeSinceManualLook = 99f;
 
-        // Dynamic game-feel channels (sprint FOV/pullback, landing spring dip, nitro/shift FOV impulse)
+        // Dynamic game-feel channels (sprint FOV/pullback, landing spring dip, nitro/shift FOV impulse,
+        // organic grounded stride bob, driving G-force bank & turn look-ahead, surface vibration & underwater sway)
         private float _sprintMotion01;
         private float _smoothedSprint01;
         private bool _nitroBoostActive;
@@ -68,10 +69,31 @@ namespace OurWorld.CameraSystem
         private float _fovImpulse;
         private float _landingDipY;
         private float _landingDipVel;
+        private float _footStrideSpeed;
+        private float _stridePhase;
+        private bool _underwaterActive;
+        private float _driveCornerG;
+        private float _smoothedDriveRollDeg;
+        private float _smoothedCornerLookAheadYaw;
+        private float _surfaceVibAmp;
+        private float _surfaceVibDecay;
 
         public void SetSprintMotion(float sprint01)
         {
             _sprintMotion01 = Mathf.Clamp01(sprint01);
+        }
+
+        public void SetFootStrideMotion(float footSpeedMs, bool isUnderwater)
+        {
+            _footStrideSpeed = Mathf.Max(0f, footSpeedMs);
+            _underwaterActive = isUnderwater;
+        }
+
+        public void SetDrivingDynamics(float lateralCornerG, float roadRoughness01)
+        {
+            _driveCornerG = Mathf.Clamp(lateralCornerG, -1.5f, 1.5f);
+            _surfaceVibAmp = Mathf.Max(_surfaceVibAmp, Mathf.Clamp01(roadRoughness01) * 0.022f);
+            _surfaceVibDecay = 0.14f;
         }
 
         public void SetNitroBoost(bool active)
@@ -263,10 +285,14 @@ namespace OurWorld.CameraSystem
             {
                 _isSeatedMode = false;
                 _sprintMotion01 = 0f;
+                _footStrideSpeed = 0f;
+                _underwaterActive = false;
             }
             else
             {
                 _nitroBoostActive = false;
+                _driveCornerG = 0f;
+                _surfaceVibAmp = 0f;
             }
             _targetRb = target != null ? target.GetComponent<Rigidbody>() : null;
 
@@ -439,11 +465,54 @@ namespace OurWorld.CameraSystem
                 _landingDipVel = 0f;
             }
 
-            // Smooth sprint & nitro motion channels + decaying FOV impulse
+            // Smooth sprint & nitro motion channels + decaying FOV impulse + organic stride / driving G-force feel
             _smoothedSprint01 = Mathf.Lerp(_smoothedSprint01, _isDrivingMode || _sportCameraActive ? 0f : _sprintMotion01, 1f - Mathf.Exp(-6.5f * dtNorm));
             _nitroBoostBlend = Mathf.Lerp(_nitroBoostBlend, _isDrivingMode && _nitroBoostActive ? 1f : 0f, 1f - Mathf.Exp(-8.5f * dtNorm));
             _fovImpulse = Mathf.Lerp(_fovImpulse, 0f, 1f - Mathf.Exp(-7.5f * dtNorm));
             if (Mathf.Abs(_fovImpulse) < 0.02f) _fovImpulse = 0f;
+
+            // Grounded micro stride bob (never nauseating; automatically disabled indoors, seated, sport, aiming)
+            Vector3 organicMicroOffset = Vector3.zero;
+            if (!_isDrivingMode && !_isSeatedMode && !_sportCameraActive && !_underwaterActive && _footStrideSpeed > 0.35f)
+            {
+                float paceNorm = Mathf.InverseLerp(0.35f, 4.4f, _footStrideSpeed);
+                float freq = Mathf.Lerp(1.85f, 2.95f, paceNorm);
+                _stridePhase += dtNorm * freq * Mathf.PI * 2f;
+                if (_stridePhase > Mathf.PI * 200f) _stridePhase -= Mathf.PI * 200f;
+                float ampY = Mathf.Lerp(0.011f, 0.026f, paceNorm);
+                float ampX = Mathf.Lerp(0.006f, 0.014f, paceNorm);
+                organicMicroOffset = new Vector3(
+                    Mathf.Cos(_stridePhase * 0.5f) * ampX,
+                    Mathf.Sin(_stridePhase) * ampY,
+                    0f);
+            }
+            else if (_underwaterActive)
+            {
+                float uwT = Time.time;
+                organicMicroOffset = new Vector3(
+                    Mathf.Sin(uwT * 1.15f) * 0.032f,
+                    Mathf.Cos(uwT * 0.85f) * 0.028f,
+                    0f);
+            }
+
+            // Smooth driving corner roll, turn look-ahead & subtle road surface vibration
+            float targetRoll = _isDrivingMode ? Mathf.Clamp(-_driveCornerG * 1.45f, -1.75f, 1.75f) : (_underwaterActive ? Mathf.Sin(Time.time * 0.72f) * 1.1f : 0f);
+            _smoothedDriveRollDeg = Mathf.Lerp(_smoothedDriveRollDeg, targetRoll, 1f - Mathf.Exp(-6.2f * dtNorm));
+            float targetLookAhead = (_isDrivingMode && _timeSinceManualLook > 0.65f) ? Mathf.Clamp(_driveCornerG * 3.1f, -3.4f, 3.4f) : 0f;
+            _smoothedCornerLookAheadYaw = Mathf.Lerp(_smoothedCornerLookAheadYaw, targetLookAhead, 1f - Mathf.Exp(-4.2f * dtNorm));
+            if (_surfaceVibDecay > 0f)
+            {
+                _surfaceVibDecay -= dtNorm;
+                if (_surfaceVibDecay <= 0f) _surfaceVibAmp = 0f;
+            }
+            else
+            {
+                _surfaceVibAmp = Mathf.MoveTowards(_surfaceVibAmp, 0f, dtNorm * 0.14f);
+            }
+            if (!_isDrivingMode)
+            {
+                _driveCornerG = Mathf.MoveTowards(_driveCornerG, 0f, dtNorm * 6f);
+            }
 
             Vector3 desiredOffset = _isDrivingMode
                 ? drivingPivotOffset
@@ -513,7 +582,7 @@ namespace OurWorld.CameraSystem
                 _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, desiredFov, 1f - Mathf.Exp(-fovSmoothSpeed * dtNorm));
             }
 
-            Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+            Quaternion rotation = Quaternion.Euler(_pitch, _yaw + _smoothedCornerLookAheadYaw, 0f);
             Vector3 backDir = rotation * Vector3.back;
 
             // Smooth wall-collision distance: fast pull-in (no wall clipping), silky ease-out (no lamppost/tree pop!)
@@ -563,6 +632,17 @@ namespace OurWorld.CameraSystem
                     (Mathf.PerlinNoise(7.3f, Time.unscaledTime * 55f) - 0.5f) * 2f * nitroAmp,
                     0f);
             }
+            if (_surfaceVibAmp > 0.001f && _isDrivingMode)
+            {
+                shakeOffset += new Vector3(
+                    (Mathf.PerlinNoise(Time.time * 38f, 9.2f) - 0.5f) * 2f * _surfaceVibAmp * 0.6f,
+                    (Mathf.PerlinNoise(5.4f, Time.time * 44f) - 0.5f) * 2f * _surfaceVibAmp,
+                    0f);
+            }
+            if (!effectivelyIndoors)
+            {
+                shakeOffset += organicMicroOffset;
+            }
 
             Vector3 worldShake = rotation * shakeOffset;
             Vector3 finalPos = _smoothedPivot + backDir * finalDistance + worldShake;
@@ -602,6 +682,10 @@ namespace OurWorld.CameraSystem
 
             transform.position = finalPos;
             transform.LookAt(_smoothedPivot + worldShake * 0.45f);
+            if (Mathf.Abs(_smoothedDriveRollDeg) > 0.01f)
+            {
+                transform.Rotate(0f, 0f, _smoothedDriveRollDeg, Space.Self);
+            }
         }
 
         private float _shakeTimer;
