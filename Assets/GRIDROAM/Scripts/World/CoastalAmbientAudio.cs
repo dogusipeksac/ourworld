@@ -14,14 +14,14 @@ namespace OurWorld.World
         [SerializeField] private float seawallX = 35.5f;
         [SerializeField] private float minZ = -24f;
         [SerializeField] private float maxZ = 278f;
-        [SerializeField] private float masterGain = 0.065f;
+        [SerializeField] private float masterGain = 0.014f;
 
         private AudioSource _source;
         private AudioClip _silentCarrierClip;
 
         // Audio-thread state
         private volatile float _sampleRate = 48000f;
-        private volatile float _gain = 0.065f;
+        private volatile float _gain = 0.014f;
         private uint _rngState = 1357924681u;
         private double _wavePhase;
         private double _gustPhase;
@@ -34,14 +34,15 @@ namespace OurWorld.World
             int sr = AudioSettings.outputSampleRate;
             if (sr <= 0) sr = 48000;
             _sampleRate = sr;
-            _gain = masterGain;
+            _gain = Mathf.Min(masterGain, 0.016f);
 
             if (_source != null)
             {
-                _source.spatialBlend = 0.72f;
+                // True 3D spatial attenuation so coastal surf NEVER bleeds inland as global 2D wind noise!
+                _source.spatialBlend = 0.98f;
                 _source.rolloffMode = AudioRolloffMode.Linear;
-                _source.minDistance = 12f;
-                _source.maxDistance = 82f;
+                _source.minDistance = 6f;
+                _source.maxDistance = 36f;
                 _source.loop = true;
                 _source.playOnAwake = true;
                 _source.volume = 1f;
@@ -69,7 +70,7 @@ namespace OurWorld.World
 
         private void Update()
         {
-            _gain = masterGain;
+            _gain = Mathf.Min(masterGain, 0.016f);
             if (PlayerModeController.Instance != null)
             {
                 Vector3 playerPos = PlayerModeController.Instance.ActiveWorldPosition;
@@ -108,14 +109,14 @@ namespace OurWorld.World
                 _rngState = x;
                 float white = ((x & 0xFFFF) / 32768f) - 1f;
 
-                float waveEnv = 0.52f + 0.48f * (float)Math.Sin(_wavePhase);
-                float surfCutoff = 0.012f + 0.032f * waveEnv;
+                float waveEnv = 0.55f + 0.45f * (float)Math.Sin(_wavePhase);
+                float surfCutoff = 0.005f + 0.011f * waveEnv;
                 _lpSurf += surfCutoff * (white - _lpSurf);
 
-                float gustEnv = 0.60f + 0.40f * (float)Math.Sin(_gustPhase);
-                _lpWind += 0.006f * (white - _lpWind);
+                float gustEnv = 0.65f + 0.35f * (float)Math.Sin(_gustPhase);
+                _lpWind += 0.003f * (white - _lpWind);
 
-                float sample = (_lpSurf * waveEnv * 0.78f + _lpWind * gustEnv * 0.35f) * gain;
+                float sample = (_lpSurf * waveEnv * 0.75f + _lpWind * gustEnv * 0.16f) * gain;
                 int baseIdx = f * channels;
                 for (int c = 0; c < channels; c++)
                 {

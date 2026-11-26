@@ -219,14 +219,16 @@ namespace OurWorld.World
                               (playerPos.x > -35f && playerPos.x < 10f && playerPos.z > -40f && playerPos.z < 5f);
             bool nearCoastOrLake = playerPos.x > 16f || playerPos.x < -125f || playerPos.z > 130f;
 
-            // 3. Smooth Ambient Bed Gains (strictly gentle & relaxing — never noisy!)
-            float outdoorMul = underwater ? 0f : (sheltered ? 0.18f : (inCar ? 0.32f : 1.0f));
-            float targetWindGain = (0.014f + WindStrength01 * 0.036f) * outdoorMul;
-            float targetCityGain = Mathf.Lerp(0.022f, 0.007f, nightFactor) * (nearNature ? 0.55f : 1.0f) * outdoorMul;
+            // 3. Smooth Ambient Bed Gains (whisper-quiet & warm — zero harsh wind static while walking!)
+            float outdoorMul = underwater ? 0f : (sheltered ? 0.14f : (inCar ? 0.22f : 1.0f));
+            float stormExtra = weather == NeighborhoodWeatherState.SummerShower ? 0.0055f
+                : (weather == NeighborhoodWeatherState.BreezyOvercast ? 0.0022f : 0f);
+            float targetWindGain = (0.0012f + WindStrength01 * 0.0028f + stormExtra) * outdoorMul;
+            float targetCityGain = Mathf.Lerp(0.0045f, 0.0018f, nightFactor) * (nearNature ? 0.50f : 1.0f) * outdoorMul;
             float cricketSeason = weather == NeighborhoodWeatherState.SummerShower ? 0.12f : 1.0f;
-            float targetCricketGain = nightFactor * cricketSeason * (nearNature ? 0.028f : 0.016f) * outdoorMul;
-            float targetIndoorGain = (!underwater && sheltered) ? 0.022f : 0f;
-            float targetUnderwaterGain = underwater ? 0.095f : 0f;
+            float targetCricketGain = nightFactor * cricketSeason * (nearNature ? 0.022f : 0.012f) * outdoorMul;
+            float targetIndoorGain = (!underwater && sheltered) ? 0.008f : 0f;
+            float targetUnderwaterGain = underwater ? 0.075f : 0f;
 
             float blend = 1f - Mathf.Exp(-3.5f * dt);
             _windGain = Mathf.Lerp(_windGain, targetWindGain, blend);
@@ -346,14 +348,14 @@ namespace OurWorld.World
                 // Soft brown-filtered city murmur
                 _lpCity += 0.0045f * (white - _lpCity);
 
-                // Layered airy wind whoosh with slow gust swell
+                // Warm, deeply low-passed gentle air breeze (zero high-frequency white-noise hiss)
                 _gustPhase += gustStep;
                 if (_gustPhase > Math.PI * 200.0) _gustPhase -= Math.PI * 200.0;
-                float gustMod = 0.62f + 0.38f * (float)Math.Sin(_gustPhase);
-                float windCut = 0.015f + 0.022f * gustMod;
+                float gustMod = 0.68f + 0.32f * (float)Math.Sin(_gustPhase);
+                float windCut = 0.0045f + 0.0055f * gustMod;
                 _lpWind1 += windCut * (white - _lpWind1);
-                _lpWind2 += 0.06f * (_lpWind1 - _lpWind2);
-                float windSample = (_lpWind1 - _lpWind2 * 0.65f) * gustMod;
+                _lpWind2 += 0.018f * (_lpWind1 - _lpWind2);
+                float windSample = _lpWind2 * gustMod;
 
                 // Gentle nocturnal Istanbul summer crickets
                 float cricketSample = 0f;

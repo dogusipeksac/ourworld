@@ -94,38 +94,38 @@ namespace OurWorld.Player
                 return;
             }
 
-            // 1. Sprint & Swim Exertion + Natural Recovery Breathing
+            // 1. Sprint & Swim Exertion + Gentle Recovery Breathing ONLY after prolonged hard sprinting (never noisy while walking!)
             bool onFoot = mode.CurrentMode == ControlMode.OnFoot && mode.FootController != null;
-            bool sprintingNow = onFoot && !mode.FootController.IsSwimming && mode.FootController.CurrentSpeed > 3.35f;
-            bool swimmingHard = onFoot && mode.FootController.IsSwimming && mode.FootController.CurrentSpeed > 2.2f;
+            bool sprintingNow = onFoot && !mode.FootController.IsSwimming && mode.FootController.CurrentSpeed > 3.90f;
+            bool swimmingHard = onFoot && mode.FootController.IsSwimming && mode.FootController.CurrentSpeed > 2.4f;
             bool underwater = onFoot && mode.FootController.IsUnderwater;
 
             if (sprintingNow || swimmingHard)
             {
-                Exertion01 = Mathf.Min(1f, Exertion01 + dt * (sprintingNow ? 0.115f : 0.145f));
-                if (Exertion01 >= 0.62f) _wasHeavySprinting = true;
+                Exertion01 = Mathf.Min(1f, Exertion01 + dt * (sprintingNow ? 0.062f : 0.095f));
+                if (Exertion01 >= 0.82f) _wasHeavySprinting = true;
             }
             else
             {
-                if (_wasHeavySprinting && Exertion01 >= 0.55f)
+                if (_wasHeavySprinting && Exertion01 >= 0.76f)
                 {
-                    _recoveryBreathsPending = Mathf.Max(_recoveryBreathsPending, 2);
-                    _breathTimer = Mathf.Min(_breathTimer, 0.35f);
+                    _recoveryBreathsPending = 1;
+                    _breathTimer = Mathf.Min(_breathTimer, 0.45f);
                 }
                 _wasHeavySprinting = false;
-                Exertion01 = Mathf.Max(0f, Exertion01 - dt * 0.16f);
+                Exertion01 = Mathf.Max(0f, Exertion01 - dt * 0.18f);
             }
 
-            if (!underwater && (_recoveryBreathsPending > 0 || Exertion01 > 0.78f))
+            if (!underwater && !sprintingNow && _recoveryBreathsPending > 0)
             {
                 _breathTimer -= dt;
                 if (_breathTimer <= 0f && _bodyAudio != null && _exhaleClip != null)
                 {
-                    _breathTimer = sprintingNow ? UnityEngine.Random.Range(1.05f, 1.35f) : UnityEngine.Random.Range(1.45f, 1.85f);
-                    float vol = Mathf.Lerp(0.08f, 0.18f, Mathf.Max(Exertion01, 0.45f));
-                    _bodyAudio.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
+                    _breathTimer = UnityEngine.Random.Range(1.8f, 2.3f);
+                    float vol = Mathf.Lerp(0.020f, 0.038f, Exertion01);
+                    _bodyAudio.pitch = UnityEngine.Random.Range(0.94f, 1.04f);
                     _bodyAudio.PlayOneShot(_exhaleClip, vol);
-                    if (_recoveryBreathsPending > 0) _recoveryBreathsPending--;
+                    _recoveryBreathsPending--;
                 }
             }
 

@@ -114,6 +114,7 @@ namespace OurWorld.Player
         private float _coyoteTimer;
         private float _jumpBufferTimer;
         private float _pivotDustCooldown;
+        private float _lastFootstepSfxTime = -10f;
         private float _rainWetness01;
         private bool _warnedRainSoaked;
         private int _wetShoeStepsRemaining;
@@ -1300,16 +1301,17 @@ namespace OurWorld.Player
             for (int i = 0; i < samplesCount; i++)
             {
                 float t = (float)i / samplesCount;
-                float env = Mathf.Exp(-t * 9.5f);
-                float freq = Mathf.Lerp(135f, 52f, t);
+                float fadeIn = Mathf.Clamp01(t / 0.06f);
+                float env = fadeIn * Mathf.Exp(-t * 11.5f);
+                float freq = Mathf.Lerp(122f, 48f, t);
                 phase += (2.0 * Math.PI * freq) / sampleRate;
 
-                float thump = (float)Math.Sin(phase) * 0.68f;
+                float thump = (float)Math.Sin(phase) * 0.72f;
                 float white = (float)(rng.NextDouble() * 2.0 - 1.0);
-                lp += 0.32f * (white - lp);
-                float click = lp * Mathf.Exp(-t * 18f) * 0.42f;
+                lp += 0.10f * (white - lp); // Warm heavily low-passed shoe tap (zero windy white-noise hiss)
+                float tap = lp * Mathf.Exp(-t * 24f) * 0.22f;
 
-                data[i] = Mathf.Clamp((thump + click) * env, -1f, 1f);
+                data[i] = Mathf.Clamp((thump + tap) * env, -1f, 1f);
             }
 
             AudioClip clip = AudioClip.Create("ProceduralFootstep", samplesCount, 1, sampleRate, false);
@@ -1319,7 +1321,7 @@ namespace OurWorld.Player
 
         private static AudioClip BuildGrassFootstepClip(int sampleRate)
         {
-            int n = Mathf.RoundToInt(sampleRate * 0.085f);
+            int n = Mathf.RoundToInt(sampleRate * 0.072f);
             float[] data = new float[n];
             System.Random rng = new System.Random(9031);
             float lp1 = 0f, lp2 = 0f;
@@ -1327,14 +1329,14 @@ namespace OurWorld.Player
             for (int i = 0; i < n; i++)
             {
                 float t = (float)i / n;
-                float env = Mathf.Sin(Mathf.Clamp01(t / 0.16f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 6.5f);
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.18f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 9.5f);
                 float w = (float)(rng.NextDouble() * 2.0 - 1.0);
-                lp1 += 0.34f * (w - lp1);
-                lp2 += 0.09f * (lp1 - lp2);
-                float rustle = (lp1 - lp2 * 0.8f) * 0.92f;
-                ph += (2.0 * Math.PI * Mathf.Lerp(88f, 42f, t)) / sampleRate;
-                float softThump = (float)Math.Sin(ph) * Mathf.Exp(-t * 12f) * 0.36f;
-                data[i] = Mathf.Clamp((rustle + softThump) * env, -1f, 1f);
+                lp1 += 0.12f * (w - lp1);
+                lp2 += 0.06f * (lp1 - lp2);
+                float softBrush = lp2 * 0.42f;
+                ph += (2.0 * Math.PI * Mathf.Lerp(82f, 40f, t)) / sampleRate;
+                float softThump = (float)Math.Sin(ph) * Mathf.Exp(-t * 13f) * 0.52f;
+                data[i] = Mathf.Clamp((softBrush + softThump) * env, -1f, 1f);
             }
             AudioClip c = AudioClip.Create("Footstep_Grass", n, 1, sampleRate, false);
             c.SetData(data, 0);
@@ -1343,19 +1345,21 @@ namespace OurWorld.Player
 
         private static AudioClip BuildSandFootstepClip(int sampleRate)
         {
-            int n = Mathf.RoundToInt(sampleRate * 0.105f);
+            int n = Mathf.RoundToInt(sampleRate * 0.082f);
             float[] data = new float[n];
             System.Random rng = new System.Random(9049);
-            float lp = 0f, prev = 0f;
+            float lp1 = 0f, lp2 = 0f;
+            double ph = 0.0;
             for (int i = 0; i < n; i++)
             {
                 float t = (float)i / n;
-                float env = Mathf.Sin(Mathf.Clamp01(t / 0.20f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 5.2f);
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.22f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 8.0f);
                 float w = (float)(rng.NextDouble() * 2.0 - 1.0);
-                lp += 0.52f * (w - lp);
-                float crunch = (lp - prev * 0.55f) * (0.72f + 0.28f * Mathf.Sin(t * 95f));
-                prev = lp;
-                data[i] = Mathf.Clamp(crunch * env * 0.88f, -1f, 1f);
+                lp1 += 0.16f * (w - lp1);
+                lp2 += 0.08f * (lp1 - lp2);
+                ph += (2.0 * Math.PI * Mathf.Lerp(74f, 36f, t)) / sampleRate;
+                float thud = (float)Math.Sin(ph) * 0.44f;
+                data[i] = Mathf.Clamp((thud + lp2 * 0.46f) * env, -1f, 1f);
             }
             AudioClip c = AudioClip.Create("Footstep_Sand", n, 1, sampleRate, false);
             c.SetData(data, 0);
@@ -1364,20 +1368,22 @@ namespace OurWorld.Player
 
         private static AudioClip BuildWoodFootstepClip(int sampleRate)
         {
-            int n = Mathf.RoundToInt(sampleRate * 0.075f);
+            int n = Mathf.RoundToInt(sampleRate * 0.072f);
             float[] data = new float[n];
             System.Random rng = new System.Random(9067);
             double ph1 = 0.0, ph2 = 0.0;
+            float lp = 0f;
             for (int i = 0; i < n; i++)
             {
                 float t = (float)i / n;
-                float env = Mathf.Exp(-t * 10.5f);
+                float env = Mathf.Clamp01(t / 0.06f) * Mathf.Exp(-t * 11.5f);
                 // Hollow timber board resonance (175 Hz + 312 Hz)
-                ph1 += (2.0 * Math.PI * Mathf.Lerp(192f, 148f, t)) / sampleRate;
-                ph2 += (2.0 * Math.PI * 318.0) / sampleRate;
-                float knock = (float)(Math.Sin(ph1) * 0.62 + Math.Sin(ph2) * 0.34);
-                float tap = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-t * 28f) * 0.32f;
-                data[i] = Mathf.Clamp((knock + tap) * env, -1f, 1f);
+                ph1 += (2.0 * Math.PI * Mathf.Lerp(186f, 142f, t)) / sampleRate;
+                ph2 += (2.0 * Math.PI * 308.0) / sampleRate;
+                float knock = (float)(Math.Sin(ph1) * 0.62 + Math.Sin(ph2) * 0.26);
+                float w = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.10f * (w - lp);
+                data[i] = Mathf.Clamp((knock + lp * 0.18f) * env, -1f, 1f);
             }
             AudioClip c = AudioClip.Create("Footstep_Wood", n, 1, sampleRate, false);
             c.SetData(data, 0);
@@ -1386,19 +1392,20 @@ namespace OurWorld.Player
 
         private static AudioClip BuildIndoorFootstepClip(int sampleRate)
         {
-            int n = Mathf.RoundToInt(sampleRate * 0.068f);
+            int n = Mathf.RoundToInt(sampleRate * 0.062f);
             float[] data = new float[n];
             System.Random rng = new System.Random(9091);
             double ph = 0.0;
+            float lp = 0f;
             for (int i = 0; i < n; i++)
             {
                 float t = (float)i / n;
-                float clickEnv = Mathf.Exp(-t * 22f);
-                float tailEnv = Mathf.Exp(-t * 9f) * 0.22f;
-                ph += (2.0 * Math.PI * Mathf.Lerp(620f, 260f, t)) / sampleRate;
-                float heel = (float)Math.Sin(ph) * clickEnv * 0.58f;
-                float crisp = (float)(rng.NextDouble() * 2.0 - 1.0) * (clickEnv * 0.52f + tailEnv);
-                data[i] = Mathf.Clamp(heel + crisp, -1f, 1f);
+                float env = Mathf.Clamp01(t / 0.06f) * Mathf.Exp(-t * 18f);
+                ph += (2.0 * Math.PI * Mathf.Lerp(420f, 190f, t)) / sampleRate;
+                float heel = (float)Math.Sin(ph) * 0.60f;
+                float w = (float)(rng.NextDouble() * 2.0 - 1.0);
+                lp += 0.12f * (w - lp);
+                data[i] = Mathf.Clamp((heel + lp * 0.22f) * env, -1f, 1f);
             }
             AudioClip c = AudioClip.Create("Footstep_Indoor", n, 1, sampleRate, false);
             c.SetData(data, 0);
@@ -1407,7 +1414,7 @@ namespace OurWorld.Player
 
         private static AudioClip BuildWetFootstepClip(int sampleRate)
         {
-            int n = Mathf.RoundToInt(sampleRate * 0.115f);
+            int n = Mathf.RoundToInt(sampleRate * 0.088f);
             float[] data = new float[n];
             System.Random rng = new System.Random(9109);
             float lp1 = 0f, lp2 = 0f;
@@ -1415,12 +1422,12 @@ namespace OurWorld.Player
             for (int i = 0; i < n; i++)
             {
                 float t = (float)i / n;
-                float env = Mathf.Sin(Mathf.Clamp01(t / 0.14f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 6.2f);
+                float env = Mathf.Sin(Mathf.Clamp01(t / 0.16f) * Mathf.PI * 0.5f) * Mathf.Exp(-t * 8.5f);
                 float w = (float)(rng.NextDouble() * 2.0 - 1.0);
-                lp1 += 0.36f * (w - lp1);
-                lp2 += 0.11f * (lp1 - lp2);
-                ph += (2.0 * Math.PI * Mathf.Lerp(420f, 160f, t)) / sampleRate;
-                float squelch = (lp1 - lp2 * 0.6f) * 0.92f + (float)Math.Sin(ph) * Mathf.Exp(-t * 16f) * 0.32f;
+                lp1 += 0.15f * (w - lp1);
+                lp2 += 0.07f * (lp1 - lp2);
+                ph += (2.0 * Math.PI * Mathf.Lerp(310f, 130f, t)) / sampleRate;
+                float squelch = lp2 * 0.45f + (float)Math.Sin(ph) * Mathf.Exp(-t * 15f) * 0.42f;
                 data[i] = Mathf.Clamp(squelch * env, -1f, 1f);
             }
             AudioClip c = AudioClip.Create("Footstep_Wet", n, 1, sampleRate, false);
@@ -1533,9 +1540,13 @@ namespace OurWorld.Player
                 }
             }
 
-            float vol = Mathf.Lerp(0.11f, 0.26f, Mathf.Clamp01(runBlend)) * volMult * (_isCrouching ? 0.35f : 1.0f);
-            _footstepAudio.pitch = pitchBase * UnityEngine.Random.Range(0.92f, 1.08f);
-            _footstepAudio.PlayOneShot(clip, vol);
+            if (Time.time - _lastFootstepSfxTime >= 0.23f)
+            {
+                _lastFootstepSfxTime = Time.time;
+                float vol = Mathf.Lerp(0.055f, 0.125f, Mathf.Clamp01(runBlend)) * volMult * (_isCrouching ? 0.35f : 1.0f);
+                _footstepAudio.pitch = pitchBase * UnityEngine.Random.Range(0.92f, 1.08f);
+                _footstepAudio.PlayOneShot(clip, vol);
+            }
 
             if (!_isSwimming && _controller.isGrounded)
             {
