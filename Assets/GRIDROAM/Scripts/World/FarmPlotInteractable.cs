@@ -16,6 +16,20 @@ namespace OurWorld.World
     {
         public static readonly List<FarmPlotInteractable> AllPlots = new List<FarmPlotInteractable>(24);
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            AllPlots.Clear();
+            _stemMat = null;
+            _leafMat = null;
+            _tomatoMat = null;
+            _pepperMat = null;
+            _strawberryMat = null;
+            _sunflowerPetalMat = null;
+            _sunflowerCoreMat = null;
+            _haloMat = null;
+        }
+
         private string _plotId;
         private InteractableTrigger _trigger;
         private MeshRenderer _soilRenderer;
@@ -180,10 +194,11 @@ namespace OurWorld.World
                     }
                 }
 
-                // Gentle sunlit breeze sway + ripe harvest indicator bob
+                // Gentle sunlit breeze sway synced to Istanbul wind + ripe harvest indicator bob
                 if (_plantRoot != null)
                 {
-                    float sway = Mathf.Sin(Time.time * 1.9f + _swayPhase) * 3.2f;
+                    float windAmp = 1.6f + IstanbulLivingSoundscape.WindStrength01 * 4.4f;
+                    float sway = Mathf.Sin(Time.time * (1.8f + IstanbulLivingSoundscape.WindStrength01 * 1.4f) + _swayPhase) * windAmp;
                     _plantRoot.localRotation = Quaternion.Euler(sway * 0.5f, 0f, sway);
                 }
                 if (_ripeHalo != null && _ripeHalo.activeSelf)

@@ -152,6 +152,26 @@ namespace OurWorld.UI
                 Fov = 56f,
                 SwayRadius = 1.25f,
                 SwaySpeed = 0.14f
+            },
+            new ScenicVista
+            {
+                NameTr = "Abdurrahmangazi · Sultanbeyli Kent Meydanı",
+                NameEn = "Abdurrahmangazi · Sultanbeyli Square",
+                BasePos = new Vector3(158.0f, 9.2f, 172.0f),
+                LookAt = new Vector3(186.0f, 4.5f, 204.0f),
+                Fov = 55f,
+                SwayRadius = 1.30f,
+                SwaySpeed = 0.15f
+            },
+            new ScenicVista
+            {
+                NameTr = "Turgut Reis · Tarihi Aydos Kalesi",
+                NameEn = "Turgut Reis · Historic Aydos Castle",
+                BasePos = new Vector3(222.0f, 10.8f, -142.0f),
+                LookAt = new Vector3(264.0f, 5.8f, -118.0f),
+                Fov = 55f,
+                SwayRadius = 1.35f,
+                SwaySpeed = 0.14f
             }
         };
 
@@ -292,14 +312,86 @@ namespace OurWorld.UI
             new DistrictOption
             {
                 LandmarkId = "lm_otogaleri",
-                NameTr = "Hamidiye Oto Galeri (Yeni)",
-                NameEn = "Hamidiye Auto Gallery (New)",
+                NameTr = "Hamidiye Oto Galeri",
+                NameEn = "Hamidiye Auto Gallery",
                 TagTr = "5 Satın Alınabilir Araç · Kişisel Garaj",
                 TagEn = "5 Ownable Vehicles · Personal Garage",
                 SpawnPos = new Vector3(-115.0f, 0.12f, 52.5f),
                 SpawnYaw = 0f,
                 PreviewCamPos = new Vector3(-128.0f, 6.2f, 51.0f),
                 PreviewLookAt = new Vector3(-115.0f, 2.2f, 72.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_abdurrahmangazi",
+                NameTr = "Abdurrahmangazi Mah. (Yeni)",
+                NameEn = "Abdurrahmangazi Dist. (New)",
+                TagTr = "Kent Meydanı · Belediye · Merkez Camii",
+                TagEn = "City Square · City Hall · Grand Mosque",
+                SpawnPos = new Vector3(172.0f, 0.14f, 184.0f),
+                SpawnYaw = 20f,
+                PreviewCamPos = new Vector3(158.0f, 9.2f, 172.0f),
+                PreviewLookAt = new Vector3(186.0f, 4.5f, 204.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_mehmetakif",
+                NameTr = "Mehmet Akif Mah. (Yeni)",
+                NameEn = "Mehmet Akif Dist. (New)",
+                TagTr = "M5 Sultanbeyli Metro · Erdoğan Cd. · Okul",
+                TagEn = "M5 Metro Station · Shops · Schoolyard",
+                SpawnPos = new Vector3(-6.0f, 0.14f, 266.0f),
+                SpawnYaw = 0f,
+                PreviewCamPos = new Vector3(-26.0f, 8.2f, 248.0f),
+                PreviewLookAt = new Vector3(0.0f, 3.2f, 276.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_hasanpasa",
+                NameTr = "Hasanpaşa Mah. (Yeni)",
+                NameEn = "Hasanpaşa Dist. (New)",
+                TagTr = "M5 Metro · Millet Parkı · Fitness & Park",
+                TagEn = "M5 Metro · Millet Park · Jogging Track",
+                SpawnPos = new Vector3(-174.0f, 0.14f, 188.0f),
+                SpawnYaw = -45f,
+                PreviewCamPos = new Vector3(-154.0f, 9.0f, 174.0f),
+                PreviewLookAt = new Vector3(-188.0f, 3.2f, 208.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_battalgazi",
+                NameTr = "Battalgazi Mah. (Yeni)",
+                NameEn = "Battalgazi Dist. (New)",
+                TagTr = "Bosna Blv. · Semt Pazarı · Sokak Futbolu",
+                TagEn = "Bosna Blvd · Open Market · Street Pitch",
+                SpawnPos = new Vector3(-176.0f, 0.14f, -174.0f),
+                SpawnYaw = 180f,
+                PreviewCamPos = new Vector3(-156.0f, 8.8f, -162.0f),
+                PreviewLookAt = new Vector3(-188.0f, 2.5f, -188.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_mimarsinan",
+                NameTr = "Mimar Sinan Mah. (Yeni)",
+                NameEn = "Mimar Sinan Dist. (New)",
+                TagTr = "Kültür Parkı · Çocuk Oyun Alanı · Çeşme",
+                TagEn = "Culture Park · Playground · Fountain",
+                SpawnPos = new Vector3(-52.0f, 0.14f, -268.0f),
+                SpawnYaw = 180f,
+                PreviewCamPos = new Vector3(-34.0f, 8.4f, -254.0f),
+                PreviewLookAt = new Vector3(-54.0f, 2.5f, -286.0f)
+            },
+            new DistrictOption
+            {
+                LandmarkId = "lm_turgutreis",
+                NameTr = "Turgut Reis · Aydos Kalesi",
+                NameEn = "Turgut Reis · Aydos Castle",
+                TagTr = "Tarihi Kale · Çam Ormanı · Akaryakıt",
+                TagEn = "Historic Fortress · Pines · Fuel Stop",
+                SpawnPos = new Vector3(236.0f, 0.14f, -138.0f),
+                SpawnYaw = 45f,
+                PreviewCamPos = new Vector3(222.0f, 10.8f, -142.0f),
+                PreviewLookAt = new Vector3(264.0f, 5.8f, -118.0f)
             }
         };
 

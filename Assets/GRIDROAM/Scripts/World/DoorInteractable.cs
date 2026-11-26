@@ -88,6 +88,11 @@ namespace OurWorld.World
 
             Vector3 doorCenter = transform.position;
             Vector3 playerPos = mode.ActiveWorldPosition;
+            // Ignore players on a different floor above or below multi-story buildings / Atlas AVM
+            if (Mathf.Abs(playerPos.y - doorCenter.y) > 2.3f)
+            {
+                return;
+            }
             float dx = playerPos.x - doorCenter.x;
             float dz = playerPos.z - doorCenter.z;
             float horizDistSq = dx * dx + dz * dz;
@@ -178,6 +183,7 @@ namespace OurWorld.World
                 StopCoroutine(_animRoutine);
             }
 
+            OurWorld.Core.GameFeelAudio.PlayDoorLatch();
             _animRoutine = StartCoroutine(AnimateDoorRoutine(targetRot, open, reachTime));
         }
 

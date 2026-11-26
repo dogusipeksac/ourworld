@@ -37,8 +37,14 @@ namespace OurWorld.World
             new LandmarkDef { Id = "lm_kadife",      NameTr = "Kadife Sokağı · Kıraathane",        NameEn = "Kadife Street · Tea House",         Center = new Vector3(  -6f, 0f, -186f), Radius = 24f },
             new LandmarkDef { Id = "lm_ciftlik",     NameTr = "Aydos Yeşil Vadi · Çiftlik",        NameEn = "Aydos Green Valley · Farm",         Center = new Vector3( 164f, 0f,    0f), Radius = 26f },
             new LandmarkDef { Id = "lm_golet",       NameTr = "Sultanbeyli Göleti & Çam Korusu",   NameEn = "Sultanbeyli Lake & Pine Grove",     Center = new Vector3(-172f, 0f,    0f), Radius = 26f },
-            new LandmarkDef { Id = "lm_avm",         NameTr = "Hamidiye Atlas AVM · 5 Katlı",      NameEn = "Hamidiye Atlas Mall · 5 Levels",    Center = new Vector3(-116f, 0f,  -40f), Radius = 28f },
-            new LandmarkDef { Id = "lm_otogaleri",   NameTr = "Hamidiye Oto Galeri & Garaj",       NameEn = "Hamidiye Auto Gallery & Garage",    Center = new Vector3(-115f, 0f,   71f), Radius = 24f }
+            new LandmarkDef { Id = "lm_avm",             NameTr = "Hamidiye Atlas AVM · 5 Katlı",            NameEn = "Hamidiye Atlas Mall · 5 Levels",        Center = new Vector3(-116f, 0f,  -40f), Radius = 28f },
+            new LandmarkDef { Id = "lm_otogaleri",       NameTr = "Hamidiye Oto Galeri & Garaj",             NameEn = "Hamidiye Auto Gallery & Garage",        Center = new Vector3(-115f, 0f,   71f), Radius = 24f },
+            new LandmarkDef { Id = "lm_abdurrahmangazi", NameTr = "Abdurrahmangazi · Sultanbeyli Meydanı",   NameEn = "Abdurrahmangazi · Sultanbeyli Square",  Center = new Vector3( 180f, 0f,  195f), Radius = 36f },
+            new LandmarkDef { Id = "lm_mehmetakif",      NameTr = "Mehmet Akif · M5 Sultanbeyli Metro",      NameEn = "Mehmet Akif · M5 Sultanbeyli Metro",    Center = new Vector3(  -6f, 0f,  276f), Radius = 36f },
+            new LandmarkDef { Id = "lm_hasanpasa",       NameTr = "Hasanpaşa · Millet Parkı & M5 Metro",     NameEn = "Hasanpaşa · Millet Park & M5 Metro",    Center = new Vector3(-185f, 0f,  196f), Radius = 36f },
+            new LandmarkDef { Id = "lm_battalgazi",      NameTr = "Battalgazi · Bosna Blv. & Semt Pazarı",   NameEn = "Battalgazi · Bosna Blvd & Bazaar",      Center = new Vector3(-185f, 0f, -185f), Radius = 36f },
+            new LandmarkDef { Id = "lm_mimarsinan",      NameTr = "Mimar Sinan · Kültür Parkı & Çeşme",      NameEn = "Mimar Sinan · Culture Park & Fountain", Center = new Vector3( -52f, 0f, -282f), Radius = 36f },
+            new LandmarkDef { Id = "lm_turgutreis",      NameTr = "Turgut Reis · Tarihi Aydos Kalesi",       NameEn = "Turgut Reis · Historic Aydos Castle",   Center = new Vector3( 246f, 0f, -132f), Radius = 40f }
         };
 
         public static int TotalCount => Landmarks.Length;

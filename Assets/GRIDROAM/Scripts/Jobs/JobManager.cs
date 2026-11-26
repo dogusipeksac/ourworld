@@ -73,7 +73,13 @@ namespace OurWorld.Jobs
             new Vector3( 44.0f, 0.08f, -191.2f), // Kadife Sokağı · Doğu
             new Vector3(-164.0f,0.08f,    4.5f), // Sultanbeyli Göleti İskelesi
             new Vector3( 146.0f,0.08f,    4.2f), // Aydos Yeşil Vadi · Çiftlik Girişi
-            new Vector3(-116.0f,0.08f,  -66.5f)  // Hamidiye Atlas AVM · Giriş Meydanı
+            new Vector3(-116.0f,0.08f,  -66.5f), // Hamidiye Atlas AVM · Giriş Meydanı
+            new Vector3( 172.0f,0.12f,  178.0f), // Abdurrahmangazi · Kent Meydanı
+            new Vector3(  -6.0f,0.12f,  268.0f), // Mehmet Akif · M5 Sultanbeyli Metro
+            new Vector3(-174.0f,0.12f,  188.0f), // Hasanpaşa · Millet Parkı & Metro
+            new Vector3(-176.0f,0.12f, -175.0f), // Battalgazi · Semt Pazarı
+            new Vector3( -52.0f,0.12f, -267.0f), // Mimar Sinan · Kültür Parkı
+            new Vector3( 232.0f,0.12f, -142.0f)  // Turgut Reis · Aydos Kalesi
         };
 
         private struct TaxiDestination
@@ -98,9 +104,15 @@ namespace OurWorld.Jobs
             new TaxiDestination { NameKey = "job.taxi.dest.zubeyde",     FallbackTr = "Zübeyde Hanım Caddesi",          WorldPos = new Vector3( 14.0f, 0.08f, -146.0f) },
             new TaxiDestination { NameKey = "job.taxi.dest.havadis",     FallbackTr = "Havadis Sokağı · Taş Fırın",     WorldPos = new Vector3(-16.0f, 0.08f,  186.0f) },
             new TaxiDestination { NameKey = "job.taxi.dest.kadife",      FallbackTr = "Kadife Sokağı · Kıraathane",     WorldPos = new Vector3(-12.0f, 0.08f, -186.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.golet",       FallbackTr = "Sultanbeyli Göleti İskelesi",    WorldPos = new Vector3(-160.0f,0.08f,    0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.ciftlik",     FallbackTr = "Aydos Yeşil Vadi · Çiftlik",     WorldPos = new Vector3( 146.0f,0.08f,    0.0f) },
-            new TaxiDestination { NameKey = "job.taxi.dest.avm",         FallbackTr = "Hamidiye Atlas AVM",             WorldPos = new Vector3(-116.0f,0.08f,  -64.0f) }
+            new TaxiDestination { NameKey = "job.taxi.dest.golet",           FallbackTr = "Sultanbeyli Göleti İskelesi",     WorldPos = new Vector3(-160.0f,0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.ciftlik",         FallbackTr = "Aydos Yeşil Vadi · Çiftlik",      WorldPos = new Vector3( 146.0f,0.08f,    0.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.avm",             FallbackTr = "Hamidiye Atlas AVM",              WorldPos = new Vector3(-116.0f,0.08f,  -64.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.abdurrahmangazi", FallbackTr = "Abdurrahmangazi · Kent Meydanı",  WorldPos = new Vector3( 172.0f,0.12f,  174.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.mehmetakif",      FallbackTr = "Mehmet Akif · M5 Metro",          WorldPos = new Vector3(  -6.0f,0.12f,  274.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.hasanpasa",       FallbackTr = "Hasanpaşa · Millet Parkı",        WorldPos = new Vector3(-174.0f,0.12f,  184.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.battalgazi",      FallbackTr = "Battalgazi · Semt Pazarı",        WorldPos = new Vector3(-176.0f,0.12f, -170.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.mimarsinan",      FallbackTr = "Mimar Sinan · Kültür Parkı",      WorldPos = new Vector3( -52.0f,0.12f, -262.0f) },
+            new TaxiDestination { NameKey = "job.taxi.dest.turgutreis",      FallbackTr = "Turgut Reis · Aydos Kalesi",      WorldPos = new Vector3( 232.0f,0.12f, -148.0f) }
         };
 
         // 4 rotating district-wide sidewalk cleanup zones (10 items each) so every cleanup shift explores a different part of the map!
@@ -247,6 +259,14 @@ namespace OurWorld.Jobs
             EnsureBlipAudio();
         }
 
+        private readonly HashSet<SedanVehicleController> _subscribedVehicles = new HashSet<SedanVehicleController>();
+
+        private void SubscribeVehicle(SedanVehicleController veh)
+        {
+            if (veh == null || !_subscribedVehicles.Add(veh)) return;
+            veh.OnCollisionImpulse += HandleVehicleCollisionImpulse;
+        }
+
         private void Start()
         {
             _allHouses = FindObjectsByType<PaintableHouse>(FindObjectsInactive.Include);
@@ -255,10 +275,12 @@ namespace OurWorld.Jobs
 
             for (int i = 0; i < _allVehicles.Length; i++)
             {
-                if (_allVehicles[i] != null)
-                {
-                    _allVehicles[i].OnCollisionImpulse += HandleVehicleCollisionImpulse;
-                }
+                SubscribeVehicle(_allVehicles[i]);
+            }
+
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.OnEnteredVehicle += SubscribeVehicle;
             }
 
             PaintableHouse.OnAnyHousePainted += HandleAnyHousePainted;
@@ -293,16 +315,18 @@ namespace OurWorld.Jobs
         private void OnDestroy()
         {
             if (_taxiPassengerMat != null) Destroy(_taxiPassengerMat);
-            if (_allVehicles != null)
+            if (PlayerModeController.Instance != null)
             {
-                for (int i = 0; i < _allVehicles.Length; i++)
+                PlayerModeController.Instance.OnEnteredVehicle -= SubscribeVehicle;
+            }
+            foreach (SedanVehicleController v in _subscribedVehicles)
+            {
+                if (v != null)
                 {
-                    if (_allVehicles[i] != null)
-                    {
-                        _allVehicles[i].OnCollisionImpulse -= HandleVehicleCollisionImpulse;
-                    }
+                    v.OnCollisionImpulse -= HandleVehicleCollisionImpulse;
                 }
             }
+            _subscribedVehicles.Clear();
 
             PaintableHouse.OnAnyHousePainted -= HandleAnyHousePainted;
 

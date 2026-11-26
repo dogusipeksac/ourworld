@@ -59,7 +59,16 @@ namespace OurWorld.World
             new Vector3(-22.0f, 0.06f, 181.2f),
             new Vector3(-16.0f, 0.06f, -181.2f),
             // Aydos Farm barn & shelter
-            new Vector3(168.0f, 0.06f,   5.5f)
+            new Vector3(168.0f, 0.06f,   5.5f),
+            // 6 Neighboring Sultanbeyli Districts (canopies, metro entrances, mosques, market awnings & pavilions)
+            new Vector3(180.0f, 0.08f, 214.0f), // Abdurrahmangazi Belediye portico
+            new Vector3(212.0f, 0.08f, 198.0f), // Abdurrahmangazi Merkez Camii courtyard portico
+            new Vector3( -6.0f, 0.08f, 260.0f), // Mehmet Akif M5 Sultanbeyli Metro canopy
+            new Vector3(-164.0f,0.08f, 174.0f), // Hasanpaşa M5 Metro canopy
+            new Vector3(-185.0f,0.08f, 212.0f), // Hasanpaşa Millet Parkı pergola
+            new Vector3(-186.0f,0.08f,-182.0f), // Battalgazi Semt Pazarı canopy
+            new Vector3( -52.0f,0.08f,-298.0f), // Mimar Sinan Kültür Parkı pergola
+            new Vector3( 218.0f,0.08f,-154.0f)  // Turgut Reis Akaryakıt canopy
         };
 
         // Window-shopping, bakery, fountain, coffee & stall interest points for realistic daily micro-stops
@@ -290,8 +299,8 @@ namespace OurWorld.World
             Vector3 nextPos = self.position + finalMove;
             if (clampWorldBounds)
             {
-                nextPos.x = Mathf.Clamp(nextPos.x, -245f, 245f);
-                nextPos.z = Mathf.Clamp(nextPos.z, -245f, 245f);
+                nextPos.x = Mathf.Clamp(nextPos.x, -418f, 418f);
+                nextPos.z = Mathf.Clamp(nextPos.z, -418f, 418f);
             }
 
             // Kinematic actors driven in Update() update transform.position immediately so multi-frame Update() never reads stale positions
@@ -597,25 +606,54 @@ namespace OurWorld.World
     public sealed class LivingNpcColliderBridge : MonoBehaviour
     {
         public int NpcIndex { get; private set; } = -1;
+        public bool IsDiverseCitizen { get; private set; }
 
         public void Configure(int npcIndex)
         {
             NpcIndex = npcIndex;
+            IsDiverseCitizen = false;
+        }
+
+        public void ConfigureDiverse(int citizenIndex)
+        {
+            NpcIndex = citizenIndex;
+            IsDiverseCitizen = true;
         }
 
         public void NotifyBumpedByPlayer(Vector3 playerPos, Vector3 playerVelocity)
         {
-            LivingNeighborhoodPopulator.Instance?.OnLivingNpcBumpedByPlayer(NpcIndex, playerPos, playerVelocity);
+            if (IsDiverseCitizen)
+            {
+                IstanbulDiverseCitizensPopulator.Instance?.OnDiverseNpcBumpedByPlayer(NpcIndex, playerPos, playerVelocity);
+            }
+            else
+            {
+                LivingNeighborhoodPopulator.Instance?.OnLivingNpcBumpedByPlayer(NpcIndex, playerPos, playerVelocity);
+            }
         }
 
         public void NotifyHitByVehicle(Vector3 carPos, Vector3 carVelocity, float speedKmh)
         {
-            LivingNeighborhoodPopulator.Instance?.OnLivingNpcHitByVehicle(NpcIndex, carPos, carVelocity, speedKmh);
+            if (IsDiverseCitizen)
+            {
+                IstanbulDiverseCitizensPopulator.Instance?.OnDiverseNpcHitByVehicle(NpcIndex, carPos, carVelocity, speedKmh);
+            }
+            else
+            {
+                LivingNeighborhoodPopulator.Instance?.OnLivingNpcHitByVehicle(NpcIndex, carPos, carVelocity, speedKmh);
+            }
         }
 
         public void NotifyHitByThrownProp(Vector3 impactPos, Vector3 impactVelocity, string propLabel)
         {
-            LivingNeighborhoodPopulator.Instance?.OnLivingNpcHitByProp(NpcIndex, impactPos, impactVelocity, propLabel);
+            if (IsDiverseCitizen)
+            {
+                IstanbulDiverseCitizensPopulator.Instance?.OnDiverseNpcHitByProp(NpcIndex, impactPos, impactVelocity, propLabel);
+            }
+            else
+            {
+                LivingNeighborhoodPopulator.Instance?.OnLivingNpcHitByProp(NpcIndex, impactPos, impactVelocity, propLabel);
+            }
         }
     }
 

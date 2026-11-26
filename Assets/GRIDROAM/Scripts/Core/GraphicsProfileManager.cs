@@ -98,9 +98,9 @@ namespace OurWorld.Core
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
-                if (mainCam.farClipPlane < 720f)
+                if (mainCam.farClipPlane < 960f)
                 {
-                    mainCam.farClipPlane = 720f;
+                    mainCam.farClipPlane = 960f;
                 }
                 UniversalAdditionalCameraData camData = mainCam.GetUniversalAdditionalCameraData();
                 if (camData != null)

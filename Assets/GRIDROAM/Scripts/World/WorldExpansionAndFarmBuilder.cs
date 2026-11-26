@@ -801,14 +801,15 @@ namespace OurWorld.World
             Transform envRoot = new GameObject("ValleyGroundAndAydosHills").transform;
             envRoot.SetParent(transform, false);
 
-            // Walkable lush valley ground split into 4 slabs leaving an open 48x36m swimming basin
-            // directly under Sultanbeyli Lake (X:-222..-174, Z:-18..+18) so players can genuinely swim & dive!
+            // Walkable lush valley ground split into 4 slabs (1280x1280m) leaving an open 48x36m swimming basin
+            // directly under Sultanbeyli Lake (X:-222..-174, Z:-18..+18) so players can genuinely swim & dive,
+            // and accommodating all 6 neighboring Sultanbeyli districts seamlessly!
             (string name, Vector3 pos, Vector3 size)[] valleySlabs =
             {
-                ("ExpandedValleyFloor_East",  new Vector3( 158f, -0.545f,    0f), new Vector3(664f, 1.0f, 980f)),
-                ("ExpandedValleyFloor_West",  new Vector3(-356f, -0.545f,    0f), new Vector3(268f, 1.0f, 980f)),
-                ("ExpandedValleyFloor_North", new Vector3(-198f, -0.545f,  254f), new Vector3( 48f, 1.0f, 472f)),
-                ("ExpandedValleyFloor_South", new Vector3(-198f, -0.545f, -254f), new Vector3( 48f, 1.0f, 472f))
+                ("ExpandedValleyFloor_East",  new Vector3( 233f, -0.545f,    0f), new Vector3(814f, 1.0f, 1280f)),
+                ("ExpandedValleyFloor_West",  new Vector3(-431f, -0.545f,    0f), new Vector3(418f, 1.0f, 1280f)),
+                ("ExpandedValleyFloor_North", new Vector3(-198f, -0.545f,  329f), new Vector3( 48f, 1.0f,  622f)),
+                ("ExpandedValleyFloor_South", new Vector3(-198f, -0.545f, -329f), new Vector3( 48f, 1.0f,  622f))
             };
             for (int s = 0; s < valleySlabs.Length; s++)
             {
@@ -828,18 +829,18 @@ namespace OurWorld.World
                 BuildOrganicMountainMesh(303)
             };
 
-            // 28 layered rolling sunlit Aydos Mountain Ridges encircling the 360-degree horizon safely OUTSIDE ±250m!
+            // 28 layered rolling sunlit Aydos Mountain Ridges encircling the 360-degree horizon safely OUTSIDE ±435m!
             System.Random rng = new System.Random(1453);
             for (int i = 0; i < 28; i++)
             {
                 float angle = (i / 28f) * Mathf.PI * 2f + (float)(rng.NextDouble() * 0.12 - 0.06);
                 bool outer = (i % 2) == 1;
-                float dist = outer ? 415f + (float)rng.NextDouble() * 42f : 345f + (float)rng.NextDouble() * 28f;
+                float dist = outer ? 545f + (float)rng.NextDouble() * 48f : 475f + (float)rng.NextDouble() * 34f;
                 float hx = Mathf.Cos(angle) * dist;
                 float hz = Mathf.Sin(angle) * dist;
-                float radiusX = 72f + (float)rng.NextDouble() * 34f;
-                float radiusZ = 64f + (float)rng.NextDouble() * 32f;
-                float height = outer ? (46f + (float)rng.NextDouble() * 34f) : (24f + (float)rng.NextDouble() * 18f);
+                float radiusX = 82f + (float)rng.NextDouble() * 38f;
+                float radiusZ = 74f + (float)rng.NextDouble() * 34f;
+                float height = outer ? (54f + (float)rng.NextDouble() * 38f) : (28f + (float)rng.NextDouble() * 20f);
 
                 // Keep Aydos horizon slopes & hilltop pines completely clear of Aydos Shooting Range (X:64..140, Z:-342..-200)
                 float hillFootprint = Mathf.Max(radiusX, radiusZ) + 22f;

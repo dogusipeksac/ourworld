@@ -1145,9 +1145,9 @@ namespace OurWorld.Vehicle
             if (transform.position.y < -3.5f)
             {
                 Vector3 safePos = new Vector3(
-                    Mathf.Clamp(transform.position.x, -242f, 242f),
+                    Mathf.Clamp(transform.position.x, -416f, 416f),
                     0.35f,
-                    Mathf.Clamp(transform.position.z, -242f, 242f));
+                    Mathf.Clamp(transform.position.z, -416f, 416f));
                 TeleportAndReset(safePos, Quaternion.Euler(0f, transform.eulerAngles.y, 0f));
                 return;
             }

@@ -90,7 +90,12 @@ namespace OurWorld.World
             bool carryPlayer = foot != null && mode.CurrentMode == ControlMode.OnFoot;
 
             if (mode != null) mode.SetModalLock(this, true);
-            if (foot != null) foot.SetMovementEnabled(false);
+            if (foot != null)
+            {
+                CarryableProp.DropHeldPropIfAny();
+                StreetCatController.CancelActivePet();
+                foot.SetMovementEnabled(false);
+            }
 
             GameFeelAudio.PlayUiClick();
 
@@ -101,9 +106,14 @@ namespace OurWorld.World
 
             Vector3 cabinBase = CabinTransform != null ? CabinTransform.position : transform.position;
             Quaternion faceAtrium = Quaternion.Euler(0f, 180f, 0f);
+            CharacterController footCc = carryPlayer ? foot.GetComponent<CharacterController>() : null;
 
             if (CabinTransform != null) CabinTransform.position = new Vector3(cabinBase.x, startY, cabinBase.z);
-            if (carryPlayer) foot.TeleportTo(new Vector3(cabinBase.x, startY + 0.14f, cabinBase.z), faceAtrium);
+            if (carryPlayer)
+            {
+                if (footCc != null) footCc.enabled = false;
+                foot.transform.SetPositionAndRotation(new Vector3(cabinBase.x, startY + 0.14f, cabinBase.z), faceAtrium);
+            }
 
             float elapsed = 0f;
             while (elapsed < duration)
@@ -114,15 +124,19 @@ namespace OurWorld.World
                 float curY = Mathf.Lerp(startY, endY, eased);
 
                 if (CabinTransform != null) CabinTransform.position = new Vector3(cabinBase.x, curY, cabinBase.z);
-                if (carryPlayer) foot.TeleportTo(new Vector3(cabinBase.x, curY + 0.14f, cabinBase.z), faceAtrium);
+                if (carryPlayer && foot != null)
+                {
+                    foot.transform.SetPositionAndRotation(new Vector3(cabinBase.x, curY + 0.14f, cabinBase.z), faceAtrium);
+                }
                 yield return null;
             }
 
             _currentFloor = targetFloor;
             if (CabinTransform != null) CabinTransform.position = new Vector3(cabinBase.x, endY, cabinBase.z);
 
-            if (carryPlayer)
+            if (carryPlayer && foot != null)
             {
+                if (footCc != null) footCc.enabled = true;
                 Vector3 exitWorld = new Vector3(cabinBase.x + LandingOffsetLocal.x, endY + LandingOffsetLocal.y, cabinBase.z + LandingOffsetLocal.z);
                 foot.TeleportTo(exitWorld, faceAtrium);
                 foot.SetMovementEnabled(true);

@@ -36,7 +36,13 @@ namespace OurWorld.World
             new Vector3( 34.0f, 0.08f,-191.2f), // Kadife Sokağı · Doğu
             new Vector3(-116.0f,0.08f, -58.0f), // Hamidiye Atlas AVM · Ön Meydan
             new Vector3(-164.0f,0.08f,   6.0f), // Sultanbeyli Göleti İskelesi
-            new Vector3( 150.0f,0.08f,   4.2f)  // Aydos Yeşil Vadi · Çiftlik
+            new Vector3( 150.0f,0.08f,   4.2f), // Aydos Yeşil Vadi · Çiftlik
+            new Vector3( 176.0f,0.12f, 184.0f), // Abdurrahmangazi Kent Meydanı
+            new Vector3( -12.0f,0.12f, 268.0f), // Mehmet Akif M5 Metro
+            new Vector3(-178.0f,0.12f, 190.0f), // Hasanpaşa Millet Parkı
+            new Vector3(-186.0f,0.12f,-176.0f), // Battalgazi Semt Pazarı
+            new Vector3( -48.0f,0.12f,-270.0f), // Mimar Sinan Kültür Parkı
+            new Vector3( 234.0f,0.12f,-142.0f)  // Turgut Reis · Aydos Kalesi
         };
 
         private float _cooldown = 55f;

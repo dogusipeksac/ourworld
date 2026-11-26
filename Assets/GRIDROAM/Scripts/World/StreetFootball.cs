@@ -235,18 +235,10 @@ namespace OurWorld.World
             }
         }
 
-        private void Update()
+        private void FixedUpdate()
         {
-            // Keep ball inside playable neighborhood bounds
-            if (transform.position.y < -1.5f || (transform.position - _spawnPosition).sqrMagnitude > 48f * 48f)
-            {
-                _rb.linearVelocity = Vector3.zero;
-                _rb.angularVelocity = Vector3.zero;
-                transform.position = _spawnPosition + Vector3.up * 0.2f;
-                return;
-            }
-
-            // Floating physics & water splash if kicked into the pool or lake!
+            if (_rb == null) return;
+            // Frame-rate-independent floating buoyancy in pools & Sultanbeyli Lake!
             if (WaterZone.TrySampleWater(transform.position, out float surfY, out _))
             {
                 if (!_wasInWater)
@@ -265,10 +257,22 @@ namespace OurWorld.World
             {
                 _wasInWater = false;
             }
+        }
+
+        private void Update()
+        {
+            // Keep ball inside playable neighborhood bounds
+            if (transform.position.y < -1.5f || (transform.position - _spawnPosition).sqrMagnitude > 54f * 54f)
+            {
+                _rb.linearVelocity = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+                transform.position = _spawnPosition + Vector3.up * 0.2f;
+                return;
+            }
 
             // Gentle realistic dribble when player walks or runs right into the ball
             PlayerModeController mode = PlayerModeController.Instance;
-            if (mode == null || mode.IsDriving || mode.FootController == null || Time.time - _lastDribbleTime < 0.14f)
+            if (mode == null || mode.CurrentMode != ControlMode.OnFoot || mode.FootController == null || Time.time - _lastDribbleTime < 0.14f)
             {
                 return;
             }

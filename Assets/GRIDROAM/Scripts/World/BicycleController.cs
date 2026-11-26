@@ -114,10 +114,16 @@ namespace OurWorld.World
 
         public bool TryGetDismount(out Vector3 position)
         {
-            if (IsMotorcycle && TryDismountAt(-transform.right, out position)) return true;
-            if (TryDismountAt(transform.right, out position)) return true;
-            if (TryDismountAt(-transform.right, out position)) return true;
-            return TryDismountAt(-transform.forward, out position);
+            if (IsMotorcycle && TryDismountAt(-transform.right, 1.1f, out position)) return true;
+            if (TryDismountAt(transform.right, 1.1f, out position)) return true;
+            if (TryDismountAt(-transform.right, 1.1f, out position)) return true;
+            if (TryDismountAt(-transform.forward, 1.15f, out position)) return true;
+            if (TryDismountAt(transform.forward, 1.25f, out position)) return true;
+            if (TryDismountAt(transform.right, 1.65f, out position)) return true;
+            if (TryDismountAt(-transform.right, 1.65f, out position)) return true;
+            // Guaranteed safe fallback right beside bike so player can never get permanently trapped in a corner
+            position = transform.position + Vector3.up * 0.25f;
+            return true;
         }
 
         public void Dismount(Vector3 position, Quaternion rotation, Action finished)
@@ -128,10 +134,10 @@ namespace OurWorld.World
             _dismountFinished = finished;
         }
 
-        private bool TryDismountAt(Vector3 direction, out Vector3 position)
+        private bool TryDismountAt(Vector3 direction, float distance, out Vector3 position)
         {
-            position = transform.position + direction * 1.1f;
-            if (!Physics.Raycast(position + Vector3.up * 0.65f, Vector3.down, out RaycastHit ground, 1.3f,
+            position = transform.position + direction * distance;
+            if (!Physics.Raycast(position + Vector3.up * 0.85f, Vector3.down, out RaycastHit ground, 1.8f,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) || ground.normal.y < 0.65f)
             {
                 return false;
@@ -209,17 +215,37 @@ namespace OurWorld.World
                 _speed = Mathf.MoveTowards(_speed, Mathf.Min(_speed, 3.2f), 22f * dt);
             }
 
-            // World bounds & void-fall safety net (matches PlayerFootController & SedanVehicleController)
+            // Real-world deep water guard: prevent riding a bicycle/motorcycle underwater on pool/lake floor!
+            if (WaterZone.TrySampleWater(transform.position, out float waterSurfY, out _) && (waterSurfY - transform.position.y) > 0.65f)
+            {
+                OurWorld.Core.VisualEffectsManager.SpawnWaterSplash(new Vector3(transform.position.x, waterSurfY, transform.position.z), bigDive: true);
+                OurWorld.Core.GameFeelAudio.PlayWaterSplash();
+                _speed = 0f;
+                PlayerModeController mode = PlayerModeController.Instance;
+                if (mode != null && mode.CurrentBicycle == this)
+                {
+                    Vector3 swimPos = transform.position + Vector3.up * 0.2f;
+                    mode.SetOnFootMode(snapCamera: false);
+                    mode.FootController?.TeleportTo(swimPos, transform.rotation);
+                    bool en = OurWorld.Core.LocalizationService.IsEnglish;
+                    mode.RaiseStatusMessage(en
+                        ? (IsMotorcycle ? "🌊 Motorcycle stalled in deep water — stepped off to swim!" : "🌊 Too deep to cycle — hopped off into the water!")
+                        : (IsMotorcycle ? "🌊 Motosiklet derin suda stop etti — yüzmek için indin!" : "🌊 Su bisiklet için çok derin — yüzmeye geçtin!"));
+                    return;
+                }
+            }
+
+            // Expanded Sultanbeyli world bounds & void-fall safety net (matches PlayerFootController & SedanVehicleController)
             Vector3 curPos = transform.position;
-            bool outOfBounds = curPos.x < -242f || curPos.x > 242f || curPos.z < -242f || curPos.z > 242f;
+            bool outOfBounds = curPos.x < -418f || curPos.x > 418f || curPos.z < -418f || curPos.z > 418f;
             if (curPos.y < -3.5f || outOfBounds)
             {
                 bool wasCc = _body.enabled;
                 _body.enabled = false;
                 transform.position = new Vector3(
-                    Mathf.Clamp(curPos.x, -240f, 240f),
+                    Mathf.Clamp(curPos.x, -414f, 414f),
                     curPos.y < -3.5f ? 0.30f : curPos.y,
-                    Mathf.Clamp(curPos.z, -240f, 240f));
+                    Mathf.Clamp(curPos.z, -414f, 414f));
                 _body.enabled = wasCc;
                 _speed = 0f;
                 if (curPos.y < -3.5f) _fallSpeed = 0f;
@@ -281,18 +307,28 @@ namespace OurWorld.World
             pushDir.y = 0f;
             if (pushDir.sqrMagnitude > 0.001f) pushDir.Normalize();
 
-            // Physically push dynamic street props on bike/motorcycle contact
-            Rigidbody rb = hit.collider.attachedRigidbody;
-            if (rb != null && !rb.isKinematic && rb.mass <= 150f)
-            {
-                rb.WakeUp();
-                rb.AddForceAtPosition(pushDir * (absSpd * Mathf.Clamp(rb.mass * 0.45f, 6f, 28f)), hit.point, ForceMode.Impulse);
-            }
-
+            // Physically push dynamic street props on bike/motorcycle contact (no double impulse!)
             DynamicWorldProp dynProp = hit.collider.GetComponentInParent<DynamicWorldProp>();
             if (dynProp != null)
             {
-                dynProp.ApplyPunchOrCrashImpulse(pushDir * (absSpd * 3.8f) + Vector3.up * 1.4f, hit.point, absSpd > 6f);
+                if (dynProp.Body != null && dynProp.Body.isKinematic)
+                {
+                    dynProp.ApplyNudge(pushDir * Mathf.Clamp(absSpd * 1.15f, 1.5f, 7.5f), hit.point);
+                }
+                else if (dynProp.Body != null)
+                {
+                    dynProp.Body.WakeUp();
+                    dynProp.Body.AddForceAtPosition(pushDir * (absSpd * Mathf.Clamp(dynProp.MassKg * 0.42f, 5f, 24f)), hit.point, ForceMode.Impulse);
+                }
+            }
+            else
+            {
+                Rigidbody rb = hit.collider.attachedRigidbody;
+                if (rb != null && !rb.isKinematic && rb.mass <= 150f)
+                {
+                    rb.WakeUp();
+                    rb.AddForceAtPosition(pushDir * (absSpd * Mathf.Clamp(rb.mass * 0.45f, 6f, 28f)), hit.point, ForceMode.Impulse);
+                }
             }
 
             if (absSpd < 2.2f) return;

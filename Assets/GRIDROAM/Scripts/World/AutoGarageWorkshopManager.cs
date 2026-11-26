@@ -364,6 +364,8 @@ namespace OurWorld.World
             _customerCarRoot = new GameObject("CustomerCarOnLift");
             _customerCarRoot.transform.SetParent(root, false);
             _customerCarRoot.transform.SetPositionAndRotation(LiftBayWorldPos + new Vector3(0f, 0.16f, 0f), Quaternion.identity);
+            WorldPhysicsSolidifier.EnsureBoxCollider(_customerCarRoot, new Vector3(0f, 0.72f, 0f), new Vector3(1.85f, 1.38f, 4.20f));
+            WorldPhysicsSolidifier.EnsureKinematicRigidbody(_customerCarRoot);
 
             GameObject custFbx = OurWorldModelLibrary.InstantiateModel("OW_CustomerCar", _customerCarRoot.transform, Vector3.zero, Quaternion.identity);
             if (custFbx != null)

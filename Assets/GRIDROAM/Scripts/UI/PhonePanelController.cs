@@ -298,6 +298,7 @@ namespace OurWorld.UI
         {
             if (panelRoot == null) return;
 
+            _cachedVehicles = FindObjectsByType<SedanVehicleController>(FindObjectsInactive.Include);
             _openedFrame = Time.frameCount;
             RefreshAllTexts();
 
@@ -409,9 +410,9 @@ namespace OurWorld.UI
         {
             HasCustomWaypoint = true;
             CustomWaypointPosition = new Vector3(
-                Mathf.Clamp(worldPos.x, -242f, 242f),
+                Mathf.Clamp(worldPos.x, -415f, 415f),
                 0.2f,
-                Mathf.Clamp(worldPos.z, -242f, 242f));
+                Mathf.Clamp(worldPos.z, -415f, 415f));
 
             if (!string.IsNullOrEmpty(label) && PlayerModeController.Instance != null)
             {
@@ -460,21 +461,15 @@ namespace OurWorld.UI
             }
         }
 
-        private bool _warnedOutOfBoundsMarker;
-
         private Vector2 WorldToViewportAnchored(Vector3 worldPos, string markerDebugName = null)
         {
             if (mapViewportRect == null) return Vector2.zero;
             Rect r = mapViewportRect.rect;
             float rawNx = (worldPos.x - ViewWorldMinX) / ViewWorldSpan;
             float rawNy = (worldPos.z - ViewWorldMinZ) / ViewWorldSpan;
-            if ((rawNx < 0f || rawNx > 1f || rawNy < 0f || rawNy > 1f) && !_warnedOutOfBoundsMarker)
-            {
-                _warnedOutOfBoundsMarker = true;
-                Debug.LogWarning($"[PhonePanelController] Map marker '{markerDebugName ?? "unknown"}' at {worldPos} lies outside Phone map bounds [{ViewWorldMinX}..{ViewWorldMinX + ViewWorldSpan}].");
-            }
-            float nx = Mathf.Clamp01(rawNx);
-            float ny = Mathf.Clamp01(rawNy);
+            // Outer Sultanbeyli districts clamp neatly to the corresponding compass rim of the Hamidiye map view
+            float nx = Mathf.Clamp(rawNx, 0.04f, 0.96f);
+            float ny = Mathf.Clamp(rawNy, 0.04f, 0.96f);
             return new Vector2((nx - 0.5f) * r.width, (ny - 0.5f) * r.height);
         }
 
@@ -629,7 +624,13 @@ namespace OurWorld.UI
                 ("Kadife Sk.", "Kadife St.",   new Vector3( -12f, 0.2f,-186f), new Color(0.14f, 0.78f, 0.70f)),
                 ("Poligon",    "Range",        new Vector3(  92f, 0.2f,-214f), new Color(0.96f, 0.68f, 0.20f)),
                 ("Spor",       "Sports",       new Vector3( -14f, 0.2f, -29f), new Color(0.92f, 0.44f, 0.36f)),
-                ("Evim No:48", "Home No:48",   new Vector3( -62f, 0.2f,   4f), new Color(0.82f, 0.88f, 0.96f))
+                ("Evim No:48", "Home No:48",   new Vector3( -62f, 0.2f,   4f), new Color(0.82f, 0.88f, 0.96f)),
+                ("Kent Meyd.", "City Square",  new Vector3( 172f, 0.2f, 184f), new Color(0.26f, 0.72f, 0.98f)),
+                ("M5 Metro",   "M5 Metro",     new Vector3(  -6f, 0.2f, 266f), new Color(0.95f, 0.30f, 0.32f)),
+                ("Hasanpaşa",  "Hasanpaşa",    new Vector3(-174f, 0.2f, 188f), new Color(0.32f, 0.86f, 0.56f)),
+                ("Semt Pazarı","Bazaar",       new Vector3(-176f, 0.2f,-174f), new Color(0.98f, 0.64f, 0.22f)),
+                ("Mimar Sinan","Mimar Sinan",  new Vector3( -52f, 0.2f,-268f), new Color(0.72f, 0.56f, 0.96f)),
+                ("Aydos Kale", "Aydos Castle", new Vector3( 236f, 0.2f,-138f), new Color(0.92f, 0.80f, 0.42f))
             };
 
             for (int i = 0; i < landmarks.Length; i++)
@@ -783,7 +784,7 @@ namespace OurWorld.UI
 
         private static bool TryResolveSafeLandingPosition(Vector3 rawTarget, bool forVehicle, out Vector3 safePos)
         {
-            Vector3 probe = new Vector3(Mathf.Clamp(rawTarget.x, -238f, 238f), 0.25f, Mathf.Clamp(rawTarget.z, -238f, 238f));
+            Vector3 probe = new Vector3(Mathf.Clamp(rawTarget.x, -412f, 412f), 0.25f, Mathf.Clamp(rawTarget.z, -412f, 412f));
 
             // Snap well-known enclosed/water footprints safely to their open entrances
             if (probe.x <= -166f && probe.x >= -226f && probe.z >= -46f && probe.z <= 46f)
@@ -802,6 +803,10 @@ namespace OurWorld.UI
             {
                 probe = new Vector3(92f, 0.22f, -210f); // Aydos Shooting Range Parking Pad
             }
+            else if (probe.x >= 244f && probe.x <= 284f && probe.z >= -138f && probe.z <= -98f)
+            {
+                probe = new Vector3(236f, 0.22f, -138f); // Historic Aydos Castle Trailhead
+            }
 
             float[] radii = { 0f, 3.2f, 6.5f, 10.5f };
             for (int rIdx = 0; rIdx < radii.Length; rIdx++)
@@ -812,9 +817,9 @@ namespace OurWorld.UI
                 {
                     float ang = (s / (float)samples) * Mathf.PI * 2f;
                     Vector3 cand = new Vector3(
-                        Mathf.Clamp(probe.x + Mathf.Cos(ang) * rad, -238f, 238f),
+                        Mathf.Clamp(probe.x + Mathf.Cos(ang) * rad, -412f, 412f),
                         0.25f,
-                        Mathf.Clamp(probe.z + Mathf.Sin(ang) * rad, -238f, 238f));
+                        Mathf.Clamp(probe.z + Mathf.Sin(ang) * rad, -412f, 412f));
 
                     // Skip water interior
                     if (cand.x <= -166f && cand.x >= -226f && cand.z >= -46f && cand.z <= 46f) continue;
@@ -908,7 +913,15 @@ namespace OurWorld.UI
             Quaternion spawnRot = Quaternion.Euler(0f, ft.eulerAngles.y, 0f);
             for (int i = 0; i < candidates.Length; i++)
             {
-                Vector3 c = new Vector3(Mathf.Clamp(candidates[i].x, -238f, 238f), 0.35f, Mathf.Clamp(candidates[i].z, -238f, 238f));
+                float cx = Mathf.Clamp(candidates[i].x, -412f, 412f);
+                float cz = Mathf.Clamp(candidates[i].z, -412f, 412f);
+                float groundY = 0.25f;
+                if (Physics.Raycast(new Vector3(cx, p.y + 4.0f, cz), Vector3.down, out RaycastHit gHit, 8.0f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) && gHit.normal.y > 0.72f)
+                {
+                    groundY = gHit.point.y + 0.28f;
+                }
+                Vector3 c = new Vector3(cx, groundY, cz);
                 if (!Physics.CheckBox(c + Vector3.up * 1.1f, new Vector3(1.1f, 0.72f, 2.2f), spawnRot,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 {

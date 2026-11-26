@@ -124,6 +124,7 @@ namespace OurWorld.World
 
         private void OnDestroy()
         {
+            if (IsFishing) StopFishing();
             if (_bobberMat != null) Destroy(_bobberMat);
             if (Instance == this) Instance = null;
         }
@@ -131,6 +132,8 @@ namespace OurWorld.World
         public void BeginFishing(PlayerModeController player)
         {
             if (player == null || IsFishing) return;
+            CarryableProp.DropHeldPropIfAny();
+            StreetCatController.CancelActivePet();
             _activePlayer = player;
             player.SetModalLock(this, true);
 

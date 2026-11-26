@@ -574,6 +574,11 @@ namespace OurWorld.Player
                 hitLiving = LivingNeighborhoodPopulator.Instance.TryReceivePlayerPunch(
                     strikeCenter, radius, transform.position, transform.forward, step);
             }
+            if (!hitLiving && IstanbulDiverseCitizensPopulator.Instance != null)
+            {
+                hitLiving = IstanbulDiverseCitizensPopulator.Instance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
             if (!hitLiving)
             {
                 hitLiving = StreetCatController.TryReceivePlayerPunch(
@@ -1551,9 +1556,9 @@ namespace OurWorld.Player
             if (transform.position.y < -3.5f)
             {
                 Vector3 safePos = new Vector3(
-                    Mathf.Clamp(transform.position.x, -242f, 242f),
+                    Mathf.Clamp(transform.position.x, -416f, 416f),
                     0.25f,
-                    Mathf.Clamp(transform.position.z, -242f, 242f));
+                    Mathf.Clamp(transform.position.z, -416f, 416f));
                 TeleportTo(safePos, transform.rotation);
                 return;
             }

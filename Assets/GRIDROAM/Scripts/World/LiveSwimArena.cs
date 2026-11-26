@@ -29,6 +29,7 @@ namespace OurWorld.World
         private static readonly Vector3 LakeCenter = new Vector3(-198.0f, 0.0f, 0.0f);
 
         private readonly List<GameObject> _pearls = new List<GameObject>(8);
+        private readonly List<float> _pearlBaseYs = new List<float>(8);
         private readonly List<Material> _ownedMats = new List<Material>(8);
         private Material _pearlMat;
         private bool _subscribed;
@@ -90,7 +91,8 @@ namespace OurWorld.World
                 if (p == null || !p.activeSelf) continue;
                 p.transform.Rotate(0f, 55f * Time.deltaTime, 0f, Space.World);
                 Vector3 pos = p.transform.localPosition;
-                pos.y += Mathf.Sin(t * 2.6f + i * 1.4f) * 0.0012f;
+                float baseY = i < _pearlBaseYs.Count ? _pearlBaseYs[i] : pos.y;
+                pos.y = baseY + Mathf.Sin(t * 2.6f + i * 1.4f) * 0.12f;
                 p.transform.localPosition = pos;
             }
         }
@@ -213,6 +215,7 @@ namespace OurWorld.World
                 trig.Configure(InteractableKind.InspectObject, $"sunken_pearl_{i}", "ui.btn.interact", 2.6f);
                 trig.SetCustomPrompt("Parlayan Sualtı İncisini Topla (+35 ₺)", "Collect Glowing Underwater Pearl (+35 ₺)");
                 _pearls.Add(pearl);
+                _pearlBaseYs.Add(pearl.transform.localPosition.y);
             }
         }
 

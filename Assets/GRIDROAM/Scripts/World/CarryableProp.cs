@@ -17,6 +17,9 @@ namespace OurWorld.World
         private const float ThrowReleaseTime = 0.22f;
         private static CarryableProp _currentlyHeld;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => _currentlyHeld = null;
+
         private Rigidbody _rb;
         private Collider[] _colliders;
         private CharacterController _holderCollider;
@@ -191,6 +194,13 @@ namespace OurWorld.World
             fwd.Normalize();
 
             float placeDist = (_holderCollider != null ? _holderCollider.radius : 0.32f) + _shapeExtents.z + 0.16f;
+            // Prevent placing carried prop inside a solid wall when standing face-to-wall
+            if (Physics.Raycast(footTr.position + Vector3.up * 0.75f, fwd, out RaycastHit wallHit, placeDist + 0.18f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                wallHit.collider.transform.root != footTr.root && wallHit.collider.transform.root != transform.root)
+            {
+                placeDist = Mathf.Max(0.28f, wallHit.distance - _shapeExtents.z - 0.08f);
+            }
             Vector3 spot = footTr.position + fwd * placeDist;
             float groundY = footTr.position.y;
             if (Physics.Raycast(spot + Vector3.up * 0.65f, Vector3.down, out RaycastHit hit, 1.5f,

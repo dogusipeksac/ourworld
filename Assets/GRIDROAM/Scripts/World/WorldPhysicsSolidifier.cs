@@ -139,8 +139,8 @@ namespace OurWorld.World
             if (_rb == null || _rb.isKinematic) return;
 
             Vector3 p = transform.position;
-            // Immediate recovery if knocked beneath the world or deep into water
-            if (p.y < -2.2f || Mathf.Abs(p.x) > 246f || Mathf.Abs(p.z) > 246f)
+            // Immediate recovery if knocked beneath the world or outside expanded Sultanbeyli bounds
+            if (p.y < -2.2f || Mathf.Abs(p.x) > 418f || Mathf.Abs(p.z) > 418f)
             {
                 ResetToHome();
                 return;

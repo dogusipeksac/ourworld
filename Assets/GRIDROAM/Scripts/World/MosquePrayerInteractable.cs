@@ -109,6 +109,8 @@ namespace OurWorld.World
             PlayerFootController foot = mode.FootController;
             if (foot == null) return;
 
+            CarryableProp.DropHeldPropIfAny();
+            StreetCatController.CancelActivePet();
             _activePrayer = this;
             _prayingMode = mode;
             _prayerRoutine = StartCoroutine(PrayerSequenceRoutine(mode, foot));

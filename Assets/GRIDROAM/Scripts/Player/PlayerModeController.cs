@@ -348,9 +348,9 @@ namespace OurWorld.Player
                 SedanVehicleController targetCar = FindVehicleBySaveId(data.savedVehicleId);
                 if (targetCar != null && (targetCar != playerSedan || HasVehicleKeys))
                 {
-                    bool carPosValid = data.savedVehiclePosX >= -248f && data.savedVehiclePosX <= 248f &&
-                                       data.savedVehiclePosZ >= -350f && data.savedVehiclePosZ <= 260f &&
-                                       data.savedVehiclePosY >= -0.5f && data.savedVehiclePosY <= 12f;
+                    bool carPosValid = data.savedVehiclePosX >= -420f && data.savedVehiclePosX <= 420f &&
+                                       data.savedVehiclePosZ >= -420f && data.savedVehiclePosZ <= 420f &&
+                                       data.savedVehiclePosY >= -0.5f && data.savedVehiclePosY <= 18f;
                     Vector3 vPos = carPosValid
                         ? new Vector3(data.savedVehiclePosX, Mathf.Max(0.24f, data.savedVehiclePosY), data.savedVehiclePosZ)
                         : targetCar.transform.position;
@@ -364,9 +364,9 @@ namespace OurWorld.Player
 
             if (footController != null)
             {
-                bool footPosValid = data.playerPosX >= -248f && data.playerPosX <= 248f &&
-                                    data.playerPosZ >= -350f && data.playerPosZ <= 260f &&
-                                    data.playerPosY >= -0.5f && data.playerPosY <= 24f;
+                bool footPosValid = data.playerPosX >= -420f && data.playerPosX <= 420f &&
+                                    data.playerPosZ >= -420f && data.playerPosZ <= 420f &&
+                                    data.playerPosY >= -0.5f && data.playerPosY <= 26f;
                 Vector3 fPos = footPosValid
                     ? new Vector3(data.playerPosX, Mathf.Max(0.10f, data.playerPosY), data.playerPosZ)
                     : new Vector3(-68.0f, 0.12f, -2.2f);
@@ -415,7 +415,13 @@ namespace OurWorld.Player
             ("Hz. Osman Camii Avlusu",              "Hz. Osman Mosque Courtyard",        new Vector3(  82.0f, 0.12f,  -24.0f), 180f),
             ("Fatih Bulvarı · Saat Kulesi",         "Fatih Blvd · Clock Tower Plaza",    new Vector3(   0.0f, 0.18f,  134.0f),   0f),
             ("Petrol Yolu Caddesi",                 "Petrol Yolu Avenue",                new Vector3( -18.0f, 0.12f,  -78.0f),  90f),
-            ("Aziziye Cd. · İlkokul",               "Aziziye Ave · Primary School",      new Vector3( -16.0f, 0.12f, -114.0f), 180f)
+            ("Aziziye Cd. · İlkokul",               "Aziziye Ave · Primary School",      new Vector3( -16.0f, 0.12f, -114.0f), 180f),
+            ("Abdurrahmangazi · Kent Meydanı",      "Abdurrahmangazi · Kent Square",     new Vector3( 172.0f, 0.14f,  184.0f),  20f),
+            ("Mehmet Akif · M5 Sultanbeyli Metro",  "Mehmet Akif · M5 Metro Station",    new Vector3(  -6.0f, 0.14f,  265.0f),   0f),
+            ("Hasanpaşa · Millet Parkı & Metro",    "Hasanpaşa · Millet Park & Metro",   new Vector3(-174.0f, 0.14f,  188.0f), -45f),
+            ("Battalgazi · Semt Pazarı",            "Battalgazi · Street Bazaar",        new Vector3(-176.0f, 0.14f, -174.0f), 180f),
+            ("Mimar Sinan · Kültür Parkı",          "Mimar Sinan · Culture Park",        new Vector3( -52.0f, 0.14f, -268.0f), 180f),
+            ("Turgut Reis · Tarihi Aydos Kalesi",   "Turgut Reis · Aydos Castle",        new Vector3( 236.0f, 0.14f, -138.0f),  45f)
         };
 
         private void Update()

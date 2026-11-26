@@ -517,6 +517,8 @@ namespace OurWorld.Player
 
             if (mode != null)
             {
+                CarryableProp.DropHeldPropIfAny();
+                StreetCatController.CancelActivePet();
                 mode.SetModalLock(this, true);
             }
             if (foot != null)
@@ -528,6 +530,7 @@ namespace OurWorld.Player
             PlayerShoppingCart.ConfiscateBySecurity(mode);
             TownPedestrian.CalmAllAngryCitizens();
             LivingNeighborhoodPopulator.CalmAllAngryNpcs();
+            IstanbulDiverseCitizensPopulator.CalmAllHostileCitizens();
             HamidiyeMallInteractionHandler.CalmAllShoppers();
             WorldExpansionAndFarmBuilder.CalmShepherdDog();
             NeighborhoodConsequenceSystem.CoolDownHeatOnRecovery();
@@ -679,6 +682,8 @@ namespace OurWorld.Player
 
             if (mode != null)
             {
+                CarryableProp.DropHeldPropIfAny();
+                StreetCatController.CancelActivePet();
                 mode.SetModalLock(this, true);
             }
 
@@ -721,6 +726,7 @@ namespace OurWorld.Player
             SetHealth(100f, 100f - _health);
             TownPedestrian.CalmAllAngryCitizens();
             LivingNeighborhoodPopulator.CalmAllAngryNpcs();
+            IstanbulDiverseCitizensPopulator.CalmAllHostileCitizens();
             HamidiyeMallInteractionHandler.CalmAllShoppers();
             WorldExpansionAndFarmBuilder.CalmShepherdDog();
             NeighborhoodConsequenceSystem.CoolDownHeatOnRecovery();
