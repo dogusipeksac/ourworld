@@ -392,10 +392,10 @@ namespace OurWorld.UI
                 NameEn = "Shooting Range",
                 TagTr = "Tabanca · Pompalı · Karabin · Sniper\nHedef · IPSC · Trap · 100m",
                 TagEn = "Pistol · Shotgun · Carbine · Sniper\nBullseye · IPSC · Trap · 100m",
-                ExitPos = new Vector3(14.0f, 0.14f, -190.5f),
+                ExitPos = new Vector3(92.0f, 0.14f, -216.5f),
                 ExitYaw = 180f,
-                PreviewCamPos = new Vector3(2.0f, 5.4f, -178.0f),
-                PreviewLookAt = new Vector3(14.0f, 2.0f, -214.0f)
+                PreviewCamPos = new Vector3(80.0f, 5.4f, -204.0f),
+                PreviewLookAt = new Vector3(92.0f, 2.0f, -240.0f)
             }
         };
 
@@ -736,6 +736,32 @@ namespace OurWorld.UI
             }
 
             // Android Back / Escape closes the topmost open modal panel cleanly before toggling Pause Menu
+            if (MobileDrivingAndPhotoHud.Instance != null && MobileDrivingAndPhotoHud.Instance.IsPhotoModeActive)
+            {
+                MobileDrivingAndPhotoHud.Instance.ExitPhotoMode(restoreHud: true);
+                return;
+            }
+            if (MallUiPanels.Instance != null && MallUiPanels.Instance.IsOpen)
+            {
+                if (MallUiPanels.Instance.IsCinemaPlaying) MallUiPanels.Instance.SkipCinema();
+                else MallUiPanels.Instance.Close();
+                return;
+            }
+            if (DailyQuestsOverlay.Instance != null && DailyQuestsOverlay.Instance.IsOpen)
+            {
+                DailyQuestsOverlay.Instance.Close();
+                return;
+            }
+            if (BarberAndStylePanel.Instance != null && BarberAndStylePanel.Instance.IsOpen)
+            {
+                BarberAndStylePanel.Instance.Close();
+                return;
+            }
+            if (AutoDealershipManager.Instance != null && AutoDealershipManager.Instance.IsOpen)
+            {
+                AutoDealershipManager.Instance.CloseModal();
+                return;
+            }
             if (PhonePanelController.Instance != null && PhonePanelController.Instance.IsOpen)
             {
                 PhonePanelController.Instance.Close();

@@ -37,6 +37,8 @@ namespace OurWorld.UI
         private bool _isOpen;
         private bool _subscribed;
 
+        public bool IsOpen => _isOpen;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoBootstrap()
         {
@@ -85,11 +87,6 @@ namespace OurWorld.UI
             {
                 _barberPoleStripe.Rotate(0f, 75f * Time.deltaTime, 0f, Space.Self);
             }
-
-            if (_isOpen && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-            {
-                Close();
-            }
         }
 
         private void HandleInteracted(InteractableTrigger trig)
@@ -107,7 +104,7 @@ namespace OurWorld.UI
 
             Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             GameObject root = new GameObject("Havadis_BerberTuncay_Pole");
-            root.transform.position = new Vector3(44.8f, 0.04f, 180.5f);
+            root.transform.position = new Vector3(39.8f, 0.04f, 180.5f);
 
             Material chrome = MakeMat(sh, new Color(0.84f, 0.88f, 0.92f), 0.85f, 0.78f);
             Material redMat = MakeMat(sh, new Color(0.86f, 0.16f, 0.18f), 0.55f, 0.08f);
@@ -142,6 +139,7 @@ namespace OurWorld.UI
             InteractableTrigger trig = root.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.InspectObject, BarberInteractId, "ui.btn.interact", 3.0f);
             trig.SetCustomPrompt("Berber Tuncay · Saç & Stil Stüdyosu", "Barber Tuncay · Hair & Style Studio");
+            PlayerModeController.Instance?.RefreshInteractablesCache();
         }
 
         private static GameObject MakePart(string name, PrimitiveType type, Transform parent, Vector3 lp, Vector3 sc, Material mat)

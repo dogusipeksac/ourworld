@@ -44,6 +44,7 @@ namespace OurWorld.World
         private Material _screenGlow;
         private Material _neonTeal;
         private Material _neonAmber;
+        private Material _alarmRedLed;
         private Material _ceilingGlow;
         private Material _waterMat;
         private Material _foliageMat;
@@ -85,6 +86,7 @@ namespace OurWorld.World
 
         private void Start()
         {
+            ClearConflictingLegacyBlocks();
             transform.position = MallCenter;
             BuildMaterials();
 
@@ -119,6 +121,23 @@ namespace OurWorld.World
             if (PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.RefreshInteractablesCache();
+            }
+        }
+
+        private static void ClearConflictingLegacyBlocks()
+        {
+            // Legacy non-enterable street filler blocks that overlapped Atlas AVM's parking plaza & side facades
+            string[] overlapping =
+            {
+                "PetrolYolu_NorthBlock_1",
+                "Eyyubi_EastApt_3",
+                "Eyyubi_EastApt_4",
+                "SeyyidKutup_WestApt_3"
+            };
+            for (int i = 0; i < overlapping.Length; i++)
+            {
+                GameObject go = GameObject.Find(overlapping[i]);
+                if (go != null) go.SetActive(false);
             }
         }
 
@@ -171,6 +190,7 @@ namespace OurWorld.World
 
             _neonTeal    = MakeEmissive(lit, "AVM_NeonTeal",    new Color(0.14f, 0.84f, 0.78f), 1.55f);
             _neonAmber   = MakeEmissive(lit, "AVM_NeonAmber",   new Color(1.00f, 0.76f, 0.24f), 1.70f);
+            _alarmRedLed = MakeEmissive(lit, "AVM_AlarmRedLed", new Color(1.00f, 0.14f, 0.16f), 2.35f);
             _ceilingGlow = MakeEmissive(lit, "AVM_CeilingGlow", new Color(1.00f, 0.95f, 0.86f), 1.25f);
             _screenGlow  = MakeEmissive(lit, "AVM_CinemaScr",   new Color(0.38f, 0.64f, 0.96f), 1.40f);
         }
@@ -327,6 +347,11 @@ namespace OurWorld.World
                 Box($"Rail_F{floor}_NR", parent, new Vector3( 3.7f, ry, AtriumHalf), new Vector3(4.6f, rh, 0.14f), _glassRailing, col: true, shadows: false);
             }
 
+            // Safety glass elevator landing doors on upper floors (1..4) so players can never fall down the 5-story shaft!
+            Box($"ElevShaftDoor_F{floor}", parent, new Vector3(0f, yTop + 1.15f, AtriumHalf - 0.04f), new Vector3(2.84f, 2.30f, 0.12f), _glassRailing, col: true, shadows: false);
+            Box($"ElevShaftFrameL_F{floor}", parent, new Vector3(-1.40f, yTop + 1.15f, AtriumHalf - 0.04f), new Vector3(0.10f, 2.34f, 0.16f), _darkFrame, col: false, shadows: false);
+            Box($"ElevShaftFrameR_F{floor}", parent, new Vector3( 1.40f, yTop + 1.15f, AtriumHalf - 0.04f), new Vector3(0.10f, 2.34f, 0.16f), _darkFrame, col: false, shadows: false);
+
             if (floor == 2)
             {
                 Box($"Rail_F{floor}_SC", parent, new Vector3(0f, ry, -AtriumHalf), new Vector3(6.8f, rh, 0.14f), _glassRailing, col: true, shadows: false);
@@ -451,7 +476,9 @@ namespace OurWorld.World
             Color staffUniform,
             string[] staffLines,
             bool darkInterior = false,
-            bool counterAtBack = true)
+            bool counterAtBack = true,
+            bool isPhysicalCheckoutStore = false,
+            bool disableCounterTrigger = false)
         {
             Transform store = new GameObject(storeObjName).transform;
             store.SetParent(parent, false);
@@ -490,6 +517,21 @@ namespace OurWorld.World
             // Warm interior ceiling LED panel
             Box("InteriorLight", store, new Vector3(0f, h - 0.12f, 0f), new Vector3(width * 0.62f, 0.06f, 0.55f), darkInterior ? _neonAmber : _ceilingGlow, col: false, shadows: false);
 
+            // Physical EAS Anti-Theft Security Pedestal Gate across retail store doorways!
+            if (isPhysicalCheckoutStore)
+            {
+                StoreSecurityGate.BuildPhysicalGate(
+                    store,
+                    signText,
+                    new Vector3(0f, 0.04f, hd - 0.06f),
+                    doorHalf * 2f,
+                    new Vector3(0f, 0.08f, hd - 1.75f),
+                    _darkFrame,
+                    _glassRailing,
+                    _neonTeal,
+                    _alarmRedLed);
+            }
+
             // Checkout / Service Counter + POS Register Monitor + Interactive Trigger
             if (!string.IsNullOrEmpty(interactId))
             {
@@ -500,9 +542,20 @@ namespace OurWorld.World
                 Box("PosMonitor",  counter.transform, new Vector3(counterW * 0.25f, 0.80f, 0.08f), new Vector3(0.42f, 0.34f, 0.08f), _darkFrame, col: false, shadows: false);
                 Box("PosScreen",   counter.transform, new Vector3(counterW * 0.25f, 0.80f, 0.13f), new Vector3(0.36f, 0.26f, 0.03f), _neonTeal, col: false, shadows: false);
 
-                InteractableTrigger trig = counter.AddComponent<InteractableTrigger>();
-                trig.Configure(InteractableKind.InspectObject, interactId, "ui.btn.interact", 3.3f);
-                trig.SetCustomPrompt(promptTr, promptEn);
+                if (isPhysicalCheckoutStore)
+                {
+                    InteractableTrigger trig = counter.AddComponent<InteractableTrigger>();
+                    trig.Configure(InteractableKind.ShopCounter, interactId, "ui.btn.shop", 3.3f);
+                    trig.SetCustomPrompt(
+                        $"{signText} Kasası (Önce stanttan ürün al/dene)",
+                        $"{signText} Checkout (Pick or Try On items first)");
+                }
+                else if (!disableCounterTrigger)
+                {
+                    InteractableTrigger trig = counter.AddComponent<InteractableTrigger>();
+                    trig.Configure(InteractableKind.InspectObject, interactId, "ui.btn.interact", 3.3f);
+                    trig.SetCustomPrompt(promptTr, promptEn);
+                }
 
                 // Uniformed Store Staff NPC standing behind the counter!
                 if (!string.IsNullOrEmpty(staffName))
@@ -513,6 +566,48 @@ namespace OurWorld.World
             }
 
             return store;
+        }
+
+        private void SpawnMallPhysicalItem(
+            Transform store,
+            string nameTr,
+            string nameEn,
+            int price,
+            ShopItemEffect effect,
+            float effectParam,
+            ConsumeAnimKind consumeKind,
+            ShopPropVisual visual,
+            Vector3 localPos,
+            bool requiresCheckout,
+            string storeName,
+            int jacketColorIdx = 0,
+            int repXp = 0,
+            bool isTryOn = false,
+            float scale = 1.08f,
+            float radius = 2.15f)
+        {
+            if (store == null) return;
+            GameObject go = new GameObject($"MallItem_{nameTr}");
+            go.transform.SetParent(store, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = Quaternion.identity;
+
+            PhysicalShopItem item = go.AddComponent<PhysicalShopItem>();
+            item.Configure(
+                nameTr,
+                price,
+                effect,
+                effectParam,
+                consumeKind,
+                visual,
+                requiresCheckout,
+                jacketColorIdx,
+                interactionRadius: radius,
+                visualScale: scale,
+                itemNameEn: nameEn,
+                reputationXp: repXp,
+                isTryOnWearable: isTryOn,
+                storeName: storeName);
         }
 
         private ProceduralHumanoid SpawnMallNpc(
@@ -605,17 +700,27 @@ namespace OurWorld.World
             Cylinder("TableLeg", set, new Vector3(0f, 0.39f, 0f), new Vector3(0.16f, 0.39f, 0.16f), _darkFrame, col: false, shadows: false);
 
             Material cm = chairMat ?? _tealAccent;
-            GameObject chair = Box("ChairSeat", set, new Vector3(0f, 0.44f, 0.96f), new Vector3(0.54f, 0.08f, 0.54f), cm, col: true, shadows: false);
-            Box("ChairBack", chair.transform, new Vector3(0f, 0.32f, 0.23f), new Vector3(0.52f, 0.54f, 0.08f), cm, col: false, shadows: false);
+            // Unscaled ChairRoot pivot (prevents squashing ChairBack & SitPoint under a flat Cube scale!)
+            GameObject chairRoot = new GameObject("DiningChair");
+            chairRoot.transform.SetParent(set, false);
+            chairRoot.transform.localPosition = new Vector3(0f, 0f, 1.08f);
+            chairRoot.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+
+            Box("ChairSeat", chairRoot.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.54f, 0.06f, 0.52f), cm, col: true, shadows: false);
+            Box("ChairBack", chairRoot.transform, new Vector3(0f, 0.72f, -0.23f), new Vector3(0.52f, 0.48f, 0.07f), cm, col: false, shadows: false);
+            Box("LegFL", chairRoot.transform, new Vector3(-0.21f, 0.22f,  0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
+            Box("LegFR", chairRoot.transform, new Vector3( 0.21f, 0.22f,  0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
+            Box("LegBL", chairRoot.transform, new Vector3(-0.21f, 0.22f, -0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
+            Box("LegBR", chairRoot.transform, new Vector3( 0.21f, 0.22f, -0.20f), new Vector3(0.05f, 0.44f, 0.05f), _darkFrame, col: false, shadows: false);
 
             GameObject sp = new GameObject("SitPoint");
-            sp.transform.SetParent(chair.transform, false);
-            sp.transform.localPosition = new Vector3(0f, 0.06f, 0f);
-            sp.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            sp.transform.SetParent(chairRoot.transform, false);
+            sp.transform.localPosition = new Vector3(0f, 0.48f, 0.04f);
+            sp.transform.localRotation = Quaternion.identity;
 
-            InteractableTrigger trig = chair.AddComponent<InteractableTrigger>();
+            InteractableTrigger trig = chairRoot.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.Seat, $"seat_{name}", "ui.btn.sit", 2.2f);
-            chair.AddComponent<SeatInteractable>().Configure(sp.transform, trig);
+            chairRoot.AddComponent<SeatInteractable>().Configure(sp.transform, trig);
         }
 
         private void BuildCinemaSeat(Transform parent, string name, Vector3 localPos)

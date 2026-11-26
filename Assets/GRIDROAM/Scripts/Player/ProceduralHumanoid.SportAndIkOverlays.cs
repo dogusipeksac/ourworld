@@ -460,7 +460,9 @@ namespace OurWorld.Player
                 chestVisual.localScale = Vector3.Lerp(chestVisual.localScale, targetScale, 1f - Mathf.Exp(-6f * p.dt));
             }
 
-            float damp = _isLyingDown ? 5.5f : (_prayerStage > 0 ? 6.5f : (_landSquatTimer >= 0f || p.carrying || p.petting || _carryThrowTimer >= 0f ? 25f : (_grounded ? 14f : 10f)));
+            bool snappyAction = _landSquatTimer >= 0f || p.carrying || p.petting || _carryThrowTimer >= 0f ||
+                                _punchTimer >= 0f || _hitReactTimer >= 0f || _vaultTimer >= 0f || _sportAnimTimer >= 0f;
+            float damp = _isLyingDown ? 5.5f : (_prayerStage > 0 ? 6.5f : (snappyAction ? 26f : (_grounded ? 15f : 11f)));
             _baseHipsLocalPos = Vector3.Lerp(_baseHipsLocalPos, p.targetHipsPos, 1f - Mathf.Exp(-damp * p.dt));
             hips.localPosition = _baseHipsLocalPos;
             SmoothRotate(hips, p.targetHipsRot, damp, p.dt);
@@ -524,8 +526,15 @@ namespace OurWorld.Player
             bool tennisJumpServe = p.tennisStance && _tennisServing && p.swingTime >= -0.22f && p.swingTime <= 0.22f;
 
             float footPlantWeight = _knockdownTimer >= 0f ? p.knockdownFootBlend : 1f;
+            // Keep feet cleanly planted during jabs/hooks (zero leg-snap pop!), and smoothly blend out ONLY for the front push kick
+            if (_punchTimer >= 0f && _combatMoveIndex == 2)
+            {
+                float kickNorm = Mathf.Clamp01(_punchTimer / KickDuration);
+                float kickEnv = Mathf.Sin(kickNorm * Mathf.PI);
+                footPlantWeight *= Mathf.Clamp01(1f - kickEnv * 1.45f);
+            }
             if (_grounded && !_isSwimming && !_isLyingDown && _prayerStage == 0 && _vaultTimer < 0f &&
-                _punchTimer < 0f && footPlantWeight > 0.005f &&
+                footPlantWeight > 0.005f &&
                 !sportAirOrKick && !tennisJumpServe &&
                 lAnkle != null && rAnkle != null)
             {

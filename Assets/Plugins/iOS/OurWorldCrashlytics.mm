@@ -2,7 +2,9 @@
 #import <objc/message.h>
 
 static NSString* OurWorldNSString(const char* str) {
-    return str != NULL ? [NSString stringWithUTF8String:str] : @"";
+    if (str == NULL) return @"";
+    NSString* result = [NSString stringWithUTF8String:str];
+    return result != nil ? result : @"";
 }
 
 static id OurWorldCrashlyticsInstance(void) {

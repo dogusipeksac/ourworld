@@ -62,6 +62,9 @@ namespace OurWorld.UI
         private Image _cinemaProgressFill;
         private bool _skipCinemaRequested;
 
+        public bool IsCinemaPlaying => _cinemaRoot != null && _cinemaRoot.activeSelf;
+        public void SkipCinema() => _skipCinemaRequested = true;
+
         private static readonly string[] FloorNamesTr =
         {
             "0 · Zemin Kat — 5M Atlas Market · StarBean · Kahve Diyarı · Gratis · Eczane",
@@ -658,7 +661,11 @@ namespace OurWorld.UI
                 return;
             }
 
-            if (sm != null && sm.Data != null) sm.Data.playerJacketColorIndex = idx;
+            if (sm != null && sm.Data != null)
+            {
+                sm.Data.playerJacketColorIndex = idx;
+                sm.Save();
+            }
             if (mode != null && mode.FootController != null)
             {
                 mode.FootController.ApplyJacketColor(idx);

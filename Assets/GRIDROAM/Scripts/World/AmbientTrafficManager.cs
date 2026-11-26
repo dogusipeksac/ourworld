@@ -47,7 +47,16 @@ namespace OurWorld.World
             public int WaypointIndex;
             public float TargetCruiseSpeed;
             public float CurrentSpeed;
+            public float BlockedByPlayerSeconds;
+            public float HornCooldown;
+            public List<Renderer> HeadlightRenderers;
+            public bool LastNightLightState;
+            public bool LightsInit;
         }
+
+        private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+        private MaterialPropertyBlock _lightMpb;
+        public IReadOnlyList<TrafficStopLine> StopLines => stopLines;
 
         private readonly RaycastHit[] _castHits = new RaycastHit[8];
         private SimpleObjectPool _pool;
@@ -173,6 +182,23 @@ namespace OurWorld.World
                 PlayerModeController.Instance.RefreshInteractablesCache();
             }
 
+            // Real-world carjacking consequence: alarm chirp, witness panic & Zabıta theft report!
+            bool en = LocalizationService.IsEnglish;
+            RealWorldDetailsSystem.PlayCarAlarmChirp(pos, highTone: true);
+            NpcWorldAwareness.NotifyViolence(pos, pos, null);
+            NeighborhoodConsequenceSystem conseq = NeighborhoodConsequenceSystem.EnsureInstance();
+            conseq.PlayZabitaWhistle(0.62f);
+            conseq.ReportOffense(
+                NeighborhoodOffenseKind.CarTheft,
+                pos,
+                en ? "Stolen Traffic Car" : "Trafikten Alınan Araç",
+                repPenalty: 20,
+                immediateFineTl: 70,
+                heatDelta: 1.75f);
+            PlayerModeController.Instance?.RaiseStatusMessage(en
+                ? "🚨 You forcibly took a car from traffic! The driver reported you to Municipal Security (-70 ₺ · -20 Reputation)."
+                : "🚨 Trafikteki aracı zorla aldın! Sürücü zabıtayı aradı (-70 ₺ · -20 Saygınlık).");
+
             return controller;
         }
 
@@ -204,6 +230,9 @@ namespace OurWorld.World
                 ? PlayerModeController.Instance.ActiveWorldPosition
                 : Vector3.zero;
 
+            bool isNight = DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
+            bool isEn = LocalizationService.IsEnglish;
+
             for (int i = _activeAgents.Count - 1; i >= 0; i--)
             {
                 ActiveAgent agent = _activeAgents[i];
@@ -212,6 +241,8 @@ namespace OurWorld.World
                     _activeAgents.RemoveAt(i);
                     continue;
                 }
+
+                UpdateAgentNightHeadlights(agent, isNight);
 
                 float distToPlayer = Vector3.Distance(agent.Go.transform.position, playerPos);
                 if (distToPlayer > activeRadius)
@@ -238,8 +269,47 @@ namespace OurWorld.World
                 Quaternion desiredRot = Quaternion.LookRotation(dir, Vector3.up);
                 agent.Go.transform.rotation = Quaternion.Slerp(agent.Go.transform.rotation, desiredRot, dt * 5f);
 
-                bool mustStop = ShouldStopForTrafficLight(agent.Go.transform.position, dir) ||
-                                HasForwardObstacle(agent.Go.transform, dir);
+                bool redLight = ShouldStopForTrafficLight(agent.Go.transform.position, dir);
+                bool obstacle = HasForwardObstacle(agent.Go.transform, dir, out bool blockedByPlayer);
+                bool mustStop = redLight || obstacle;
+
+                if (agent.HornCooldown > 0f) agent.HornCooldown -= dt;
+                if (!redLight && blockedByPlayer && distToPlayer < 14f)
+                {
+                    agent.BlockedByPlayerSeconds += dt;
+                    if (agent.BlockedByPlayerSeconds >= 1.65f && agent.HornCooldown <= 0f)
+                    {
+                        agent.HornCooldown = 5.5f;
+                        agent.BlockedByPlayerSeconds = 0.4f;
+                        GameFeelAudio.PlayCarHorn();
+                        string[] trHorns =
+                        {
+                            "Yoldan çekilsene kardeşim!",
+                            "Trafiği tıkama, yürü!",
+                            "Korna basıyorum, kenara geç!"
+                        };
+                        string[] enHorns =
+                        {
+                            "Hey! Get out of the road!",
+                            "Don't block traffic, move aside!",
+                            "Beep beep! Clear the lane!"
+                        };
+                        string line = isEn
+                            ? enHorns[UnityEngine.Random.Range(0, enHorns.Length)]
+                            : trHorns[UnityEngine.Random.Range(0, trHorns.Length)];
+                        NpcSpeechBubbleManager.Say(
+                            agent.Go.transform,
+                            isEn ? "Driver" : "Sürücü",
+                            line,
+                            2.6f,
+                            NpcBubbleMood.Alert,
+                            3.0f);
+                    }
+                }
+                else
+                {
+                    agent.BlockedByPlayerSeconds = Mathf.Max(0f, agent.BlockedByPlayerSeconds - dt * 2f);
+                }
 
                 float desiredSpeed = mustStop ? 0f : agent.TargetCruiseSpeed;
                 float accel = mustStop ? 18f : 7.5f;
@@ -300,8 +370,54 @@ namespace OurWorld.World
             return false;
         }
 
-        private bool HasForwardObstacle(Transform selfTr, Vector3 dir)
+        private void UpdateAgentNightHeadlights(ActiveAgent agent, bool isNight)
         {
+            if (agent == null || agent.Go == null) return;
+            if (agent.LightsInit && agent.LastNightLightState == isNight) return;
+
+            if (agent.HeadlightRenderers == null)
+            {
+                agent.HeadlightRenderers = new List<Renderer>(4);
+                Renderer[] rends = agent.Go.GetComponentsInChildren<Renderer>(true);
+                for (int r = 0; r < rends.Length; r++)
+                {
+                    if (rends[r] == null) continue;
+                    string n = rends[r].gameObject.name;
+                    if (n.IndexOf("Headlight", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        agent.HeadlightRenderers.Add(rends[r]);
+                    }
+                }
+            }
+
+            agent.LightsInit = true;
+            agent.LastNightLightState = isNight;
+            if (_lightMpb == null) _lightMpb = new MaterialPropertyBlock();
+            Color col = isNight ? new Color(1.0f, 0.94f, 0.76f) * 3.8f : Color.black;
+            for (int r = 0; r < agent.HeadlightRenderers.Count; r++)
+            {
+                Renderer rend = agent.HeadlightRenderers[r];
+                if (rend == null) continue;
+                if (isNight)
+                {
+                    Material[] mats = rend.sharedMaterials;
+                    for (int m = 0; m < mats.Length; m++)
+                    {
+                        if (mats[m] != null && !mats[m].IsKeywordEnabled("_EMISSION"))
+                        {
+                            mats[m].EnableKeyword("_EMISSION");
+                        }
+                    }
+                }
+                rend.GetPropertyBlock(_lightMpb);
+                _lightMpb.SetColor(EmissionColorId, col);
+                rend.SetPropertyBlock(_lightMpb);
+            }
+        }
+
+        private bool HasForwardObstacle(Transform selfTr, Vector3 dir, out bool blockedByPlayer)
+        {
+            blockedByPlayer = false;
             Vector3 origin = selfTr.position + Vector3.up * 0.75f + dir * 2.15f;
             int count = Physics.SphereCastNonAlloc(
                 origin,
@@ -312,6 +428,7 @@ namespace OurWorld.World
                 ~0,
                 QueryTriggerInteraction.Ignore);
 
+            bool anyBlocked = false;
             for (int i = 0; i < count; i++)
             {
                 Transform hitTr = _castHits[i].transform;
@@ -326,10 +443,22 @@ namespace OurWorld.World
                     continue;
                 }
 
-                return true;
+                anyBlocked = true;
+                if (hitTr.GetComponentInParent<PlayerFootController>() != null)
+                {
+                    blockedByPlayer = true;
+                }
+                else
+                {
+                    SedanVehicleController veh = hitTr.GetComponentInParent<SedanVehicleController>();
+                    if (veh != null && veh.IsPlayerDriving)
+                    {
+                        blockedByPlayer = true;
+                    }
+                }
             }
 
-            return false;
+            return anyBlocked;
         }
 
         private void TrySpawnNearPlayer(Vector3 playerPos)

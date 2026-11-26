@@ -40,6 +40,11 @@ namespace OurWorld.UI
             if (!hasFocus) Release();
         }
 
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            if (pauseStatus) Release();
+        }
+
         private void Release()
         {
             if (_activePointerId == int.MinValue) return;

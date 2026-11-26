@@ -154,6 +154,8 @@ namespace OurWorld.World
         private bool _isOpen;
         private bool _subscribed;
 
+        public bool IsOpen => _isOpen;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoBootstrap()
         {
@@ -175,12 +177,29 @@ namespace OurWorld.World
 
         private void Start()
         {
+            ClearConflictingLegacyBlocks();
             EnsureStarterOwned();
             BuildDealershipWorld();
             if (PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.OnInteracted += HandleInteracted;
                 _subscribed = true;
+            }
+        }
+
+        private static void ClearConflictingLegacyBlocks()
+        {
+            // Legacy non-enterable street filler blocks that overlapped Hamidiye Oto Galeri's showroom & car delivery bay
+            string[] overlapping =
+            {
+                "Ataturk_SouthBldg_1",
+                "Mursit_Block_1",
+                "SeyyidKutup_WestApt_4"
+            };
+            for (int i = 0; i < overlapping.Length; i++)
+            {
+                GameObject go = GameObject.Find(overlapping[i]);
+                if (go != null) go.SetActive(false);
             }
         }
 
@@ -206,11 +225,6 @@ namespace OurWorld.World
                 {
                     _turntables[i].Rotate(0f, (i % 2 == 0 ? 16f : -14f) * dt, 0f, Space.Self);
                 }
-            }
-
-            if (_isOpen && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-            {
-                CloseModal();
             }
         }
 
@@ -348,6 +362,8 @@ namespace OurWorld.World
             l.range = 24f;
             l.intensity = 4.2f;
             l.shadows = LightShadows.None;
+
+            PlayerModeController.Instance?.RefreshInteractablesCache();
         }
 
         private static void BuildStylizedShowroomCar(Transform parent, DealershipCarDef car, Shader sh, Material glass, Material chrome, Material tire, Material headGlow)

@@ -106,6 +106,17 @@ namespace OurWorld.Missions
             }
 
             Instance = this;
+
+            // Clone MissionCatalog at runtime so dynamic chapter expansions (e.g. Chapter 6)
+            // never mutate or leave destroyed null entries in the serialized ScriptableObject asset!
+            if (missionCatalog != null)
+            {
+                missionCatalog = Instantiate(missionCatalog);
+                if (missionCatalog.missions != null)
+                {
+                    missionCatalog.missions.RemoveAll(m => m == null);
+                }
+            }
         }
 
         private void Start()

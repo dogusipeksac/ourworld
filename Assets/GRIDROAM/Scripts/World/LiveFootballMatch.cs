@@ -1049,6 +1049,10 @@ namespace OurWorld.World
                     {
                         _ballVel.y = -_ballVel.y * 0.50f;
                         PlayKickSound(0.22f);
+                        if (_player != null)
+                        {
+                            SportsArenaAtmosphere.SpawnTurfKickPuff(transform.TransformPoint(_ballPos), heavy: false);
+                        }
                     }
                     else
                     {
@@ -1368,8 +1372,11 @@ namespace OurWorld.World
 
             if (_player != null || IsPlayerNear(26f))
             {
+                Vector3 goalWorld = transform.TransformPoint(_ballPos + Vector3.up * 0.8f);
+                SportsArenaAtmosphere.PulseNearestNet(goalWorld, maxDist: 4.5f);
+                SportsArenaAtmosphere.CelebrateEvent(transform.position, "football", redScored, bigPlay: true);
                 GameFeelAudio.SpawnBurst(
-                    transform.TransformPoint(_ballPos + Vector3.up * 0.8f),
+                    goalWorld,
                     redScored ? new Color(0.95f, 0.25f, 0.20f) : new Color(0.22f, 0.56f, 0.98f),
                     count: 18, spread: 0.80f);
             }

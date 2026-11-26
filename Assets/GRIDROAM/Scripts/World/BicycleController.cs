@@ -36,7 +36,7 @@ namespace OurWorld.World
         private Action _dismountFinished;
         private AudioSource _engine;
 
-        public float SpeedKmh => _speed * 3.6f;
+        public float SpeedKmh => Mathf.Abs(_speed) * 3.6f;
         public float MaxSpeedKmh => (IsMotorcycle ? 20f : TopSpeed) * 3.6f;
         public bool IsMotorcycle { get; private set; }
         public bool IsMounting => _mountProgress < 1f && _dismountFinished == null;
@@ -183,32 +183,60 @@ namespace OurWorld.World
             float brake = locked || input.HandbrakeHeld ? 1f : input.DriveBrake;
             float steer = locked ? 0f : input.DriveSteer;
             float topSpeed = MaxSpeedKmh / 3.6f;
-            float targetSpeed = brake > 0f ? 0f : throttle * topSpeed;
-            float rate = brake > 0f ? (IsMotorcycle ? 15f : 10f) * brake :
-                throttle > 0f ? (IsMotorcycle ? 6.1f : 3.2f) : (IsMotorcycle ? 2.1f : 0.9f);
+
+            // Support gentle foot-push reverse when stopped and holding Brake so bikes never stay nose-pinned at walls
+            bool wantReverse = !locked && !input.HandbrakeHeld && brake > 0.05f && throttle <= 0.01f && _speed <= 0.12f;
+            float targetSpeed = wantReverse ? -1.75f * brake : (brake > 0f ? 0f : throttle * topSpeed);
+            float rate = wantReverse ? 4.2f :
+                (brake > 0f ? (IsMotorcycle ? 15f : 10f) * brake :
+                (throttle > 0f ? (IsMotorcycle ? 6.4f : 3.5f) : (IsMotorcycle ? 2.2f : 1.0f)));
             float prevSpeed = _speed;
             _speed = Mathf.MoveTowards(_speed, targetSpeed, rate * dt);
 
-            float speedFactor = Mathf.InverseLerp(0.12f, 2.1f, _speed);
-            float turnRate = Mathf.Lerp(95f, IsMotorcycle ? 31f : 43f, _speed / topSpeed);
-            _smoothedSteer = Mathf.Lerp(_smoothedSteer, steer, 1f - Mathf.Exp(-11f * dt));
-            transform.Rotate(0f, steer * speedFactor * turnRate * dt, 0f, Space.World);
+            float absSpeed = Mathf.Abs(_speed);
+            float speedFactor = Mathf.InverseLerp(0.10f, 1.9f, absSpeed);
+            float turnRate = Mathf.Lerp(98f, IsMotorcycle ? 33f : 45f, absSpeed / topSpeed);
+            float steerFollow = (steer * _smoothedSteer < -0.01f) ? 18f : 12.5f;
+            _smoothedSteer = Mathf.Lerp(_smoothedSteer, steer, 1f - Mathf.Exp(-steerFollow * dt));
+            float yawSign = _speed < -0.05f ? -1f : 1f;
+            // Drive yaw from _smoothedSteer so lean, handlebars, and turn arc stay 100% synchronized
+            transform.Rotate(0f, _smoothedSteer * speedFactor * turnRate * yawSign * dt, 0f, Space.World);
             _fallSpeed = _body.isGrounded ? -2f : Mathf.Max(-15f, _fallSpeed - 16f * dt);
             Vector3 before = transform.position;
             CollisionFlags collisions = _body.Move((transform.forward * _speed + Vector3.up * _fallSpeed) * dt);
-            if ((collisions & CollisionFlags.Sides) != 0) _speed = Mathf.Min(_speed, 2f);
+            if ((collisions & CollisionFlags.Sides) != 0 && _speed > 0f)
+            {
+                _speed = Mathf.MoveTowards(_speed, Mathf.Min(_speed, 3.2f), 22f * dt);
+            }
+
+            // World bounds & void-fall safety net (matches PlayerFootController & SedanVehicleController)
+            Vector3 curPos = transform.position;
+            bool outOfBounds = curPos.x < -242f || curPos.x > 242f || curPos.z < -242f || curPos.z > 242f;
+            if (curPos.y < -3.5f || outOfBounds)
+            {
+                bool wasCc = _body.enabled;
+                _body.enabled = false;
+                transform.position = new Vector3(
+                    Mathf.Clamp(curPos.x, -240f, 240f),
+                    curPos.y < -3.5f ? 0.30f : curPos.y,
+                    Mathf.Clamp(curPos.z, -240f, 240f));
+                _body.enabled = wasCc;
+                _speed = 0f;
+                if (curPos.y < -3.5f) _fallSpeed = 0f;
+            }
 
             Vector3 travel = transform.position - before;
             travel.y = 0f;
+            float signedTravel = Vector3.Dot(travel, transform.forward);
             float tireRadius = IsMotorcycle ? 0.36f : WheelRadius;
-            float wheelDegrees = travel.magnitude / tireRadius * Mathf.Rad2Deg;
+            float wheelDegrees = signedTravel / tireRadius * Mathf.Rad2Deg;
             _wheelAngle = Mathf.Repeat(_wheelAngle + wheelDegrees, 360f);
             if (_crank != null)
             {
                 // Cranks are geared to the rear wheel: derive cadence from the distance actually travelled so
                 // pedals never spin while the bike is pinned against a wall, and always match the wheel speed.
                 // Coasting / braking freewheels (cranks stop) like a real bicycle.
-                bool pedaling = throttle > 0.02f && brake <= 0.01f;
+                bool pedaling = throttle > 0.02f && brake <= 0.01f && signedTravel > 0.0001f;
                 float targetCrankRate = pedaling ? (wheelDegrees / dt) / PedalGearRatio : 0f;
                 _crankSpinRate = Mathf.Lerp(_crankSpinRate, targetCrankRate, 1f - Mathf.Exp(-7f * dt));
                 if (_crankSpinRate > 2f)
@@ -227,15 +255,16 @@ namespace OurWorld.World
                 : Mathf.Clamp(-accelRaw * 0.14f, -0.55f, 0.70f);
             _accelLean = Mathf.Lerp(_accelLean, targetAccelLean, 1f - Mathf.Exp(-8f * dt));
 
-            _lean = Mathf.Lerp(_lean, -_smoothedSteer * (IsMotorcycle ? 26f : 15f) * speedFactor, 1f - Mathf.Exp(-8f * dt));
+            float leanDir = _speed >= 0f ? 1f : 0f;
+            _lean = Mathf.Lerp(_lean, -_smoothedSteer * (IsMotorcycle ? 26f : 15f) * speedFactor * leanDir, 1f - Mathf.Exp(-8.5f * dt));
             _visual.localRotation = Quaternion.Euler(_pitch, 0f, _lean);
-            _fork.localRotation = Quaternion.Euler(0f, _smoothedSteer * Mathf.Lerp(23f, 12f, IsMotorcycle ? _speed / topSpeed : 0.25f * _speed / topSpeed), 0f);
+            _fork.localRotation = Quaternion.Euler(0f, _smoothedSteer * Mathf.Lerp(23f, 12f, IsMotorcycle ? absSpeed / topSpeed : 0.25f * absSpeed / topSpeed), 0f);
             _frontWheel.localRotation = Quaternion.Euler(_wheelAngle, 0f, 0f);
             _rearWheel.localRotation = _frontWheel.localRotation;
             if (_crank != null) _crank.localRotation = Quaternion.Euler(_crankAngle, 0f, 0f);
             if (_engine != null)
             {
-                _engine.pitch = Mathf.Lerp(0.75f, 1.75f, _speed / topSpeed) + throttle * 0.28f;
+                _engine.pitch = Mathf.Lerp(0.75f, 1.75f, absSpeed / topSpeed) + throttle * 0.28f;
                 _engine.volume = Mathf.Lerp(0.14f, 0.29f, throttle);
             }
             UpdateRider();

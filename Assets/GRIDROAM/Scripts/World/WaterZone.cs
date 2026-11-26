@@ -11,6 +11,9 @@ namespace OurWorld.World
     {
         private static readonly List<WaterZone> ActiveZones = new List<WaterZone>();
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => ActiveZones.Clear();
+
         [SerializeField] private Vector3 localCenter = Vector3.zero;
         [SerializeField] private Vector3 zoneSize = new Vector3(12f, 2.2f, 18f);
         [SerializeField] private float waterSurfaceWorldY = 1.18f;

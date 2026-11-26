@@ -17,7 +17,15 @@ namespace OurWorld.World
         private static readonly float[] PawPhase = { 0f, 0.5f, 0.73f, 0.23f };
         private const float PetDuration = 1.92f;
         private const float PetReachTime = 0.52f;
+        private static readonly List<StreetCatController> AllCats = new List<StreetCatController>(16);
         internal static StreetCatController ActivePet { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetCatStatics()
+        {
+            ActivePet = null;
+            AllCats.Clear();
+        }
 
         private readonly Transform[] _legs = new Transform[4];
         private readonly Vector3[] _legPositions = new Vector3[4];
@@ -62,6 +70,81 @@ namespace OurWorld.World
             furColor = coatColor;
             wanderRadius = Mathf.Max(1f, radius);
             ApplyFurColor();
+        }
+
+        private float _lastHitTime = -10f;
+
+        private void OnEnable()
+        {
+            if (!AllCats.Contains(this)) AllCats.Add(this);
+        }
+
+        public static bool TryReceivePlayerPunch(Vector3 strikeCenter, float radius, Vector3 attackerPos, Vector3 punchDir, int comboStep)
+        {
+            StreetCatController best = null;
+            float maxR = radius + 0.55f;
+            float bestDistSq = maxR * maxR;
+            for (int i = 0; i < AllCats.Count; i++)
+            {
+                StreetCatController c = AllCats[i];
+                if (c == null || !c.gameObject.activeInHierarchy) continue;
+                if (Time.time - c._lastHitTime < 0.45f) continue;
+                Vector3 d = (c.transform.position + Vector3.up * 0.35f) - strikeCenter;
+                if (Mathf.Abs(d.y) > 1.45f) continue;
+                d.y = 0f;
+                float dSq = d.sqrMagnitude;
+                if (dSq < bestDistSq)
+                {
+                    bestDistSq = dSq;
+                    best = c;
+                }
+            }
+            if (best == null) return false;
+
+            best.OnPunchedByPlayer(attackerPos, punchDir);
+            return true;
+        }
+
+        private void OnPunchedByPlayer(Vector3 attackerPos, Vector3 punchDir)
+        {
+            _lastHitTime = Time.time;
+            if (ActivePet == this) EndPet();
+
+            NeighborhoodConsequenceSystem.EnsureInstance().PlayCatHiss(0.70f);
+            bool en = LocalizationService.IsEnglish;
+            bool scratchBack = Random.value < 0.58f;
+
+            if (scratchBack)
+            {
+                Vector3 toP = attackerPos - transform.position;
+                toP.y = 0f;
+                if (toP.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(toP.normalized, Vector3.up);
+                NpcSpeechBubbleManager.Say(transform, catName, en ? "HISSS!! 🐾 (Scratched!)" : "TISSSS!! 🐾 (Tırmaladı!)", 2.8f, NpcBubbleMood.Alert, 0.95f);
+                PlayerNeedsController.Instance?.TakeDamage(8f, transform.position, en ? $"{catName} the Cat" : $"{catName} Kedisi", heavyHit: false);
+            }
+            else
+            {
+                NpcSpeechBubbleManager.Say(transform, catName, en ? "MREOW!! 🐾" : "MİYAAAV!! 🐾", 2.5f, NpcBubbleMood.Alert, 0.95f);
+                PlayerModeController.Instance?.RaiseStatusMessage(en
+                    ? $"⚠️ {catName} hissed and bolted away in fear! (-10 Reputation)"
+                    : $"⚠️ {catName} tıslayarak korku içinde kaçtı! (-10 Saygınlık)");
+            }
+
+            Vector3 away = transform.position - attackerPos;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.01f) away = punchDir;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.01f ? away.normalized : transform.forward;
+            _targetPos = transform.position + away * 5.2f;
+            _targetPos.y = _homePos.y;
+            _walking = true;
+            _retreating = true;
+            _approachingPlayer = false;
+            _stateTimer = 4.5f;
+            _reactCooldown = 5.0f;
+
+            NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                NeighborhoodOffenseKind.HarmAnimal, transform.position, catName, repPenalty: 10, immediateFineTl: 0, heatDelta: 1.0f);
         }
 
         private void Start()
@@ -568,6 +651,7 @@ namespace OurWorld.World
 
         private void OnDisable()
         {
+            AllCats.Remove(this);
             if (ActivePet == this) EndPet();
         }
 

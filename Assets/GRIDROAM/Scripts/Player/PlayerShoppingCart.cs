@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using OurWorld.Core;
+using OurWorld.World;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -11,7 +12,11 @@ namespace OurWorld.Player
         RunningShoes = 1,
         TurboKit = 2,
         JacketColor = 3,
-        FuelCan = 4
+        FuelCan = 4,
+        Sunglasses = 5,
+        StreetCap = 6,
+        ReputationPrestige = 7,
+        SeedPack = 8
     }
 
     public enum ShopPropVisual
@@ -30,18 +35,32 @@ namespace OurWorld.Player
         RunningShoes = 11,
         JacketFolded = 12,
         TurboKit = 13,
-        FuelCan = 14
+        FuelCan = 14,
+        Sunglasses = 15,
+        Wristwatch = 16,
+        StreetCap = 17,
+        PerfumeBottle = 18,
+        TechGadget = 19,
+        MedicineBox = 20,
+        PorcelainSet = 21,
+        BookStack = 22,
+        MealTray = 23
     }
 
     public struct ShopCartItem
     {
         public string Name;
+        public string NameTr;
+        public string NameEn;
         public int Price;
         public ShopItemEffect Effect;
         public float EffectParam;
         public ConsumeAnimKind ConsumeKind;
         public ShopPropVisual Visual;
         public int JacketColorIndex;
+        public int ReputationXp;
+        public bool IsTryOnWearable;
+        public string SourceStoreName;
     }
 
     /// <summary>
@@ -52,6 +71,13 @@ namespace OurWorld.Player
     {
         private static Shader _cachedShader;
         private static readonly Dictionary<int, Material> MaterialCache = new Dictionary<int, Material>(32);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticCache()
+        {
+            _cachedShader = null;
+            MaterialCache.Clear();
+        }
 
         public static GameObject BuildProp(
             Transform parent,
@@ -161,14 +187,7 @@ namespace OurWorld.Player
                     break;
 
                 case ShopPropVisual.JacketFolded:
-                    Color[] jacketPalette =
-                    {
-                        new Color(0.16f, 0.24f, 0.42f), // Lacivert
-                        new Color(0.54f, 0.14f, 0.18f), // Bordo
-                        new Color(0.28f, 0.38f, 0.22f), // Zeytin
-                        new Color(0.18f, 0.20f, 0.24f)  // Antrasit
-                    };
-                    Color jc = jacketPalette[Mathf.Clamp(jacketColorIndex, 0, jacketPalette.Length - 1)];
+                    Color jc = PlayerFootController.GetJacketColor(jacketColorIndex);
                     Part("FoldedBody", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.055f, 0f), new Vector3(0.28f, 0.095f, 0.24f), Mat(jc, 0.28f, 0.04f));
                     Part("Collar", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.112f, -0.05f), new Vector3(0.16f, 0.035f, 0.09f), Mat(jc * 0.85f, 0.32f, 0.04f));
                     Part("Zipper", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.104f, 0.02f), new Vector3(0.018f, 0.010f, 0.18f), Mat(new Color(0.78f, 0.80f, 0.84f), 0.80f, 0.85f));
@@ -183,6 +202,83 @@ namespace OurWorld.Player
                     Part("CanBody", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.15f, 0f), new Vector3(0.22f, 0.28f, 0.14f), Mat(new Color(0.84f, 0.14f, 0.12f), 0.45f, 0.05f));
                     Part("Handle", PrimitiveType.Cube, root.transform, new Vector3(-0.02f, 0.305f, 0f), new Vector3(0.14f, 0.035f, 0.045f), Mat(new Color(0.76f, 0.12f, 0.10f), 0.42f, 0.05f));
                     Part("Nozzle", PrimitiveType.Cylinder, root.transform, new Vector3(0.08f, 0.32f, 0f), new Vector3(0.035f, 0.055f, 0.035f), Mat(new Color(0.95f, 0.82f, 0.14f), 0.50f, 0f), Quaternion.Euler(0f, 0f, -25f));
+                    break;
+
+                case ShopPropVisual.Sunglasses:
+                    Material lensM = Mat(new Color(0.06f, 0.10f, 0.18f), 0.94f, 0.45f);
+                    Material goldM = Mat(new Color(0.90f, 0.74f, 0.26f), 0.88f, 0.82f);
+                    Part("StandBase", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.015f, 0f), new Vector3(0.14f, 0.014f, 0.14f), Mat(new Color(0.14f, 0.16f, 0.20f), 0.65f, 0.4f));
+                    Part("StandNeck", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.075f, 0f), new Vector3(0.022f, 0.055f, 0.022f), goldM);
+                    Part("LensL", PrimitiveType.Cube, root.transform, new Vector3(-0.062f, 0.14f, 0.04f), new Vector3(0.095f, 0.054f, 0.018f), lensM);
+                    Part("LensR", PrimitiveType.Cube, root.transform, new Vector3( 0.062f, 0.14f, 0.04f), new Vector3(0.095f, 0.054f, 0.018f), lensM);
+                    Part("Bridge", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.152f, 0.042f), new Vector3(0.046f, 0.012f, 0.016f), goldM);
+                    Part("TopBar", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.172f, 0.041f), new Vector3(0.22f, 0.011f, 0.016f), goldM);
+                    Part("ArmL", PrimitiveType.Cube, root.transform, new Vector3(-0.112f, 0.145f, -0.045f), new Vector3(0.012f, 0.014f, 0.17f), goldM);
+                    Part("ArmR", PrimitiveType.Cube, root.transform, new Vector3( 0.112f, 0.145f, -0.045f), new Vector3(0.012f, 0.014f, 0.17f), goldM);
+                    break;
+
+                case ShopPropVisual.Wristwatch:
+                    Material velvet = Mat(new Color(0.10f, 0.13f, 0.22f), 0.25f, 0.05f);
+                    Material steel = Mat(new Color(0.84f, 0.87f, 0.92f), 0.90f, 0.88f);
+                    Material dial = Mat(new Color(0.08f, 0.22f, 0.42f), 0.85f, 0.35f);
+                    Part("Cushion", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.045f, 0f), new Vector3(0.16f, 0.085f, 0.16f), velvet);
+                    Part("Band", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.10f, 0f), new Vector3(0.125f, 0.036f, 0.125f), steel, Quaternion.Euler(0f, 0f, 90f));
+                    Part("Case", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.142f, 0.02f), new Vector3(0.095f, 0.018f, 0.095f), steel, Quaternion.Euler(24f, 0f, 0f));
+                    Part("Dial", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.150f, 0.024f), new Vector3(0.078f, 0.014f, 0.078f), dial, Quaternion.Euler(24f, 0f, 0f));
+                    break;
+
+                case ShopPropVisual.StreetCap:
+                    Material capNavy = Mat(new Color(0.10f, 0.24f, 0.48f), 0.25f, 0.02f);
+                    Material capGold = Mat(new Color(0.95f, 0.72f, 0.20f), 0.40f, 0.12f);
+                    Part("CapCrown", PrimitiveType.Sphere, root.transform, new Vector3(0f, 0.08f, -0.01f), new Vector3(0.24f, 0.15f, 0.24f), capNavy);
+                    Part("CapVisor", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.045f, 0.135f), new Vector3(0.19f, 0.015f, 0.115f), capNavy, Quaternion.Euler(8f, 0f, 0f));
+                    Part("CapEmblem", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.105f, 0.105f), new Vector3(0.06f, 0.028f, 0.015f), capGold);
+                    break;
+
+                case ShopPropVisual.PerfumeBottle:
+                    Material crystal = Mat(new Color(0.84f, 0.46f, 0.88f), 0.92f, 0.15f);
+                    Material capG = Mat(new Color(0.94f, 0.78f, 0.26f), 0.88f, 0.82f);
+                    Part("Flacon", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.085f, 0f), new Vector3(0.11f, 0.15f, 0.07f), crystal);
+                    Part("Label", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.085f, 0.038f), new Vector3(0.075f, 0.065f, 0.008f), Mat(new Color(0.98f, 0.96f, 0.92f), 0.4f, 0f));
+                    Part("Neck", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.175f, 0f), new Vector3(0.032f, 0.018f, 0.032f), capG);
+                    Part("SprayCap", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.21f, 0f), new Vector3(0.048f, 0.025f, 0.048f), capG);
+                    break;
+
+                case ShopPropVisual.TechGadget:
+                    Material slate = Mat(new Color(0.10f, 0.12f, 0.16f), 0.78f, 0.65f);
+                    Material screen = Mat(new Color(0.14f, 0.82f, 0.86f), 0.95f, 0.10f);
+                    Part("DeviceBody", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.055f, 0f), new Vector3(0.24f, 0.036f, 0.14f), slate, Quaternion.Euler(-18f, 0f, 0f));
+                    Part("DeviceScreen", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.066f, 0.006f), new Vector3(0.18f, 0.024f, 0.105f), screen, Quaternion.Euler(-18f, 0f, 0f));
+                    break;
+
+                case ShopPropVisual.MedicineBox:
+                    Material boxW = Mat(new Color(0.96f, 0.97f, 0.99f), 0.42f, 0f);
+                    Material crossR = Mat(new Color(0.88f, 0.16f, 0.18f), 0.45f, 0f);
+                    Part("Pack", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.065f, 0f), new Vector3(0.18f, 0.12f, 0.10f), boxW);
+                    Part("CrossH", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.07f, 0.053f), new Vector3(0.07f, 0.020f, 0.008f), crossR);
+                    Part("CrossV", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.07f, 0.053f), new Vector3(0.020f, 0.07f, 0.008f), crossR);
+                    break;
+
+                case ShopPropVisual.PorcelainSet:
+                    Material porc = Mat(new Color(0.96f, 0.95f, 0.92f), 0.84f, 0.08f);
+                    Material trimG = Mat(new Color(0.90f, 0.72f, 0.24f), 0.86f, 0.78f);
+                    Part("Plate", PrimitiveType.Cylinder, root.transform, new Vector3(0f, 0.015f, 0f), new Vector3(0.24f, 0.014f, 0.24f), porc);
+                    Part("Teapot", PrimitiveType.Sphere, root.transform, new Vector3(-0.04f, 0.095f, 0f), new Vector3(0.13f, 0.12f, 0.13f), porc);
+                    Part("GoldBand", PrimitiveType.Cylinder, root.transform, new Vector3(-0.04f, 0.155f, 0f), new Vector3(0.07f, 0.015f, 0.07f), trimG);
+                    Part("CupSmall", PrimitiveType.Cylinder, root.transform, new Vector3(0.07f, 0.055f, 0.03f), new Vector3(0.068f, 0.042f, 0.068f), porc);
+                    break;
+
+                case ShopPropVisual.BookStack:
+                    Part("Book1", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.025f, 0f), new Vector3(0.22f, 0.042f, 0.16f), Mat(new Color(0.16f, 0.34f, 0.66f), 0.28f, 0.05f));
+                    Part("Book2", PrimitiveType.Cube, root.transform, new Vector3(0.01f, 0.066f, 0f), new Vector3(0.20f, 0.038f, 0.15f), Mat(new Color(0.76f, 0.20f, 0.22f), 0.28f, 0.05f), Quaternion.Euler(0f, 8f, 0f));
+                    Part("Book3", PrimitiveType.Cube, root.transform, new Vector3(-0.01f, 0.104f, 0f), new Vector3(0.18f, 0.035f, 0.14f), Mat(new Color(0.90f, 0.70f, 0.22f), 0.32f, 0.08f), Quaternion.Euler(0f, -6f, 0f));
+                    break;
+
+                case ShopPropVisual.MealTray:
+                    Part("FoodTray", PrimitiveType.Cube, root.transform, new Vector3(0f, 0.014f, 0f), new Vector3(0.28f, 0.020f, 0.20f), Mat(new Color(0.84f, 0.18f, 0.16f), 0.45f, 0.05f));
+                    Part("MainBun", PrimitiveType.Sphere, root.transform, new Vector3(-0.04f, 0.068f, 0f), new Vector3(0.13f, 0.088f, 0.13f), Mat(new Color(0.86f, 0.56f, 0.22f), 0.28f, 0f));
+                    Part("Patty", PrimitiveType.Cylinder, root.transform, new Vector3(-0.04f, 0.056f, 0f), new Vector3(0.135f, 0.016f, 0.135f), Mat(new Color(0.42f, 0.20f, 0.10f), 0.22f, 0f));
+                    Part("DrinkCup", PrimitiveType.Cylinder, root.transform, new Vector3(0.085f, 0.075f, -0.02f), new Vector3(0.065f, 0.065f, 0.065f), Mat(new Color(0.96f, 0.96f, 0.98f), 0.55f, 0f));
                     break;
             }
 
@@ -237,12 +333,23 @@ namespace OurWorld.Player
     [DefaultExecutionOrder(200)]
     public class PlayerShoppingCart : MonoBehaviour
     {
-        private const int MaxCartItems = 3;
-        private const float MaxLeaveDistance = 19f;
+        private const int MaxCartItems = 4;
+        private const float MaxLeaveDistance = 13.5f;
         private const float InspectHoldDuration = 0.46f;
         private const float InspectSettleDuration = 0.40f;
 
         private static PlayerShoppingCart _activeInstance;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetActiveCart() => _activeInstance = null;
+
+        public static void ClearAndRevertOnTeleport()
+        {
+            if (_activeInstance != null && _activeInstance._items.Count > 0)
+            {
+                _activeInstance.ClearCart(silent: true, revertTryOn: true);
+            }
+        }
 
         private readonly List<ShopCartItem> _items = new List<ShopCartItem>();
         private PlayerFootController _foot;
@@ -251,6 +358,9 @@ namespace OurWorld.Player
         private GameObject _heldProp;
         private ShopPropVisual _heldVisual;
         private Vector3 _shopOrigin;
+        private string _activeStoreName = string.Empty;
+        private bool _hasUnpaidTryOn;
+        private bool _checkingOut;
         private bool _inspectActive;
         private float _inspectTimer;
         private float _inspectYaw;
@@ -258,6 +368,7 @@ namespace OurWorld.Player
         private bool _wasBusy;
 
         public static bool HasActiveItems => _activeInstance != null && _activeInstance._items.Count > 0;
+        public static Vector3 ActiveShopOrigin => _activeInstance != null ? _activeInstance._shopOrigin : Vector3.zero;
 
         public static string ActiveSummary
         {
@@ -269,7 +380,10 @@ namespace OurWorld.Player
                 {
                     return $"{_activeInstance._items[0].Name} ({total} ₺)";
                 }
-                return $"{_activeInstance._items.Count} ürün ({total} ₺)";
+                bool en = LocalizationService.IsEnglish;
+                return en
+                    ? $"{_activeInstance._items.Count} items ({total} ₺)"
+                    : $"{_activeInstance._items.Count} ürün ({total} ₺)";
             }
         }
 
@@ -325,8 +439,8 @@ namespace OurWorld.Player
                 return;
             }
 
-            // Keep arms visibly inspecting & carrying the picked product while walking to Kasa Bandı
-            if (_foot != null && _foot.Humanoid != null)
+            // Keep arms visibly inspecting & carrying a physical prop ONLY when actually holding a non-wearable prop!
+            if (_heldProp != null && _foot != null && _foot.Humanoid != null)
             {
                 bool busy = PlayerConsumeAnimator.IsAnyPlaying || PlayerActionAnimator.IsAnyPlaying ||
                             (_consumeAnim != null && _consumeAnim.IsPlaying) || (_actionAnim != null && _actionAnim.IsPlaying);
@@ -399,14 +513,11 @@ namespace OurWorld.Player
                 }
             }
 
-            // If player walks far away from the market without paying, cleanly return items to shelf
+            // Fallback perimeter security catch if player somehow leaves the store zone without crossing the door gate!
             float distSq = (transform.position - _shopOrigin).sqrMagnitude;
             if (distSq > MaxLeaveDistance * MaxLeaveDistance)
             {
-                bool enLeave = LocalizationService.IsEnglish;
-                ClearCart(silent: false, message: enLeave
-                    ? "Hüseyin Abi: Neighbor, you walked out before checking out — items returned to the shelf!"
-                    : "Hüseyin Abi: Komşu elindekileri kasadan geçirmeden çıktın, rafa geri bıraktın!");
+                StoreAntiTheftSystem.EnsureInstance().TriggerCatch(mode, _activeStoreName, _shopOrigin);
             }
         }
 
@@ -474,22 +585,120 @@ namespace OurWorld.Player
                 case ShopPropVisual.JacketFolded:
                 case ShopPropVisual.TurboKit:
                 case ShopPropVisual.FuelCan:
+                case ShopPropVisual.PorcelainSet:
+                case ShopPropVisual.BookStack:
+                case ShopPropVisual.MealTray:
                     return true;
                 default:
                     return false;
             }
         }
 
+        public static bool IsWearingUnpaidTrial(ShopItemEffect effect, int jacketColorIndex = 0)
+        {
+            if (_activeInstance == null || _activeInstance._items.Count == 0) return false;
+            for (int i = 0; i < _activeInstance._items.Count; i++)
+            {
+                ShopCartItem it = _activeInstance._items[i];
+                if (!it.IsTryOnWearable || it.Effect != effect) continue;
+                if (effect == ShopItemEffect.JacketColor && it.JacketColorIndex != jacketColorIndex) continue;
+                return true;
+            }
+            return false;
+        }
+
+        public static bool TryTakeOffTrialItem(PlayerModeController mode, ShopItemEffect effect, int jacketColorIndex = 0)
+        {
+            if (_activeInstance == null || _activeInstance._items.Count == 0) return false;
+            for (int i = _activeInstance._items.Count - 1; i >= 0; i--)
+            {
+                ShopCartItem it = _activeInstance._items[i];
+                if (!it.IsTryOnWearable || it.Effect != effect) continue;
+                if (effect == ShopItemEffect.JacketColor && it.JacketColorIndex != jacketColorIndex) continue;
+
+                string removedName = it.Name;
+                _activeInstance._items.RemoveAt(i);
+                _activeInstance.ReapplyActiveTryOnPreview();
+                GameFeelAudio.PlayUiClick();
+                bool en = LocalizationService.IsEnglish;
+                mode?.RaiseStatusMessage(en
+                    ? $"Took off {removedName} and placed it back on the stand."
+                    : $"{removedName} çıkarılıp stanta geri bırakıldı.");
+                return true;
+            }
+            return false;
+        }
+
+        public static void ConfiscateBySecurity(PlayerModeController mode)
+        {
+            if (_activeInstance == null) return;
+            _activeInstance.ClearCart(silent: true);
+        }
+
+        private void ReapplyActiveTryOnPreview()
+        {
+            if (_foot == null) return;
+            _foot.ApplySavedAppearance();
+            _hasUnpaidTryOn = false;
+
+            SaveData d = SaveManager.Instance != null ? SaveManager.Instance.Data : null;
+            bool glass = d != null && d.ownsSunglasses && d.equipSunglasses;
+            bool cap = d != null && d.ownsStreetCap && d.equipStreetCap;
+
+            for (int i = 0; i < _items.Count; i++)
+            {
+                ShopCartItem it = _items[i];
+                if (!it.IsTryOnWearable) continue;
+                _hasUnpaidTryOn = true;
+                if (it.Effect == ShopItemEffect.JacketColor)
+                {
+                    _foot.ApplyJacketColor(it.JacketColorIndex);
+                }
+                else if (it.Effect == ShopItemEffect.Sunglasses)
+                {
+                    glass = true;
+                }
+                else if (it.Effect == ShopItemEffect.StreetCap)
+                {
+                    cap = true;
+                }
+            }
+            if (_hasUnpaidTryOn)
+            {
+                _foot.ApplyHeadAccessories(glass, cap);
+            }
+        }
+
         public bool TryAddItem(PlayerModeController mode, ShopCartItem item, Vector3 shelfWorldPos)
         {
             bool en = LocalizationService.IsEnglish;
+
+            // If already trying on the EXACT same wearable, take it off cleanly!
+            if (item.IsTryOnWearable && IsWearingUnpaidTrial(item.Effect, item.JacketColorIndex))
+            {
+                TryTakeOffTrialItem(mode, item.Effect, item.JacketColorIndex);
+                return false;
+            }
+
+            // If trying on a different jacket while already wearing an unpaid trial jacket, swap cleanly!
+            if (item.IsTryOnWearable)
+            {
+                for (int i = _items.Count - 1; i >= 0; i--)
+                {
+                    if (_items[i].IsTryOnWearable && _items[i].Effect == item.Effect)
+                    {
+                        _items.RemoveAt(i);
+                    }
+                }
+            }
+
             if (_items.Count >= MaxCartItems)
             {
                 if (mode != null)
                 {
                     mode.RaiseStatusMessage(en
-                        ? $"Hands full ({ActiveSummary}) — Take them to the Checkout Counter (Hüseyin Abi) first!"
-                        : $"Elin dolu ({ActiveSummary}) — Önce Kasa Bandına (Hüseyin Abi) götürüp öde!");
+                        ? $"Hands full ({ActiveSummary}) — Head to the Checkout Counter to pay first!"
+                        : $"Elin dolu ({ActiveSummary}) — Önce Kasaya götürüp öde!");
                 }
                 return false;
             }
@@ -497,29 +706,48 @@ namespace OurWorld.Player
             if (_items.Count == 0)
             {
                 _shopOrigin = shelfWorldPos;
+                _activeStoreName = item.SourceStoreName ?? string.Empty;
+            }
+            else if (!string.IsNullOrEmpty(item.SourceStoreName))
+            {
+                _activeStoreName = item.SourceStoreName;
             }
             if (_actionAnim == null && _foot != null) _actionAnim = _foot.GetComponent<PlayerActionAnimator>();
             if (_consumeAnim == null && _foot != null) _consumeAnim = _foot.GetComponent<PlayerConsumeAnimator>();
 
             _items.Add(item);
-            _inspectActive = true;
-            _inspectTimer = 0f;
-            _inspectYaw = 0f;
-            _carryBlend = 0.85f;
-            RebuildHeldProp(item, shelfWorldPos);
 
-            if (mode != null)
+            if (item.IsTryOnWearable)
             {
-                mode.RaiseStatusMessage(en
-                    ? $"Holding {item.Name} ({item.Price} ₺) — Bring to Checkout (Hüseyin Abi) and press E! (Total: {TotalPrice} ₺)"
-                    : $"{item.Name} ({item.Price} ₺) elinde — Kasa Bandına (Hüseyin Abi) götürüp E ile öde! (Toplam: {TotalPrice} ₺)");
+                ReapplyActiveTryOnPreview();
+                if (mode != null)
+                {
+                    mode.RaiseStatusMessage(en
+                        ? $"Trying on {item.Name} ({item.Price} ₺) in 3D! Pay at the register — leaving without paying triggers the alarm! (Total: {TotalPrice} ₺)"
+                        : $"{item.Name} ({item.Price} ₺) üzerinde deniyorsun! Kasada öde — ödemeden kapıdan çıkarsan alarm çalar! (Toplam: {TotalPrice} ₺)");
+                }
+            }
+            else
+            {
+                _inspectActive = true;
+                _inspectTimer = 0f;
+                _inspectYaw = 0f;
+                _carryBlend = 0.85f;
+                RebuildHeldProp(item, shelfWorldPos);
+
+                if (mode != null)
+                {
+                    mode.RaiseStatusMessage(en
+                        ? $"Holding {item.Name} ({item.Price} ₺) — Pay at the register! Leaving without paying triggers the alarm! (Total: {TotalPrice} ₺)"
+                        : $"{item.Name} ({item.Price} ₺) elinde — Kasaya götürüp öde! Ödemeden kapıdan çıkarsan alarm çalar! (Toplam: {TotalPrice} ₺)");
+                }
             }
             return true;
         }
 
         public void Checkout(PlayerModeController mode, Transform registerTransform)
         {
-            if (_items.Count == 0 || mode == null || SaveManager.Instance == null || SaveManager.Instance.Data == null)
+            if (_checkingOut || _items.Count == 0 || mode == null || SaveManager.Instance == null || SaveManager.Instance.Data == null)
             {
                 return;
             }
@@ -529,16 +757,21 @@ namespace OurWorld.Player
             if (SaveManager.Instance.Data.money < total)
             {
                 mode.RaiseStatusMessage(en
-                    ? $"Insufficient funds! ({total} ₺ needed · Balance: {SaveManager.Instance.Data.money} ₺) — Items returned to shelf."
-                    : $"Yetersiz bakiye! ({total} ₺ gerekli · Bakiye: {SaveManager.Instance.Data.money} ₺) — Ürünler rafa bırakıldı.");
+                    ? $"Insufficient funds! ({total} ₺ needed · Balance: {SaveManager.Instance.Data.money} ₺) — Items returned to the stands."
+                    : $"Yetersiz bakiye! ({total} ₺ gerekli · Bakiye: {SaveManager.Instance.Data.money} ₺) — Ürünler stantlara geri bırakıldı.");
                 ClearCart(silent: true);
                 return;
             }
 
+            _checkingOut = true;
             List<ShopCartItem> snapshot = new List<ShopCartItem>(_items);
-            ClearCart(silent: true);
+            bool fromMall = !string.IsNullOrEmpty(_activeStoreName) &&
+                            _activeStoreName.IndexOf("Bakkal", System.StringComparison.OrdinalIgnoreCase) < 0;
+            // Keep Try-On preview smoothly visible during keypad animation until permanently applied in onClimax
+            ClearCart(silent: true, revertTryOn: false);
 
             float pendingEnergy = 0f;
+            int pendingRepXp = 0;
             ConsumeAnimKind pendingConsume = ConsumeAnimKind.None;
             string pendingLabel = snapshot[snapshot.Count - 1].Name;
             bool paidOk = false;
@@ -547,6 +780,7 @@ namespace OurWorld.Player
             {
                 if (SaveManager.Instance == null || !SaveManager.Instance.TrySpend(total))
                 {
+                    _foot?.ApplySavedAppearance();
                     mode.RaiseStatusMessage(en ? "Payment could not be completed." : "Ödeme tamamlanamadı.");
                     return;
                 }
@@ -558,16 +792,25 @@ namespace OurWorld.Player
                     : mode.ActiveWorldPosition + Vector3.up * 1.25f;
                 GameFeelAudio.SpawnBurst(fxPos, new Color(0.98f, 0.84f, 0.28f), count: 14, spread: 0.50f);
 
+                int packedServings = 0;
                 for (int i = 0; i < snapshot.Count; i++)
                 {
                     ShopCartItem it = snapshot[i];
+                    pendingRepXp += it.ReputationXp;
                     if (it.Effect == ShopItemEffect.Energy)
                     {
-                        pendingEnergy += it.EffectParam;
-                        if (it.ConsumeKind != ConsumeAnimKind.None)
+                        if (PlayerBackpackInventory.ShouldPackIntoBackpack(it, isCheckoutStore: true))
                         {
-                            pendingConsume = it.ConsumeKind;
-                            pendingLabel = it.Name;
+                            packedServings += PlayerBackpackInventory.EnsureInstance().AddFromShopCartItem(it);
+                        }
+                        else
+                        {
+                            pendingEnergy += it.EffectParam;
+                            if (it.ConsumeKind != ConsumeAnimKind.None)
+                            {
+                                pendingConsume = it.ConsumeKind;
+                                pendingLabel = it.Name;
+                            }
                         }
                     }
                     else
@@ -576,24 +819,50 @@ namespace OurWorld.Player
                     }
                 }
 
-                if (pendingConsume == ConsumeAnimKind.None)
+                if (pendingRepXp > 0)
+                {
+                    NeighborhoodReputation.AddReputation(pendingRepXp);
+                }
+                if (fromMall)
+                {
+                    DailyQuestAndAchievementSystem.RecordMallPurchase();
+                }
+
+                string xpNote = pendingRepXp > 0 ? $" · +{pendingRepXp} XP" : string.Empty;
+                if (packedServings > 0 && pendingConsume == ConsumeAnimKind.None)
+                {
+                    VisualEffectsManager.SpawnFloatingText(
+                        mode.ActiveWorldPosition + Vector3.up * 2.3f,
+                        en ? $"+{packedServings} Backpack!" : $"+{packedServings} Çantaya!",
+                        new Color(0.32f, 0.94f, 0.62f),
+                        scale: 1.0f,
+                        duration: 1.15f);
+                    mode.RaiseStatusMessage(en
+                        ? $"Paid at checkout (-{total} ₺{xpNote}) · Packed {packedServings} item(s) into your Backpack! Open Bag (B) whenever hungry."
+                        : $"Kasada ödendi (-{total} ₺{xpNote}) · {packedServings} ürün Çantana eklendi! Acıkınca Çanta'dan (B) yiyebilirsin.");
+                }
+                else if (pendingConsume == ConsumeAnimKind.None)
                 {
                     if (pendingEnergy > 0f && PlayerNeedsController.Instance != null)
                     {
                         PlayerNeedsController.Instance.RestoreEnergy(pendingEnergy);
                     }
                     mode.RaiseStatusMessage(en
-                        ? $"Paid at checkout (-{total} ₺) · Enjoy, neighbor!"
-                        : $"Kasada ödendi (-{total} ₺) · Hayırlı olsun komşu!");
+                        ? $"Paid at checkout (-{total} ₺{xpNote}) · Enjoy, neighbor!"
+                        : $"Kasada ödendi (-{total} ₺{xpNote}) · Güle güle kullan komşu!");
                 }
                 else
                 {
+                    string packNote = packedServings > 0
+                        ? (en ? $" (+{packedServings} to Backpack)" : $" (+{packedServings} Çantaya)")
+                        : string.Empty;
                     mode.RaiseStatusMessage(en
-                        ? $"Paid at checkout (-{total} ₺) · Enjoying {pendingLabel}!"
-                        : $"Kasada ödendi (-{total} ₺) · {pendingLabel} afiyetle tüketiliyor!");
+                        ? $"Paid at checkout (-{total} ₺{xpNote}){packNote} · Enjoying {pendingLabel}!"
+                        : $"Kasada ödendi (-{total} ₺{xpNote}){packNote} · {pendingLabel} afiyetle tüketiliyor!");
                 }
             }, onFinished: () =>
             {
+                _checkingOut = false;
                 if (!paidOk) return;
                 if (pendingConsume != ConsumeAnimKind.None && mode.FootController != null && mode.CurrentMode == ControlMode.OnFoot)
                 {
@@ -628,7 +897,7 @@ namespace OurWorld.Player
                     SaveManager.Instance.Save();
                     break;
                 case ShopItemEffect.JacketColor:
-                    int idx = Mathf.Clamp(item.JacketColorIndex, 0, 3);
+                    int idx = Mathf.Clamp(item.JacketColorIndex, 0, PlayerFootController.JacketColorCount - 1);
                     data.playerJacketColorIndex = idx;
                     SaveManager.Instance.Save();
                     if (mode != null && mode.FootController != null)
@@ -644,12 +913,38 @@ namespace OurWorld.Player
                     data.missionSedanFuel = 1f;
                     SaveManager.Instance.Save();
                     break;
+                case ShopItemEffect.Sunglasses:
+                    data.ownsSunglasses = true;
+                    data.equipSunglasses = true;
+                    SaveManager.Instance.Save();
+                    mode?.FootController?.ApplySavedAppearance();
+                    break;
+                case ShopItemEffect.StreetCap:
+                    data.ownsStreetCap = true;
+                    data.equipStreetCap = true;
+                    SaveManager.Instance.Save();
+                    mode?.FootController?.ApplySavedAppearance();
+                    break;
+                case ShopItemEffect.SeedPack:
+                    data.invTomatoes += 2;
+                    data.invStrawberries += 2;
+                    SaveManager.Instance.Save();
+                    break;
+                case ShopItemEffect.ReputationPrestige:
+                    if (item.EffectParam > 0f && PlayerNeedsController.Instance != null)
+                    {
+                        PlayerNeedsController.Instance.RestoreEnergy(item.EffectParam);
+                    }
+                    break;
             }
         }
 
-        public void ClearCart(bool silent, string message = null)
+        public void ClearCart(bool silent, string message = null, bool revertTryOn = true)
         {
+            bool hadTryOn = _hasUnpaidTryOn;
             _items.Clear();
+            _hasUnpaidTryOn = false;
+            _activeStoreName = string.Empty;
             _inspectActive = false;
             _inspectTimer = 0f;
             _inspectYaw = 0f;
@@ -665,10 +960,15 @@ namespace OurWorld.Player
                 _foot.Humanoid.SetConsumePose(0, 0f, 0f);
                 _foot.Humanoid.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
             }
+            if (revertTryOn && hadTryOn && _foot != null)
+            {
+                _foot.ApplySavedAppearance();
+            }
             if (!silent && !string.IsNullOrEmpty(message) && PlayerModeController.Instance != null)
             {
                 PlayerModeController.Instance.RaiseStatusMessage(message);
             }
+            PlayerModeController.Instance?.RefreshCurrentInteractPrompt();
         }
 
         private void RebuildHeldProp(ShopCartItem item, Vector3 spawnWorldPos)

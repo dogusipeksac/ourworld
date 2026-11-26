@@ -123,6 +123,19 @@ namespace OurWorld.UI
         private Text _attackBtnLabel;
         private Text _jumpBtnLabel;
         private GameObject _jumpBtnObject;
+        private Image _healthFillImage;
+        private Text _healthLabelText;
+        private Image _hungerFillImage;
+        private Text _hungerLabelText;
+        private Button _backpackHudButton;
+        private Image _backpackHudBg;
+        private Text _backpackHudLabel;
+        private Image _damageVignetteImage;
+        private Texture2D _damageVignetteTex;
+        private Sprite _damageVignetteSprite;
+        private float _damageFlashAlpha;
+        private float _currentHealth = 100f;
+        private float _currentHunger = 88f;
 
         private const string PrefLargeSubtitlesKey = "ow_subtitle_large";
         private int _baseDialogueSpeakerSize;
@@ -394,6 +407,7 @@ namespace OurWorld.UI
                 }
             }
 
+            BuildRuntimeHealthAndDamageHud();
             BindButtons();
             SubscribeEvents();
             RefreshStaticLabels();
@@ -403,6 +417,8 @@ namespace OurWorld.UI
         private void OnDestroy()
         {
             UnsubscribeEvents();
+            if (_damageVignetteSprite != null) Destroy(_damageVignetteSprite);
+            if (_damageVignetteTex != null) Destroy(_damageVignetteTex);
         }
 
         private void BindButtons()
@@ -526,7 +542,11 @@ namespace OurWorld.UI
             if (PlayerNeedsController.Instance != null)
             {
                 PlayerNeedsController.Instance.OnEnergyChanged += HandleEnergyChanged;
+                PlayerNeedsController.Instance.OnHealthChanged += HandleHealthChanged;
+                PlayerNeedsController.Instance.OnHungerChanged += HandleHungerChanged;
             }
+
+            PlayerBackpackInventory.EnsureInstance().OnInventoryChanged += RefreshBackpackHudButton;
 
             if (GraphicsProfileManager.Instance != null)
             {
@@ -583,6 +603,13 @@ namespace OurWorld.UI
             if (PlayerNeedsController.Instance != null)
             {
                 PlayerNeedsController.Instance.OnEnergyChanged -= HandleEnergyChanged;
+                PlayerNeedsController.Instance.OnHealthChanged -= HandleHealthChanged;
+                PlayerNeedsController.Instance.OnHungerChanged -= HandleHungerChanged;
+            }
+
+            if (PlayerBackpackInventory.Instance != null)
+            {
+                PlayerBackpackInventory.Instance.OnInventoryChanged -= RefreshBackpackHudButton;
             }
 
             if (GraphicsProfileManager.Instance != null)
@@ -646,7 +673,10 @@ namespace OurWorld.UI
             if (PlayerNeedsController.Instance != null)
             {
                 HandleEnergyChanged(PlayerNeedsController.Instance.Energy, PlayerNeedsController.Instance.IsTired);
+                HandleHealthChanged(PlayerNeedsController.Instance.Health, 0f);
+                HandleHungerChanged(PlayerNeedsController.Instance.Hunger, PlayerNeedsController.Instance.IsHungry);
             }
+            RefreshBackpackHudButton();
 
             if (PlayerModeController.Instance != null)
             {
@@ -690,6 +720,8 @@ namespace OurWorld.UI
             if (retryButtonLabel != null) retryButtonLabel.text = LocalizationService.Tr("ui.btn.retry", "Tekrar Dene");
             if (resetSaveLabel != null) resetSaveLabel.text = LocalizationService.Tr("ui.btn.reset_save", "Sıfırla");
             if (sprintButtonLabel != null) sprintButtonLabel.text = LocalizationService.Tr("ui.btn.sprint", "Koş");
+            if (_hungerLabelText != null) _hungerLabelText.text = LocalizationService.IsEnglish ? "Food" : "Tok";
+            RefreshBackpackHudButton();
             if (handbrakeLabel != null) handbrakeLabel.text = LocalizationService.Tr("ui.btn.handbrake", "El Freni");
             if (phoneButtonLabel != null)
             {
@@ -720,6 +752,28 @@ namespace OurWorld.UI
             if (clockText != null && DayNightCycle.Instance != null)
             {
                 clockText.text = DayNightCycle.Instance.GetFormattedTime();
+            }
+
+            // 1b. Red damage vignette decay + low-HP heartbeat pulse
+            if (_damageVignetteImage != null)
+            {
+                if (_damageFlashAlpha > 0f)
+                {
+                    _damageFlashAlpha = Mathf.Max(0f, _damageFlashAlpha - unscaledDt * 1.45f);
+                }
+                float lowPulse = _currentHealth <= 30f && _currentHealth > 0f
+                    ? (0.14f + Mathf.Sin(Time.unscaledTime * 5.2f) * 0.08f) * Mathf.InverseLerp(30f, 5f, _currentHealth)
+                    : 0f;
+                float finalAlpha = Mathf.Clamp01(Mathf.Max(_damageFlashAlpha, lowPulse));
+                bool active = finalAlpha > 0.005f;
+                if (_damageVignetteImage.gameObject.activeSelf != active)
+                {
+                    _damageVignetteImage.gameObject.SetActive(active);
+                }
+                if (active)
+                {
+                    _damageVignetteImage.color = new Color(0.86f, 0.08f, 0.10f, finalAlpha);
+                }
             }
 
             // 2. Countdown Timer (Story Mission timer or Side-Job timer)
@@ -992,6 +1046,266 @@ namespace OurWorld.UI
             }
         }
 
+        private void HandleHealthChanged(float health, float delta)
+        {
+            _currentHealth = Mathf.Clamp(health, 0f, 100f);
+            if (_healthFillImage != null)
+            {
+                _healthFillImage.fillAmount = Mathf.Clamp01(_currentHealth / 100f);
+                _healthFillImage.color = _currentHealth <= 30f
+                    ? new Color(1.00f, 0.20f, 0.22f, 1f)
+                    : new Color(0.90f, 0.24f, 0.28f, 1f);
+            }
+            if (_healthLabelText != null)
+            {
+                _healthLabelText.text = $"♥ {Mathf.CeilToInt(_currentHealth)}";
+            }
+            if (delta < -0.5f)
+            {
+                float kick = Mathf.Clamp(Mathf.Abs(delta) / 28f, 0.28f, 0.68f);
+                _damageFlashAlpha = Mathf.Max(_damageFlashAlpha, kick);
+            }
+        }
+
+        private void HandleHungerChanged(float hunger, bool isHungry)
+        {
+            _currentHunger = Mathf.Clamp(hunger, 0f, 100f);
+            if (_hungerFillImage != null)
+            {
+                _hungerFillImage.fillAmount = Mathf.Clamp01(_currentHunger / 100f);
+                _hungerFillImage.color = isHungry
+                    ? new Color(0.98f, 0.36f, 0.22f, 1f)
+                    : new Color(0.98f, 0.68f, 0.18f, 1f);
+            }
+            RefreshBackpackHudButton();
+        }
+
+        private void RefreshBackpackHudButton()
+        {
+            if (_backpackHudLabel == null) return;
+            bool en = LocalizationService.IsEnglish;
+            int count = PlayerBackpackInventory.Instance != null ? PlayerBackpackInventory.Instance.TotalItemCount : 0;
+            bool hungryWithFood = _currentHunger < 35f && count > 0;
+            string prefix = en ? "Bag" : "Çanta";
+            _backpackHudLabel.text = count > 0 ? $"{prefix} ({count})" : prefix;
+            _backpackHudLabel.color = hungryWithFood ? new Color(1.0f, 0.86f, 0.32f, 1f) : OurWorldUiKit.TextPrimary;
+            if (_backpackHudBg != null)
+            {
+                _backpackHudBg.color = hungryWithFood
+                    ? new Color(0.24f, 0.15f, 0.05f, 0.94f)
+                    : new Color(0.055f, 0.082f, 0.130f, 0.92f);
+            }
+        }
+
+        private void BuildRuntimeHealthAndDamageHud()
+        {
+            // 1. Add sleek crimson Health Bar + amber Hunger (Tokluk) Bar right above Energy bar inside StatusCard_TopRight
+            if (energyFillImage != null && energyFillImage.transform.parent != null)
+            {
+                RectTransform energyTrackRt = energyFillImage.transform.parent.GetComponent<RectTransform>();
+                Transform statusCard = energyTrackRt != null ? energyTrackRt.parent : null;
+                if (statusCard != null && statusCard.Find("HealthTrack") == null)
+                {
+                    RectTransform cardRt = statusCard.GetComponent<RectTransform>();
+                    if (cardRt != null)
+                    {
+                        cardRt.anchoredPosition = new Vector2(-24f, -14f);
+                        cardRt.sizeDelta = new Vector2(336f, 92f);
+                    }
+
+                    // Stack all 3 compact horizontal bars neatly: Energy (y=6), Hunger/Tokluk (y=18), Health (y=30)
+                    energyTrackRt.anchoredPosition = new Vector2(58f, 6f);
+                    energyTrackRt.sizeDelta = new Vector2(260f, 8f);
+
+                    Font uiFont = moneyText != null ? moneyText.font : OurWorldUiKit.DefaultFont;
+                    Image energyTrackImg = energyTrackRt.GetComponent<Image>();
+
+                    // Subtle "⚡" tag left of Energy bar
+                    GameObject enLblGo = new GameObject("EnergyIconLabel", typeof(RectTransform), typeof(Text));
+                    enLblGo.transform.SetParent(statusCard, false);
+                    RectTransform enLblRt = enLblGo.GetComponent<RectTransform>();
+                    enLblRt.anchorMin = Vector2.zero;
+                    enLblRt.anchorMax = Vector2.zero;
+                    enLblRt.pivot = Vector2.zero;
+                    enLblRt.anchoredPosition = new Vector2(18f, 2f);
+                    enLblRt.sizeDelta = new Vector2(36f, 15f);
+                    Text enTxt = enLblGo.GetComponent<Text>();
+                    enTxt.font = uiFont;
+                    enTxt.text = "⚡";
+                    enTxt.fontSize = 11;
+                    enTxt.fontStyle = FontStyle.Bold;
+                    enTxt.alignment = TextAnchor.MiddleLeft;
+                    enTxt.color = AccentTealColor;
+                    enTxt.raycastTarget = false;
+
+                    // Compact "Tok" / "Food" label + warm-amber Hunger Track
+                    GameObject huLblGo = new GameObject("HungerLabel", typeof(RectTransform), typeof(Text));
+                    huLblGo.transform.SetParent(statusCard, false);
+                    RectTransform huLblRt = huLblGo.GetComponent<RectTransform>();
+                    huLblRt.anchorMin = Vector2.zero;
+                    huLblRt.anchorMax = Vector2.zero;
+                    huLblRt.pivot = Vector2.zero;
+                    huLblRt.anchoredPosition = new Vector2(16f, 13f);
+                    huLblRt.sizeDelta = new Vector2(38f, 15f);
+                    _hungerLabelText = huLblGo.GetComponent<Text>();
+                    _hungerLabelText.font = uiFont;
+                    _hungerLabelText.text = LocalizationService.IsEnglish ? "Food" : "Tok";
+                    _hungerLabelText.fontSize = 11;
+                    _hungerLabelText.fontStyle = FontStyle.Bold;
+                    _hungerLabelText.alignment = TextAnchor.MiddleLeft;
+                    _hungerLabelText.color = new Color(0.98f, 0.72f, 0.24f, 1f);
+                    _hungerLabelText.raycastTarget = false;
+
+                    GameObject huTrack = new GameObject("HungerTrack", typeof(RectTransform), typeof(Image));
+                    huTrack.transform.SetParent(statusCard, false);
+                    RectTransform huTrackRt = huTrack.GetComponent<RectTransform>();
+                    huTrackRt.anchorMin = Vector2.zero;
+                    huTrackRt.anchorMax = Vector2.zero;
+                    huTrackRt.pivot = Vector2.zero;
+                    huTrackRt.anchoredPosition = new Vector2(58f, 18f);
+                    huTrackRt.sizeDelta = new Vector2(260f, 8f);
+                    Image huTrackImg = huTrack.GetComponent<Image>();
+                    if (energyTrackImg != null)
+                    {
+                        huTrackImg.sprite = energyTrackImg.sprite;
+                        huTrackImg.type = energyTrackImg.type;
+                    }
+                    huTrackImg.color = new Color(1f, 1f, 1f, 0.14f);
+                    huTrackImg.raycastTarget = false;
+
+                    GameObject huFill = new GameObject("HungerFill", typeof(RectTransform), typeof(Image));
+                    huFill.transform.SetParent(huTrack.transform, false);
+                    RectTransform huFillRt = huFill.GetComponent<RectTransform>();
+                    huFillRt.anchorMin = Vector2.zero;
+                    huFillRt.anchorMax = Vector2.one;
+                    huFillRt.offsetMin = Vector2.zero;
+                    huFillRt.offsetMax = Vector2.zero;
+                    _hungerFillImage = huFill.GetComponent<Image>();
+                    _hungerFillImage.sprite = energyFillImage.sprite;
+                    _hungerFillImage.type = Image.Type.Filled;
+                    _hungerFillImage.fillMethod = Image.FillMethod.Horizontal;
+                    _hungerFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+                    _hungerFillImage.fillAmount = 0.88f;
+                    _hungerFillImage.color = new Color(0.98f, 0.68f, 0.18f, 1f);
+                    _hungerFillImage.raycastTarget = false;
+
+                    // Compact "♥ 100" label left of Health bar
+                    GameObject hpLblGo = new GameObject("HealthLabel", typeof(RectTransform), typeof(Text));
+                    hpLblGo.transform.SetParent(statusCard, false);
+                    RectTransform hpLblRt = hpLblGo.GetComponent<RectTransform>();
+                    hpLblRt.anchorMin = Vector2.zero;
+                    hpLblRt.anchorMax = Vector2.zero;
+                    hpLblRt.pivot = Vector2.zero;
+                    hpLblRt.anchoredPosition = new Vector2(16f, 24f);
+                    hpLblRt.sizeDelta = new Vector2(38f, 16f);
+                    _healthLabelText = hpLblGo.GetComponent<Text>();
+                    _healthLabelText.font = uiFont;
+                    _healthLabelText.text = "♥ 100";
+                    _healthLabelText.fontSize = 11;
+                    _healthLabelText.fontStyle = FontStyle.Bold;
+                    _healthLabelText.alignment = TextAnchor.MiddleLeft;
+                    _healthLabelText.color = new Color(0.98f, 0.36f, 0.38f, 1f);
+                    _healthLabelText.raycastTarget = false;
+
+                    // HealthTrack (background)
+                    GameObject hpTrack = new GameObject("HealthTrack", typeof(RectTransform), typeof(Image));
+                    hpTrack.transform.SetParent(statusCard, false);
+                    RectTransform hpTrackRt = hpTrack.GetComponent<RectTransform>();
+                    hpTrackRt.anchorMin = Vector2.zero;
+                    hpTrackRt.anchorMax = Vector2.zero;
+                    hpTrackRt.pivot = Vector2.zero;
+                    hpTrackRt.anchoredPosition = new Vector2(58f, 30f);
+                    hpTrackRt.sizeDelta = new Vector2(260f, 9f);
+                    Image hpTrackImg = hpTrack.GetComponent<Image>();
+                    if (energyTrackImg != null)
+                    {
+                        hpTrackImg.sprite = energyTrackImg.sprite;
+                        hpTrackImg.type = energyTrackImg.type;
+                    }
+                    hpTrackImg.color = new Color(1f, 1f, 1f, 0.14f);
+                    hpTrackImg.raycastTarget = false;
+
+                    // HealthFill (crimson horizontal fill)
+                    GameObject hpFill = new GameObject("HealthFill", typeof(RectTransform), typeof(Image));
+                    hpFill.transform.SetParent(hpTrack.transform, false);
+                    RectTransform hpFillRt = hpFill.GetComponent<RectTransform>();
+                    hpFillRt.anchorMin = Vector2.zero;
+                    hpFillRt.anchorMax = Vector2.one;
+                    hpFillRt.offsetMin = Vector2.zero;
+                    hpFillRt.offsetMax = Vector2.zero;
+                    _healthFillImage = hpFill.GetComponent<Image>();
+                    _healthFillImage.sprite = energyFillImage.sprite;
+                    _healthFillImage.type = Image.Type.Filled;
+                    _healthFillImage.fillMethod = Image.FillMethod.Horizontal;
+                    _healthFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+                    _healthFillImage.fillAmount = 1f;
+                    _healthFillImage.color = new Color(0.90f, 0.24f, 0.28f, 1f);
+                    _healthFillImage.raycastTarget = false;
+                }
+            }
+
+            // 1b. 1-Tap Backpack ("Çanta") HUD Button aligned cleanly right next to "Menü" under StatusCard_TopRight!
+            Transform safeArea = transform.Find("SafeAreaRoot") ?? transform;
+            if (safeArea != null && safeArea.Find("Btn_Backpack") == null)
+            {
+                _backpackHudButton = OurWorldUiKit.CreatePillButton(
+                    "Btn_Backpack",
+                    safeArea,
+                    LocalizationService.IsEnglish ? "Bag" : "Çanta",
+                    22,
+                    new Color(0.055f, 0.082f, 0.130f, 0.92f),
+                    OurWorldUiKit.TextPrimary,
+                    OurWorldUiKit.BorderSubtle,
+                    out _backpackHudLabel,
+                    () => BackpackPanelController.EnsureInstance().Toggle());
+                _backpackHudBg = _backpackHudButton.GetComponent<Image>();
+                RectTransform brt = (RectTransform)_backpackHudButton.transform;
+                brt.anchorMin = new Vector2(1f, 1f);
+                brt.anchorMax = new Vector2(1f, 1f);
+                brt.pivot = new Vector2(1f, 1f);
+                brt.anchoredPosition = new Vector2(-210f, -114f);
+                brt.sizeDelta = new Vector2(150f, 70f);
+                RefreshBackpackHudButton();
+            }
+
+            // 2. Full-screen peripheral red Damage Vignette overlay (transparent center, crimson edges)
+            if (_damageVignetteImage == null)
+            {
+                const int sz = 128;
+                _damageVignetteTex = new Texture2D(sz, sz, TextureFormat.RGBA32, false);
+                _damageVignetteTex.wrapMode = TextureWrapMode.Clamp;
+                Color[] pix = new Color[sz * sz];
+                for (int y = 0; y < sz; y++)
+                {
+                    float ny = (y / (float)(sz - 1)) * 2f - 1f;
+                    for (int x = 0; x < sz; x++)
+                    {
+                        float nx = (x / (float)(sz - 1)) * 2f - 1f;
+                        float dist = Mathf.Sqrt(nx * nx + ny * ny);
+                        float edge = Mathf.SmoothStep(0.58f, 1.32f, dist);
+                        pix[y * sz + x] = new Color(1f, 1f, 1f, edge);
+                    }
+                }
+                _damageVignetteTex.SetPixels(pix);
+                _damageVignetteTex.Apply();
+                _damageVignetteSprite = Sprite.Create(_damageVignetteTex, new Rect(0, 0, sz, sz), new Vector2(0.5f, 0.5f));
+
+                GameObject vigGo = new GameObject("DamageVignetteOverlay", typeof(RectTransform), typeof(Image));
+                vigGo.transform.SetParent(transform, false);
+                vigGo.transform.SetAsFirstSibling();
+                RectTransform vrt = vigGo.GetComponent<RectTransform>();
+                vrt.anchorMin = Vector2.zero;
+                vrt.anchorMax = Vector2.one;
+                vrt.offsetMin = Vector2.zero;
+                vrt.offsetMax = Vector2.zero;
+                _damageVignetteImage = vigGo.GetComponent<Image>();
+                _damageVignetteImage.sprite = _damageVignetteSprite;
+                _damageVignetteImage.color = new Color(0.86f, 0.08f, 0.10f, 0f);
+                _damageVignetteImage.raycastTarget = false;
+                vigGo.SetActive(false);
+            }
+        }
+
         private void HandleJobStateChanged()
         {
             JobManager jm = JobManager.Instance;
@@ -1054,6 +1368,7 @@ namespace OurWorld.UI
                     LocalizationService.Tr("ui.btn.exit_car", "İn");
             }
             if (sprintButton != null) sprintButton.gameObject.SetActive(!tennis);
+            if (_backpackHudButton != null) _backpackHudButton.gameObject.SetActive(!inMatchSport);
 
             CacheSportActionButtons();
             if (_jumpBtnObject != null)
@@ -1352,8 +1667,8 @@ namespace OurWorld.UI
                     interactButtonLabel.text = Application.isMobilePlatform ? localized : $"E · {localized}";
                     if (_interactRect != null)
                     {
-                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 340f : 316f;
-                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 15f + 78f, minW, 520f);
+                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 340f : 364f;
+                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 16f + 86f, minW, 560f);
                         _interactRect.sizeDelta = new Vector2(desiredW, _interactRect.sizeDelta.y);
                     }
                 }
@@ -1371,8 +1686,8 @@ namespace OurWorld.UI
                     interactButtonLabel.text = Application.isMobilePlatform ? prompt : $"E · {prompt}";
                     if (_interactRect != null)
                     {
-                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 340f : 316f;
-                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 15f + 78f, minW, 520f);
+                        float minW = ResponsiveTabletLayout.IsTabletLayoutActive ? 340f : 364f;
+                        float desiredW = Mathf.Clamp(interactButtonLabel.text.Length * 16f + 86f, minW, 560f);
                         _interactRect.sizeDelta = new Vector2(desiredW, _interactRect.sizeDelta.y);
                     }
                 }

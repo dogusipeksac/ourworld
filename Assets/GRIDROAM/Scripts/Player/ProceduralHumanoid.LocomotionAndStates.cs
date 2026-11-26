@@ -1237,44 +1237,80 @@ namespace OurWorld.Player
         {
             float dur = _combatMoveIndex == 2 ? KickDuration : PunchDuration;
             float pNorm = Mathf.Clamp01(_punchTimer / dur);
-            float thrust = pNorm < 0.25f
-                ? -(pNorm / 0.25f) * 0.45f
-                : (pNorm < 0.58f
-                    ? Mathf.Lerp(-0.45f, 1.0f, (pNorm - 0.25f) / 0.33f)
-                    : Mathf.Lerp(1.0f, 0f, (pNorm - 0.58f) / 0.42f));
-            float tPos = Mathf.Clamp01(thrust);
+            // Smooth anticipation wind-up -> explosive snap -> controlled recovery (zero frame pops)
+            float wind = pNorm < 0.24f
+                ? Mathf.SmoothStep(0f, 1f, pNorm / 0.24f)
+                : (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((pNorm - 0.24f) / 0.14f)));
+            float strike = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((pNorm - 0.18f) / 0.24f)) *
+                           (1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((pNorm - 0.54f) / 0.46f)));
+            float thrust = strike - wind * 0.42f;
+            float tPos = Mathf.Clamp01(strike);
             float guardEnv = Mathf.Sin(pNorm * Mathf.PI);
 
             if (_combatMoveIndex == 0)
             {
-                // Hit 1: Snappy Left Jab
-                p.targetSpineRot.y += 24f * thrust;
-                p.targetSpineRot.x += 10f * tPos;
-                p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-90f, 10f, -6f), tPos);
-                p.targetLElbowRot = Vector3.Lerp(p.targetLElbowRot, new Vector3(-8f, 0f, 0f), tPos);
-                p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(-52f, -18f, 16f), guardEnv);
-                p.targetRElbowRot = Vector3.Lerp(p.targetRElbowRot, new Vector3(-92f, 0f, 0f), guardEnv);
+                // Hit 1: Snappy Left Jab with hip-to-shoulder kinetic chain & gaze locked on target
+                p.targetHipsPos.y -= 0.042f * guardEnv;
+                p.targetHipsPos.z += 0.036f * tPos;
+                p.targetHipsRot.y += 14f * thrust;
+                p.targetSpineRot.y += 26f * thrust;
+                p.targetSpineRot.x += 11f * tPos;
+                p.targetHeadRot.y -= 20f * thrust;
+                p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-92f, 12f, -6f), tPos);
+                p.targetLElbowRot = Vector3.Lerp(p.targetLElbowRot, new Vector3(-6f, 0f, 0f), tPos);
+                p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(-56f, -20f, 16f), guardEnv);
+                p.targetRElbowRot = Vector3.Lerp(p.targetRElbowRot, new Vector3(-98f, 0f, 0f), guardEnv);
             }
             else if (_combatMoveIndex == 1)
             {
-                // Hit 2: Heavy Right Hook / Cross with big torso torque
-                p.targetSpineRot.y += -38f * thrust;
-                p.targetSpineRot.x += 15f * tPos;
-                p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(-86f, -34f, 22f), tPos);
-                p.targetRElbowRot = Vector3.Lerp(p.targetRElbowRot, new Vector3(-36f, 0f, 0f), tPos);
-                p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-54f, 20f, -18f), guardEnv);
-                p.targetLElbowRot = Vector3.Lerp(p.targetLElbowRot, new Vector3(-96f, 0f, 0f), guardEnv);
+                // Hit 2: Heavy Right Hook / Cross with explosive pelvis whip & tight left chin guard
+                p.targetHipsPos.y -= 0.062f * guardEnv;
+                p.targetHipsPos.z += 0.055f * tPos;
+                p.targetHipsRot.y += -22f * thrust;
+                p.targetSpineRot.y += -40f * thrust;
+                p.targetSpineRot.x += 16f * tPos;
+                p.targetSpineRot.z += -6f * tPos;
+                p.targetHeadRot.y += 30f * thrust;
+                p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(-88f, -38f, 26f), tPos);
+                p.targetRElbowRot = Vector3.Lerp(p.targetRElbowRot, new Vector3(-34f, 0f, 0f), tPos);
+                p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-58f, 22f, -18f), guardEnv);
+                p.targetLElbowRot = Vector3.Lerp(p.targetLElbowRot, new Vector3(-102f, 0f, 0f), guardEnv);
             }
             else
             {
-                // Hit 3: Powerful Front Push Kick!
-                p.targetSpineRot.x = Mathf.Lerp(p.targetSpineRot.x, -22f, tPos);
-                p.targetSpineRot.y += -16f * tPos;
-                p.targetRHipRot = Vector3.Lerp(p.targetRHipRot, new Vector3(-98f, 0f, 6f), tPos);
-                p.targetRKneeRot = Vector3.Lerp(p.targetRKneeRot, pNorm < 0.34f ? new Vector3(88f, 0f, 0f) : new Vector3(8f, 0f, 0f), guardEnv);
-                p.targetRAnkleRot = Vector3.Lerp(p.targetRAnkleRot, new Vector3(24f, 0f, 0f), tPos);
-                p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-42f, 0f, -34f), guardEnv);
-                p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(26f, 0f, 28f), guardEnv);
+                // Hit 3: Powerful Front Push Kick — continuous chamber -> snap extension -> smooth recovery (zero 80-deg knee pop!)
+                float chamberIn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(pNorm / 0.26f));
+                float snapExt = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((pNorm - 0.22f) / 0.20f));
+                float retract = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((pNorm - 0.62f) / 0.38f));
+                float kickEnv = chamberIn * (1f - retract);
+                float extendPeak = snapExt * (1f - retract);
+
+                p.targetHipsPos.y -= 0.055f * kickEnv;
+                p.targetHipsPos.z += 0.045f * extendPeak;
+                p.targetHipsRot.x += -10f * extendPeak;
+                p.targetHipsRot.y += -12f * extendPeak;
+                p.targetSpineRot.x = Mathf.Lerp(p.targetSpineRot.x, -22f, extendPeak);
+                p.targetSpineRot.y += -14f * extendPeak;
+                p.targetHeadRot.x += 14f * extendPeak;
+                p.targetHeadRot.y += 14f * extendPeak;
+
+                // Planted left support leg bends athletically to anchor the kick
+                p.targetLHipRot = Vector3.Lerp(p.targetLHipRot, new Vector3(-16f, 0f, -6f), kickEnv);
+                p.targetLKneeRot = Vector3.Lerp(p.targetLKneeRot, new Vector3(24f, 0f, 0f), kickEnv);
+                p.targetLAnkleRot = Vector3.Lerp(p.targetLAnkleRot, new Vector3(-8f, 0f, 0f), kickEnv);
+
+                // Kicking right leg smoothly chambers knee high (92 deg) then whips straight (10 deg)
+                float rightHipPitch = Mathf.Lerp(-68f, -104f, snapExt);
+                float rightKneeBend = Mathf.Lerp(92f, 10f, snapExt);
+                p.targetRHipRot = Vector3.Lerp(p.targetRHipRot, new Vector3(rightHipPitch, 0f, 6f), kickEnv);
+                p.targetRKneeRot = Vector3.Lerp(p.targetRKneeRot, new Vector3(rightKneeBend, 0f, 0f), kickEnv);
+                p.targetRAnkleRot = Vector3.Lerp(p.targetRAnkleRot, new Vector3(Mathf.Lerp(-12f, 26f, snapExt), 0f, 0f), kickEnv);
+
+                // Counter-balance guard arms
+                p.targetLShoulderRot = Vector3.Lerp(p.targetLShoulderRot, new Vector3(-48f, 10f, -36f), kickEnv);
+                p.targetLElbowRot = Vector3.Lerp(p.targetLElbowRot, new Vector3(-68f, 0f, 0f), kickEnv);
+                p.targetRShoulderRot = Vector3.Lerp(p.targetRShoulderRot, new Vector3(28f, 0f, 30f), kickEnv);
+                p.targetRElbowRot = Vector3.Lerp(p.targetRElbowRot, new Vector3(-42f, 0f, 0f), kickEnv);
             }
         }
 

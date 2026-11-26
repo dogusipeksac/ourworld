@@ -41,13 +41,16 @@ namespace OurWorld.World
         private Vignette _volVignette;
         private LiftGammaGain _volLiftGammaGain;
         private Bloom _volBloom;
-        private float _dayPostExposure = 0.08f;
-        private float _dayContrast = 12f;
-        private float _daySaturation = 8f;
-        private Color _dayColorFilter = new Color(1.0f, 0.97f, 0.93f);
-        private float _dayVignetteIntensity = 0.20f;
-        private float _dayBloomThreshold = 1.05f;
-        private float _dayBloomIntensity = 0.45f;
+        private WhiteBalance _volWhiteBalance;
+        private ChromaticAberration _volChromatic;
+        private float _impactChromaticPulse;
+        private float _dayPostExposure = 0.10f;
+        private float _dayContrast = 14f;
+        private float _daySaturation = 12f;
+        private Color _dayColorFilter = new Color(1.0f, 0.98f, 0.95f);
+        private float _dayVignetteIntensity = 0.18f;
+        private float _dayBloomThreshold = 1.00f;
+        private float _dayBloomIntensity = 0.48f;
 
         public float CurrentHour => _currentHour;
         public bool IsNight => _currentHour >= 18.5f || _currentHour < 6.5f;
@@ -218,12 +221,31 @@ namespace OurWorld.World
             return $"{hh:00}:{mm:00}";
         }
 
+        public void PulseImpactChromatic(float intensity = 0.24f)
+        {
+            _impactChromaticPulse = Mathf.Max(_impactChromaticPulse, Mathf.Clamp(intensity, 0.05f, 0.45f));
+            if (_volChromatic != null)
+            {
+                _volChromatic.active = true;
+                _volChromatic.intensity.Override(_impactChromaticPulse);
+            }
+        }
+
         private void Update()
         {
             if (OurWorld.UI.MainMenuController.IsMenuActive) return;
 
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
+
+            if (_impactChromaticPulse > 0f)
+            {
+                _impactChromaticPulse = Mathf.Max(0f, _impactChromaticPulse - Time.unscaledDeltaTime * 1.15f);
+                if (_volChromatic != null)
+                {
+                    _volChromatic.intensity.Override(_impactChromaticPulse);
+                }
+            }
 
             float hoursDelta = dt / Mathf.Max(5f, realSecondsPerGameHour);
             _currentHour = Mathf.Repeat(_currentHour + hoursDelta, 24f);
@@ -285,35 +307,75 @@ namespace OurWorld.World
                 if (_volBloom.threshold.overrideState) _dayBloomThreshold = _volBloom.threshold.value;
                 if (_volBloom.intensity.overrideState) _dayBloomIntensity = _volBloom.intensity.value;
             }
+            else
+            {
+                _volBloom = profile.Add<Bloom>(true);
+            }
+
+            if (!profile.TryGet(out _volWhiteBalance))
+            {
+                _volWhiteBalance = profile.Add<WhiteBalance>(true);
+            }
+            if (!profile.TryGet(out _volChromatic))
+            {
+                _volChromatic = profile.Add<ChromaticAberration>(true);
+                _volChromatic.intensity.Override(0f);
+            }
         }
 
         private void ApplyNightVolumeGrading(float nightFactor)
         {
+            float golden = IstanbulAtmosphereVFX.ComputeGoldenHourFactor(_currentHour) * (1f - nightFactor * 0.55f);
+            NeighborhoodWeatherState weather = NeighborhoodWeatherSystem.Instance != null
+                ? NeighborhoodWeatherSystem.Instance.CurrentWeather
+                : NeighborhoodWeatherState.Clear;
+            float rainMood = weather == NeighborhoodWeatherState.SummerShower ? 1f
+                : (weather == NeighborhoodWeatherState.BreezyOvercast ? 0.5f : 0f);
+
             if (_volColorAdj != null)
             {
-                _volColorAdj.postExposure.Override(Mathf.Lerp(_dayPostExposure, 0.32f, nightFactor));
-                _volColorAdj.contrast.Override(Mathf.Lerp(_dayContrast, 4f, nightFactor));
-                _volColorAdj.saturation.Override(Mathf.Lerp(_daySaturation, 14f, nightFactor));
-                _volColorAdj.colorFilter.Override(Color.Lerp(_dayColorFilter, new Color(0.96f, 0.98f, 1.00f), nightFactor));
+                float dayExp = Mathf.Lerp(_dayPostExposure, _dayPostExposure - 0.08f, rainMood);
+                float dayCon = Mathf.Lerp(Mathf.Max(_dayContrast, 14f), 9f, rainMood);
+                float daySat = Mathf.Lerp(Mathf.Lerp(Mathf.Max(_daySaturation, 12f), 19f, golden), 4f, rainMood);
+                Color dayTint = Color.Lerp(Color.Lerp(_dayColorFilter, new Color(1.00f, 0.94f, 0.85f), golden), new Color(0.92f, 0.96f, 1.00f), rainMood);
+
+                _volColorAdj.postExposure.Override(Mathf.Lerp(dayExp, 0.30f, nightFactor));
+                _volColorAdj.contrast.Override(Mathf.Lerp(dayCon, 6f, nightFactor));
+                _volColorAdj.saturation.Override(Mathf.Lerp(daySat, 16f, nightFactor));
+                _volColorAdj.colorFilter.Override(Color.Lerp(dayTint, new Color(0.95f, 0.97f, 1.00f), nightFactor));
+            }
+
+            if (_volWhiteBalance != null)
+            {
+                _volWhiteBalance.active = true;
+                float temp = Mathf.Lerp(Mathf.Lerp(5f, 20f, golden), -14f, rainMood);
+                temp = Mathf.Lerp(temp, -6f, nightFactor);
+                _volWhiteBalance.temperature.Override(temp);
+                _volWhiteBalance.tint.Override(Mathf.Lerp(2f, 6f, golden) * (1f - nightFactor));
             }
 
             if (_volVignette != null)
             {
-                _volVignette.intensity.Override(Mathf.Lerp(_dayVignetteIntensity, 0.08f, nightFactor));
+                _volVignette.intensity.Override(Mathf.Lerp(Mathf.Lerp(_dayVignetteIntensity, 0.24f, golden), 0.10f, nightFactor));
             }
 
             if (_volLiftGammaGain != null)
             {
                 _volLiftGammaGain.active = true;
-                // Gentle gamma midtone lift + 1% shadow floor prevents ACES black crush without milky haze
+                // Gentle warm golden-hour gain & crisp readable night shadow lift
                 _volLiftGammaGain.lift.Override(Vector4.Lerp(new Vector4(1f, 1f, 1f, 0f), new Vector4(1.00f, 1.01f, 1.04f, 0.010f), nightFactor));
-                _volLiftGammaGain.gamma.Override(Vector4.Lerp(new Vector4(1f, 1f, 1f, 0f), new Vector4(1.01f, 1.02f, 1.04f, 0.045f), nightFactor));
+                _volLiftGammaGain.gamma.Override(Vector4.Lerp(new Vector4(1f, 1f, 1f, 0f), new Vector4(1.01f, 1.02f, 1.04f, 0.042f), nightFactor));
+                _volLiftGammaGain.gain.Override(Vector4.Lerp(new Vector4(1f, 1f, 1f, 0f), new Vector4(1.04f, 1.01f, 0.96f, 0.02f), golden));
             }
 
             if (_volBloom != null)
             {
-                _volBloom.threshold.Override(Mathf.Lerp(_dayBloomThreshold, 0.88f, nightFactor));
-                _volBloom.intensity.Override(Mathf.Lerp(_dayBloomIntensity, 0.62f, nightFactor));
+                _volBloom.active = true;
+                float dayThr = Mathf.Lerp(_dayBloomThreshold, 0.88f, golden);
+                float dayInt = Mathf.Lerp(Mathf.Lerp(_dayBloomIntensity, 0.74f, golden), 0.34f, rainMood);
+                _volBloom.threshold.Override(Mathf.Lerp(dayThr, 0.80f, nightFactor));
+                _volBloom.intensity.Override(Mathf.Lerp(dayInt, 0.78f, nightFactor));
+                _volBloom.scatter.Override(Mathf.Lerp(Mathf.Lerp(0.66f, 0.74f, golden), 0.74f, nightFactor));
             }
         }
 
@@ -356,7 +418,10 @@ namespace OurWorld.World
             RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.24f, 0.25f, 0.33f), new Color(0.28f, 0.24f, 0.20f), dayFactor) * sample.AmbientIntensity;
             RenderSettings.ambientIntensity = sample.AmbientIntensity;
             RenderSettings.fogColor = sample.FogColor;
-            RenderSettings.fogDensity = Mathf.Lerp(_baseDayFogDensity, 0.00115f, NightFactor);
+            float rainMistMul = NeighborhoodWeatherSystem.Instance != null &&
+                                NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower
+                ? 1.26f : 1.0f;
+            RenderSettings.fogDensity = Mathf.Lerp(_baseDayFogDensity, 0.00115f, NightFactor) * rainMistMul;
             RenderSettings.reflectionIntensity = Mathf.Lerp(_baseDayReflectionIntensity, 0.46f, NightFactor);
 
             if (_runtimeSkybox != null && _runtimeSkybox.HasProperty(ExposureId))

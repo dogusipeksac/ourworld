@@ -399,12 +399,16 @@ namespace OurWorld.World
             right = transform.TransformPoint(gripCenter + side);
         }
 
+        private float _thrownImpactExpiry;
+        private float _lastPropHitTime = -99f;
+
         public void Throw(Vector3 forwardDir)
         {
             if (!_attached) return;
             Vector3 dir = Vector3.ProjectOnPlane(forwardDir, Vector3.up);
             if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
 
+            _thrownImpactExpiry = Time.time + 2.6f;
             Drop(dir.normalized * throwSpeed + Vector3.up * 3.6f);
             _rb.AddTorque(Random.onUnitSphere * 8f, ForceMode.VelocityChange);
             GameFeelAudio.PlayUiClick();
@@ -518,6 +522,82 @@ namespace OurWorld.World
                 _rb.angularVelocity = Vector3.zero;
                 _rb.position = _spawnPos + Vector3.up * 0.25f;
                 _rb.rotation = _spawnRot;
+            }
+        }
+
+        public void ApplyPunchImpulse(Vector3 strikeDir, bool heavy)
+        {
+            if (_currentlyHeld == this || _rb == null) return;
+            Vector3 flat = strikeDir;
+            flat.y = 0f;
+            if (flat.sqrMagnitude < 0.01f) flat = transform.forward;
+            else flat.Normalize();
+
+            _thrownImpactExpiry = Time.time + 2.4f;
+            _rb.isKinematic = false;
+            float speed = (heavy ? 8.8f : 5.4f) * Mathf.Lerp(1.15f, 0.68f, _carryHeaviness);
+            Vector3 vel = flat * speed + Vector3.up * (heavy ? 3.4f : 2.1f);
+            _rb.linearVelocity = vel;
+            _rb.angularVelocity = Vector3.Cross(Vector3.up, flat) * (heavy ? 11f : 7f) +
+                                  new Vector3(Random.Range(-3f, 3f), Random.Range(-5f, 5f), Random.Range(-3f, 3f));
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (_currentlyHeld == this || collision == null || collision.contactCount == 0) return;
+            if (Time.time > _thrownImpactExpiry || Time.time - _lastPropHitTime < 0.22f) return;
+
+            float relSpeed = collision.relativeVelocity.magnitude;
+            if (relSpeed < 3.0f) return;
+
+            Collider other = collision.collider;
+            if (other == null) return;
+            if (other.GetComponentInParent<PlayerFootController>() != null) return;
+
+            ContactPoint cp = collision.GetContact(0);
+            Vector3 hitDir = _rb != null && _rb.linearVelocity.sqrMagnitude > 0.1f
+                ? _rb.linearVelocity.normalized
+                : -cp.normal;
+            bool heavy = relSpeed >= 6.5f || _carryHeaviness >= 0.55f;
+
+            // 1. Thrown prop strikes a pedestrian -> physical stagger/knockdown & witness reaction!
+            TownPedestrian ped = other.GetComponentInParent<TownPedestrian>();
+            if (ped != null)
+            {
+                _lastPropHitTime = Time.time;
+                _thrownImpactExpiry = 0f;
+                ped.OnPunchedByPlayer(transform.position, hitDir, heavy ? 2 : 1);
+                NeighborhoodConsequenceSystem.EnsureInstance().PlayWoodThud(0.64f);
+                VisualEffectsManager.SpawnCombatImpact(cp.point, hitDir, heavy, new Color(1.0f, 0.72f, 0.24f));
+                return;
+            }
+
+            // 2. Thrown prop strikes a vehicle -> bodywork dent + Car Alarm + vandalism report!
+            OurWorld.Vehicle.VehicleDamageSystem carDmg = other.GetComponentInParent<OurWorld.Vehicle.VehicleDamageSystem>();
+            if (carDmg != null)
+            {
+                _lastPropHitTime = Time.time;
+                _thrownImpactExpiry = 0f;
+                carDmg.ApplyMeleeHit(cp.point, hitDir, heavy ? 2 : 1);
+                NeighborhoodConsequenceSystem conseq = NeighborhoodConsequenceSystem.EnsureInstance();
+                conseq.PlayMetalClang(0.65f);
+                conseq.ReportOffense(
+                    NeighborhoodOffenseKind.VehicleDamage,
+                    cp.point,
+                    propLabel,
+                    repPenalty: 8,
+                    immediateFineTl: 0,
+                    heatDelta: 0.75f);
+                VisualEffectsManager.SpawnCombatImpact(cp.point, -hitDir, heavy, new Color(1.0f, 0.80f, 0.26f));
+                return;
+            }
+
+            // 3. Thrown prop slams into shop windows, doors, poles, or walls (ignore flat ground bounces)
+            if (cp.normal.y < 0.72f)
+            {
+                _lastPropHitTime = Time.time;
+                PlayerFootController foot = PlayerModeController.Instance != null ? PlayerModeController.Instance.FootController : null;
+                NeighborhoodConsequenceSystem.EnsureInstance().HandleWorldObjectHit(other, cp.point, hitDir, heavy, foot);
             }
         }
 

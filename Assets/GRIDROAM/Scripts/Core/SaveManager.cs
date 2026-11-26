@@ -163,6 +163,30 @@ namespace OurWorld.Core
             {
                 Data.bestFishName = string.Empty;
             }
+            if (Data.ownedVehicleIds == null)
+            {
+                Data.ownedVehicleIds = new List<string>();
+            }
+            if (!Data.ownedVehicleIds.Contains("car_classic_sedan"))
+            {
+                Data.ownedVehicleIds.Add("car_classic_sedan");
+            }
+            if (string.IsNullOrWhiteSpace(Data.activeOwnedVehicleId))
+            {
+                Data.activeOwnedVehicleId = "car_classic_sedan";
+            }
+            if (Data.dailyQuestDate == null)
+            {
+                Data.dailyQuestDate = string.Empty;
+            }
+            if (Data.backpackItems == null)
+            {
+                Data.backpackItems = new List<BackpackItemSaveEntry>();
+            }
+            else
+            {
+                Data.backpackItems.RemoveAll(e => e == null || string.IsNullOrEmpty(e.itemId) || e.count <= 0);
+            }
 
             // Forward-compatibility guard: never auto-reset saves written by a newer schema version!
             if (Data.schemaVersion > CurrentSchemaVersion)
@@ -213,6 +237,8 @@ namespace OurWorld.Core
 
             Data.money = Mathf.Max(0, Data.money);
             Data.energy = Mathf.Clamp(Data.energy, 0f, 100f);
+            Data.health = Data.health <= 0.01f ? 100f : Mathf.Clamp(Data.health, 1f, 100f);
+            Data.hunger = Data.hunger <= 0.01f ? 85f : Mathf.Clamp(Data.hunger, 0f, 100f);
             Data.timeOfDayHours = Mathf.Repeat(Data.timeOfDayHours, 24f);
             Data.missionSedanFuel = Mathf.Clamp01(Data.missionSedanFuel);
             Data.savedVehicleFuel = Mathf.Clamp01(Data.savedVehicleFuel);
@@ -285,6 +311,16 @@ namespace OurWorld.Core
             LastMoneyDelta = amount;
             OnMoneyChanged?.Invoke(Data.money);
             Save();
+
+            if (OurWorld.Player.PlayerModeController.Instance != null)
+            {
+                VisualEffectsManager.SpawnFloatingText(
+                    OurWorld.Player.PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 2.18f,
+                    $"+{amount} ₺",
+                    new Color(1.00f, 0.86f, 0.28f),
+                    scale: 0.96f,
+                    duration: 0.95f);
+            }
         }
 
         public bool TrySpend(int cost)
@@ -412,6 +448,8 @@ namespace OurWorld.Core
         public void ResetSave()
         {
             Data = new SaveData();
+            Data.ownedVehicleIds.Add("car_classic_sedan");
+            OurWorld.World.ShootingRangeStore.ResetAll();
             LastMoneyDelta = 0;
 
             try

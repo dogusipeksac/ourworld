@@ -84,6 +84,16 @@ namespace OurWorld.Core
             int newRank = CurrentRankIndex;
             SaveManager.Instance.Save();
 
+            if (PlayerModeController.Instance != null)
+            {
+                VisualEffectsManager.SpawnFloatingText(
+                    PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 2.35f,
+                    $"+{deltaXp} XP",
+                    new Color(0.24f, 0.94f, 0.88f),
+                    scale: 0.88f,
+                    duration: 0.90f);
+            }
+
             if (newRank > oldRank)
             {
                 GameFeelAudio.PlayMilestoneFanfare();
@@ -107,6 +117,23 @@ namespace OurWorld.Core
             {
                 bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
                 PlayerModeController.Instance.RaiseStatusMessage(isEn ? $"{toastPrefix} (+{deltaXp} Reputation)" : $"{toastPrefix} (+{deltaXp} Saygınlık)");
+            }
+        }
+
+        public static void DeductReputation(int amount)
+        {
+            if (amount <= 0 || SaveManager.Instance == null || SaveManager.Instance.Data == null) return;
+            SaveManager.Instance.Data.reputationXp = Mathf.Max(0, SaveManager.Instance.Data.reputationXp - amount);
+            SaveManager.Instance.Save();
+
+            if (PlayerModeController.Instance != null)
+            {
+                VisualEffectsManager.SpawnFloatingText(
+                    PlayerModeController.Instance.ActiveWorldPosition + Vector3.up * 2.28f,
+                    $"-{amount} XP",
+                    new Color(1.0f, 0.34f, 0.30f),
+                    scale: 0.90f,
+                    duration: 0.95f);
             }
         }
     }

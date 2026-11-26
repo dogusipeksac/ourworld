@@ -32,7 +32,7 @@ namespace OurWorld.UI
 
             GameObject btnGo = CreateRoundedPanel("Btn_MainMenu", parent, _roundedCardSprite,
                 new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-28f, -110f), new Vector2(178f, 60f),
+                new Vector2(-24f, -114f), new Vector2(176f, 70f),
                 new Color(0.055f, 0.082f, 0.130f, 0.92f), addBorder: true);
             UnityEngine.UI.Shadow btnSh = btnGo.AddComponent<UnityEngine.UI.Shadow>();
             btnSh.effectColor = new Color(0f, 0f, 0f, 0.42f);

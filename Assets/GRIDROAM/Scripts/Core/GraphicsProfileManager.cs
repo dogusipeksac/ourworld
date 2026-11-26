@@ -29,8 +29,8 @@ namespace OurWorld.Core
         [SerializeField] private int editorTargetFps = 60;
         [SerializeField] private float lowRenderScale = 0.75f;
         [SerializeField] private float lowShadowDistance = 26f;
-        [SerializeField] private float mediumRenderScale = 0.90f;
-        [SerializeField] private float mediumShadowDistance = 45f;
+        [SerializeField] private float mediumRenderScale = 0.96f;
+        [SerializeField] private float mediumShadowDistance = 58f;
 
         public GraphicsTier CurrentTier { get; private set; } = GraphicsTier.Medium;
         public event Action<GraphicsTier> OnTierChanged;
@@ -98,6 +98,10 @@ namespace OurWorld.Core
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
+                if (mainCam.farClipPlane < 720f)
+                {
+                    mainCam.farClipPlane = 720f;
+                }
                 UniversalAdditionalCameraData camData = mainCam.GetUniversalAdditionalCameraData();
                 if (camData != null)
                 {

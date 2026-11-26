@@ -141,9 +141,30 @@ namespace OurWorld.Core
             if (_reloadClickClip != null) Destroy(_reloadClickClip);
             if (_emptyClickClip != null) Destroy(_emptyClickClip);
             if (_rangeBuzzerClip != null) Destroy(_rangeBuzzerClip);
-            if (_hitstopRoutine != null) Time.timeScale = 1f;
+            if (_hitstopRoutine != null)
+            {
+                StopCoroutine(_hitstopRoutine);
+                _hitstopRoutine = null;
+                if (!OurWorld.UI.MainMenuController.IsMenuActive)
+                {
+                    Time.timeScale = 1f;
+                }
+            }
             if (_burstMat != null) Destroy(_burstMat);
             if (Instance == this) Instance = null;
+        }
+
+        private void OnDisable()
+        {
+            if (_hitstopRoutine != null)
+            {
+                StopCoroutine(_hitstopRoutine);
+                _hitstopRoutine = null;
+                if (!OurWorld.UI.MainMenuController.IsMenuActive)
+                {
+                    Time.timeScale = 1f;
+                }
+            }
         }
 
         public static void PlayCoinChime()
@@ -314,12 +335,17 @@ namespace OurWorld.Core
             inst.PlayOneShotPitched(inst._rangeBuzzerClip, 0.38f, 0.99f, 1.01f);
         }
 
-        public static void TriggerHitstop(float unscaledSeconds = 0.042f)
+        public static void TriggerHitstop(float unscaledSeconds = 0.042f, float slowScale = 0.08f)
         {
+            if (OurWorld.UI.MainMenuController.IsMenuActive) return;
             GameFeelAudio inst = EnsureInstance();
             if (!inst.isActiveAndEnabled) return;
+            // Never clobber an external pause (Time.timeScale == 0)
+            if (inst._hitstopRoutine == null && Time.timeScale <= 0.001f) return;
             if (inst._hitstopRoutine != null) inst.StopCoroutine(inst._hitstopRoutine);
-            inst._hitstopRoutine = inst.StartCoroutine(inst.HitstopRoutine(Mathf.Clamp(unscaledSeconds, 0.015f, 0.075f)));
+            inst._hitstopRoutine = inst.StartCoroutine(inst.HitstopRoutine(
+                Mathf.Clamp(unscaledSeconds, 0.015f, 0.075f),
+                Mathf.Clamp(slowScale, 0.05f, 0.45f)));
         }
 
         private IEnumerator DelayedWhistleRoutine(float delay)
@@ -328,18 +354,20 @@ namespace OurWorld.Core
             PlayOneShotPitched(_whistleClip, 0.26f, 1.02f, 1.07f);
         }
 
-        private IEnumerator HitstopRoutine(float duration)
+        private IEnumerator HitstopRoutine(float duration, float slowScale)
         {
-            Time.timeScale = 0.08f;
+            Time.timeScale = slowScale;
             yield return new WaitForSecondsRealtime(duration);
-            Time.timeScale = 1f;
+            if (!OurWorld.UI.MainMenuController.IsMenuActive)
+            {
+                Time.timeScale = 1f;
+            }
             _hitstopRoutine = null;
         }
 
         public static void SpawnBurst(Vector3 worldPos, Color color, int count = 10, float spread = 0.55f)
         {
-            GameFeelAudio inst = EnsureInstance();
-            inst.StartCoroutine(inst.BurstRoutine(worldPos, color, Mathf.Clamp(count, 4, 24), spread));
+            VisualEffectsManager.SpawnGlowBurst(worldPos, color, count, spread);
         }
 
         private void PlayOneShotPitched(AudioClip clip, float volume, float minPitch, float maxPitch)

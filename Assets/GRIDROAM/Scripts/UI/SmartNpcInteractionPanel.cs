@@ -178,6 +178,23 @@ namespace OurWorld.UI
         private DynamicActionMode _currentDynamicMode;
         private int _openedFrame = -1;
         private float _spotCheckTimer;
+        private static readonly HashSet<string> DailyQuestCreditedNpcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static string _creditedNpcDate = string.Empty;
+
+        private static void RecordUniqueNpcChatForDailyQuest(string npcName)
+        {
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+            if (!string.Equals(_creditedNpcDate, today, StringComparison.Ordinal))
+            {
+                _creditedNpcDate = today;
+                DailyQuestCreditedNpcs.Clear();
+            }
+            string key = string.IsNullOrWhiteSpace(npcName) ? "neighbor" : npcName.Trim();
+            if (DailyQuestCreditedNpcs.Add(key))
+            {
+                DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
+            }
+        }
 
         public bool IsOpen => _panelRoot != null && _panelRoot.activeSelf;
 
@@ -231,7 +248,7 @@ namespace OurWorld.UI
                     : "Hey! Az önce yaptığını unutmadım... Ne istiyorsun?")
                 : citizen.GetSmartGreetingLine(isEn);
 
-            DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
+            RecordUniqueNpcChatForDailyQuest(_activeName);
             ShowPanel(opening);
         }
 
@@ -267,7 +284,7 @@ namespace OurWorld.UI
             }
 
             string opening = BuildLivingNpcSmartGreeting(IsEnglish);
-            DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
+            RecordUniqueNpcChatForDailyQuest(_activeName);
             ShowPanel(opening);
         }
 

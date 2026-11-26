@@ -206,6 +206,10 @@ namespace OurWorld.Vehicle
 
             EmitSparks(worldHitPoint, -strikeDirWorld, comboStep >= 2 ? 12 : 6);
             PlayImpactSound(isHeavy: comboStep >= 2, volume: comboStep >= 2 ? 0.56f : 0.42f);
+            if (_vehicle != null && !_vehicle.IsPlayerDriving)
+            {
+                _vehicle.TriggerCarAlarm(7.5f);
+            }
 
             UpdateSmokeState();
             if (_health <= 0.01f && !_warnedStalled && PlayerModeController.Instance != null)

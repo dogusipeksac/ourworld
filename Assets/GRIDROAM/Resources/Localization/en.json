@@ -695,7 +695,7 @@
     },
     {
       "key": "ui.hint.controls_foot",
-      "value": "WASD · Shift Run · Space Jump · LMB Hit/Kick/Throw · E Interact · G FastTravel · T Time · M Map"
+      "value": "WASD Move · Shift Run · Space Jump · LMB Hit/Kick/Throw · E Interact · G FastTravel · T Time · M Map"
     },
     {
       "key": "ui.hint.controls_drive",

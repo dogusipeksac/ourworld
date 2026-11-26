@@ -68,6 +68,89 @@ namespace OurWorld.World
         private float _dogWalkBlend;
         private bool _dogMoving;
         private bool _dogGalloping;
+        private float _dogAngryTimer;
+        private float _dogBiteCooldown;
+        private float _dogHitCooldown;
+        private float _duckHitCooldown;
+
+        public static void CalmShepherdDog()
+        {
+            if (Instance != null)
+            {
+                Instance._dogAngryTimer = 0f;
+                Instance._dogBiteCooldown = 0f;
+            }
+        }
+
+        public void ProvokeShepherdDog(Vector3 attackerPos, bool defendingFarm = false)
+        {
+            if (_shepherdDog == null) return;
+            _dogAngryTimer = 15.0f;
+            _dogBiteCooldown = Mathf.Min(_dogBiteCooldown, 0.45f);
+            NeighborhoodConsequenceSystem.EnsureInstance().PlayDogBark(0.80f);
+            bool en = LocalizationService.IsEnglish;
+            string line = defendingFarm
+                ? (en ? "WOOF! GRRR!! (Defending the farm!)" : "HAV! HAV!! (Çiftliği koruyor!)")
+                : (en ? "GRRR!! WOOF!! 🐾" : "HAV! HIRRR!! 🐾");
+            NpcSpeechBubbleManager.Say(_shepherdDog, "Karabaş", line, 3.0f, NpcBubbleMood.Alert, 1.35f);
+        }
+
+        public bool TryReceivePlayerPunch(Vector3 strikeCenter, float radius, Vector3 attackerPos, Vector3 punchDir, int comboStep)
+        {
+            bool en = LocalizationService.IsEnglish;
+
+            // 1. Check Anatolian Shepherd Dog Karabaş!
+            if (_shepherdDog != null && _dogHitCooldown <= 0f)
+            {
+                Vector3 d = (_shepherdDog.position + Vector3.up * 0.65f) - strikeCenter;
+                if (Mathf.Abs(d.y) < 1.6f)
+                {
+                    d.y = 0f;
+                    float maxR = radius + 0.68f;
+                    if (d.sqrMagnitude <= maxR * maxR)
+                    {
+                        _dogHitCooldown = 0.40f;
+                        ProvokeShepherdDog(attackerPos, defendingFarm: false);
+                        PlayerModeController.Instance?.RaiseStatusMessage(en
+                            ? "🐕 Karabaş is furious and charging at you! (-14 Reputation)"
+                            : "🐕 Çoban köpeği Karabaş öfkeyle üzerine saldırıyor! (-14 Saygınlık)");
+                        NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                            NeighborhoodOffenseKind.HarmAnimal, _shepherdDog.position, "Karabaş", repPenalty: 14, immediateFineTl: 0, heatDelta: 1.3f);
+                        return true;
+                    }
+                }
+            }
+
+            // 2. Check Sultanbeyli Lake Pond Ducks!
+            if (_duckHitCooldown <= 0f)
+            {
+                float duckR = radius + 0.65f;
+                for (int i = 0; i < _ducks.Count; i++)
+                {
+                    Transform duck = _ducks[i].duck;
+                    if (duck == null) continue;
+                    Vector3 d = (duck.position + Vector3.up * 0.25f) - strikeCenter;
+                    if (Mathf.Abs(d.y) > 1.5f) continue;
+                    d.y = 0f;
+                    if (d.sqrMagnitude <= duckR * duckR)
+                    {
+                        _duckHitCooldown = 0.55f;
+                        _duckAngles[i] += 0.95f;
+                        VisualEffectsManager.SpawnWaterSplash(duck.position, bigDive: false);
+                        NeighborhoodConsequenceSystem.EnsureInstance().PlayFarmAlarm(0.55f);
+                        NpcSpeechBubbleManager.Say(duck, en ? "Pond Duck" : "Gölet Ördeği", en ? "QUACK!! 🦆" : "VAK VAK!! 🦆", 2.4f, NpcBubbleMood.Alert, 0.85f);
+                        PlayerModeController.Instance?.RaiseStatusMessage(en
+                            ? "⚠️ You startled the pond duck! (-5 Reputation)"
+                            : "⚠️ Gölet ördeğini ürküttün! (-5 Saygınlık)");
+                        NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                            NeighborhoodOffenseKind.HarmAnimal, duck.position, en ? "Pond Duck" : "Gölet Ördeği", repPenalty: 5, immediateFineTl: 0, heatDelta: 0.6f);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
 
         private Transform _farmRoot;
         private int _spawnedChickens;
@@ -116,6 +199,10 @@ namespace OurWorld.World
 
         private readonly System.Collections.Generic.List<Material> _runtimeMats =
             new System.Collections.Generic.List<Material>(32);
+        private readonly System.Collections.Generic.List<Mesh> _runtimeMeshes =
+            new System.Collections.Generic.List<Mesh>(8);
+        private readonly System.Collections.Generic.List<Texture2D> _runtimeTextures =
+            new System.Collections.Generic.List<Texture2D>(8);
 
         private void OnDestroy()
         {
@@ -125,7 +212,17 @@ namespace OurWorld.World
             {
                 if (_runtimeMats[i] != null) Destroy(_runtimeMats[i]);
             }
+            for (int i = 0; i < _runtimeMeshes.Count; i++)
+            {
+                if (_runtimeMeshes[i] != null) Destroy(_runtimeMeshes[i]);
+            }
+            for (int i = 0; i < _runtimeTextures.Count; i++)
+            {
+                if (_runtimeTextures[i] != null) Destroy(_runtimeTextures[i]);
+            }
             _runtimeMats.Clear();
+            _runtimeMeshes.Clear();
+            _runtimeTextures.Clear();
             if (Instance == this) Instance = null;
         }
 
@@ -144,6 +241,10 @@ namespace OurWorld.World
                 Vector3 p = _lakeSurface.localPosition;
                 p.y = 0.04f + Mathf.Sin(Time.time * 1.4f) * 0.018f;
                 _lakeSurface.localPosition = p;
+                if (_lakeWaterMat != null && _lakeWaterMat.HasProperty("_BaseMap"))
+                {
+                    _lakeWaterMat.SetTextureOffset("_BaseMap", new Vector2(Time.time * 0.022f, Time.time * 0.015f));
+                }
             }
 
             // Gliding & dabbling pond ducks (smooth velocity-aligned facing, dabble slowdown, pier clearance & buoyancy!)
@@ -212,9 +313,76 @@ namespace OurWorld.World
                 }
             }
 
-            // Friendly Anatolian shepherd dog Karabaş: patrols clear of paddock fences & trots/gallops smoothly to greet Deniz!
+            // Anatolian shepherd dog Karabaş: defends the farm furiously when provoked, otherwise greets Deniz!
+            if (_dogHitCooldown > 0f) _dogHitCooldown -= dt;
+            if (_duckHitCooldown > 0f) _duckHitCooldown -= dt;
+            if (_dogBiteCooldown > 0f) _dogBiteCooldown -= dt;
+
             if (_shepherdDog != null)
             {
+                bool dogChasing = false;
+                if (_dogAngryTimer > 0f)
+                {
+                    _dogAngryTimer -= dt;
+                    PlayerModeController pm = PlayerModeController.Instance;
+                    bool stopChase = pm == null || pm.IsModalLocked || pm.CurrentMode != ControlMode.OnFoot ||
+                                     (PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsKnockedOut);
+                    if (stopChase)
+                    {
+                        _dogAngryTimer = 0f;
+                    }
+                    else
+                    {
+                        Vector3 pPos = pm.ActiveWorldPosition;
+                        Vector3 toP = pPos - _shepherdDog.position;
+                        toP.y = 0f;
+                        float pDist = toP.magnitude;
+                        if (pDist > 26f)
+                        {
+                            _dogAngryTimer = 0f;
+                        }
+                        else
+                        {
+                            dogChasing = true;
+                            if (pDist > 0.05f)
+                            {
+                                Vector3 dir = toP / pDist;
+                                _shepherdDog.rotation = Quaternion.Slerp(_shepherdDog.rotation, Quaternion.LookRotation(dir, Vector3.up), 1f - Mathf.Exp(-12f * dt));
+                                if (pDist > 1.25f)
+                                {
+                                    Vector3 next = _shepherdDog.position + dir * (4.85f * dt);
+                                    next.y = _dogHome.y;
+                                    _shepherdDog.position = next;
+                                    if (_shepherdSkel != null && _shepherdSkel.HasClips)
+                                    {
+                                        _shepherdSkel.PlayClip("Gallop", 0.14f, 1.45f);
+                                    }
+                                    else
+                                    {
+                                        _dogWalkPhase += dt * 16f;
+                                        for (int i = 0; i < _shepherdLegs.Count; i++)
+                                        {
+                                            if (_shepherdLegs[i] == null) continue;
+                                            float ang = Mathf.Sin(_dogWalkPhase + DogTrotPhase[i] * Mathf.PI * 2f) * 38f;
+                                            _shepherdLegs[i].localRotation = Quaternion.Euler(ang, 0f, 0f);
+                                        }
+                                    }
+                                }
+                                else if (_dogBiteCooldown <= 0f)
+                                {
+                                    _dogBiteCooldown = 1.45f;
+                                    NeighborhoodConsequenceSystem.EnsureInstance().PlayDogBark(0.82f);
+                                    bool enB = LocalizationService.IsEnglish;
+                                    NpcSpeechBubbleManager.Say(_shepherdDog, "Karabaş", enB ? "CHOMP!! GRRR!!" : "HAV!! ISIRDI!!", 2.0f, NpcBubbleMood.Alert, 1.35f);
+                                    PlayerNeedsController.Instance?.TakeDamage(18f, _shepherdDog.position, enB ? "Karabaş (Guard Dog)" : "Çoban Köpeği Karabaş", heavyHit: true);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!dogChasing)
+                {
                 _dogPhase += dt * 0.52f;
                 // Keep patrol safely between chicken coop fence (x=170) and sheep pen fence (x=180)
                 Vector3 target = _dogHome + new Vector3(Mathf.Sin(_dogPhase) * 2.0f - 1.2f, 0f, Mathf.Cos(_dogPhase * 0.7f) * 3.4f);
@@ -351,6 +519,7 @@ namespace OurWorld.World
                         _shepherdTail.localRotation = Quaternion.Slerp(_shepherdTail.localRotation, targetTail, 1f - Mathf.Exp(-12f * dt));
                     }
                 }
+                }
             }
 
             // Spin auto-sprinklers if unlocked
@@ -371,8 +540,14 @@ namespace OurWorld.World
         {
             Shader lit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
             _meadowMat = MakeMat(lit, "MAT_Exp_Meadow", new Color(0.24f, 0.45f, 0.19f), 0.10f);
-            _hillNearMat = MakeMat(lit, "MAT_Exp_HillNear", new Color(0.20f, 0.40f, 0.18f), 0.08f);
-            _hillFarMat = MakeMat(lit, "MAT_Exp_HillFar", new Color(0.17f, 0.34f, 0.22f), 0.06f);
+            _hillNearMat = MakeMat(lit, "MAT_Exp_HillNear", Color.white, 0.02f);
+            _hillFarMat = MakeMat(lit, "MAT_Exp_HillFar", new Color(0.84f, 0.90f, 0.95f), 0.02f);
+            Texture2D hillNearTex = BuildAydosHillTexture(256, isFarRange: false);
+            Texture2D hillFarTex = BuildAydosHillTexture(256, isFarRange: true);
+            AssignAlbedoTexture(_hillNearMat, hillNearTex, new Vector2(2f, 1f));
+            AssignAlbedoTexture(_hillFarMat, hillFarTex, new Vector2(2f, 1f));
+            DisableDistantSpecular(_hillNearMat);
+            DisableDistantSpecular(_hillFarMat);
             _roadCountryMat = MakeMat(lit, "MAT_Exp_CountryRoad", new Color(0.30f, 0.29f, 0.27f), 0.18f);
             _stonePathMat = MakeMat(lit, "MAT_Exp_StonePath", new Color(0.68f, 0.64f, 0.56f), 0.16f);
             _woodTimberMat = MakeMat(lit, "MAT_Exp_WoodDark", new Color(0.42f, 0.26f, 0.14f), 0.15f);
@@ -389,21 +564,231 @@ namespace OurWorld.World
             _flowerRedMat = MakeMat(lit, "MAT_Exp_FlowerRed", new Color(0.92f, 0.20f, 0.22f), 0.28f);
             _flowerYellowMat = MakeMat(lit, "MAT_Exp_FlowerYellow", new Color(0.98f, 0.82f, 0.18f), 0.28f);
             _flowerPurpleMat = MakeMat(lit, "MAT_Exp_FlowerPurple", new Color(0.64f, 0.34f, 0.88f), 0.28f);
-            _lakeWaterMat = MakeMat(lit, "MAT_Exp_LakeWater", new Color(0.12f, 0.56f, 0.68f), 0.88f);
+            _lakeWaterMat = MakeMat(lit, "MAT_Exp_LakeWater", new Color(0.22f, 0.70f, 0.82f, 0.64f), 0.92f);
+            if (_lakeWaterMat != null)
+            {
+                if (_lakeWaterMat.HasProperty("_Surface")) _lakeWaterMat.SetFloat("_Surface", 1f);
+                if (_lakeWaterMat.HasProperty("_SrcBlend")) _lakeWaterMat.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+                if (_lakeWaterMat.HasProperty("_DstBlend")) _lakeWaterMat.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+                if (_lakeWaterMat.HasProperty("_ZWrite")) _lakeWaterMat.SetInt("_ZWrite", 0);
+                _lakeWaterMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                _lakeWaterMat.renderQueue = (int)RenderQueue.Transparent;
+            }
+            Texture2D lakeTex = BuildLakeRippleTexture(128);
+            AssignAlbedoTexture(_lakeWaterMat, lakeTex, new Vector2(10f, 10f));
             _sandShoreMat = MakeMat(lit, "MAT_Exp_SandShore", new Color(0.78f, 0.72f, 0.56f), 0.14f);
             _tractorRedMat = MakeMat(lit, "MAT_Exp_TractorRed", new Color(0.84f, 0.18f, 0.14f), 0.65f);
             _darkMetalMat = MakeMat(lit, "MAT_Exp_DarkMetal", new Color(0.18f, 0.19f, 0.21f), 0.45f);
         }
 
+        private static void DisableDistantSpecular(Material m)
+        {
+            if (m == null) return;
+            if (m.HasProperty("_SpecularHighlights")) m.SetFloat("_SpecularHighlights", 0f);
+            if (m.HasProperty("_EnvironmentReflections")) m.SetFloat("_EnvironmentReflections", 0f);
+            m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+        }
+
+        private static void AssignAlbedoTexture(Material m, Texture2D tex, Vector2 tiling)
+        {
+            if (m == null || tex == null) return;
+            if (m.HasProperty("_BaseMap"))
+            {
+                m.SetTexture("_BaseMap", tex);
+                m.SetTextureScale("_BaseMap", tiling);
+            }
+            if (m.HasProperty("_MainTex"))
+            {
+                m.SetTexture("_MainTex", tex);
+                m.SetTextureScale("_MainTex", tiling);
+            }
+        }
+
+        /// <summary>
+        /// Generates a natural rolling Anatolian mountain-ridge mesh (unit radius, unit height,
+        /// UV.y = elevation 0..1) so horizon hills read as sculpted forested ridges instead of smooth spheres.
+        /// </summary>
+        private Mesh BuildOrganicMountainMesh(int seed)
+        {
+            const int segs = 22;
+            const int rings = 9;
+            float p1 = seed * 0.73f;
+            float p2 = seed * 1.41f;
+            float p3 = seed * 2.17f;
+
+            var verts = new System.Collections.Generic.List<Vector3>((segs + 1) * (rings + 1));
+            var uvs = new System.Collections.Generic.List<Vector2>((segs + 1) * (rings + 1));
+            var tris = new System.Collections.Generic.List<int>(segs * rings * 6);
+
+            for (int r = 0; r <= rings; r++)
+            {
+                float v = r / (float)rings; // 0 = base skirt, 1 = summit
+                float baseRadius = 1f - v;
+                // Natural bell-ridge profile with broad sweeping foothills and distinct crest
+                float elevProfile = Mathf.Pow(Mathf.Sin(v * Mathf.PI * 0.5f), 1.25f);
+
+                for (int s = 0; s <= segs; s++)
+                {
+                    float u = s / (float)segs;
+                    float theta = u * Mathf.PI * 2f;
+
+                    float ridge1 = Mathf.Sin(theta * 2f + p1) * 0.16f;
+                    float ridge2 = Mathf.Cos(theta * 3f - p2) * 0.11f;
+                    float ridge3 = Mathf.Sin(theta * 5f + p3 + v * 2.4f) * 0.055f;
+
+                    // Shoulder asymmetry tapers smoothly to 0 at summit & base skirt
+                    float midMask = Mathf.Sin(v * Mathf.PI);
+                    float rad = baseRadius * (1f + (ridge1 + ridge2 * 0.8f) * (0.4f + 0.6f * midMask));
+                    float y = elevProfile * (1f + (ridge1 * 0.45f + ridge2 * 0.35f + ridge3) * (0.25f + 0.75f * midMask));
+                    // Secondary shoulder peak offset
+                    float shoulder = Mathf.Exp(-Mathf.Pow(v - 0.55f, 2f) * 16f) * Mathf.Max(0f, Mathf.Cos(theta - p1)) * 0.22f;
+                    y = Mathf.Max(0f, y + shoulder);
+
+                    verts.Add(new Vector3(Mathf.Cos(theta) * rad, y, Mathf.Sin(theta) * rad));
+                    uvs.Add(new Vector2(u, Mathf.Clamp01(y)));
+                }
+            }
+
+            int stride = segs + 1;
+            for (int r = 0; r < rings; r++)
+            {
+                for (int s = 0; s < segs; s++)
+                {
+                    int a = r * stride + s;
+                    int b = a + 1;
+                    int c = (r + 1) * stride + s;
+                    int d = c + 1;
+                    tris.Add(a); tris.Add(c); tris.Add(b);
+                    tris.Add(b); tris.Add(c); tris.Add(d);
+                }
+            }
+
+            Mesh mesh = new Mesh { name = $"AydosRidgeMesh_{seed}" };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            _runtimeMeshes.Add(mesh);
+            return mesh;
+        }
+
+        /// <summary>
+        /// Pure-albedo procedural pine-forest + olive scrub + sunlit limestone ridge texture
+        /// (zero normal map = zero distance shimmer on mobile/desktop!).
+        /// </summary>
+        private Texture2D BuildAydosHillTexture(int size, bool isFarRange)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGB24, true)
+            {
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear
+            };
+            _runtimeTextures.Add(tex);
+
+            Color forestLow = isFarRange ? new Color(0.16f, 0.28f, 0.24f) : new Color(0.14f, 0.31f, 0.14f);
+            Color pineMid   = isFarRange ? new Color(0.22f, 0.34f, 0.27f) : new Color(0.22f, 0.42f, 0.17f);
+            Color oliveHi   = isFarRange ? new Color(0.32f, 0.40f, 0.33f) : new Color(0.36f, 0.46f, 0.23f);
+            Color rockRidge = isFarRange ? new Color(0.46f, 0.50f, 0.48f) : new Color(0.56f, 0.52f, 0.40f);
+
+            Color[] pix = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float v = y / (float)(size - 1); // 0 = foothill forest, 1 = sunlit ridge crest
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size;
+                    // Seamless periodic tree-canopy dapple using trigonometric harmonics + Perlin
+                    float canopy = 0.5f
+                        + 0.25f * Mathf.Sin(u * Mathf.PI * 12f + Mathf.Sin(v * 14f) * 1.4f)
+                        + 0.15f * Mathf.Cos(u * Mathf.PI * 24f - v * 28f)
+                        + 0.10f * Mathf.PerlinNoise(u * 10f + 3.1f, v * 10f + 7.4f);
+
+                    float elev = Mathf.Clamp01(v + (canopy - 0.5f) * 0.22f);
+                    Color c;
+                    if (elev < 0.42f)
+                    {
+                        c = Color.Lerp(forestLow, pineMid, elev / 0.42f);
+                    }
+                    else if (elev < 0.76f)
+                    {
+                        c = Color.Lerp(pineMid, oliveHi, (elev - 0.42f) / 0.34f);
+                    }
+                    else
+                    {
+                        c = Color.Lerp(oliveHi, rockRidge, (elev - 0.76f) / 0.24f);
+                    }
+
+                    // Subtle dappled pine shadows so slopes feel richly vegetated from any distance
+                    float dapple = Mathf.Lerp(0.84f, 1.12f, Mathf.Clamp01(canopy));
+                    pix[y * size + x] = c * dapple;
+                }
+            }
+            tex.SetPixels(pix);
+            tex.Apply(true, false);
+            return tex;
+        }
+
+        private Texture2D BuildLakeRippleTexture(int size)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGB24, true)
+            {
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear
+            };
+            _runtimeTextures.Add(tex);
+
+            Color deepAqua = new Color(0.32f, 0.72f, 0.84f);
+            Color crestGlint = new Color(0.88f, 0.98f, 1.00f);
+
+            Color[] pix = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float v = y / (float)size;
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x / (float)size;
+                    float w1 = Mathf.Sin((u * 4f + v * 2f) * Mathf.PI * 2f);
+                    float w2 = Mathf.Cos((u * 3f - v * 5f) * Mathf.PI * 2f);
+                    float w3 = Mathf.Sin((u * 7f + v * 6f) * Mathf.PI * 2f);
+                    float caustic = Mathf.Pow(Mathf.Clamp01((w1 + w2 + w3 * 0.6f) * 0.25f + 0.5f), 2.8f);
+                    pix[y * size + x] = Color.Lerp(deepAqua, crestGlint, caustic * 0.55f);
+                }
+            }
+            tex.SetPixels(pix);
+            tex.Apply(true, false);
+            return tex;
+        }
+
         private static void ClearLegacyTightPerimeterWalls()
         {
-            string[] legacyPerimeters = { "Hamidiye_DistrictPerimeter", "World_CountryFencePerimeter" };
-            for (int i = 0; i < legacyPerimeters.Length; i++)
+            string[] legacyObstacles =
             {
-                GameObject old = GameObject.Find(legacyPerimeters[i]);
+                "Hamidiye_DistrictPerimeter",
+                "World_CountryFencePerimeter",
+                // Legacy West-side street kiosks that overlapped the expanded Sultanbeyli Lake promenade & south gazebo
+                "Eyyubi_WestBufe_3",
+                "Eyyubi_WestBufe_4",
+                "Eyyubi_WestBufe_5"
+            };
+            for (int i = 0; i < legacyObstacles.Length; i++)
+            {
+                GameObject old = GameObject.Find(legacyObstacles[i]);
                 if (old != null)
                 {
                     old.SetActive(false);
+                }
+            }
+
+            // Offset Havadis_Mailbox cleanly away from Hamidiye_AveLamp_01 (-56.0, 180.5) so the streetlamp pole doesn't impale it!
+            GameObject mailbox = GameObject.Find("Havadis_Mailbox");
+            if (mailbox != null)
+            {
+                Vector3 mp = mailbox.transform.position;
+                if (Mathf.Abs(mp.x + 56.0f) < 0.8f && Mathf.Abs(mp.z - 180.6f) < 0.8f)
+                {
+                    mailbox.transform.position = new Vector3(-53.6f, mp.y, mp.z);
                 }
             }
         }
@@ -416,44 +801,93 @@ namespace OurWorld.World
             Transform envRoot = new GameObject("ValleyGroundAndAydosHills").transform;
             envRoot.SetParent(transform, false);
 
-            // Large walkable lush valley ground right under existing scene floor (-0.045 so zero z-fighting!)
-            GameObject ground = CreateBox("ExpandedValleyFloor", envRoot, new Vector3(0f, -0.545f, 0f),
-                new Vector3(980f, 1.0f, 980f), _meadowMat, collider: true);
-            ground.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            // Walkable lush valley ground split into 4 slabs leaving an open 48x36m swimming basin
+            // directly under Sultanbeyli Lake (X:-222..-174, Z:-18..+18) so players can genuinely swim & dive!
+            (string name, Vector3 pos, Vector3 size)[] valleySlabs =
+            {
+                ("ExpandedValleyFloor_East",  new Vector3( 158f, -0.545f,    0f), new Vector3(664f, 1.0f, 980f)),
+                ("ExpandedValleyFloor_West",  new Vector3(-356f, -0.545f,    0f), new Vector3(268f, 1.0f, 980f)),
+                ("ExpandedValleyFloor_North", new Vector3(-198f, -0.545f,  254f), new Vector3( 48f, 1.0f, 472f)),
+                ("ExpandedValleyFloor_South", new Vector3(-198f, -0.545f, -254f), new Vector3( 48f, 1.0f, 472f))
+            };
+            for (int s = 0; s < valleySlabs.Length; s++)
+            {
+                GameObject slab = CreateBox(valleySlabs[s].name, envRoot, valleySlabs[s].pos, valleySlabs[s].size, _meadowMat, collider: true);
+                slab.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            }
+            // Sunlit sandy lakebed floor at Y = -1.70m so underwater pearls & M23 sunken watch are reachable and visible!
+            GameObject lakeBed = CreateBox("SultanbeyliLakeBed", envRoot, new Vector3(-198f, -1.95f, 0f),
+                new Vector3(54f, 0.50f, 42f), _sandShoreMat, collider: true);
+            lakeBed.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
 
-            // 28 layered rolling sunlit Aydos Hills encircling the 360-degree horizon safely OUTSIDE ±250m!
+            // 3 sculpted organic Anatolian mountain-ridge meshes reused across all 28 horizon hills!
+            Mesh[] hillMeshes =
+            {
+                BuildOrganicMountainMesh(101),
+                BuildOrganicMountainMesh(202),
+                BuildOrganicMountainMesh(303)
+            };
+
+            // 28 layered rolling sunlit Aydos Mountain Ridges encircling the 360-degree horizon safely OUTSIDE ±250m!
             System.Random rng = new System.Random(1453);
             for (int i = 0; i < 28; i++)
             {
                 float angle = (i / 28f) * Mathf.PI * 2f + (float)(rng.NextDouble() * 0.12 - 0.06);
                 bool outer = (i % 2) == 1;
-                float dist = outer ? 410f + (float)rng.NextDouble() * 40f : 345f + (float)rng.NextDouble() * 28f;
+                float dist = outer ? 415f + (float)rng.NextDouble() * 42f : 345f + (float)rng.NextDouble() * 28f;
                 float hx = Mathf.Cos(angle) * dist;
                 float hz = Mathf.Sin(angle) * dist;
-                float radiusX = 58f + (float)rng.NextDouble() * 26f;
-                float radiusZ = 52f + (float)rng.NextDouble() * 26f;
-                float height = outer ? (38f + (float)rng.NextDouble() * 26f) : (20f + (float)rng.NextDouble() * 16f);
+                float radiusX = 72f + (float)rng.NextDouble() * 34f;
+                float radiusZ = 64f + (float)rng.NextDouble() * 32f;
+                float height = outer ? (46f + (float)rng.NextDouble() * 34f) : (24f + (float)rng.NextDouble() * 18f);
 
-                GameObject hill = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                hill.name = $"AydosHill_{i:00}";
+                // Keep Aydos horizon slopes & hilltop pines completely clear of Aydos Shooting Range (X:64..140, Z:-342..-200)
+                float hillFootprint = Mathf.Max(radiusX, radiusZ) + 22f;
+                for (int push = 0; push < 6; push++)
+                {
+                    float cx = Mathf.Clamp(hx, 64f, 140f);
+                    float cz = Mathf.Clamp(hz, -342f, -200f);
+                    float dx = hx - cx;
+                    float dz = hz - cz;
+                    if (dx * dx + dz * dz >= hillFootprint * hillFootprint) break;
+                    dist += 40f;
+                    hx = Mathf.Cos(angle) * dist;
+                    hz = Mathf.Sin(angle) * dist;
+                }
+
+                GameObject hill = new GameObject($"AydosHill_{i:00}");
                 hill.transform.SetParent(envRoot, false);
-                hill.transform.position = new Vector3(hx, -height * 0.22f, hz);
-                hill.transform.localScale = new Vector3(radiusX * 2f, height * 1.4f, radiusZ * 2f);
-                Destroy(hill.GetComponent<Collider>());
-                MeshRenderer hr = hill.GetComponent<MeshRenderer>();
+                hill.transform.position = new Vector3(hx, -2.0f, hz);
+                hill.transform.rotation = Quaternion.Euler(0f, (float)(rng.NextDouble() * 360.0), 0f);
+                hill.transform.localScale = new Vector3(radiusX, height, radiusZ);
+                hill.AddComponent<MeshFilter>().sharedMesh = hillMeshes[i % hillMeshes.Length];
+                MeshRenderer hr = hill.AddComponent<MeshRenderer>();
                 hr.sharedMaterial = outer ? _hillFarMat : _hillNearMat;
                 hr.shadowCastingMode = ShadowCastingMode.Off;
+                hr.receiveShadows = false;
+                hr.reflectionProbeUsage = ReflectionProbeUsage.Off;
+                hr.lightProbeUsage = LightProbeUsage.Off;
 
-                // Hilltop pine trees on inner hills for rich Istanbul Aydos Forest skyline!
+                // Hilltop cypress & pine forest silhouettes on inner hills for rich Istanbul Aydos skyline!
                 if (!outer)
                 {
-                    for (int t = 0; t < 4; t++)
+                    for (int t = 0; t < 6; t++)
                     {
-                        float ox = (float)(rng.NextDouble() * 28.0 - 14.0);
-                        float oz = (float)(rng.NextDouble() * 28.0 - 14.0);
-                        SpawnPineTree(envRoot, new Vector3(hx + ox, height * 0.38f, hz + oz), 1.4f + (float)rng.NextDouble() * 0.8f);
+                        float ta = (t / 6f) * Mathf.PI * 2f + (float)rng.NextDouble() * 0.6f;
+                        float tr = 8f + (float)rng.NextDouble() * 22f;
+                        float ox = Mathf.Cos(ta) * tr;
+                        float oz = Mathf.Sin(ta) * tr;
+                        float treeY = Mathf.Lerp(height * 0.72f, height * 0.36f, tr / 34f);
+                        SpawnPineTree(envRoot, new Vector3(hx + ox, treeY, hz + oz), 1.6f + (float)rng.NextDouble() * 1.0f);
                     }
                 }
+            }
+
+            // Ensure main camera far clip plane comfortably clears the outer 450m Aydos Hills even from Atlas AVM / Gölet
+            Camera mainCam = Camera.main;
+            if (mainCam != null && mainCam.farClipPlane < 720f)
+            {
+                mainCam.farClipPlane = 720f;
             }
         }
 
@@ -494,7 +928,7 @@ namespace OurWorld.World
 
             // Cute cherry-blossom tree + flowerbed + cozy warm garden lantern framing Deniz's home garden
             SpawnBlossomTree(homeRoot, new Vector3(-59.2f, 0f, 13.8f), 0.92f);
-            SpawnFlowerBed(homeRoot, new Vector3(-51.4f, 0.02f, 6.8f), 0f);
+            SpawnFlowerBed(homeRoot, new Vector3(-53.2f, 0.02f, 6.1f), 0f);
             SpawnFarmLantern(homeRoot, new Vector3(-52.4f, 0f, 12.8f));
         }
 
@@ -1042,19 +1476,27 @@ namespace OurWorld.World
             CreateBox("LakeBoulevard", lakeRoot, new Vector3(-138f, 0.02f, 0f), new Vector3(56f, 0.04f, 8.6f), _roadCountryMat, collider: false);
             CreateBox("LakePromenade", lakeRoot, new Vector3(-168f, 0.025f, 0f), new Vector3(8.5f, 0.05f, 38f), _stonePathMat, collider: false);
 
-            // Shimmering Turquoise Pond (-198, 0, 0) + Sandy Shore Rim
-            CreateCylinder("LakeShore", lakeRoot, new Vector3(-198f, 0.01f, 0f), new Vector3(62f, 0.02f, 48f), _sandShoreMat, collider: false);
+            // Shimmering Translucent Turquoise Pond (-198, 0, 0) + Sandy Shore Rim & Sloped Wade-In Banks!
+            CreateBox("LakeShore_East",  lakeRoot, new Vector3(-171.5f, -0.025f,   0f), new Vector3(5.5f, 0.04f, 46f), _sandShoreMat, collider: false);
+            CreateBox("LakeShore_West",  lakeRoot, new Vector3(-225.0f, -0.025f,   0f), new Vector3(6.5f, 0.04f, 46f), _sandShoreMat, collider: false);
+            CreateBox("LakeShore_North", lakeRoot, new Vector3(-198.0f, -0.025f,  20.5f), new Vector3(56f, 0.04f, 5.5f), _sandShoreMat, collider: false);
+            CreateBox("LakeShore_South", lakeRoot, new Vector3(-198.0f, -0.025f, -20.5f), new Vector3(56f, 0.04f, 5.5f), _sandShoreMat, collider: false);
+            // Gentle sandy underwater shore slopes around all 4 edges so players can wade/swim straight back onto land anywhere!
+            CreateBox("LakeBankRamp_East",  lakeRoot, new Vector3(-176.5f, -0.92f,   0f), new Vector3(5.8f, 0.24f, 36f), _sandShoreMat, collider: true).transform.localRotation = Quaternion.Euler(0f, 0f, 18f);
+            CreateBox("LakeBankRamp_West",  lakeRoot, new Vector3(-219.5f, -0.92f,   0f), new Vector3(5.8f, 0.24f, 36f), _sandShoreMat, collider: true).transform.localRotation = Quaternion.Euler(0f, 0f, -18f);
+            CreateBox("LakeBankRamp_North", lakeRoot, new Vector3(-198.0f, -0.92f,  15.5f), new Vector3(48f, 0.24f, 5.8f), _sandShoreMat, collider: true).transform.localRotation = Quaternion.Euler(-18f, 0f, 0f);
+            CreateBox("LakeBankRamp_South", lakeRoot, new Vector3(-198.0f, -0.92f, -15.5f), new Vector3(48f, 0.24f, 5.8f), _sandShoreMat, collider: true).transform.localRotation = Quaternion.Euler(18f, 0f, 0f);
             GameObject water = CreateCylinder("LakeWater", lakeRoot, new Vector3(-198f, 0.04f, 0f), new Vector3(56f, 0.04f, 42f), _lakeWaterMat, collider: false);
             _lakeSurface = water.transform;
 
-            // Wooden Viewing Pier jutting out over the turquoise lake!
+            // Wooden Viewing Pier jutting out over the turquoise lake (pilings grounded deep into sandy lakebed!)
             CreateBox("PierDeck", lakeRoot, new Vector3(-175.5f, 0.36f, 0f), new Vector3(15f, 0.16f, 4.2f), _woodLightMat, collider: true);
             CreateBox("PierRamp", lakeRoot, new Vector3(-167.2f, 0.18f, 0f), new Vector3(2.2f, 0.14f, 4.2f), _woodLightMat, collider: true).transform.localRotation = Quaternion.Euler(0f, 0f, 10f);
             for (int p = 0; p < 4; p++)
             {
                 float px = -170f - p * 4.0f;
-                CreateCylinder($"PierPilingN_{p}", lakeRoot, new Vector3(px, 0.25f,  1.95f), new Vector3(0.22f, 0.65f, 0.22f), _woodTimberMat, collider: false);
-                CreateCylinder($"PierPilingS_{p}", lakeRoot, new Vector3(px, 0.25f, -1.95f), new Vector3(0.22f, 0.65f, 0.22f), _woodTimberMat, collider: false);
+                CreateCylinder($"PierPilingN_{p}", lakeRoot, new Vector3(px, -0.52f,  1.95f), new Vector3(0.22f, 1.42f, 0.22f), _woodTimberMat, collider: false);
+                CreateCylinder($"PierPilingS_{p}", lakeRoot, new Vector3(px, -0.52f, -1.95f), new Vector3(0.22f, 1.42f, 0.22f), _woodTimberMat, collider: false);
             }
             SpawnFarmLantern(lakeRoot, new Vector3(-182.2f, 0.44f,  1.8f));
             SpawnFarmLantern(lakeRoot, new Vector3(-182.2f, 0.44f, -1.8f));

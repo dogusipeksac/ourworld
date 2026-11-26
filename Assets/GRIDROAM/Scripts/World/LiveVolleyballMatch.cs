@@ -1380,8 +1380,11 @@ namespace OurWorld.World
 
             if (_player != null || IsPlayerNear(24f))
             {
+                Vector3 impactWorld = transform.TransformPoint(burstPos + Vector3.up * 0.4f);
+                SportsArenaAtmosphere.SpawnSandSplash(transform.TransformPoint(burstPos), heavy: true);
+                SportsArenaAtmosphere.CelebrateEvent(transform.position, "volleyball", tealWon, bigPlay: _rallyCount >= 3 || _matchOver);
                 GameFeelAudio.SpawnBurst(
-                    transform.TransformPoint(burstPos + Vector3.up * 0.4f),
+                    impactWorld,
                     tealWon ? new Color(0.18f, 0.88f, 0.78f) : new Color(0.78f, 0.22f, 0.34f),
                     count: 16, spread: 0.60f);
             }

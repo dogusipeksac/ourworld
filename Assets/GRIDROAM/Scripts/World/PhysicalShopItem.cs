@@ -21,7 +21,11 @@ namespace OurWorld.World
         private ShopPropVisual _visual = ShopPropVisual.WaterBottle;
         private int _jacketColorIndex;
         private bool _requiresCheckout;
+        private int _reputationXp;
+        private bool _isTryOnWearable;
+        private string _storeName;
         private bool _lastTagWasEn;
+        private bool _lastWearingTrial;
 
         private static readonly System.Collections.Generic.Dictionary<string, string> EnItemNames =
             new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.Ordinal)
@@ -33,6 +37,7 @@ namespace OurWorld.World
                 { "Soğuk Gazoz", "Chilled Soda" },
                 { "Taze Portakal", "Fresh Orange" },
                 { "Aydos Elması", "Aydos Apple" },
+                { "Meyve Çantası", "Fruit Bag" },
                 { "Vitamin Sepeti", "Vitamin Basket" },
                 { "Ezine Peynir & Zeytin", "Ezine Cheese & Olives" },
                 { "Sucuklu Tost", "Sucuk Toast" },
@@ -79,10 +84,16 @@ namespace OurWorld.World
             bool requiresCheckout,
             int jacketColorIndex = 0,
             float interactionRadius = 2.05f,
-            float visualScale = 1.05f)
+            float visualScale = 1.05f,
+            string itemNameEn = null,
+            int reputationXp = 0,
+            bool isTryOnWearable = false,
+            string storeName = null)
         {
             _itemName = itemName;
-            _itemNameEn = EnItemNames.TryGetValue(itemName ?? string.Empty, out string mappedEn) ? mappedEn : itemName;
+            _itemNameEn = !string.IsNullOrEmpty(itemNameEn)
+                ? itemNameEn
+                : (EnItemNames.TryGetValue(itemName ?? string.Empty, out string mappedEn) ? mappedEn : itemName);
             _price = price;
             _effect = effect;
             _effectParam = effectParam;
@@ -90,6 +101,9 @@ namespace OurWorld.World
             _visual = visual;
             _requiresCheckout = requiresCheckout;
             _jacketColorIndex = jacketColorIndex;
+            _reputationXp = reputationXp;
+            _isTryOnWearable = isTryOnWearable;
+            _storeName = storeName ?? string.Empty;
 
             _visualRoot = ShopPropFactory.BuildProp(transform, visual, Vector3.zero, visualScale, jacketColorIndex);
             _baseVisualScale = _visualRoot != null ? _visualRoot.transform.localScale : Vector3.one;
@@ -101,10 +115,69 @@ namespace OurWorld.World
             {
                 _trigger = gameObject.AddComponent<InteractableTrigger>();
             }
-            string verbTr = requiresCheckout ? "Eline Al" : "Satın Al";
-            string verbEn = requiresCheckout ? "Pick Up" : "Buy";
             _trigger.Configure(InteractableKind.ShopItem, $"shopitem_{itemName}".ToLowerInvariant(), "ui.btn.shop", interactionRadius);
-            _trigger.SetCustomPrompt($"{verbTr}: {_itemName} · {price} ₺", $"{verbEn}: {_itemNameEn} · {price} ₺");
+            RefreshPromptAndTag(force: true);
+        }
+
+        private void RefreshPromptAndTag(bool force = false)
+        {
+            bool isEnNow = IsEn;
+            bool wearingTrial = _isTryOnWearable && _requiresCheckout &&
+                                PlayerShoppingCart.IsWearingUnpaidTrial(_effect, _jacketColorIndex);
+
+            if (!force && isEnNow == _lastTagWasEn && wearingTrial == _lastWearingTrial) return;
+            _lastTagWasEn = isEnNow;
+            _lastWearingTrial = wearingTrial;
+
+            if (_trigger != null)
+            {
+                if (wearingTrial)
+                {
+                    _trigger.SetCustomPrompt(
+                        $"Çıkar & Stanta Bırak: {_itemName}",
+                        $"Take Off & Return: {_itemNameEn}");
+                }
+                else if (_isTryOnWearable && _requiresCheckout)
+                {
+                    _trigger.SetCustomPrompt(
+                        $"3D Dene: {_itemName} · {_price} ₺",
+                        $"Try On (3D): {_itemNameEn} · {_price} ₺");
+                }
+                else
+                {
+                    string verbTr = _requiresCheckout ? "Eline Al" : "Satın Al";
+                    string verbEn = _requiresCheckout ? "Pick Up" : "Buy";
+                    _trigger.SetCustomPrompt(
+                        $"{verbTr}: {_itemName} · {_price} ₺",
+                        $"{verbEn}: {_itemNameEn} · {_price} ₺");
+                }
+            }
+
+            if (_priceTagText != null)
+            {
+                if (wearingTrial)
+                {
+                    _priceTagText.text = isEnNow
+                        ? $"{_itemNameEn}\n✓ Wearing · Pay at Register"
+                        : $"{_itemName}\n✓ Üzerinde · Kasada Öde";
+                }
+                else if (_isTryOnWearable && _requiresCheckout)
+                {
+                    _priceTagText.text = isEnNow
+                        ? $"{_itemNameEn}\nTRY ON · {_price} ₺"
+                        : $"{_itemName}\nDENE · {_price} ₺";
+                }
+                else
+                {
+                    _priceTagText.text = $"{LocalizedName}\n{_price} ₺";
+                }
+            }
+
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (mode != null && _trigger != null && mode.NearestInteractable == _trigger)
+            {
+                mode.RefreshCurrentInteractPrompt();
+            }
         }
 
         private void BuildWorldPriceTag()
@@ -176,17 +249,15 @@ namespace OurWorld.World
                     _baseVisualScale * targetMul,
                     1f - Mathf.Exp(-12f * Time.deltaTime));
             }
+            if (showTag || isTargeted)
+            {
+                RefreshPromptAndTag();
+            }
             if (_priceTagText != null && showTag)
             {
-                bool isEnNow = IsEn;
-                if (isEnNow != _lastTagWasEn)
-                {
-                    _lastTagWasEn = isEnNow;
-                    _priceTagText.text = $"{LocalizedName}\n{_price} ₺";
-                }
-                _priceTagText.color = isTargeted
-                    ? new Color(1.0f, 0.88f, 0.24f)
-                    : new Color(0.95f, 0.96f, 0.98f);
+                _priceTagText.color = _lastWearingTrial
+                    ? new Color(0.32f, 0.96f, 0.62f)
+                    : (isTargeted ? new Color(1.0f, 0.88f, 0.24f) : new Color(0.95f, 0.96f, 0.98f));
             }
         }
 
@@ -209,36 +280,85 @@ namespace OurWorld.World
                 mode.RaiseStatusMessage(isEn ? "Turbo Engine Kit is already installed on your car!" : "Turbo Motor Kiti aracında zaten takılı!");
                 return;
             }
+            if (_effect == ShopItemEffect.Sunglasses && data.ownsSunglasses)
+            {
+                mode.RaiseStatusMessage(isEn
+                    ? "You already own Polarized Sunglasses! Toggle them anytime at Barber Tuncay."
+                    : "Polarize Güneş Gözlüğüne zaten sahipsin! Berber Tuncay'dan takıp çıkarabilirsin.");
+                return;
+            }
+            if (_effect == ShopItemEffect.StreetCap && data.ownsStreetCap)
+            {
+                mode.RaiseStatusMessage(isEn
+                    ? "You already own the 3D Street Cap! Toggle it anytime at Barber Tuncay."
+                    : "3D Sokak Şapkasına zaten sahipsin! Berber Tuncay'dan takıp çıkarabilirsin.");
+                return;
+            }
+            if (_effect == ShopItemEffect.JacketColor &&
+                data.playerJacketColorIndex == _jacketColorIndex &&
+                !PlayerShoppingCart.IsWearingUnpaidTrial(ShopItemEffect.JacketColor, _jacketColorIndex))
+            {
+                mode.RaiseStatusMessage(isEn
+                    ? $"You are already wearing {dispName}!"
+                    : $"{dispName} zaten senin kayıtlı ceketin!");
+                return;
+            }
 
-            // FLOW 1: Supermarket shelf/fridge/manav — physically pick the item off the shelf and carry it to Kasa!
+            // FLOW 1: Retail store stand / supermarket shelf — physically pick up or Try On in 3D, then pay at Checkout!
             if (_requiresCheckout)
             {
                 PlayerShoppingCart cart = PlayerShoppingCart.GetOrCreate(mode);
                 if (cart == null) return;
 
+                if (_isTryOnWearable && PlayerShoppingCart.IsWearingUnpaidTrial(_effect, _jacketColorIndex))
+                {
+                    PlayerActionAnimator.Play(mode, transform, PlayerActionKind.ChangeOutfit, onClimax: () =>
+                    {
+                        PlayerShoppingCart.TryTakeOffTrialItem(mode, _effect, _jacketColorIndex);
+                        RefreshPromptAndTag(force: true);
+                    }, startStatus: isEn ? $"Taking off {dispName}..." : $"{dispName} çıkarılıyor...");
+                    return;
+                }
+
                 ShopCartItem entry = new ShopCartItem
                 {
                     Name = dispName,
+                    NameTr = _itemName,
+                    NameEn = _itemNameEn,
                     Price = _price,
                     Effect = _effect,
                     EffectParam = _effectParam,
                     ConsumeKind = _consumeKind,
                     Visual = _visual,
-                    JacketColorIndex = _jacketColorIndex
+                    JacketColorIndex = _jacketColorIndex,
+                    ReputationXp = _reputationXp,
+                    IsTryOnWearable = _isTryOnWearable,
+                    SourceStoreName = _storeName
                 };
 
-                PlayerActionAnimator.Play(mode, transform, PlayerActionKind.InspectReach, onClimax: () =>
+                PlayerActionKind reachAnim = _isTryOnWearable ? PlayerActionKind.ChangeOutfit : PlayerActionKind.InspectReach;
+                string statusStr = _isTryOnWearable
+                    ? (isEn ? $"Trying on {dispName}..." : $"{dispName} üzerinde deneniyor...")
+                    : (isEn ? $"Picking up {dispName}..." : $"Raftan {dispName} alınıyor...");
+
+                PlayerActionAnimator.Play(mode, transform, reachAnim, onClimax: () =>
                 {
                     if (cart.TryAddItem(mode, entry, transform.position))
                     {
-                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.12f, new Color(0.45f, 0.88f, 0.98f), count: 7, spread: 0.22f);
-                        StartCoroutine(RestockRoutine(10f));
+                        Color fxCol = _isTryOnWearable ? new Color(0.32f, 0.95f, 0.68f) : new Color(0.45f, 0.88f, 0.98f);
+                        GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.14f, fxCol, count: 8, spread: 0.24f);
+                        RefreshPromptAndTag(force: true);
+                        // Keep Try-On display samples visible on the stand so you can compare colors or return them!
+                        if (!_isTryOnWearable)
+                        {
+                            StartCoroutine(RestockRoutine(10f));
+                        }
                     }
-                }, startStatus: isEn ? $"Picking up {dispName}..." : $"Raftan {dispName} alınıyor...");
+                }, startStatus: statusStr);
                 return;
             }
 
-            // FLOW 2: Direct over-the-counter / street stall purchase — reach, pay & use immediately!
+            // FLOW 2: Direct over-the-counter / cafe / food court / street stall purchase — reach, pay & use immediately!
             if (data.money < _price)
             {
                 mode.RaiseStatusMessage(isEn
@@ -255,11 +375,41 @@ namespace OurWorld.World
                     mode.RaiseStatusMessage(isEn ? "Not enough cash!" : "Yetersiz bakiye!");
                     return;
                 }
+                if (_reputationXp > 0)
+                {
+                    NeighborhoodReputation.AddReputation(_reputationXp);
+                }
+                if (!string.IsNullOrEmpty(_storeName))
+                {
+                    DailyQuestAndAchievementSystem.RecordMallPurchase();
+                }
                 GameFeelAudio.PlayCoinChime();
                 GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.2f, new Color(0.98f, 0.84f, 0.28f), count: 10, spread: 0.35f);
-                mode.RaiseStatusMessage(isEn ? $"Bought {dispName} (-{_price} ₺) · Enjoy!" : $"{dispName} alındı (-{_price} ₺) · Afiyet olsun!");
+                string xpNote = _reputationXp > 0 ? $" · +{_reputationXp} XP" : string.Empty;
                 StartCoroutine(RestockRoutine(8f));
 
+                ShopCartItem directPackCheck = new ShopCartItem
+                {
+                    Name = dispName,
+                    NameTr = _itemName,
+                    NameEn = _itemNameEn,
+                    Price = _price,
+                    Effect = _effect,
+                    EffectParam = _effectParam,
+                    ConsumeKind = _consumeKind,
+                    Visual = _visual,
+                    SourceStoreName = _storeName
+                };
+                if (PlayerBackpackInventory.ShouldPackIntoBackpack(directPackCheck, isCheckoutStore: false))
+                {
+                    int servings = PlayerBackpackInventory.EnsureInstance().AddFromShopCartItem(directPackCheck);
+                    mode.RaiseStatusMessage(isEn
+                        ? $"You're full — packed {dispName} (×{servings}) into your Backpack! (-{_price} ₺{xpNote})"
+                        : $"Tok olduğun için {dispName} (×{servings}) Çantana konuldu! (-{_price} ₺{xpNote})");
+                    return;
+                }
+
+                mode.RaiseStatusMessage(isEn ? $"Bought {dispName} (-{_price} ₺{xpNote}) · Enjoy!" : $"{dispName} alındı (-{_price} ₺{xpNote}) · Afiyet olsun!");
                 PlayerConsumeAnimator.PlayPurchase(
                     mode.FootController,
                     "direct_counter",
@@ -270,8 +420,8 @@ namespace OurWorld.World
                 return;
             }
 
-            // Non-food physical purchases (Jacket, Running Shoes, Turbo Kit, Fuel Can)
-            PlayerActionKind animKind = _effect == ShopItemEffect.JacketColor
+            // Non-food physical purchases (Jacket, Running Shoes, Turbo Kit, Fuel Can, Accessories)
+            PlayerActionKind animKind = (_effect == ShopItemEffect.JacketColor || _effect == ShopItemEffect.Sunglasses || _effect == ShopItemEffect.StreetCap)
                 ? PlayerActionKind.ChangeOutfit
                 : (_effect == ShopItemEffect.RunningShoes ? PlayerActionKind.LoadWashingMachine : PlayerActionKind.InspectReach);
 
@@ -291,9 +441,19 @@ namespace OurWorld.World
                     EffectParam = _effectParam,
                     ConsumeKind = _consumeKind,
                     Visual = _visual,
-                    JacketColorIndex = _jacketColorIndex
+                    JacketColorIndex = _jacketColorIndex,
+                    ReputationXp = _reputationXp,
+                    SourceStoreName = _storeName
                 };
                 PlayerShoppingCart.ApplyNonEnergyEffect(mode, entry);
+                if (_reputationXp > 0)
+                {
+                    NeighborhoodReputation.AddReputation(_reputationXp);
+                }
+                if (!string.IsNullOrEmpty(_storeName))
+                {
+                    DailyQuestAndAchievementSystem.RecordMallPurchase();
+                }
 
                 GameFeelAudio.PlayCoinChime();
                 GameFeelAudio.SpawnBurst(mode.ActiveWorldPosition + Vector3.up * 1.15f, new Color(0.98f, 0.84f, 0.28f), count: 12, spread: 0.45f);
@@ -322,7 +482,7 @@ namespace OurWorld.World
                             : $"Acil Yakıt Bidonu alındı (-{_price} ₺) · Aracının deposu %100 doldu!");
                         break;
                     default:
-                        if (_effectParam > 0f && PlayerNeedsController.Instance != null)
+                        if (_effect != ShopItemEffect.ReputationPrestige && _effectParam > 0f && PlayerNeedsController.Instance != null)
                         {
                             PlayerNeedsController.Instance.RestoreEnergy(_effectParam);
                         }

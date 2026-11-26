@@ -52,6 +52,14 @@ namespace OurWorld.World
         public int CurrentFloor => _currentFloor;
         public bool IsMoving => _isMoving;
 
+        private void OnDestroy()
+        {
+            if (_isMoving && PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.SetModalLock(this, false);
+            }
+        }
+
         public void OpenFloorSelector(int calledFromFloor)
         {
             if (_isMoving) return;
@@ -134,12 +142,20 @@ namespace OurWorld.World
 
     public sealed class MallStrollingShopper
     {
+        public string DisplayName;
         public Transform Root;
         public ProceduralHumanoid Humanoid;
         public Vector3[] LocalWaypoints;
         public int TargetIdx;
         public float Speed;
         public float PauseTimer;
+        public bool IsFighter;
+        public float HitCooldown;
+        public float FightTimer;
+        public float PunchCooldown;
+        public float PendingPunchTimer;
+        public bool PendingPunchHeavy;
+        public int PunchCombo;
     }
 
     public sealed class MallNpcProfile
@@ -156,6 +172,11 @@ namespace OurWorld.World
     /// </summary>
     public sealed class HamidiyeMallInteractionHandler : MonoBehaviour
     {
+        public static HamidiyeMallInteractionHandler ActiveInstance { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetMallStatics() => ActiveInstance = null;
+
         public Vector3 MallCenter;
         public GameObject InteriorRoot;
         public Transform FountainSpinner;
@@ -173,9 +194,11 @@ namespace OurWorld.World
         private bool _interiorActive = true;
         private float _cullTimer = 0.25f;
         private float _lastArcadePlayTime = -20f;
+        private float _lastTelescopeXpTime = -99f;
 
         private void Awake()
         {
+            ActiveInstance = this;
             BuildAllAtlasparkCatalogs();
         }
 
@@ -190,6 +213,7 @@ namespace OurWorld.World
 
         private void OnDestroy()
         {
+            if (ActiveInstance == this) ActiveInstance = null;
             TurkishCarRadio.SetMallAmbienceActive(false);
             if (_subscribed && PlayerModeController.Instance != null)
             {
@@ -239,15 +263,141 @@ namespace OurWorld.World
             UpdateStrollingShoppers(dt);
         }
 
+        public static void CalmAllShoppers()
+        {
+            if (ActiveInstance == null) return;
+            for (int i = 0; i < ActiveInstance.Strollers.Count; i++)
+            {
+                MallStrollingShopper s = ActiveInstance.Strollers[i];
+                if (s == null) continue;
+                s.FightTimer = 0f;
+                s.PendingPunchTimer = 0f;
+            }
+        }
+
+        public bool TryReceivePlayerPunch(Vector3 strikeCenter, float radius, Vector3 attackerPos, Vector3 punchDir, int comboStep)
+        {
+            if (!_interiorActive) return false;
+            MallStrollingShopper best = null;
+            float maxR = radius + 0.55f;
+            float bestSq = maxR * maxR;
+            for (int i = 0; i < Strollers.Count; i++)
+            {
+                MallStrollingShopper s = Strollers[i];
+                if (s == null || s.Root == null || s.Humanoid == null || s.HitCooldown > 0f) continue;
+                Vector3 p = s.Root.position;
+                if (Mathf.Abs(p.y - attackerPos.y) > 1.8f) continue;
+                float dSq = ((p + Vector3.up * 1.0f) - strikeCenter).sqrMagnitude;
+                if (dSq < bestSq)
+                {
+                    bestSq = dSq;
+                    best = s;
+                }
+            }
+            if (best == null) return false;
+
+            best.HitCooldown = 0.35f;
+            best.Humanoid.PlayHitReact();
+            bool en = LocalizationService.IsEnglish;
+            string who = string.IsNullOrEmpty(best.DisplayName) ? (en ? "Mall Shopper" : "AVM Ziyaretçisi") : best.DisplayName;
+            if (best.IsFighter)
+            {
+                best.FightTimer = 10f;
+                best.PunchCooldown = 0.55f;
+                best.PendingPunchTimer = 0f;
+                string line = en ? "Hey! Don't touch me in the mall!" : "Hey! AVM'nin ortasında kime vuruyorsun sen?!";
+                NpcSpeechBubbleManager.Say(best.Root, who, line, 2.8f, NpcBubbleMood.Alert, 2.0f);
+                PlayerModeController.Instance?.RaiseStatusMessage($"{who}: {line}");
+            }
+            else
+            {
+                best.PauseTimer = 0f;
+                string line = en ? "Security! Help!" : "Güvenlik! İmdat!";
+                NpcSpeechBubbleManager.Say(best.Root, who, line, 2.8f, NpcBubbleMood.Alert, 2.0f);
+                PlayerModeController.Instance?.RaiseStatusMessage($"{who}: {line}");
+            }
+            NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                NeighborhoodOffenseKind.AssaultCitizen,
+                best.Root.position,
+                who,
+                repPenalty: 12,
+                immediateFineTl: 0,
+                heatDelta: 1.15f);
+            return true;
+        }
+
         private void UpdateStrollingShoppers(float dt)
         {
             bool modalOpen = PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked;
+            bool playerKo = PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsKnockedOut;
             Vector3 playerPos = PlayerModeController.Instance != null ? PlayerModeController.Instance.ActiveWorldPosition : Vector3.one * 9999f;
 
             for (int i = 0; i < Strollers.Count; i++)
             {
                 MallStrollingShopper s = Strollers[i];
                 if (s == null || s.Root == null || s.LocalWaypoints == null || s.LocalWaypoints.Length < 2) continue;
+
+                if (s.HitCooldown > 0f) s.HitCooldown -= dt;
+
+                // Retaliating mall shopper fights back!
+                if (s.FightTimer > 0f)
+                {
+                    s.FightTimer -= dt;
+                    if (s.PunchCooldown > 0f) s.PunchCooldown -= dt;
+                    Vector3 toP = playerPos - s.Root.position;
+                    bool sameFloor = Mathf.Abs(toP.y) < 2.2f;
+                    toP.y = 0f;
+                    float distP = toP.magnitude;
+
+                    if (modalOpen || playerKo || !sameFloor || distP > 14f)
+                    {
+                        s.FightTimer = 0f;
+                        s.PendingPunchTimer = 0f;
+                    }
+                    else
+                    {
+                        if (toP.sqrMagnitude > 0.01f)
+                        {
+                            s.Root.rotation = Quaternion.Slerp(s.Root.rotation, Quaternion.LookRotation(toP.normalized, Vector3.up), dt * 10f);
+                        }
+                        if (s.PendingPunchTimer > 0f)
+                        {
+                            s.PendingPunchTimer -= dt;
+                            if (s.PendingPunchTimer <= 0f && distP <= 2.25f)
+                            {
+                                float dmg = s.PendingPunchHeavy ? 18f : 13f;
+                                PlayerNeedsController.Instance?.TakeDamage(dmg, s.Root.position, s.DisplayName, s.PendingPunchHeavy);
+                            }
+                        }
+                        if (distP > 1.65f)
+                        {
+                            Vector3 step = toP.normalized * (3.2f * dt);
+                            if (!Physics.Raycast(s.Root.position + Vector3.up * 0.9f, toP.normalized, 0.8f, ~0, QueryTriggerInteraction.Ignore))
+                            {
+                                s.Root.position += step;
+                                s.Humanoid?.SetLocomotion(3.2f, true, 0f);
+                            }
+                            else
+                            {
+                                s.Humanoid?.SetLocomotion(0f, true, 0f);
+                            }
+                        }
+                        else
+                        {
+                            s.Humanoid?.SetLocomotion(0f, true, 0f);
+                            if (s.PunchCooldown <= 0f && s.PendingPunchTimer <= 0f)
+                            {
+                                int combo = s.PunchCombo % 3;
+                                s.PunchCombo++;
+                                s.PendingPunchHeavy = combo == 2;
+                                s.PunchCooldown = s.PendingPunchHeavy ? 1.4f : 1.05f;
+                                s.PendingPunchTimer = 0.16f;
+                                s.Humanoid?.PlayCombatMove(combo);
+                            }
+                        }
+                        continue;
+                    }
+                }
 
                 // Stop politely when player talks nearby or modal is open
                 Vector3 toPlayer = playerPos - s.Root.position;
@@ -337,28 +487,14 @@ namespace OurWorld.World
                 return;
             }
 
-            // 3. Atlas Waikiki Fashion Boutique Wardrobe (8 jacket colors!)
-            if (id == "mall_shop_waikiki")
-            {
-                MallUiPanels.EnsureInstance().ShowBoutiqueModal();
-                return;
-            }
-
-            // 4. CineAtlas Movie Theater Ticket Selector + Live Screening!
+            // 3. CineAtlas Movie Theater Ticket Selector + Live Screening!
             if (id == "mall_cinema_watch")
             {
                 MallUiPanels.EnsureInstance().ShowCinemaModal(movieIdx => BeginCinemaExperience(movieIdx, isEn));
                 return;
             }
 
-            // 5. Universal Multi-Item Store / Coffee / Food Court Catalogs!
-            if (_catalogs != null && _catalogs.TryGetValue(id, out MallShopCatalog catalog))
-            {
-                MallUiPanels.EnsureInstance().ShowShopMenuModal(catalog, trig.transform);
-                return;
-            }
-
-            // 6. Ground Floor Info Desk
+            // 4. Ground Floor Info Desk
             if (id == "mall_info_desk")
             {
                 GameFeelAudio.PlayUiClick();
@@ -368,12 +504,13 @@ namespace OurWorld.World
                 return;
             }
 
-            // 7. JoyPark 3rd-Floor Arcade Machines
+            // 7. JoyPark 3rd-Floor Arcade Machines (balanced odds + 10s cooldown to prevent infinite cash/XP exploit)
             if (id.StartsWith("mall_arcade_", System.StringComparison.Ordinal))
             {
-                if (Time.time - _lastArcadePlayTime < 4.5f)
+                if (Time.time - _lastArcadePlayTime < 10f)
                 {
-                    mode?.RaiseStatusMessage(isEn ? "Machine resetting — try again in a second!" : "Oyun makinesi sıfırlanıyor — birkaç saniye bekle!");
+                    int waitSec = Mathf.CeilToInt(10f - (Time.time - _lastArcadePlayTime));
+                    mode?.RaiseStatusMessage(isEn ? $"Machine resetting ({waitSec}s)!" : $"Oyun makinesi hazırlanıyor ({waitSec} sn)!");
                     return;
                 }
                 _lastArcadePlayTime = Time.time;
@@ -385,24 +522,38 @@ namespace OurWorld.World
                     return;
                 }
 
-                int score = Random.Range(1800, 9990);
-                int prize = score >= 7400 ? 48 : (score >= 4500 ? 24 : 14);
+                int roll = Random.Range(0, 100);
+                int score, prize, xp;
+                if (roll >= 95) { score = Random.Range(9200, 9990); prize = 32; xp = 16; }
+                else if (roll >= 80) { score = Random.Range(7400, 9199); prize = 18; xp = 10; }
+                else if (roll >= 45) { score = Random.Range(4600, 7399); prize = 10; xp = 6; }
+                else { score = Random.Range(1400, 4599); prize = 4; xp = 3; }
+
                 sm?.AddMoney(prize);
-                NeighborhoodReputation.AddReputation(12);
+                NeighborhoodReputation.AddReputation(xp);
                 DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
-                GameFeelAudio.PlayMilestoneFanfare();
+                if (prize >= 18) GameFeelAudio.PlayMilestoneFanfare();
+                else GameFeelAudio.PlayUiClick();
                 GameFeelAudio.SpawnBurst(trig.transform.position + Vector3.up * 1.4f, OurWorldUiKit.AccentGold, 10, 0.55f);
                 mode?.RaiseStatusMessage(isEn
-                    ? $"JoyPark High Score: {score} pts! Prize Ticket +{prize} ₺"
-                    : $"JoyPark Skoru: {score} puan! Ödül Bileti +{prize} ₺");
+                    ? $"JoyPark Score: {score} pts! Prize Ticket +{prize} ₺ (+{xp} XP)"
+                    : $"JoyPark Skoru: {score} puan! Ödül Bileti +{prize} ₺ (+{xp} XP)");
                 return;
             }
 
-            // 8. 4th Floor Rooftop Panoramic Binoculars
+            // 8. 4th Floor Rooftop Panoramic Binoculars (60s XP cooldown to prevent spam)
             if (id == "mall_telescope")
             {
-                GameFeelAudio.PlayCoinChime();
-                NeighborhoodReputation.AddReputation(8);
+                if (Time.time - _lastTelescopeXpTime >= 60f)
+                {
+                    _lastTelescopeXpTime = Time.time;
+                    GameFeelAudio.PlayCoinChime();
+                    NeighborhoodReputation.AddReputation(8);
+                }
+                else
+                {
+                    GameFeelAudio.PlayUiClick();
+                }
                 mode?.RaiseStatusMessage(isEn
                     ? "Rooftop Panorama: Sultanbeyli Lake shines west, Fatih Clock Tower north, and Aydos Farm hills east!"
                     : "Çatı Dürbünü: Batıda Sultanbeyli Göleti, kuzeyde Fatih Saat Kulesi, doğuda Aydos Çiftliği tepeleri görünüyor!");
@@ -413,18 +564,26 @@ namespace OurWorld.World
         {
             PlayerModeController mode = PlayerModeController.Instance;
             PlayerFootController foot = mode != null ? mode.FootController : null;
+            float cinemaFloorY = CinemaSeatWorldPos.y - 0.54f;
             if (foot != null && CinemaSeatWorldPos.sqrMagnitude > 1f)
             {
-                foot.TeleportTo(CinemaSeatWorldPos, Quaternion.Euler(0f, 180f, 0f));
-                foot.Humanoid?.SetSitting(true);
+                foot.SetSeatedState(true);
+                foot.transform.SetPositionAndRotation(CinemaSeatWorldPos, Quaternion.Euler(0f, 180f, 0f));
+                if (foot.Humanoid != null)
+                {
+                    foot.Humanoid.SetSitting(true, driving: false);
+                    foot.Humanoid.SetSeatContact(cinemaFloorY, 1f);
+                }
             }
 
             MallUiPanels.EnsureInstance().StartCinemaScreening(movieIdx, () =>
             {
                 if (foot != null)
                 {
-                    foot.Humanoid?.SetSitting(false);
-                    foot.TeleportTo(CinemaSeatWorldPos + new Vector3(0f, 0.08f, 1.5f), Quaternion.identity);
+                    foot.Humanoid?.SetSitting(false, driving: false);
+                    foot.SetSeatedState(false);
+                    foot.TeleportTo(new Vector3(CinemaSeatWorldPos.x, cinemaFloorY + 0.06f, CinemaSeatWorldPos.z + 1.45f), Quaternion.identity);
+                    foot.SetMovementEnabled(mode == null || !mode.IsModalLocked);
                 }
 
                 float energy = movieIdx == 1 ? 50f : 45f;
@@ -432,6 +591,7 @@ namespace OurWorld.World
                 DayNightCycle.Instance?.AdvanceHours(1.5f);
                 PlayerNeedsController.Instance?.RestoreEnergy(energy);
                 NeighborhoodReputation.AddReputation(xp);
+                DailyQuestAndAchievementSystem.RecordNpcChatOrArcade();
                 GameFeelAudio.PlayMilestoneFanfare();
                 mode?.RaiseStatusMessage(isEn
                     ? $"Movie finished at CineAtlas! (+{Mathf.RoundToInt(energy)} Energy · +{xp} XP · +1.5h)"

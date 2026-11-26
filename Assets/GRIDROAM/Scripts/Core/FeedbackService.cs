@@ -433,7 +433,8 @@ namespace OurWorld.Core
             AppendString(sb, "language", string.IsNullOrWhiteSpace(item.language) ? "tr" : item.language); sb.Append(',');
             sb.Append("\"completedMissions\":{\"integerValue\":\"").Append(Mathf.Clamp(item.completedMissions, 0, 1000)).Append("\"},");
             sb.Append("\"playMinutes\":{\"integerValue\":\"").Append(Mathf.Clamp(item.playMinutes, 0, 1000000)).Append("\"},");
-            sb.Append("\"createdAt\":{\"timestampValue\":\"").Append(item.createdAt).Append("\"}");
+            string freshUtc = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
+            sb.Append("\"createdAt\":{\"timestampValue\":\"").Append(freshUtc).Append("\"}");
             sb.Append("}}");
 
             using (UnityWebRequest req = JsonPost(url, sb.ToString(), _idToken))

@@ -108,14 +108,24 @@ namespace OurWorld.World
             }
         }
 
+        public static bool IsPositionSheltered(Vector3 p)
+        {
+            if (InteriorZone.IsPlayerInsideAny) return true;
+            // Hamidiye Atlas AVM enclosed levels 0..3 (Y < 17.8m; open-air 4th floor Rooftop Terrace stays outdoors!)
+            if (p.x >= -133.6f && p.x <= -98.4f && p.z >= -50.6f && p.z <= -17.4f && p.y < 17.8f) return true;
+            // Aydos Shooting Range covered 4-bay pavilion roof (center 92, -222, width 27m, depth 10m)
+            if (p.x >= 78.0f && p.x <= 106.0f && p.z >= -227.5f && p.z <= -216.5f && p.y < 4.0f) return true;
+            // Hamidiye Oto Galeri covered showroom canopy (center -115, 71, local Z: -5.6..+8.6)
+            if (p.x >= -127.8f && p.x <= -102.2f && p.z >= 65.4f && p.z <= 79.6f && p.y < 5.0f) return true;
+            return false;
+        }
+
         private static bool IsPlayerIndoors()
         {
             if (InteriorZone.IsPlayerInsideAny) return true;
             PlayerModeController mode = PlayerModeController.Instance;
             if (mode == null) return false;
-            Vector3 p = mode.ActiveWorldPosition;
-            // Hamidiye Atlas AVM enclosed levels 0..3 (Y < 17.8m; open-air 4th floor Rooftop Terrace stays outdoors!)
-            return p.x >= -133.6f && p.x <= -98.4f && p.z >= -50.6f && p.z <= -17.4f && p.y < 17.8f;
+            return IsPositionSheltered(mode.ActiveWorldPosition);
         }
 
         private void AdvanceWeatherState()

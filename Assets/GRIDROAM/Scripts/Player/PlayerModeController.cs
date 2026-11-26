@@ -253,6 +253,11 @@ namespace OurWorld.Player
 
         private void ApplyLockToControllers(bool locked)
         {
+            if (locked && InputHub.Instance != null)
+            {
+                InputHub.Instance.ClearAllTouchInputs();
+            }
+
             if (footController != null)
             {
                 footController.SetMovementEnabled(!locked && CurrentMode == ControlMode.OnFoot);
@@ -344,7 +349,7 @@ namespace OurWorld.Player
                 if (targetCar != null && (targetCar != playerSedan || HasVehicleKeys))
                 {
                     bool carPosValid = data.savedVehiclePosX >= -248f && data.savedVehiclePosX <= 248f &&
-                                       data.savedVehiclePosZ >= -248f && data.savedVehiclePosZ <= 248f &&
+                                       data.savedVehiclePosZ >= -350f && data.savedVehiclePosZ <= 260f &&
                                        data.savedVehiclePosY >= -0.5f && data.savedVehiclePosY <= 12f;
                     Vector3 vPos = carPosValid
                         ? new Vector3(data.savedVehiclePosX, Mathf.Max(0.24f, data.savedVehiclePosY), data.savedVehiclePosZ)
@@ -360,8 +365,8 @@ namespace OurWorld.Player
             if (footController != null)
             {
                 bool footPosValid = data.playerPosX >= -248f && data.playerPosX <= 248f &&
-                                    data.playerPosZ >= -248f && data.playerPosZ <= 248f &&
-                                    data.playerPosY >= -0.5f && data.playerPosY <= 12f;
+                                    data.playerPosZ >= -350f && data.playerPosZ <= 260f &&
+                                    data.playerPosY >= -0.5f && data.playerPosY <= 24f;
                 Vector3 fPos = footPosValid
                     ? new Vector3(data.playerPosX, Mathf.Max(0.10f, data.playerPosY), data.playerPosZ)
                     : new Vector3(-68.0f, 0.12f, -2.2f);
@@ -397,6 +402,9 @@ namespace OurWorld.Player
         private static readonly (string labelTr, string labelEn, Vector3 pos, float yaw)[] FastTravelSpots =
         {
             ("No:48 Selman Sokağı · Benim Evim",    "No:48 Selman St · My Home",         new Vector3( -62.0f, 0.12f,    4.5f),   0f),
+            ("Hamidiye Atlas AVM · 5 Katlı",        "Hamidiye Atlas Mall · 5 Levels",    new Vector3(-116.0f, 0.12f,  -58.0f),   0f),
+            ("Hamidiye Oto Galeri & Garaj",         "Hamidiye Auto Gallery",             new Vector3(-115.0f, 0.12f,   52.5f),   0f),
+            ("Aydos Atış Poligonu",                 "Aydos Shooting Range",              new Vector3(  92.0f, 0.14f, -214.0f), 180f),
             ("Aydos Yeşil Vadi · Çiftlik & Bostan", "Aydos Green Valley · Farm",         new Vector3( 136.0f, 0.12f,    0.0f),  90f),
             ("Sultanbeyli Göleti & Balıkçılık",     "Sultanbeyli Lake & Fishing",        new Vector3(-164.0f, 0.12f,    0.0f), -90f),
             ("Aydos Tazyikli Oto Yıkama",           "Aydos Pressure Car Wash",           new Vector3( 124.0f, 0.12f,   -4.5f), 180f),
@@ -431,6 +439,14 @@ namespace OurWorld.Player
             if (!IsModalLocked && CurrentMode == ControlMode.OnFoot && !MosquePrayerInteractable.IsPlayerPraying &&
                 footController != null && Keyboard.current != null && Keyboard.current.gKey.wasPressedThisFrame)
             {
+                if (PlayerShoppingCart.HasActiveItems)
+                {
+                    GameFeelAudio.PlayUiClick();
+                    RaiseStatusMessage(L(
+                        "Işınlanmadan önce elindeki / denediğin ürünleri kasada öde veya stanta bırak!",
+                        "Pay at the register or return unpaid items before fast-traveling!"));
+                    return;
+                }
                 CarryableProp.DropHeldPropIfAny();
                 StreetCatController.CancelActivePet();
                 var spot = FastTravelSpots[_fastTravelIndex % FastTravelSpots.Length];
@@ -607,6 +623,11 @@ namespace OurWorld.Player
         {
             if (_nearestInteractable == next) return;
             _nearestInteractable = next;
+            OnInteractableChanged?.Invoke(_nearestInteractable);
+        }
+
+        public void RefreshCurrentInteractPrompt()
+        {
             OnInteractableChanged?.Invoke(_nearestInteractable);
         }
 
@@ -1037,7 +1058,7 @@ namespace OurWorld.Player
         {
             Vector3 origin = seat.position + seat.forward * 0.47f + Vector3.up * 0.2f;
             if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 1.35f, Physics.DefaultRaycastLayers,
-                    QueryTriggerInteraction.Ignore) && hit.point.y < seat.position.y - 0.15f)
+                    QueryTriggerInteraction.Ignore) && hit.point.y < seat.position.y - 0.30f)
                 return hit.point.y;
             return _seatApproachPos.y;
         }

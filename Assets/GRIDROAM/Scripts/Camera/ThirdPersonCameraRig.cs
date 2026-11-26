@@ -48,6 +48,8 @@ namespace OurWorld.CameraSystem
         private float _yaw;
         private float _pitch = 16f;
         private float _currentDistance;
+        private float _smoothedCollisionDist;
+        private bool _collisionDistInit;
         private Vector3 _smoothedPivot;
         private bool _isDrivingMode;
         private bool _isSeatedMode;
@@ -57,6 +59,37 @@ namespace OurWorld.CameraSystem
         private float _sportCameraFov = 62f;
         private float? _sportLockedYaw;
         private float _timeSinceManualLook = 99f;
+
+        // Dynamic game-feel channels (sprint FOV/pullback, landing spring dip, nitro/shift FOV impulse)
+        private float _sprintMotion01;
+        private float _smoothedSprint01;
+        private bool _nitroBoostActive;
+        private float _nitroBoostBlend;
+        private float _fovImpulse;
+        private float _landingDipY;
+        private float _landingDipVel;
+
+        public void SetSprintMotion(float sprint01)
+        {
+            _sprintMotion01 = Mathf.Clamp01(sprint01);
+        }
+
+        public void SetNitroBoost(bool active)
+        {
+            _nitroBoostActive = active;
+        }
+
+        public void AddFovImpulse(float degrees)
+        {
+            _fovImpulse = Mathf.Clamp(_fovImpulse + degrees, -4.5f, 8.5f);
+        }
+
+        public void AddLandingDip(float strength01)
+        {
+            float clamped = Mathf.Clamp01(strength01);
+            float kick = Mathf.Lerp(-1.35f, -3.45f, clamped);
+            _landingDipVel = Mathf.Min(_landingDipVel, kick);
+        }
 
         // Over-the-shoulder TPS Aiming / ADS / Sniper Scope profile (Shooting Range)
         private bool _aimCameraActive;
@@ -169,6 +202,10 @@ namespace OurWorld.CameraSystem
             Vector3 offset = _isDrivingMode ? drivingPivotOffset : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
             _smoothedPivot = target.position + offset;
             _currentDistance = _isDrivingMode ? drivingDistance : GetEffectiveFootMaxDistance();
+            _smoothedCollisionDist = _currentDistance;
+            _collisionDistInit = true;
+            _landingDipY = 0f;
+            _landingDipVel = 0f;
         }
 
         public bool TryGetGameplayPose(out Vector3 position, out Quaternion rotation, out float fov)
@@ -225,6 +262,11 @@ namespace OurWorld.CameraSystem
             if (drivingMode)
             {
                 _isSeatedMode = false;
+                _sprintMotion01 = 0f;
+            }
+            else
+            {
+                _nitroBoostActive = false;
             }
             _targetRb = target != null ? target.GetComponent<Rigidbody>() : null;
 
@@ -237,6 +279,10 @@ namespace OurWorld.CameraSystem
                 _currentDistance = _sportCameraActive
                     ? _sportCameraDistance
                     : (drivingMode ? drivingDistance : GetEffectiveFootMaxDistance());
+                _smoothedCollisionDist = _currentDistance;
+                _collisionDistInit = true;
+                _landingDipY = 0f;
+                _landingDipVel = 0f;
             }
         }
 
@@ -328,11 +374,19 @@ namespace OurWorld.CameraSystem
                 if (_shakeTimer > 0f)
                 {
                     _shakeTimer -= Time.unscaledDeltaTime;
-                    float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
-                    aimShake = new Vector3(
-                        (Mathf.PerlinNoise(Time.unscaledTime * 54f, 1.3f) - 0.5f) * 2f * amp,
-                        (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 54f) - 0.5f) * 2f * amp,
-                        0f);
+                    if (_shakeTimer <= 0f)
+                    {
+                        _shakeTimer = 0f;
+                        _shakeIntensity = 0f;
+                    }
+                    else
+                    {
+                        float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
+                        aimShake = new Vector3(
+                            (Mathf.PerlinNoise(Time.unscaledTime * 54f, 1.3f) - 0.5f) * 2f * amp,
+                            (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 54f) - 0.5f) * 2f * amp,
+                            0f);
+                    }
                 }
 
                 Vector3 aimCamPos;
@@ -369,11 +423,40 @@ namespace OurWorld.CameraSystem
                 _pitch = Mathf.Lerp(_pitch, drivingDefaultPitch, 1f - Mathf.Exp(-2.2f * Time.deltaTime));
             }
 
+            float dtNorm = Time.deltaTime;
+            // Critically-damped vertical spring for tactile jump/vault landing dip
+            if (Mathf.Abs(_landingDipY) > 0.0005f || Mathf.Abs(_landingDipVel) > 0.005f)
+            {
+                const float springK = 145f;
+                const float springDamp = 19.5f;
+                float springAccel = -springK * _landingDipY - springDamp * _landingDipVel;
+                _landingDipVel += springAccel * dtNorm;
+                _landingDipY = Mathf.Clamp(_landingDipY + _landingDipVel * dtNorm, -0.26f, 0.08f);
+            }
+            else
+            {
+                _landingDipY = 0f;
+                _landingDipVel = 0f;
+            }
+
+            // Smooth sprint & nitro motion channels + decaying FOV impulse
+            _smoothedSprint01 = Mathf.Lerp(_smoothedSprint01, _isDrivingMode || _sportCameraActive ? 0f : _sprintMotion01, 1f - Mathf.Exp(-6.5f * dtNorm));
+            _nitroBoostBlend = Mathf.Lerp(_nitroBoostBlend, _isDrivingMode && _nitroBoostActive ? 1f : 0f, 1f - Mathf.Exp(-8.5f * dtNorm));
+            _fovImpulse = Mathf.Lerp(_fovImpulse, 0f, 1f - Mathf.Exp(-7.5f * dtNorm));
+            if (Mathf.Abs(_fovImpulse) < 0.02f) _fovImpulse = 0f;
+
             Vector3 desiredOffset = _isDrivingMode
                 ? drivingPivotOffset
                 : (_isSeatedMode ? seatedPivotOffset : footPivotOffset);
-            Vector3 desiredPivot = target.position + desiredOffset;
-            _smoothedPivot = Vector3.Lerp(_smoothedPivot, desiredPivot, 1f - Mathf.Exp(-pivotFollowSpeed * Time.deltaTime));
+            Vector3 desiredPivot = target.position + desiredOffset + Vector3.up * _landingDipY;
+            float horizK = 1f - Mathf.Exp(-pivotFollowSpeed * dtNorm);
+            // Slightly gentler vertical follow on foot smooths out stair steps & sidewalk curbs cleanly
+            float vertFollow = _isDrivingMode ? pivotFollowSpeed : 11.5f;
+            float vertK = 1f - Mathf.Exp(-vertFollow * dtNorm);
+            _smoothedPivot = new Vector3(
+                Mathf.Lerp(_smoothedPivot.x, desiredPivot.x, horizK),
+                Mathf.Lerp(_smoothedPivot.y, desiredPivot.y, vertK),
+                Mathf.Lerp(_smoothedPivot.z, desiredPivot.z, horizK));
 
             // Automatic overhead ceiling detection: works inside ANY house, shop, porch or garage
             // even before an InteriorZone trigger fires so the camera can NEVER float above a roof!
@@ -402,46 +485,87 @@ namespace OurWorld.CameraSystem
                 speedFactor = Mathf.InverseLerp(0f, fovMaxSpeedKmh, speedKmh);
             }
 
+            float footSprintPull = effectivelyIndoors ? 0f : _smoothedSprint01 * 0.34f;
             float desiredDistance = _sportCameraActive
                 ? _sportCameraDistance
                 : (_isDrivingMode
-                    ? drivingDistance + speedFactor * drivingSpeedExtraDistance
-                    : (hasOverheadCeiling ? Mathf.Min(GetEffectiveFootMaxDistance(), 1.90f) : GetEffectiveFootMaxDistance()));
+                    ? drivingDistance + speedFactor * drivingSpeedExtraDistance + _nitroBoostBlend * 0.62f
+                    : (hasOverheadCeiling
+                        ? Mathf.Min(GetEffectiveFootMaxDistance(), 1.90f)
+                        : GetEffectiveFootMaxDistance() + footSprintPull));
             float distSpeed = effectivelyIndoors ? distanceBlendSpeed * 2.2f : distanceBlendSpeed;
-            _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distSpeed * Time.deltaTime));
+            _currentDistance = Mathf.Lerp(_currentDistance, desiredDistance, 1f - Mathf.Exp(-distSpeed * dtNorm));
 
             if (_camera == null) _camera = GetComponent<Camera>();
             if (_camera != null)
             {
+                float sprintFovKick = effectivelyIndoors ? 0f : _smoothedSprint01 * 4.2f;
+                float nitroFovKick = _nitroBoostBlend * 6.5f;
                 float baseTargetFov = _sportCameraActive
                     ? _sportCameraFov
                     : (_isDrivingMode
-                        ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor)
-                        : (effectivelyIndoors ? 66f : baseFov));
+                        ? Mathf.Lerp(baseFov, drivingMaxFov, speedFactor) + nitroFovKick
+                        : (effectivelyIndoors ? 66f : baseFov + sprintFovKick));
                 // Preserve wide horizontal view on 4:3 iPads, 16:10 Android tablets & foldables
                 float aspect = _camera.aspect > 0.1f ? _camera.aspect : (16f / 9f);
                 float tabletFovBoost = aspect < 1.70f ? Mathf.Clamp((1.70f - aspect) * 26f, 0f, 12f) : 0f;
-                float desiredFov = baseTargetFov + tabletFovBoost;
-                _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, desiredFov, 1f - Mathf.Exp(-fovSmoothSpeed * Time.deltaTime));
+                float desiredFov = Mathf.Clamp(baseTargetFov + tabletFovBoost + _fovImpulse, 44f, 88f);
+                _camera.fieldOfView = Mathf.Lerp(_camera.fieldOfView, desiredFov, 1f - Mathf.Exp(-fovSmoothSpeed * dtNorm));
             }
 
             Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
             Vector3 backDir = rotation * Vector3.back;
 
-            float finalDistance = ComputeCollisionAdjustedDistance(_smoothedPivot, backDir, _currentDistance);
+            // Smooth wall-collision distance: fast pull-in (no wall clipping), silky ease-out (no lamppost/tree pop!)
+            float rawCollisionDist = ComputeCollisionAdjustedDistance(_smoothedPivot, backDir, _currentDistance);
+            if (!_collisionDistInit)
+            {
+                _smoothedCollisionDist = rawCollisionDist;
+                _collisionDistInit = true;
+            }
+            else if (rawCollisionDist < _smoothedCollisionDist)
+            {
+                _smoothedCollisionDist = Mathf.Lerp(_smoothedCollisionDist, rawCollisionDist, 1f - Mathf.Exp(-28f * dtNorm));
+                if (rawCollisionDist < _smoothedCollisionDist - 0.18f)
+                {
+                    _smoothedCollisionDist = rawCollisionDist;
+                }
+            }
+            else
+            {
+                _smoothedCollisionDist = Mathf.Lerp(_smoothedCollisionDist, rawCollisionDist, 1f - Mathf.Exp(-6.8f * dtNorm));
+            }
+            float finalDistance = Mathf.Min(_smoothedCollisionDist, _currentDistance);
 
             Vector3 shakeOffset = Vector3.zero;
             if (_shakeTimer > 0f)
             {
                 _shakeTimer -= Time.unscaledDeltaTime;
-                float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
-                shakeOffset = new Vector3(
-                    (Mathf.PerlinNoise(Time.unscaledTime * 42f, 1.3f) - 0.5f) * 2f * amp,
-                    (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 42f) - 0.5f) * 2f * amp,
+                if (_shakeTimer <= 0f)
+                {
+                    _shakeTimer = 0f;
+                    _shakeIntensity = 0f;
+                }
+                else
+                {
+                    float amp = _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration));
+                    shakeOffset = new Vector3(
+                        (Mathf.PerlinNoise(Time.unscaledTime * 42f, 1.3f) - 0.5f) * 2f * amp,
+                        (Mathf.PerlinNoise(2.7f, Time.unscaledTime * 42f) - 0.5f) * 2f * amp,
+                        0f);
+                }
+            }
+            if (_nitroBoostBlend > 0.05f)
+            {
+                float nitroAmp = 0.032f * _nitroBoostBlend;
+                shakeOffset += new Vector3(
+                    (Mathf.PerlinNoise(Time.unscaledTime * 55f, 4.1f) - 0.5f) * 2f * nitroAmp,
+                    (Mathf.PerlinNoise(7.3f, Time.unscaledTime * 55f) - 0.5f) * 2f * nitroAmp,
                     0f);
             }
 
-            Vector3 finalPos = _smoothedPivot + backDir * finalDistance + transform.TransformDirection(shakeOffset);
+            Vector3 worldShake = rotation * shakeOffset;
+            Vector3 finalPos = _smoothedPivot + backDir * finalDistance + worldShake;
 
             // Hard safety clamp below overhead ceiling & above floor so camera NEVER clips through roof slabs!
             if (hasOverheadCeiling)
@@ -471,12 +595,13 @@ namespace OurWorld.CameraSystem
                     if (toCam.sqrMagnitude > 0.0001f)
                     {
                         finalPos = _smoothedPivot + toCam.normalized * safeDist;
+                        _smoothedCollisionDist = Mathf.Min(_smoothedCollisionDist, safeDist);
                     }
                 }
             }
 
             transform.position = finalPos;
-            transform.LookAt(_smoothedPivot + shakeOffset * 0.45f);
+            transform.LookAt(_smoothedPivot + worldShake * 0.45f);
         }
 
         private float _shakeTimer;
@@ -485,9 +610,13 @@ namespace OurWorld.CameraSystem
 
         public void AddShake(float intensity, float duration = 0.18f)
         {
-            _shakeIntensity = Mathf.Max(_shakeIntensity, intensity);
-            _shakeDuration = Mathf.Max(0.05f, duration);
-            _shakeTimer = _shakeDuration;
+            float activeAmp = _shakeTimer > 0f
+                ? _shakeIntensity * Mathf.Clamp01(_shakeTimer / Mathf.Max(0.01f, _shakeDuration))
+                : 0f;
+            float clampedDur = Mathf.Max(0.05f, duration);
+            _shakeIntensity = Mathf.Max(activeAmp, intensity);
+            _shakeTimer = Mathf.Max(_shakeTimer, clampedDur);
+            _shakeDuration = Mathf.Max(_shakeTimer, clampedDur);
         }
 
         private float ComputeCollisionAdjustedDistance(Vector3 origin, Vector3 direction, float maxDist)

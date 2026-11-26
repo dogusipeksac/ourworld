@@ -88,6 +88,7 @@ namespace OurWorld.World
 
         private Transform _ball;
         private Transform _ballShadow;
+        private TextMesh _courtScoreboard;
         private ProceduralHumanoid _opponent;
         private ProceduralHumanoid _ambientPlayer;
         private Transform _opponentRacket;
@@ -179,10 +180,12 @@ namespace OurWorld.World
             AudioSource ballSound,
             AudioClip hitSound,
             AudioClip bounceSound,
-            ProceduralHumanoid ambientPlayer = null)
+            ProceduralHumanoid ambientPlayer = null,
+            TextMesh courtScoreboard = null)
         {
             _ball = ball;
             _ballShadow = ballShadow;
+            _courtScoreboard = courtScoreboard;
             _opponent = opponent;
             _opponentRacket = opponentRacket;
             _playerRacket = playerRacket;
@@ -193,6 +196,7 @@ namespace OurWorld.World
             _hitSound = hitSound;
             _bounceSound = bounceSound;
             _ambientPlayer = ambientPlayer;
+            UpdateCourtScoreboard();
 
             if (_ambientPlayer != null)
             {
@@ -335,6 +339,7 @@ namespace OurWorld.World
             }
 
             ResetPoint();
+            UpdateCourtScoreboard();
             GameFeelAudio.PlayRefereeWhistle(doubleBlast: false);
             SetCallout(L($"{GetLeagueLabel()} · Tenis Maçı Başladı!", $"{GetLeagueLabel()} · Tennis Match Started!"), new Color(0.28f, 0.94f, 0.80f), 1.6f);
             enabled = true;
@@ -1004,8 +1009,7 @@ namespace OurWorld.World
             if (_elapsed - dt < _flight.FirstLeg && _elapsed >= _flight.FirstLeg)
             {
                 _ballSound.PlayOneShot(_bounceSound, 0.48f);
-                // Clay court dust burst on bounce!
-                GameFeelAudio.SpawnBurst(_ball.position, new Color(0.84f, 0.44f, 0.26f), count: 4, spread: 0.20f);
+                SportsArenaAtmosphere.SpawnClayPuff(_ball.position);
             }
 
             bool toPlayer = _phase == Phase.ToPlayer;
@@ -1245,6 +1249,8 @@ namespace OurWorld.World
         {
             if (playerWon) _points++;
             else _opponentPoints++;
+            UpdateCourtScoreboard();
+            SportsArenaAtmosphere.CelebrateEvent(transform.position, "tennis", playerWon, bigPlay: _lastShotKind == ShotKind.GoldenServe || _points >= 4 || _opponentPoints >= 4);
 
             _lastPointWon = playerWon;
             _lastShotWasPerfect = false;
@@ -1284,7 +1290,7 @@ namespace OurWorld.World
                         }
                         SaveManager.Instance.Save();
                     }
-                    NeighborhoodReputation.AddReputation(30 + _leagueTier * 10, $"Tenis [{GetLeagueLabel()}] Zaferi! (+{reward} ₺)");
+                    NeighborhoodReputation.AddReputation(30 + _leagueTier * 10, L($"Tenis [{GetLeagueLabel()}] Zaferi! (+{reward} ₺)", $"Tennis [{GetLeagueLabel()}] Victory! (+{reward} ₺)"));
                 }
                 else
                 {
@@ -1424,6 +1430,26 @@ namespace OurWorld.World
             Vector3 point = Vector3.LerpUnclamped(start, end, time / duration);
             point.y += 0.5f * Gravity * time * (duration - time);
             return point;
+        }
+
+        private void UpdateCourtScoreboard()
+        {
+            if (_courtScoreboard == null) return;
+            string scoreLine;
+            if (_points >= 3 && _opponentPoints >= 3)
+            {
+                if (_points == _opponentPoints) scoreLine = L("BERABERE", "DEUCE");
+                else if (_points > _opponentPoints) scoreLine = L("AVANTAJ DENİZ", "ADV DENİZ");
+                else scoreLine = L("AVANTAJ RAKİP", "ADV RIVAL");
+            }
+            else
+            {
+                string[] labels = { "0", "15", "30", "40" };
+                string p = labels[Mathf.Clamp(_points, 0, 3)];
+                string o = labels[Mathf.Clamp(_opponentPoints, 0, 3)];
+                scoreLine = $"{p} - {o}";
+            }
+            _courtScoreboard.text = L($"GÜRSU TENİS\n{scoreLine}", $"GURSU TENNIS\n{scoreLine}");
         }
     }
 }

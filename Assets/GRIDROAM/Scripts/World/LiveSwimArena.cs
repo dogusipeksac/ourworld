@@ -176,7 +176,7 @@ namespace OurWorld.World
             lakeZoneGo.transform.SetParent(transform, false);
             lakeZoneGo.transform.position = LakeCenter;
             WaterZone lakeWz = lakeZoneGo.AddComponent<WaterZone>();
-            lakeWz.Configure(new Vector3(0f, -0.8f, 0f), new Vector3(48f, 2.4f, 36f), surfaceY: 0.14f, floorY: -1.70f);
+            lakeWz.Configure(new Vector3(0f, -0.8f, 0f), new Vector3(48f, 2.4f, 36f), surfaceY: 0.08f, floorY: -1.70f);
 
             // Spawn 6 shimmering collectible Underwater Pearls (4 in Sultanbeyli Lake, 2 on Hamidiye Pool floor!)
             Shader unlit = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");

@@ -276,7 +276,9 @@ namespace OurWorld.UI
                 return;
             }
 
-            // Do not open phone over active story dialogue or mission failure modal
+            // Do not open phone over Main Menu, Pause Menu, active story dialogue, mission failure, or any other open modal
+            if (MainMenuController.IsMenuActive) return;
+            if (PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked) return;
             MissionManager mm = MissionManager.Instance;
             if (mm != null && (mm.IsDialoguePlaying || mm.IsFailed))
             {
@@ -625,6 +627,7 @@ namespace OurWorld.UI
                 ("Saat Kulesi","Clock Tower",  new Vector3(   0f, 0.2f, 136f), new Color(0.96f, 0.56f, 0.28f)),
                 ("Havadis Sk.","Havadis St.",  new Vector3( -16f, 0.2f, 186f), new Color(0.14f, 0.78f, 0.70f)),
                 ("Kadife Sk.", "Kadife St.",   new Vector3( -12f, 0.2f,-186f), new Color(0.14f, 0.78f, 0.70f)),
+                ("Poligon",    "Range",        new Vector3(  92f, 0.2f,-214f), new Color(0.96f, 0.68f, 0.20f)),
                 ("Spor",       "Sports",       new Vector3( -14f, 0.2f, -29f), new Color(0.92f, 0.44f, 0.36f)),
                 ("Evim No:48", "Home No:48",   new Vector3( -62f, 0.2f,   4f), new Color(0.82f, 0.88f, 0.96f))
             };
@@ -722,6 +725,36 @@ namespace OurWorld.UI
             bool isEn = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
             if (mode == null || mode.FootController == null) return;
 
+            if (PlayerShoppingCart.HasActiveItems)
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn
+                    ? "Pay at the register or return unpaid items before calling a taxi!"
+                    : "Taksi çağırmadan önce elindeki / denediğin ürünleri kasada öde veya stanta bırak!");
+                return;
+            }
+
+            if ((mode.CurrentMode != ControlMode.OnFoot && mode.CurrentMode != ControlMode.Driving) ||
+                MosquePrayerInteractable.IsPlayerPraying ||
+                PlayerActionAnimator.IsBusyOn(mode))
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn
+                    ? "Finish your current activity (stand up / exit sport or bike) before taking a taxi!"
+                    : "Taksi çağırmadan önce mevcut aktiviteyi bitir (kalk, bisikletten veya maçtan çık)!");
+                return;
+            }
+
+            bool isDriving = mode.IsDriving && mode.CurrentVehicle != null;
+            if (!TryResolveSafeLandingPosition(CustomWaypointPosition, isDriving, out Vector3 safeDest))
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn
+                    ? "That pin is inside a building or obstacle — tap a road or landmark badge!"
+                    : "İşaretli nokta bina veya engel içinde — haritada bir yola ya da bölge rozetine dokun!");
+                return;
+            }
+
             SaveManager sm = SaveManager.Instance;
             if (sm != null && !sm.TrySpend(25))
             {
@@ -730,20 +763,88 @@ namespace OurWorld.UI
                 return;
             }
 
-            Vector3 dest = new Vector3(CustomWaypointPosition.x, 0.25f, CustomWaypointPosition.z);
-            if (mode.IsDriving && mode.CurrentVehicle != null)
+            CarryableProp.DropHeldPropIfAny();
+            StreetCatController.CancelActivePet();
+
+            if (isDriving)
             {
-                mode.CurrentVehicle.TeleportAndReset(dest + Vector3.up * 0.2f, mode.CurrentVehicle.transform.rotation);
+                mode.CurrentVehicle.TeleportAndReset(safeDest + Vector3.up * 0.22f, mode.CurrentVehicle.transform.rotation);
             }
             else
             {
-                mode.FootController.TeleportTo(dest, mode.FootController.transform.rotation);
+                mode.FootController.TeleportTo(safeDest, mode.FootController.transform.rotation);
             }
 
             ClearCustomWaypoint();
             GameFeelAudio.PlayCoinChime();
             mode.RaiseStatusMessage(isEn ? "Arrived via Fast Travel Taxi (-25 ₺)" : "Taksiyle hedefe ulaştın (-25 ₺)");
             Close();
+        }
+
+        private static bool TryResolveSafeLandingPosition(Vector3 rawTarget, bool forVehicle, out Vector3 safePos)
+        {
+            Vector3 probe = new Vector3(Mathf.Clamp(rawTarget.x, -238f, 238f), 0.25f, Mathf.Clamp(rawTarget.z, -238f, 238f));
+
+            // Snap well-known enclosed/water footprints safely to their open entrances
+            if (probe.x <= -166f && probe.x >= -226f && probe.z >= -46f && probe.z <= 46f)
+            {
+                probe = new Vector3(-163.5f, 0.22f, 0f); // Sultanbeyli Lake Pier
+            }
+            else if (probe.x >= -135f && probe.x <= -97f && probe.z >= -52f && probe.z <= -16f)
+            {
+                probe = new Vector3(-116f, 0.22f, -58f); // Hamidiye Atlas AVM Entrance Plaza
+            }
+            else if (probe.x >= -129f && probe.x <= -101f && probe.z >= 59f && probe.z <= 82f)
+            {
+                probe = new Vector3(-115f, 0.25f, 54.5f); // Hamidiye Oto Galeri Delivery Bay
+            }
+            else if (probe.x >= 66f && probe.x <= 138f && probe.z >= -342f && probe.z <= -216f)
+            {
+                probe = new Vector3(92f, 0.22f, -210f); // Aydos Shooting Range Parking Pad
+            }
+
+            float[] radii = { 0f, 3.2f, 6.5f, 10.5f };
+            for (int rIdx = 0; rIdx < radii.Length; rIdx++)
+            {
+                float rad = radii[rIdx];
+                int samples = rad <= 0.1f ? 1 : 8;
+                for (int s = 0; s < samples; s++)
+                {
+                    float ang = (s / (float)samples) * Mathf.PI * 2f;
+                    Vector3 cand = new Vector3(
+                        Mathf.Clamp(probe.x + Mathf.Cos(ang) * rad, -238f, 238f),
+                        0.25f,
+                        Mathf.Clamp(probe.z + Mathf.Sin(ang) * rad, -238f, 238f));
+
+                    // Skip water interior
+                    if (cand.x <= -166f && cand.x >= -226f && cand.z >= -46f && cand.z <= 46f) continue;
+
+                    // Raycast down from sky: reject rooftops (y > 1.35m) so we never land on roofs or inside high geometry
+                    float groundY = 0.18f;
+                    if (Physics.Raycast(new Vector3(cand.x, 32f, cand.z), Vector3.down, out RaycastHit hit, 36f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                    {
+                        if (hit.point.y > 1.35f || hit.point.y < -0.4f) continue;
+                        groundY = Mathf.Max(0.12f, hit.point.y + 0.08f);
+                    }
+
+                    Vector3 testPos = new Vector3(cand.x, groundY, cand.z);
+                    bool blocked = forVehicle
+                        ? Physics.CheckBox(testPos + Vector3.up * 1.15f, new Vector3(1.1f, 0.75f, 2.2f), Quaternion.identity,
+                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                        : Physics.CheckCapsule(testPos + Vector3.up * 0.45f, testPos + Vector3.up * 1.65f, 0.36f,
+                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+
+                    if (!blocked)
+                    {
+                        safePos = testPos;
+                        return true;
+                    }
+                }
+            }
+
+            safePos = probe;
+            return false;
         }
 
         private void HandleCallPersonalCar()
@@ -757,17 +858,24 @@ namespace OurWorld.UI
                 mode.RaiseStatusMessage(isEn ? "You are already inside a vehicle!" : "Zaten bir aracın içindesin!");
                 return;
             }
+            if (mode.CurrentMode != ControlMode.OnFoot || MosquePrayerInteractable.IsPlayerPraying)
+            {
+                mode.RaiseStatusMessage(isEn ? "Stand on foot outside to call your car!" : "Arabanı çağırmak için dışarıda ayakta olmalısın!");
+                return;
+            }
 
-            // Do not summon a car indoors or inside Atlas AVM
+            // Do not summon a car indoors, inside Atlas AVM, or on Oto Galeri showroom deck
             Vector3 p = mode.ActiveWorldPosition;
-            if (InteriorZone.IsPlayerInsideAny || (p.x >= -134f && p.x <= -98f && p.z >= -51f && p.z <= -17f))
+            bool inMall = p.x >= -134f && p.x <= -98f && p.z >= -51f && p.z <= -17f;
+            bool inShowroom = p.x >= -128f && p.x <= -102f && p.z >= 64f && p.z <= 80f;
+            if (InteriorZone.IsPlayerInsideAny || inMall || inShowroom)
             {
                 mode.RaiseStatusMessage(isEn ? "Step outside to summon your car!" : "Arabanı çağırmak için dışarı çık!");
                 return;
             }
 
-            SedanVehicleController targetCar = null;
-            if (_cachedVehicles != null)
+            SedanVehicleController targetCar = mode.PlayerSedan;
+            if (targetCar == null && _cachedVehicles != null)
             {
                 for (int i = 0; i < _cachedVehicles.Length; i++)
                 {
@@ -785,6 +893,37 @@ namespace OurWorld.UI
                 return;
             }
 
+            // Find an unobstructed spot near the player so the car never spawns inside a wall
+            Transform ft = mode.FootController.transform;
+            Vector3[] candidates =
+            {
+                p + ft.forward * 4.8f,
+                p + ft.right * 4.8f,
+                p - ft.right * 4.8f,
+                p - ft.forward * 4.8f,
+                p + ft.forward * 7.5f
+            };
+            Vector3 spawnPos = Vector3.zero;
+            bool foundSpot = false;
+            Quaternion spawnRot = Quaternion.Euler(0f, ft.eulerAngles.y, 0f);
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                Vector3 c = new Vector3(Mathf.Clamp(candidates[i].x, -238f, 238f), 0.35f, Mathf.Clamp(candidates[i].z, -238f, 238f));
+                if (!Physics.CheckBox(c + Vector3.up * 1.1f, new Vector3(1.1f, 0.72f, 2.2f), spawnRot,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    spawnPos = c;
+                    foundSpot = true;
+                    break;
+                }
+            }
+            if (!foundSpot)
+            {
+                GameFeelAudio.PlayUiClick();
+                mode.RaiseStatusMessage(isEn ? "Too tight here — step onto the road to call Valet!" : "Burası çok dar — vale için sokağa veya açık alana çık!");
+                return;
+            }
+
             SaveManager sm = SaveManager.Instance;
             if (sm != null && !sm.TrySpend(15))
             {
@@ -793,9 +932,7 @@ namespace OurWorld.UI
                 return;
             }
 
-            Vector3 spawnPos = p + mode.FootController.transform.forward * 4.5f;
-            spawnPos.y = 0.35f;
-            targetCar.TeleportAndReset(spawnPos, Quaternion.Euler(0f, mode.FootController.transform.eulerAngles.y, 0f));
+            targetCar.TeleportAndReset(spawnPos, spawnRot);
             GameFeelAudio.PlayCoinChime();
             mode.RaiseStatusMessage(isEn ? "Valet delivered your car right ahead! (-15 ₺)" : "Vale arabanı hemen önüne getirdi! (-15 ₺)");
             Close();

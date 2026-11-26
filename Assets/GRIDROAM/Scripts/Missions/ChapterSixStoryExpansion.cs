@@ -101,6 +101,7 @@ namespace OurWorld.Missions
             MissionManager mm = MissionManager.Instance ?? FindAnyObjectByType<MissionManager>();
             if (mm == null || mm.Catalog == null || mm.Catalog.missions == null) return;
 
+            mm.Catalog.missions.RemoveAll(m => m == null);
             if (mm.Catalog.GetById("m21_ilk_simit_ve_mektup") != null) return;
 
             // Chain Mission 20 directly into Chapter 6 Mission 21!
@@ -282,26 +283,29 @@ namespace OurWorld.Missions
             ProceduralHumanoid template = PlayerModeController.Instance?.FootController?.Humanoid;
             if (template == null) return;
 
-            SpawnStoryNpc("npc_simitci_ahmet", "NPC_SimitciAhmet", "Simitçi Ahmet Amca ile Konuş", template, new Vector3(-14.0f, 0.04f, 180.8f), 180f, new Color(0.84f, 0.20f, 0.18f));
-            SpawnStoryNpc("npc_cayci_riza", "NPC_CayciRiza", "Çaycı Rıza Usta ile Konuş", template, new Vector3(-20.0f, 0.04f, 68.5f), 170f, new Color(0.14f, 0.56f, 0.62f));
-            _captainTarik = SpawnStoryNpc("npc_kaptan_tarik", "NPC_KaptanTarik", "Kaptan Tarık ile Konuş", template, _captainPierPos, 90f, new Color(0.16f, 0.28f, 0.52f));
-            SpawnStoryNpc("npc_havuz_selin", "NPC_HakemSelin", "Yüzme Hakemi Selin ile Konuş", template, new Vector3(11.4f, 1.44f, -34.0f), 160f, new Color(0.12f, 0.66f, 0.72f));
-            SpawnStoryNpc("npc_farmer_irfan", "NPC_CiftciIrfan", "Çiftçi İrfan Amca ile Konuş", template, new Vector3(160.2f, 0.04f, -10.2f), -45f, new Color(0.46f, 0.54f, 0.22f));
+            SpawnStoryNpc("npc_simitci_ahmet", "NPC_SimitciAhmet", "Simitçi Ahmet Amca ile Konuş", "Talk to Simit Seller Ahmet", template, new Vector3(-14.0f, 0.04f, 180.8f), 180f, new Color(0.84f, 0.20f, 0.18f));
+            SpawnStoryNpc("npc_cayci_riza", "NPC_CayciRiza", "Çaycı Rıza Usta ile Konuş", "Talk to Tea Master Rıza", template, new Vector3(-20.0f, 0.04f, 68.5f), 170f, new Color(0.14f, 0.56f, 0.62f));
+            _captainTarik = SpawnStoryNpc("npc_kaptan_tarik", "NPC_KaptanTarik", "Kaptan Tarık ile Konuş", "Talk to Captain Tarık", template, _captainPierPos, 90f, new Color(0.16f, 0.28f, 0.52f));
+            SpawnStoryNpc("npc_havuz_selin", "NPC_HakemSelin", "Yüzme Hakemi Selin ile Konuş", "Talk to Swim Referee Selin", template, new Vector3(8.8f, 1.44f, -34.6f), 145f, new Color(0.12f, 0.66f, 0.72f));
+            SpawnStoryNpc("npc_farmer_irfan", "NPC_CiftciIrfan", "Çiftçi İrfan Amca ile Konuş", "Talk to Farmer İrfan", template, new Vector3(160.2f, 0.04f, -10.2f), -45f, new Color(0.46f, 0.54f, 0.22f));
 
             // Sport WorldAnchors for M24 objective beacon guidance
             SpawnZoneAnchor("sport_swim_race", new Vector3(8.4f, 1.45f, -36.4f), 8f);
             SpawnZoneAnchor("sport_diving_board", new Vector3(8.4f, 1.45f, -40.0f), 8f);
 
             // Glowing Mission Story Pickups (visible only while their mission is active!)
-            SpawnStoryPickup("m23_sunken_watch", "m23_goletin_batik_yadigari", new Vector3(-191.0f, -0.55f, 3.8f),
-                new Color(1.0f, 0.86f, 0.28f), new Vector3(0.56f, 0.36f, 0.42f), "Batık Gümüş Cep Saati Sandığını Çıkar");
+            SpawnStoryPickup("m23_sunken_watch", "m23_goletin_batik_yadigari", new Vector3(-189.0f, -1.25f, 3.8f),
+                new Color(1.0f, 0.86f, 0.28f), new Vector3(0.56f, 0.36f, 0.42f),
+                "Batık Gümüş Cep Saati Sandığını Çıkar", "Retrieve Sunken Silver Pocket Watch Chest");
             SpawnStoryPickup("m25_goat_cheese_crate", "m25_aydos_solen_sofrasi", new Vector3(163.5f, 0.06f, -11.5f),
-                new Color(0.96f, 0.90f, 0.66f), new Vector3(0.58f, 0.38f, 0.46f), "Taze Köy Peyniri Sepetini Al");
+                new Color(0.96f, 0.90f, 0.66f), new Vector3(0.58f, 0.38f, 0.46f),
+                "Taze Köy Peyniri Sepetini Al", "Pick Up Fresh Village Cheese Basket");
             SpawnStoryPickup("m25_festival_simit_tray", "m25_aydos_solen_sofrasi", new Vector3(-16.0f, 0.06f, 181.2f),
-                new Color(0.94f, 0.64f, 0.22f), new Vector3(0.62f, 0.24f, 0.46f), "Şölen Simit Tepsisini Al");
+                new Color(0.94f, 0.64f, 0.22f), new Vector3(0.62f, 0.24f, 0.46f),
+                "Şölen Simit Tepsisini Al", "Pick Up Festival Simit Tray");
         }
 
-        private Transform SpawnStoryNpc(string anchorId, string objName, string prompt, ProceduralHumanoid template, Vector3 pos, float yaw, Color shirtColor)
+        private Transform SpawnStoryNpc(string anchorId, string objName, string promptTr, string promptEn, ProceduralHumanoid template, Vector3 pos, float yaw, Color shirtColor)
         {
             ProceduralHumanoid hum = Instantiate(template, transform);
             hum.name = objName;
@@ -332,7 +336,7 @@ namespace OurWorld.Missions
             hum.gameObject.AddComponent<WorldAnchor>().Configure(anchorId, 3.4f, new Vector3(0f, 2.25f, 0f));
             InteractableTrigger trig = hum.gameObject.AddComponent<InteractableTrigger>();
             trig.Configure(InteractableKind.Npc, anchorId, "ui.btn.talk", 3.4f);
-            trig.SetCustomPrompt(prompt);
+            trig.SetCustomPrompt(promptTr, promptEn);
             return hum.transform;
         }
 
@@ -344,7 +348,7 @@ namespace OurWorld.Missions
             z.AddComponent<WorldAnchor>().Configure(anchorId, radius, new Vector3(0f, 2.2f, 0f));
         }
 
-        private void SpawnStoryPickup(string anchorId, string missionId, Vector3 pos, Color glowColor, Vector3 scale, string prompt)
+        private void SpawnStoryPickup(string anchorId, string missionId, Vector3 pos, Color glowColor, Vector3 scale, string promptTr, string promptEn)
         {
             GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "StoryPickup_" + anchorId;
@@ -367,8 +371,8 @@ namespace OurWorld.Missions
 
             go.AddComponent<WorldAnchor>().Configure(anchorId, 3.0f, new Vector3(0f, 1.4f, 0f));
             InteractableTrigger trig = go.AddComponent<InteractableTrigger>();
-            trig.Configure(InteractableKind.PickupPackage, anchorId, "ui.btn.interact", 3.2f);
-            trig.SetCustomPrompt(prompt);
+            trig.Configure(InteractableKind.PickupPackage, anchorId, "ui.btn.interact", 3.4f);
+            trig.SetCustomPrompt(promptTr, promptEn);
 
             go.SetActive(false);
             _pickups.Add(new StoryPickup { Go = go, AnchorId = anchorId, MissionId = missionId });
@@ -425,17 +429,33 @@ namespace OurWorld.Missions
             }
 
             // Friendly ambient chatter when talking to Chapter 6 story NPCs outside their active step!
+            bool en = LocalizationService.IsEnglish;
             string id = trig.InteractableId;
             if (id == "npc_simitci_ahmet")
-                NpcSpeechBubbleManager.Say(trig.transform, "Simitçi Ahmet Amca", "Günaydın Deniz! Tezgahta sıcacık simitler hazır, 1984 hatıraları da aklımda!", 4.2f, NpcBubbleMood.Mission);
+                NpcSpeechBubbleManager.Say(trig.transform,
+                    en ? "Simit Seller Ahmet" : "Simitçi Ahmet Amca",
+                    en ? "Good morning Deniz! Fresh warm simits on the cart, and 1984 memories in mind!" : "Günaydın Deniz! Tezgahta sıcacık simitler hazır, 1984 hatıraları da aklımda!",
+                    4.2f, NpcBubbleMood.Mission);
             else if (id == "npc_cayci_riza")
-                NpcSpeechBubbleManager.Say(trig.transform, "Çaycı Rıza Usta", "Hoş geldin evladım, çınar altında tavşan kanı çayımız her daim taze!", 4.2f, NpcBubbleMood.Friendly);
+                NpcSpeechBubbleManager.Say(trig.transform,
+                    en ? "Tea Master Rıza" : "Çaycı Rıza Usta",
+                    en ? "Welcome neighbor, our crimson Turkish tea under the plane tree is always fresh!" : "Hoş geldin evladım, çınar altında tavşan kanı çayımız her daim taze!",
+                    4.2f, NpcBubbleMood.Friendly);
             else if (id == "npc_kaptan_tarik")
-                NpcSpeechBubbleManager.Say(trig.transform, "Kaptan Tarık", "Kuğular bugün bir başka zarif yüzüyor Deniz. Göletin suları eski hatıralarla dolu...", 4.4f, NpcBubbleMood.Mission);
+                NpcSpeechBubbleManager.Say(trig.transform,
+                    en ? "Captain Tarık" : "Kaptan Tarık",
+                    en ? "The swans glide gracefully today, Deniz. These lake waters hold old memories..." : "Kuğular bugün bir başka zarif yüzüyor Deniz. Göletin suları eski hatıralarla dolu...",
+                    4.4f, NpcBubbleMood.Mission);
             else if (id == "npc_havuz_selin")
-                NpcSpeechBubbleManager.Say(trig.transform, "Yüzme Hakemi Selin", "Havuzda 50m yarışa ya da tramplen dalışına hazırsan başlangıç bloğu seni bekliyor!", 4.2f, NpcBubbleMood.Friendly);
+                NpcSpeechBubbleManager.Say(trig.transform,
+                    en ? "Swim Referee Selin" : "Yüzme Hakemi Selin",
+                    en ? "Ready for a 50m race or springboard dive? The starting block is waiting for you!" : "Havuzda 50m yarışa ya da tramplen dalışına hazırsan başlangıç bloğu seni bekliyor!",
+                    4.2f, NpcBubbleMood.Friendly);
             else if (id == "npc_farmer_irfan")
-                NpcSpeechBubbleManager.Say(trig.transform, "Çiftçi İrfan Amca", "Aydos Çiftliği bereket saçıyor! Yeni keçilerimiz Akkız ve Kınalı seni görünce sevindi.", 4.2f, NpcBubbleMood.Friendly);
+                NpcSpeechBubbleManager.Say(trig.transform,
+                    en ? "Farmer İrfan" : "Çiftçi İrfan Amca",
+                    en ? "Aydos Farm is thriving! Our goats Akkız and Kınalı are happy to see you." : "Aydos Çiftliği bereket saçıyor! Yeni keçilerimiz Akkız ve Kınalı seni görünce sevindi.",
+                    4.2f, NpcBubbleMood.Friendly);
         }
     }
 }

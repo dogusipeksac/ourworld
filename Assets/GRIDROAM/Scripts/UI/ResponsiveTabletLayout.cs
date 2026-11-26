@@ -1,13 +1,17 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace OurWorld.UI
 {
     /// <summary>
-    /// Ensures ergonomic, mobile-first touch control sizes across phones (16:9 / 20:9 iPhone & Android)
+    /// Ensures ergonomic, mobile-standard touch control sizes across phones (16:9 / 19.5:9 / 20:9 iPhone & Android)
     /// and tablets (4:3 iPad / 16:10 Android tablets / foldables) at runtime with zero scene rebuild required.
-    /// Enlarges the movement joystick, on-foot action buttons, car steering/pedals, interact pill, and top
-    /// utility buttons to comfortable real-world thumb targets and reacts live to screen/window resizes.
+    /// - Uses phone-first CanvasScaler reference scaling (~1613x907 height-weighted on phones) so thumb targets
+    ///   hit authentic mobile gaming standards (20-24mm joystick, 12-15mm action buttons, 6-7mm interact/menu pills)
+    /// - Avoids macOS/Windows Editor DPI misclassification when simulating iPhone resolutions in Game View
+    /// - Enlarges and cleanly aligns the movement joystick, on-foot action arc, car steering/pedals/utility bar,
+    ///   interact pill, phone guide, menu, backpack, and photo buttons with zero overlap.
     /// </summary>
     public sealed class ResponsiveTabletLayout : MonoBehaviour
     {
@@ -24,6 +28,12 @@ namespace OurWorld.UI
         private RectTransform _camZone;
         private RectTransform _phonePanel;
         private RectTransform _phoneBtn;
+        private RectTransform _statusCard;
+        private RectTransform _mainMenuBtn;
+        private RectTransform _backpackBtn;
+        private RectTransform _photoBtn;
+        private RectTransform _drivingUtilBar;
+        private RectTransform _backpackCard;
 
         // Touch control RectTransforms resized for real mobile ergonomics
         private RectTransform _joyBg;
@@ -78,6 +88,16 @@ namespace OurWorld.UI
         {
             CacheReferences();
             ApplyResponsiveLayout(force: true);
+            StartCoroutine(LateReapplyRuntimeControlsRoutine());
+        }
+
+        private IEnumerator LateReapplyRuntimeControlsRoutine()
+        {
+            // Wait 2 frames so MainMenuController, MobileDrivingAndPhotoHud & BackpackPanelController finish spawning HUD buttons
+            yield return null;
+            yield return null;
+            CacheReferences();
+            ApplyResponsiveLayout(force: true);
         }
 
         private void Update()
@@ -117,6 +137,16 @@ namespace OurWorld.UI
             if (_camZone == null) _camZone = FindChildRect(scope, "CameraTouchZone");
             if (_phonePanel == null) _phonePanel = FindChildRect(scope, "PhonePanel");
             if (_phoneBtn == null) _phoneBtn = FindChildRect(scope, "Btn_Phone");
+            if (_statusCard == null) _statusCard = FindChildRect(scope, "StatusCard_TopRight");
+            if (_mainMenuBtn == null) _mainMenuBtn = FindChildRect(scope, "Btn_MainMenu");
+            if (_backpackBtn == null) _backpackBtn = FindChildRect(scope, "Btn_Backpack");
+            if (_photoBtn == null) _photoBtn = FindChildRect(scope, "Btn_PhotoMode");
+            if (_drivingUtilBar == null) _drivingUtilBar = FindChildRect(scope, "MobileDrivingUtilityBar");
+
+            if (_backpackCard == null && BackpackPanelController.Instance != null)
+            {
+                _backpackCard = FindChildRect(BackpackPanelController.Instance.transform, "BackpackCard");
+            }
 
             if (_joyBg == null) _joyBg = FindChildRect(scope, "VirtualJoystick_BG");
             if (_joyRing == null) _joyRing = FindChildRect(scope, "Joystick_Ring");
@@ -160,28 +190,46 @@ namespace OurWorld.UI
             CacheReferences();
 
             float aspect = (float)w / h;
-            float dpi = (Screen.dpi >= 72f && Screen.dpi <= 700f) ? Screen.dpi : 0f;
+            // Only trust Screen.dpi for physical tablet detection on real mobile hardware —
+            // in macOS/Windows Editor Game View, Screen.dpi is the host monitor's DPI, which would falsely flag iPhone 12 Pro as a 19" tablet!
+            bool trustPhysicalDpi = Application.isMobilePlatform && !Application.isEditor;
+            float dpi = (trustPhysicalDpi && Screen.dpi >= 72f && Screen.dpi <= 700f) ? Screen.dpi : 0f;
             float diagInches = dpi > 0f ? Mathf.Sqrt(w * w + h * h) / dpi : 0f;
 
-            bool isPhysicalTablet = diagInches >= 7.2f;
+            bool isPhysicalTablet = trustPhysicalDpi && diagInches >= 7.2f;
             bool isTabletAspect = aspect <= 1.66f;
             bool tabletMode = isPhysicalTablet || isTabletAspect;
             IsTabletLayoutActive = tabletMode;
 
-            // Keep buttons ergonomic in real physical size on big 10"-13" tablets instead of swelling oversized
-            float physicalScaleBoost = 1.0f;
-            if (diagInches >= 8.0f)
-            {
-                physicalScaleBoost = Mathf.Lerp(1.08f, 1.24f, Mathf.InverseLerp(8.0f, 13.0f, diagInches));
-            }
-            else if (isTabletAspect)
-            {
-                physicalScaleBoost = Mathf.Lerp(1.10f, 1.04f, Mathf.InverseLerp(1.25f, 1.66f, aspect));
-            }
+            // Phone-first mobile gaming standard scale vs ergonomic tablet scale
+            float targetRefW;
+            float targetRefH;
+            float match;
 
-            float targetRefW = BaseRefWidth * physicalScaleBoost;
-            float targetRefH = BaseRefHeight * physicalScaleBoost;
-            float match = isTabletAspect ? 0.0f : (isPhysicalTablet ? 0.25f : 0.50f);
+            if (tabletMode)
+            {
+                float tabletBoost = 1.04f;
+                if (trustPhysicalDpi && diagInches >= 8.0f)
+                {
+                    tabletBoost = Mathf.Lerp(1.08f, 1.24f, Mathf.InverseLerp(8.0f, 13.0f, diagInches));
+                }
+                else if (isTabletAspect)
+                {
+                    tabletBoost = Mathf.Lerp(1.10f, 1.04f, Mathf.InverseLerp(1.25f, 1.66f, aspect));
+                }
+                targetRefW = BaseRefWidth * tabletBoost;
+                targetRefH = BaseRefHeight * tabletBoost;
+                match = isTabletAspect ? 0.0f : 0.25f;
+            }
+            else
+            {
+                // Phones (16:9 / 19.5:9 / 20:9): lower reference resolution + height-weighted match=0.88
+                // brings touch controls directly into GTA / PUBG / Genshin mobile thumb-size standards!
+                float phoneRefScale = (trustPhysicalDpi && diagInches >= 6.45f) ? 0.88f : 0.84f;
+                targetRefW = BaseRefWidth * phoneRefScale;
+                targetRefH = BaseRefHeight * phoneRefScale;
+                match = 0.88f;
+            }
 
             ApplyToAllCanvasScalers(targetRefW, targetRefH, match);
             ApplyMobileTouchControlErgonomics(tabletMode);
@@ -200,95 +248,105 @@ namespace OurWorld.UI
             else
             {
                 if (_missionBox != null) _missionBox.sizeDelta = _origMissionSize;
-                if (_joyZone != null) _joyZone.anchorMax = new Vector2(0.44f, 0.72f);
-                if (_camZone != null) _camZone.anchorMin = new Vector2(0.44f, 0f);
+                if (_joyZone != null) _joyZone.anchorMax = new Vector2(0.45f, 0.72f);
+                if (_camZone != null) _camZone.anchorMin = new Vector2(0.45f, 0f);
             }
 
-            // Guarantee Phone/Map modal fits cleanly inside any aspect ratio (including 4:3 iPad & Split-Screen)
-            if (_phonePanel != null)
+            // Guarantee modal panels fit cleanly inside any aspect ratio (compact phones, 4:3 iPad & Split-Screen)
+            float effW = targetRefW;
+            float effH = targetRefW / Mathf.Max(0.5f, aspect);
+            if (match > 0.01f)
             {
-                float effW = targetRefW;
-                float effH = targetRefW / Mathf.Max(0.5f, aspect);
-                if (match > 0.01f)
-                {
-                    float logW = Mathf.Log(w / targetRefW, 2f);
-                    float logH = Mathf.Log(h / targetRefH, 2f);
-                    float scale = Mathf.Pow(2f, Mathf.Lerp(logW, logH, match));
-                    effW = w / Mathf.Max(0.01f, scale);
-                    effH = h / Mathf.Max(0.01f, scale);
-                }
-
-                Vector2 panelSize = _phonePanel.sizeDelta;
-                if (panelSize.x > 100f && panelSize.y > 100f)
-                {
-                    float fitX = (effW - 64f) / panelSize.x;
-                    float fitY = (effH - 64f) / panelSize.y;
-                    float fitScale = Mathf.Clamp(Mathf.Min(fitX, fitY), 0.62f, 1.0f);
-                    _phonePanel.localScale = Vector3.one * fitScale;
-                }
+                float logW = Mathf.Log(w / targetRefW, 2f);
+                float logH = Mathf.Log(h / targetRefH, 2f);
+                float scale = Mathf.Pow(2f, Mathf.Lerp(logW, logH, match));
+                effW = w / Mathf.Max(0.01f, scale);
+                effH = h / Mathf.Max(0.01f, scale);
             }
+            FitModalToCanvas(_phonePanel, effW, effH);
+            FitModalToCanvas(_backpackCard, effW, effH);
+        }
+
+        private static void FitModalToCanvas(RectTransform panel, float effW, float effH)
+        {
+            if (panel == null) return;
+            Vector2 panelSize = panel.sizeDelta;
+            if (panelSize.x <= 100f || panelSize.y <= 100f) return;
+            float fitX = (effW - 56f) / panelSize.x;
+            float fitY = (effH - 56f) / panelSize.y;
+            float fitScale = Mathf.Clamp(Mathf.Min(fitX, fitY), 0.62f, 1.0f);
+            panel.localScale = Vector3.one * fitScale;
         }
 
         private void ApplyMobileTouchControlErgonomics(bool tabletMode)
         {
-            // 1. Movement Virtual Joystick — generous 284px base, 116px knob, 96px smooth analog range
-            Vector2 joyRestPos = new Vector2(198f, 186f);
+            // 1. Movement Virtual Joystick — mobile-standard 316px base / 130px knob on phones (20-24mm physical!)
+            float joySize = tabletMode ? 284f : 316f;
+            float knobSize = tabletMode ? 116f : 130f;
+            float joyRange = tabletMode ? 96f : 106f;
+            Vector2 joyRestPos = tabletMode ? new Vector2(198f, 186f) : new Vector2(212f, 198f);
             if (_joyBg != null)
             {
-                _joyBg.sizeDelta = new Vector2(284f, 284f);
+                _joyBg.sizeDelta = new Vector2(joySize, joySize);
                 _joyBg.anchoredPosition = joyRestPos;
             }
-            if (_joyRing != null) _joyRing.sizeDelta = new Vector2(284f, 284f);
-            if (_joyHandle != null) _joyHandle.sizeDelta = new Vector2(116f, 116f);
-            if (_virtualJoystick != null) _virtualJoystick.ConfigureSizing(96f, joyRestPos);
+            if (_joyRing != null) _joyRing.sizeDelta = new Vector2(joySize, joySize);
+            if (_joyHandle != null) _joyHandle.sizeDelta = new Vector2(knobSize, knobSize);
+            if (_virtualJoystick != null) _virtualJoystick.ConfigureSizing(joyRange, joyRestPos);
 
-            // 2. On-Foot Right-Thumb Action Arc (Sprint / Jump / Attack)
+            // 2. On-Foot Right-Thumb Action Arc (Sprint / Attack / Jump) — 12-15mm phone-standard targets!
             if (_sprintBtn != null)
             {
-                _sprintBtn.anchoredPosition = new Vector2(-42f, 46f);
-                _sprintBtn.sizeDelta = new Vector2(168f, 168f);
+                _sprintBtn.anchoredPosition = tabletMode ? new Vector2(-42f, 46f) : new Vector2(-36f, 42f);
+                _sprintBtn.sizeDelta = tabletMode ? new Vector2(168f, 168f) : new Vector2(188f, 188f);
             }
             if (_jumpBtn != null)
             {
-                _jumpBtn.anchoredPosition = new Vector2(-52f, 238f);
-                _jumpBtn.sizeDelta = new Vector2(150f, 150f);
+                _jumpBtn.anchoredPosition = tabletMode ? new Vector2(-52f, 238f) : new Vector2(-44f, 254f);
+                _jumpBtn.sizeDelta = tabletMode ? new Vector2(152f, 152f) : new Vector2(176f, 176f);
             }
             if (_attackBtn != null)
             {
-                _attackBtn.anchoredPosition = new Vector2(-234f, 54f);
-                _attackBtn.sizeDelta = new Vector2(150f, 150f);
+                _attackBtn.anchoredPosition = tabletMode ? new Vector2(-234f, 54f) : new Vector2(-248f, 50f);
+                _attackBtn.sizeDelta = tabletMode ? new Vector2(154f, 154f) : new Vector2(188f, 188f);
             }
 
             // 3. Driving Controls — large racing-game thumb steering & pedals
             if (_steerLeftBtn != null)
             {
-                _steerLeftBtn.anchoredPosition = new Vector2(38f, 48f);
-                _steerLeftBtn.sizeDelta = new Vector2(196f, 178f);
+                _steerLeftBtn.anchoredPosition = tabletMode ? new Vector2(38f, 48f) : new Vector2(34f, 44f);
+                _steerLeftBtn.sizeDelta = tabletMode ? new Vector2(196f, 178f) : new Vector2(216f, 196f);
             }
             if (_steerRightBtn != null)
             {
-                _steerRightBtn.anchoredPosition = new Vector2(258f, 48f);
-                _steerRightBtn.sizeDelta = new Vector2(196f, 178f);
+                _steerRightBtn.anchoredPosition = tabletMode ? new Vector2(258f, 48f) : new Vector2(272f, 44f);
+                _steerRightBtn.sizeDelta = tabletMode ? new Vector2(196f, 178f) : new Vector2(216f, 196f);
             }
             if (_gasBtn != null)
             {
-                _gasBtn.anchoredPosition = new Vector2(-38f, 48f);
-                _gasBtn.sizeDelta = new Vector2(180f, 228f);
+                _gasBtn.anchoredPosition = tabletMode ? new Vector2(-38f, 48f) : new Vector2(-34f, 44f);
+                _gasBtn.sizeDelta = tabletMode ? new Vector2(180f, 228f) : new Vector2(198f, 248f);
             }
             if (_brakeBtn != null)
             {
-                _brakeBtn.anchoredPosition = new Vector2(-242f, 48f);
-                _brakeBtn.sizeDelta = new Vector2(176f, 178f);
+                _brakeBtn.anchoredPosition = tabletMode ? new Vector2(-242f, 48f) : new Vector2(-254f, 44f);
+                _brakeBtn.sizeDelta = tabletMode ? new Vector2(176f, 178f) : new Vector2(192f, 196f);
             }
             if (_handbrakeBtn != null)
             {
-                _handbrakeBtn.anchoredPosition = new Vector2(-242f, 248f);
-                _handbrakeBtn.sizeDelta = new Vector2(176f, 82f);
+                _handbrakeBtn.anchoredPosition = tabletMode ? new Vector2(-242f, 248f) : new Vector2(-254f, 260f);
+                _handbrakeBtn.sizeDelta = tabletMode ? new Vector2(176f, 84f) : new Vector2(192f, 94f);
             }
             if (_exitCarBtn != null)
             {
-                _exitCarBtn.anchoredPosition = new Vector2(-38f, 298f);
-                _exitCarBtn.sizeDelta = new Vector2(180f, 82f);
+                _exitCarBtn.anchoredPosition = tabletMode ? new Vector2(-38f, 298f) : new Vector2(-34f, 312f);
+                _exitCarBtn.sizeDelta = tabletMode ? new Vector2(180f, 84f) : new Vector2(198f, 94f);
+            }
+
+            if (_drivingUtilBar != null)
+            {
+                _drivingUtilBar.anchoredPosition = new Vector2(0f, -20f);
+                _drivingUtilBar.sizeDelta = tabletMode ? new Vector2(490f, 60f) : new Vector2(540f, 68f);
             }
 
             // Center speedometer cleanly between left steer arrows and right pedals
@@ -302,24 +360,54 @@ namespace OurWorld.UI
                 _speedGroup.offsetMax = new Vector2(halfW, 40f + height);
             }
 
-            // 4. Shared Interact Pill — tall, thumb-friendly & centered cleanly between left/right clusters
+            // 4. Shared Interact Pill — tall, unmistakable mobile thumb pill centered between left/right clusters
             if (_interactBtn != null)
             {
-                float baseY = tabletMode ? 86f : 74f;
+                float baseY = tabletMode ? 86f : 80f;
+                float minW = tabletMode ? 340f : 364f;
+                float pillH = tabletMode ? 86f : 94f;
                 _interactBtn.anchoredPosition = new Vector2(0f, baseY);
-                _interactBtn.sizeDelta = new Vector2(Mathf.Max(_interactBtn.sizeDelta.x, 316f), 84f);
-                UnityEngine.UI.Text lbl = _interactBtn.GetComponentInChildren<UnityEngine.UI.Text>(true);
-                if (lbl != null) lbl.fontSize = 26;
+                _interactBtn.sizeDelta = new Vector2(Mathf.Max(_interactBtn.sizeDelta.x, minW), pillH);
+                Text lbl = _interactBtn.GetComponentInChildren<Text>(true);
+                if (lbl != null) lbl.fontSize = tabletMode ? 26 : 28;
                 if (_hudController != null) _hudController.SetInteractBaseY(baseY);
             }
 
-            // 5. Top-Left Phone / Town Guide button — roomier mobile tap target
+            // 5. Top-Left Phone / Town Guide button — generous phone tap target
             if (_phoneBtn != null)
             {
-                _phoneBtn.anchoredPosition = new Vector2(28f, -206f);
-                _phoneBtn.sizeDelta = new Vector2(188f, 64f);
-                UnityEngine.UI.Text pLbl = _phoneBtn.GetComponentInChildren<UnityEngine.UI.Text>(true);
-                if (pLbl != null) pLbl.fontSize = 22;
+                _phoneBtn.anchoredPosition = new Vector2(24f, -206f);
+                _phoneBtn.sizeDelta = tabletMode ? new Vector2(198f, 66f) : new Vector2(214f, 72f);
+                Text pLbl = _phoneBtn.GetComponentInChildren<Text>(true);
+                if (pLbl != null) pLbl.fontSize = tabletMode ? 22 : 24;
+            }
+
+            // 6. Top-Right Utility Cluster (StatusCard + Menu + Backpack + Photo) — ZERO overlap, roomy mobile hitboxes!
+            if (_statusCard != null)
+            {
+                _statusCard.anchoredPosition = new Vector2(-24f, -14f);
+                _statusCard.sizeDelta = new Vector2(336f, 92f);
+            }
+            if (_mainMenuBtn != null)
+            {
+                _mainMenuBtn.anchoredPosition = new Vector2(-24f, -114f);
+                _mainMenuBtn.sizeDelta = tabletMode ? new Vector2(174f, 64f) : new Vector2(176f, 70f);
+                Text mLbl = _mainMenuBtn.GetComponentInChildren<Text>(true);
+                if (mLbl != null) mLbl.fontSize = tabletMode ? 22 : 24;
+            }
+            if (_backpackBtn != null)
+            {
+                _backpackBtn.anchoredPosition = new Vector2(-210f, -114f);
+                _backpackBtn.sizeDelta = tabletMode ? new Vector2(148f, 64f) : new Vector2(150f, 70f);
+                Text bLbl = _backpackBtn.GetComponentInChildren<Text>(true);
+                if (bLbl != null) bLbl.fontSize = tabletMode ? 20 : 22;
+            }
+            if (_photoBtn != null)
+            {
+                _photoBtn.anchoredPosition = new Vector2(-24f, tabletMode ? -188f : -194f);
+                _photoBtn.sizeDelta = tabletMode ? new Vector2(138f, 54f) : new Vector2(144f, 60f);
+                Text phLbl = _photoBtn.GetComponentInChildren<Text>(true);
+                if (phLbl != null) phLbl.fontSize = tabletMode ? 19 : 21;
             }
         }
 

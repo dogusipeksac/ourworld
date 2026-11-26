@@ -148,8 +148,8 @@ namespace OurWorld.UI
                         lrt.offsetMin = lrt.offsetMax = Vector2.zero;
                         label.alignment = TextAnchor.MiddleCenter;
                         label.resizeTextForBestFit = true;
-                        label.resizeTextMinSize = 15;
-                        label.resizeTextMaxSize = Mathf.Max(18, Mathf.RoundToInt(label.fontSize * 0.85f));
+                        label.resizeTextMinSize = 18;
+                        label.resizeTextMaxSize = Mathf.Max(24, Mathf.RoundToInt(label.fontSize * 0.92f));
                         if (!string.IsNullOrEmpty(e.captionKey))
                         {
                             _captions.Add((label, e.captionKey, e.captionFallback));
@@ -179,8 +179,8 @@ namespace OurWorld.UI
                         RectTransform lrt = label.rectTransform;
                         lrt.offsetMin = new Vector2(lrt.offsetMin.x + pad + iconSize * 0.85f, lrt.offsetMin.y);
                         label.resizeTextForBestFit = true;
-                        label.resizeTextMinSize = 16;
-                        label.resizeTextMaxSize = Mathf.Max(22, label.fontSize);
+                        label.resizeTextMinSize = 18;
+                        label.resizeTextMaxSize = Mathf.Max(28, label.fontSize);
                     }
                     break;
                 }

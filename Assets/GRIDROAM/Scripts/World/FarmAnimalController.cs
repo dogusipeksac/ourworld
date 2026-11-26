@@ -65,6 +65,99 @@ namespace OurWorld.World
         private float _tailFlickTimer;
         private float _tailFlickCooldown = 3.5f;
         private float _animSeed;
+        private float _lastPunchedTime = -10f;
+
+        public static bool TryReceivePlayerPunch(Vector3 strikeCenter, float radius, Vector3 attackerPos, Vector3 punchDir, int comboStep)
+        {
+            FarmAnimalController best = null;
+            float maxR = radius + 0.72f;
+            float bestDistSq = maxR * maxR;
+            for (int i = 0; i < AllAnimals.Count; i++)
+            {
+                FarmAnimalController a = AllAnimals[i];
+                if (a == null || !a.gameObject.activeInHierarchy) continue;
+                if (Time.time - a._lastPunchedTime < 0.45f) continue;
+                Vector3 d = (a.transform.position + Vector3.up * 0.65f) - strikeCenter;
+                if (Mathf.Abs(d.y) > 1.75f) continue;
+                d.y = 0f;
+                float dSq = d.sqrMagnitude;
+                if (dSq < bestDistSq)
+                {
+                    bestDistSq = dSq;
+                    best = a;
+                }
+            }
+            if (best == null) return false;
+            best.OnPunchedByPlayer(attackerPos, punchDir, comboStep);
+            return true;
+        }
+
+        private void OnPunchedByPlayer(Vector3 attackerPos, Vector3 punchDir, int comboStep)
+        {
+            _lastPunchedTime = Time.time;
+            _happyAnimTimer = 0f;
+            _feedEatingTimer = 0f;
+            _interactionPauseTimer = 0f;
+            // Frightened farm animals stop producing for a full cycle!
+            _productReady = false;
+            _produceTimer = _produceInterval;
+            RefreshReadyVisualsAndPrompt();
+
+            bool en = IsEn;
+            NeighborhoodConsequenceSystem cons = NeighborhoodConsequenceSystem.EnsureInstance();
+            cons.PlayFarmAlarm(0.74f);
+
+            Vector3 away = transform.position - attackerPos;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.01f ? away.normalized : (punchDir.sqrMagnitude > 0.01f ? punchDir.normalized : transform.forward);
+
+            if (_kind == FarmAnimalKind.Cow)
+            {
+                // Angry cow turns & kicks/rams back hard!
+                transform.rotation = Quaternion.LookRotation(-away, Vector3.up);
+                NpcSpeechBubbleManager.Say(transform, _displayName, en ? "MOOOOO!! 🐄" : "MÖÖÖÖ!! 🐄", 3.0f, NpcBubbleMood.Alert, 1.85f);
+                PlayerNeedsController.Instance?.TakeDamage(20f, transform.position, en ? $"{_displayName} the Cow" : $"{_displayName} İneği", heavyHit: true);
+                cons.ReportOffense(NeighborhoodOffenseKind.HarmAnimal, transform.position, _displayName, repPenalty: 12, immediateFineTl: 35, heatDelta: 1.25f);
+            }
+            else if (_kind == FarmAnimalKind.Sheep)
+            {
+                bool ramBack = Random.value < 0.55f;
+                NpcSpeechBubbleManager.Say(transform, _displayName, en ? "BAAAA!! 🐑" : "MEEEE!! 🐑", 2.8f, NpcBubbleMood.Alert, 1.35f);
+                if (ramBack)
+                {
+                    transform.rotation = Quaternion.LookRotation(-away, Vector3.up);
+                    PlayerNeedsController.Instance?.TakeDamage(11f, transform.position, en ? $"{_displayName} the Sheep" : $"{_displayName} Koyunu", heavyHit: false);
+                }
+                else
+                {
+                    PlayerModeController.Instance?.RaiseStatusMessage(en
+                        ? $"⚠️ {_displayName} bolted in panic! (-10 Reputation)"
+                        : $"⚠️ {_displayName} panikleyerek kaçtı! (-10 Saygınlık)");
+                }
+                _targetPos = ClampInsidePasture(transform.position + away * 5.0f);
+                _idleTimer = 0f;
+                _isFleeingPlayer = true;
+                _playerReactCooldown = 5.5f;
+                cons.ReportOffense(NeighborhoodOffenseKind.HarmAnimal, transform.position, _displayName, repPenalty: 10, immediateFineTl: 0, heatDelta: 1.0f);
+            }
+            else
+            {
+                // Chicken explodes feathers & scrambles away in panic!
+                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.45f, new Color(0.98f, 0.94f, 0.82f), count: 14, spread: 0.65f);
+                NpcSpeechBubbleManager.Say(transform, _displayName, en ? "BWAWK!! 🐔" : "GUT GUT GAAAK!! 🐔", 2.6f, NpcBubbleMood.Alert, 0.95f);
+                PlayerModeController.Instance?.RaiseStatusMessage(en
+                    ? $"⚠️ {_displayName} squawked in panic — Karabaş heard it! (-8 Reputation)"
+                    : $"⚠️ {_displayName} gıdaklayarak kaçtı — Karabaş sesi duydu! (-8 Saygınlık)");
+                _targetPos = ClampInsidePasture(transform.position + away * 4.5f);
+                _idleTimer = 0f;
+                _isFleeingPlayer = true;
+                _playerReactCooldown = 5.0f;
+                cons.ReportOffense(NeighborhoodOffenseKind.HarmAnimal, transform.position, _displayName, repPenalty: 8, immediateFineTl: 0, heatDelta: 0.9f);
+            }
+
+            // Shepherd Dog Karabaş rushes to defend the farm whenever ANY livestock is harmed!
+            WorldExpansionAndFarmBuilder.Instance?.ProvokeShepherdDog(attackerPos, defendingFarm: true);
+        }
 
         private static AudioClip _cluckClip;
         private static AudioClip _mooClip;

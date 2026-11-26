@@ -164,6 +164,17 @@ namespace OurWorld.UI
                 SaveManager.Instance.ResetSave();
             }
 
+            // Immediately sync live character cosmetics, personal sedan tuning & audio ambience to fresh save state
+            if (PlayerModeController.Instance != null)
+            {
+                PlayerModeController.Instance.FootController?.ApplySavedAppearance();
+                if (PlayerModeController.Instance.PlayerSedan != null && SaveManager.Instance != null && SaveManager.Instance.Data != null)
+                {
+                    PlayerModeController.Instance.PlayerSedan.ApplyTuningFromSave(SaveManager.Instance.Data);
+                }
+            }
+            TurkishCarRadio.SetMallAmbienceActive(false);
+
             IsPauseMode = false;
             ResetConfirmRowVisibility(confirming: false);
             OpenDrawer(MenuDrawer.None);

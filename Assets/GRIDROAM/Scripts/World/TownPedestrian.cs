@@ -37,6 +37,9 @@ namespace OurWorld.World
         public static readonly List<TownPedestrian> ActiveCitizens = new List<TownPedestrian>(48);
         private static readonly RaycastHit[] WallHits = new RaycastHit[8];
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => ActiveCitizens.Clear();
+
         [SerializeField] private Vector3[] waypoints;
         [SerializeField] private SeatInteractable[] candidateSeats;
         [SerializeField] private float walkSpeed = 1.3f;
@@ -174,6 +177,9 @@ namespace OurWorld.World
         // Brave confrontation, vehicle yield & horn sidestep state
         private float _confrontTimer;
         private float _confrontPunchCooldown;
+        private float _pendingPunchTimer;
+        private bool _pendingPunchHeavy;
+        private int _confrontComboStep;
         private Vector3 _sidestepDir = Vector3.right;
         private float _sidestepPeakSpeed;
         private float _sidestepDuration = 0.85f;
@@ -214,6 +220,22 @@ namespace OurWorld.World
         public void AddFriendship(int delta)
         {
             _friendshipPoints = Mathf.Clamp(_friendshipPoints + delta, 0, 100);
+        }
+
+        public static void CalmAllAngryCitizens()
+        {
+            for (int i = 0; i < ActiveCitizens.Count; i++)
+            {
+                TownPedestrian p = ActiveCitizens[i];
+                if (p == null) continue;
+                p._confrontTimer = 0f;
+                p._pendingPunchTimer = 0f;
+                p._fleeTimer = 0f;
+                if (p._brainState == CitizenBrainState.ConfrontPlayer || p._brainState == CitizenBrainState.Fleeing)
+                {
+                    p._brainState = CitizenBrainState.Patrol;
+                }
+            }
         }
 
         public void ClearGrudgeAndMakePeace()
@@ -466,6 +488,47 @@ namespace OurWorld.World
             return trLine;
         }
 
+        private float _bumpCooldown;
+
+        /// <summary>
+        /// Real-world physical reaction when the player sprints straight into a pedestrian:
+        /// citizen stumbles aside slightly, glances back startled, and gives a natural street remark.
+        /// </summary>
+        public void OnBumpedByPlayer(Vector3 playerPos, Vector3 playerVelocity)
+        {
+            if (_bumpCooldown > 0f || _knockdownTimer > 0f || _isAirborne || _occupiedSeat != null) return;
+            _bumpCooldown = 2.6f;
+
+            Vector3 away = transform.position - playerPos;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.001f) away = playerVelocity;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.001f ? away.normalized : transform.right;
+
+            _stumbleVelocity = away * 2.4f;
+            _idleTimer = Mathf.Max(_idleTimer, 1.35f);
+            BeginSmoothFace(-away);
+            humanoid?.PlayStartled(0.68f, playerPos);
+
+            bool en = IsEnglish;
+            string[] trLines =
+            {
+                "Önüne baksana kardeşim!",
+                "Pardon?! Biraz dikkat etsene!",
+                "Yavaş ol, çarpıyordun!",
+                "Hop! Nereye bu acele?"
+            };
+            string[] enLines =
+            {
+                "Hey, watch where you're going!",
+                "Whoa, easy there!",
+                "Excuse me?! Slow down a bit!",
+                "Careful, almost knocked me over!"
+            };
+            string line = en ? enLines[Random.Range(0, enLines.Length)] : trLines[Random.Range(0, trLines.Length)];
+            NpcSpeechBubbleManager.Say(transform, citizenName, line, 2.5f, NpcBubbleMood.Alert, 2.2f);
+        }
+
         public void OnPunchedByPlayer(Vector3 attackerPos, Vector3 punchDir, int comboStep = 1)
         {
             if (_hitCooldown > 0f || _knockdownTimer > 0f) return;
@@ -527,20 +590,32 @@ namespace OurWorld.World
                 react += isEn ? $" (+{coins} ₺ dropped)" : $" (+{coins} ₺ düştü)";
             }
 
-            if (isBrave && !triggerKnockdown)
+            bool willFightBack = isBrave || (string.IsNullOrEmpty(vendorShopId) && _hitCount >= 2 && Random.value < 0.65f);
+            if (willFightBack && !isBrave)
             {
-                // Brave citizen stands ground, confronts, and punches back!
+                isBrave = true;
+            }
+
+            if (willFightBack)
+            {
+                // Brave / provoked citizen squares up, chases & throws real punches that drain player Health!
                 BeginSmoothFace(-knockDir);
-                _confrontTimer = 7.0f;
-                _confrontPunchCooldown = 0.9f;
-                _brainState = CitizenBrainState.ConfrontPlayer;
-                if (humanoid != null) humanoid.PlayCombatMove(1);
-                if (PlayerNeedsController.Instance != null)
+                _confrontTimer = 11.5f;
+                _confrontPunchCooldown = triggerKnockdown ? 0.45f : 0.55f;
+                _pendingPunchTimer = 0f;
+                _fleeTimer = 0f;
+                if (!triggerKnockdown)
                 {
-                    PlayerNeedsController.Instance.ConsumeEnergy(6f);
+                    _brainState = CitizenBrainState.ConfrontPlayer;
+                    string[] fightTr = { "Bana mı vurdun?! Al sana!", "Kiminle uğraştığını bilmiyorsun!", "Öyle kolay kaçamazsın, gel buraya!" };
+                    string[] fightEn = { "You hit me?! Take that!", "You picked the wrong neighbor!", "Oh, you want a fight? Bring it!" };
+                    bubbleText = isEn ? fightEn[Random.Range(0, fightEn.Length)] : fightTr[Random.Range(0, fightTr.Length)];
+                    react = $"{citizenName}: {bubbleText}";
                 }
-                bubbleText = isEn ? "You hit me?! Take that!" : "Bana mı vurdun?! Al sana!";
-                react = isEn ? $"{citizenName}: {bubbleText} (-6 Energy)" : $"{citizenName}: {bubbleText} (-6 Enerji)";
+                else
+                {
+                    _brainState = CitizenBrainState.KnockedDown;
+                }
             }
             else
             {
@@ -551,6 +626,13 @@ namespace OurWorld.World
 
             NpcSpeechBubbleManager.Say(transform, citizenName, bubbleText, 3.2f, NpcBubbleMood.Alert);
             NpcWorldAwareness.NotifyViolence(transform.position, attackerPos, this);
+            NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                string.IsNullOrEmpty(vendorShopId) ? NeighborhoodOffenseKind.AssaultCitizen : NeighborhoodOffenseKind.AssaultStaffOrAuthority,
+                transform.position,
+                citizenName,
+                repPenalty: string.IsNullOrEmpty(vendorShopId) ? 12 : 16,
+                immediateFineTl: 0,
+                heatDelta: 1.15f);
 
             if (PlayerModeController.Instance != null)
             {
@@ -594,6 +676,16 @@ namespace OurWorld.World
             _idleTimer = 0f;
 
             float downDuration = Mathf.Clamp(3.4f + carSpeedKmh * 0.045f, 3.6f, 6.0f);
+            if (carSpeedKmh >= 8f)
+            {
+                NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
+                    NeighborhoodOffenseKind.HitPedestrianWithCar,
+                    transform.position,
+                    citizenName,
+                    repPenalty: 18,
+                    immediateFineTl: 75,
+                    heatDelta: 1.8f);
+            }
             _knockdownTimer = downDuration;
             _fleeTimer = 7.5f;
             _fleeDirection = impactDir;
@@ -669,6 +761,13 @@ namespace OurWorld.World
             _playerGreetCooldown = Random.Range(4f, 12f);
             _socialChatCooldown = Random.Range(6f, 18f);
             _curiosityCooldown = Random.Range(8f, 20f);
+
+            // Realistic neighborhood variety: ~45% of non-vendor citizens will stand up and fight back if assaulted!
+            if (!isBrave && string.IsNullOrEmpty(vendorShopId))
+            {
+                int seedHash = (citizenName ?? gameObject.name).GetHashCode() ^ Mathf.RoundToInt(transform.position.x * 13f + transform.position.z * 7f);
+                isBrave = (Mathf.Abs(seedHash) % 100) < 45;
+            }
         }
 
         private void OnEnable()
@@ -932,6 +1031,7 @@ namespace OurWorld.World
 
             if (_startledCooldown > 0f) _startledCooldown -= dt;
             if (_hitCooldown > 0f) _hitCooldown -= dt;
+            if (_bumpCooldown > 0f) _bumpCooldown -= dt;
             if (_vehicleHitCooldown > 0f) _vehicleHitCooldown -= dt;
             if (_carSidestepCooldown > 0f) _carSidestepCooldown -= dt;
             if (_playerGreetCooldown > 0f) _playerGreetCooldown -= dt;
@@ -1771,9 +1871,11 @@ namespace OurWorld.World
             if (_confrontPunchCooldown > 0f) _confrontPunchCooldown -= dt;
 
             PlayerModeController mode = PlayerModeController.Instance;
-            if (mode == null || _confrontTimer <= 0f)
+            bool playerKo = PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsKnockedOut;
+            if (mode == null || _confrontTimer <= 0f || playerKo || mode.IsModalLocked)
             {
                 _confrontTimer = 0f;
+                _pendingPunchTimer = 0f;
                 _brainState = CitizenBrainState.Patrol;
                 return;
             }
@@ -1781,9 +1883,10 @@ namespace OurWorld.World
             Vector3 toPlayer = mode.ActiveWorldPosition - transform.position;
             toPlayer.y = 0f;
             float dist = toPlayer.magnitude;
-            if (dist > 16f || mode.IsDriving)
+            if (dist > 19f || mode.IsDriving)
             {
                 _confrontTimer = 0f;
+                _pendingPunchTimer = 0f;
                 _brainState = CitizenBrainState.Patrol;
                 return;
             }
@@ -1795,20 +1898,40 @@ namespace OurWorld.World
                 turning = UpdateSmoothFace(dt);
             }
 
-            float spd = 0f;
-            if (dist > 1.75f)
+            // Resolve telegraphed punch impact after realistic 0.16s swing wind-up (allows fair dodging!)
+            if (_pendingPunchTimer > 0f)
             {
-                spd = 3.1f;
+                _pendingPunchTimer -= dt;
+                if (_pendingPunchTimer <= 0f && dist <= 2.30f && mode.CurrentMode == ControlMode.OnFoot)
+                {
+                    float dmg = _pendingPunchHeavy ? Random.Range(19f, 23f) : Random.Range(12f, 16f);
+                    PlayerNeedsController.Instance?.TakeDamage(dmg, transform.position, citizenName, _pendingPunchHeavy);
+                }
+            }
+
+            float spd = 0f;
+            if (dist > 1.72f)
+            {
+                spd = 3.75f;
                 Vector3 chaseDir = transform.forward;
                 MoveSafely(chaseDir * (spd * dt), ref chaseDir, false);
             }
-            else if (_confrontPunchCooldown <= 0f)
+            else if (_confrontPunchCooldown <= 0f && _pendingPunchTimer <= 0f)
             {
-                _confrontPunchCooldown = 2.0f;
-                if (humanoid != null) humanoid.PlayCombatMove(1);
-                if (PlayerNeedsController.Instance != null) PlayerNeedsController.Instance.ConsumeEnergy(5f);
-                string warn = IsEnglish ? "Back off right now!" : "Geri çekil dedim sana!";
-                NpcSpeechBubbleManager.Say(transform, citizenName, warn, 2.5f, NpcBubbleMood.Alert);
+                int combo = _confrontComboStep % 3;
+                _confrontComboStep++;
+                bool heavy = combo == 2;
+                _confrontPunchCooldown = heavy ? Random.Range(1.35f, 1.70f) : Random.Range(0.95f, 1.30f);
+                _pendingPunchTimer = heavy ? 0.19f : 0.15f;
+                _pendingPunchHeavy = heavy;
+                if (humanoid != null) humanoid.PlayCombatMove(combo);
+                if (Random.value < 0.55f)
+                {
+                    string[] trWarns = { "Al bakalım!", "Geri çekil dedim sana!", "Bir daha vurmaya kalkışma!" };
+                    string[] enWarns = { "Take that!", "Back off right now!", "You asked for this!" };
+                    string warn = IsEnglish ? enWarns[Random.Range(0, enWarns.Length)] : trWarns[Random.Range(0, trWarns.Length)];
+                    NpcSpeechBubbleManager.Say(transform, citizenName, warn, 2.3f, NpcBubbleMood.Alert);
+                }
             }
 
             if (humanoid != null)

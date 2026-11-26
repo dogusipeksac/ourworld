@@ -246,6 +246,7 @@ namespace OurWorld.World
             if (PlayerNeedsController.Instance != null)
             {
                 PlayerNeedsController.Instance.RestoreEnergy(100f);
+                PlayerNeedsController.Instance.SetHunger(100f);
             }
 
             if (d != null && d.invFishCount > 0)

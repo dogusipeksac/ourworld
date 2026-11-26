@@ -95,6 +95,8 @@ namespace OurWorld.Player
         private float _seatGestureTimer = -1f;
         private float _seatGestureDuration;
         private float _seatGestureCooldown = -1f;
+        private float _seatedCheerTimer = -1f;
+        private float _seatedCheerDuration = 1.4f;
         private Transform _doorHandle;
         private float _doorReachStarted;
         private float _doorReachDuration;
@@ -278,6 +280,7 @@ namespace OurWorld.Player
         public bool IsSeatTransitionActive => _autoSeatActive;
         public bool IsSeatedOnFloorContact => isSitting && _seatFloor.HasValue && !isDrivingSeat;
         public float KneelWeight => _kneelWeight;
+        public float LastLandImpact01 => _landImpact01;
         public bool HasUnevenGroundSample => Mathf.Abs(_leftGroundYOffset) > 0.015f || Mathf.Abs(_rightGroundYOffset) > 0.015f;
         public event Action<float> OnFootstepContact;
         public event Action OnLanded;
@@ -594,11 +597,19 @@ namespace OurWorld.Player
             ResetSeatedGesture();
         }
 
+        public void PlaySeatedCheer(float duration = 1.55f)
+        {
+            _seatedCheerDuration = Mathf.Max(0.45f, duration);
+            _seatedCheerTimer = 0f;
+            _seatGestureTimer = -1f;
+        }
+
         private void ResetSeatedGesture()
         {
             _seatGestureKind = 0;
             _seatGestureTimer = -1f;
             _seatGestureCooldown = -1f;
+            _seatedCheerTimer = -1f;
         }
 
         public void PlayDoorReach(Transform handle, float duration, float reachTime = 0.16f)
@@ -737,10 +748,10 @@ namespace OurWorld.Player
             }
             else
             {
-                hips.localPosition = new Vector3(0f, 0.08f, 0.02f);
+                hips.localPosition = new Vector3(0f, 0.105f, 0.03f);
                 hips.localRotation = Quaternion.identity;
-                if (spine != null) spine.localRotation = Quaternion.Euler(-7f, 0f, 0f);
-                if (neck != null) neck.localRotation = Quaternion.Euler(5f, 0f, 0f);
+                if (spine != null) spine.localRotation = Quaternion.Euler(-5f, 0f, 0f);
+                if (neck != null) neck.localRotation = Quaternion.Euler(4f, 0f, 0f);
                 if (head != null) head.localRotation = Quaternion.identity;
 
                 if (lHip != null) lHip.localRotation = Quaternion.Euler(-88f, 0f, -5f);

@@ -59,15 +59,6 @@ namespace OurWorld.UI
             if (Instance == this) Instance = null;
         }
 
-        private void Update()
-        {
-            if (!_isOpen) return;
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-            {
-                Close();
-            }
-        }
-
         public void Show(int initialTab = 0)
         {
             _activeTab = Mathf.Clamp(initialTab, 0, 1);

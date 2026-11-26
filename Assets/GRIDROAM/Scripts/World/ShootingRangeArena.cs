@@ -92,7 +92,7 @@ namespace OurWorld.World
         public static ShootingRangeInstaller Instance { get; private set; }
         public static LiveShootingRange ActiveRange { get; private set; }
 
-        public static readonly Vector3 RangeCenter = new Vector3(14.0f, 0.0f, -196.0f);
+        public static readonly Vector3 RangeCenter = new Vector3(92.0f, 0.0f, -222.0f);
 
         private readonly List<Material> _ownedMats = new List<Material>(24);
         private Transform _instructorHead;
@@ -242,8 +242,8 @@ namespace OurWorld.World
             Material goldMat = MakeTexturedMat("MAT_RangeGold", new Color(0.90f, 0.70f, 0.22f), null, Vector2.one, 0.52f, 0.70f);
             Material ledWarmMat = MakeEmissiveMat("MAT_RangeLED", new Color(1.0f, 0.94f, 0.80f), new Color(2.4f, 2.0f, 1.4f));
 
-            // 1. Connecting Scenic Access Road from Southern Hamidiye Avenue (local Z = +8 .. +44 -> world Z = -188 .. -152)
-            CreateBox("AccessRoad_Asphalt", root.transform, new Vector3(0f, 0.016f, 26f), new Vector3(8.5f, 0.03f, 38f), asphaltMat, collider: false);
+            // 1. Connecting Scenic Access Road from Kadife Sokağı (local Z = +9.5 .. +36.5 -> world Z = -212.5 .. -185.5, clear 51m corridor!)
+            CreateBox("AccessRoad_Asphalt", root.transform, new Vector3(0f, 0.016f, 23.0f), new Vector3(8.5f, 0.03f, 27.0f), asphaltMat, collider: false);
             CreateBox("ParkingPad", root.transform, new Vector3(0f, 0.018f, 9.5f), new Vector3(30f, 0.03f, 12f), asphaltMat, collider: false);
 
             // Entrance Archway Sign facing North (+Z toward arriving players!)
@@ -519,6 +519,14 @@ namespace OurWorld.World
                 return true;
             }
             return false;
+        }
+
+        public static void ResetAll()
+        {
+            for (int w = 0; w < 8; w++) PlayerPrefs.DeleteKey(Prefix + "w_" + w);
+            for (int u = 0; u < 8; u++) PlayerPrefs.DeleteKey(Prefix + "u_" + u);
+            for (int m = 0; m < 8; m++) PlayerPrefs.DeleteKey(Prefix + "best_" + m);
+            PlayerPrefs.Save();
         }
     }
 

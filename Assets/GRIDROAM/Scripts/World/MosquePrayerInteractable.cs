@@ -28,6 +28,13 @@ namespace OurWorld.World
         private static MosquePrayerInteractable _activePrayer;
         private static bool _hasAbdest;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _activePrayer = null;
+            _hasAbdest = false;
+        }
+
         private Coroutine _prayerRoutine;
         private PlayerModeController _prayingMode;
         private float _lastAbdestTime = -99f;

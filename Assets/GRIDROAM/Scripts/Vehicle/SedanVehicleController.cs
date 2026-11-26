@@ -100,6 +100,19 @@ namespace OurWorld.Vehicle
         private Vector3 _prevVelocity;
         private float _bodyPitch;
         private float _bodyRoll;
+        private float _shiftPitchKick;
+        private OurWorld.CameraSystem.ThirdPersonCameraRig _cachedCamRig;
+        private bool _nitroVisualActive;
+
+        // Real-world detail state: car alarm, water hydro-lock flooding, rain spray, driver crash cooldown
+        private float _alarmTimer;
+        private float _alarmPulseTimer;
+        private bool _alarmFlashOn;
+        private bool _alarmHighTone;
+        private float _deepWaterSubmergeTime;
+        private float _waterFloodTimer;
+        private float _wetSprayTimer;
+        private float _driverCrashHurtCooldown;
 
         private readonly List<Renderer> _headlightRenderers = new List<Renderer>();
         private readonly List<Renderer> _taillightRenderers = new List<Renderer>();
@@ -115,6 +128,8 @@ namespace OurWorld.Vehicle
         private bool _headlightsManualState;
         private float _nitroCharge = 1.0f;
         private float _nitroFxTimer;
+        private float _driftSmokeTimer;
+        private float _exhaustWispTimer;
         private float _driftStreakSeconds;
         private float _driftGraceTimer;
         private bool _wasNitroEmptyWarned;
@@ -155,6 +170,9 @@ namespace OurWorld.Vehicle
         };
 
         public bool IsPlayerDriving => _isPlayerDriving;
+        public bool AreHeadlightsOn => _lastHeadlightOnVisual;
+        public bool IsEngineFlooded => _waterFloodTimer > 0f;
+        public bool IsAlarmActive => _alarmTimer > 0f;
         public float SpeedKmh => _rb != null ? _rb.linearVelocity.magnitude * 3.6f : 0f;
         public float ForwardSpeedMs => _rb != null ? Vector3.Dot(_rb.linearVelocity, transform.forward) : 0f;
         public Transform BodyVisualRoot => bodyVisualRoot;
@@ -258,6 +276,63 @@ namespace OurWorld.Vehicle
             if (_rb != null && _rb.IsSleeping())
             {
                 _rb.WakeUp();
+            }
+            if (!_isPlayerDriving)
+            {
+                TriggerCarAlarm(7.5f);
+            }
+        }
+
+        /// <summary>
+        /// Triggers a real-world pulsating parked car alarm (flashing headlights/taillights + siren chirp + nearby witness shock).
+        /// </summary>
+        public void TriggerCarAlarm(float duration = 7.5f)
+        {
+            bool newlyTriggered = _alarmTimer <= 0.05f;
+            _alarmTimer = Mathf.Max(_alarmTimer, Mathf.Clamp(duration, 2.5f, 12f));
+            if (newlyTriggered)
+            {
+                _alarmPulseTimer = 0f;
+                _alarmFlashOn = true;
+                _alarmHighTone = true;
+                AlertNearbyWitnessesToAlarm();
+            }
+        }
+
+        public void SilenceCarAlarm()
+        {
+            if (_alarmTimer <= 0f && !_alarmFlashOn) return;
+            _alarmTimer = 0f;
+            _alarmFlashOn = false;
+            _headlightsInitialized = false;
+            _lastBrakingVisual = !IsBraking;
+            UpdateHeadlightState();
+        }
+
+        private void AlertNearbyWitnessesToAlarm()
+        {
+            bool en = LocalizationService.IsEnglish;
+            int alerted = 0;
+            for (int i = 0; i < TownPedestrian.ActiveCitizens.Count && alerted < 2; i++)
+            {
+                TownPedestrian ped = TownPedestrian.ActiveCitizens[i];
+                if (ped == null || ped.IsBusyOrPanicking) continue;
+                Vector3 d = ped.transform.position - transform.position;
+                d.y = 0f;
+                if (d.sqrMagnitude > 14f * 14f) continue;
+                ProceduralHumanoid hum = ped.GetComponentInChildren<ProceduralHumanoid>();
+                hum?.PlayStartled(1.0f, transform.position);
+                if (alerted == 0)
+                {
+                    NpcSpeechBubbleManager.Say(
+                        ped.transform,
+                        ped.CitizenName,
+                        en ? "Whoa! Someone's car alarm is going off!" : "Eyvah! Kimin arabasının alarmı çalıyor?!",
+                        2.8f,
+                        NpcBubbleMood.Alert,
+                        3.5f);
+                }
+                alerted++;
             }
         }
 
@@ -482,6 +557,11 @@ namespace OurWorld.Vehicle
 
         private void OnDestroy()
         {
+            if (_nitroVisualActive && _cachedCamRig != null)
+            {
+                _cachedCamRig.SetNitroBoost(false);
+                _nitroVisualActive = false;
+            }
             if (DayNightCycle.Instance != null)
             {
                 DayNightCycle.Instance.OnNightStateChanged -= HandleNightStateChanged;
@@ -545,6 +625,15 @@ namespace OurWorld.Vehicle
                     pushInward = -pushInward;
                 }
                 _damageSystem.ApplyCrashImpact(contact.point, pushInward, relSpeed, _isPlayerDriving);
+            }
+
+            // Hard crash driver whiplash / airbag injury (> ~41 km/h sudden collision impact)
+            if (_isPlayerDriving && relSpeed >= 11.4f && _driverCrashHurtCooldown <= 0f && PlayerNeedsController.Instance != null)
+            {
+                _driverCrashHurtCooldown = 1.5f;
+                float crashSeverity = Mathf.Clamp01((relSpeed - 11.4f) / 14.5f);
+                float driverDmg = Mathf.Lerp(6f, 26f, crashSeverity);
+                PlayerNeedsController.Instance.TakeVehicleCrashDamage(driverDmg, contact.point, severe: relSpeed >= 17.5f);
             }
         }
 
@@ -698,6 +787,7 @@ namespace OurWorld.Vehicle
             if (driving)
             {
                 CarryableProp.DropHeldPropIfAny();
+                SilenceCarAlarm();
             }
             UpdateSeatedDriverVisibility();
 
@@ -707,6 +797,11 @@ namespace OurWorld.Vehicle
                 CurrentGear = 0;
                 IsBraking = false;
                 IsReversing = false;
+                if (_nitroVisualActive)
+                {
+                    _nitroVisualActive = false;
+                    if (_cachedCamRig != null) _cachedCamRig.SetNitroBoost(false);
+                }
                 if (InputHub.Instance != null)
                 {
                     InputHub.Instance.ClearDrivingTouchInputs();
@@ -819,6 +914,7 @@ namespace OurWorld.Vehicle
             if (GameFeelAudio.PlayCarHorn())
             {
                 StartleNearbyPedestriansFromHorn();
+                RealWorldDetailsSystem.Instance?.NotifyPlayerCarHorn(transform.position);
             }
         }
 
@@ -851,6 +947,33 @@ namespace OurWorld.Vehicle
 
         private void Update()
         {
+            float dt = Time.deltaTime;
+            if (_driverCrashHurtCooldown > 0f)
+            {
+                _driverCrashHurtCooldown = Mathf.Max(0f, _driverCrashHurtCooldown - dt);
+            }
+
+            if (_alarmTimer > 0f)
+            {
+                _alarmTimer -= dt;
+                _alarmPulseTimer -= dt;
+                if (_alarmPulseTimer <= 0f)
+                {
+                    _alarmPulseTimer = 0.44f;
+                    _alarmFlashOn = !_alarmFlashOn;
+                    if (_alarmFlashOn)
+                    {
+                        _alarmHighTone = !_alarmHighTone;
+                        RealWorldDetailsSystem.PlayCarAlarmChirp(transform.position, _alarmHighTone);
+                    }
+                    ApplyAlarmStrobeVisuals(_alarmFlashOn);
+                }
+                if (_alarmTimer <= 0f)
+                {
+                    SilenceCarAlarm();
+                }
+            }
+
             if (!_isPlayerDriving || _inputLocked || Keyboard.current == null)
             {
                 return;
@@ -869,6 +992,32 @@ namespace OurWorld.Vehicle
             if (Keyboard.current.rKey.wasPressedThisFrame)
             {
                 CycleCarRadio();
+            }
+        }
+
+        private void ApplyAlarmStrobeVisuals(bool on)
+        {
+            if (!_lightsCached) CacheVisualReferences();
+            if (_mpb == null) _mpb = new MaterialPropertyBlock();
+
+            Color headCol = on ? new Color(1.0f, 0.72f, 0.14f) * 4.2f : Color.black;
+            for (int i = 0; i < _headlightRenderers.Count; i++)
+            {
+                Renderer r = _headlightRenderers[i];
+                if (r == null) continue;
+                r.GetPropertyBlock(_mpb);
+                _mpb.SetColor(EmissionColorId, headCol);
+                r.SetPropertyBlock(_mpb);
+            }
+
+            float tailMult = on ? 4.2f : 0.25f;
+            for (int i = 0; i < _taillightRenderers.Count; i++)
+            {
+                Renderer r = _taillightRenderers[i];
+                if (r == null) continue;
+                r.GetPropertyBlock(_mpb);
+                _mpb.SetColor(EmissionColorId, _taillightBaseEmissions[i] * tailMult);
+                r.SetPropertyBlock(_mpb);
             }
         }
 
@@ -950,18 +1099,21 @@ namespace OurWorld.Vehicle
                 handbrake = InputHub.Instance.HandbrakeHeld;
             }
 
-            float speedFactor120 = Mathf.InverseLerp(0f, 120f, speedKmh);
+            float speedFactor120 = IsReversing ? 0f : Mathf.InverseLerp(0f, 120f, speedKmh);
             float maxSteerAtSpeed = Mathf.Lerp(maxSteeringAngleLowSpeed, maxSteeringAngleHighSpeed, speedFactor120);
-            float steerRate = Mathf.Lerp(steerRateLowSpeed, steerRateHighSpeed, speedFactor120);
+            float baseSteerRate = Mathf.Lerp(Mathf.Max(steerRateLowSpeed, 165f), Mathf.Max(steerRateHighSpeed, 78f), speedFactor120);
 
             if (Mathf.Abs(steerInput) > 0.01f)
             {
                 float targetSteer = steerInput * maxSteerAtSpeed;
+                // Snappy 2.15x counter-steering boost when reversing wheel direction across center
+                bool counterSteering = _currentSteerAngle * targetSteer < -0.5f;
+                float steerRate = counterSteering ? baseSteerRate * 2.15f : baseSteerRate;
                 _currentSteerAngle = Mathf.MoveTowards(_currentSteerAngle, targetSteer, steerRate * dt);
             }
             else
             {
-                float centerRate = Mathf.Lerp(65f, 145f, Mathf.InverseLerp(0f, 60f, speedKmh));
+                float centerRate = Mathf.Lerp(110f, 185f, Mathf.InverseLerp(0f, 60f, speedKmh));
                 _currentSteerAngle = Mathf.MoveTowards(_currentSteerAngle, 0f, centerRate * dt);
             }
 
@@ -1114,6 +1266,15 @@ namespace OurWorld.Vehicle
                     _shiftTimer = shiftDuration;
                     _shiftCooldown = shiftDuration + 0.30f;
                     activeGearRatio = gearRatios[CurrentGear - 1];
+                    // Tactile gear-shift suspension nod, exhaust puff & subtle FOV kick
+                    _shiftPitchKick = 1.65f;
+                    if (_isPlayerDriving)
+                    {
+                        if (_cachedCamRig == null) _cachedCamRig = FindAnyObjectByType<OurWorld.CameraSystem.ThirdPersonCameraRig>();
+                        _cachedCamRig?.AddFovImpulse(1.25f);
+                        Vector3 shiftExhaust = transform.TransformPoint(new Vector3(-0.42f, 0.30f, -2.28f));
+                        VisualEffectsManager.SpawnNitroExhaust(shiftExhaust, -transform.forward, isNitro: false);
+                    }
                 }
                 else if (EngineRpm <= downshiftRpm && CurrentGear > 1)
                 {
@@ -1121,12 +1282,80 @@ namespace OurWorld.Vehicle
                     _shiftTimer = shiftDuration * 0.75f;
                     _shiftCooldown = shiftDuration + 0.30f;
                     activeGearRatio = gearRatios[CurrentGear - 1];
+                    _shiftPitchKick = -0.85f;
+                }
+            }
+
+            // Real-world water flooding / hydro-lock + wet rain road physics!
+            bool isRaining = NeighborhoodWeatherSystem.Instance != null &&
+                             NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower;
+            bool inWater = WaterZone.TrySampleWater(transform.position, out float waterSurfY, out _);
+            float waterDepth = inWater ? (waterSurfY - transform.position.y) : 0f;
+
+            if (waterDepth > 0.22f)
+            {
+                // Heavy hydrodynamic drag in deep water + splash spray
+                _rb.AddForce(-_rb.linearVelocity * (_rb.mass * Mathf.Clamp(waterDepth * 2.2f, 0.5f, 3.4f)), ForceMode.Force);
+                _wetSprayTimer -= dt;
+                if (_wetSprayTimer <= 0f && speedKmh > 6f)
+                {
+                    _wetSprayTimer = 0.20f;
+                    VisualEffectsManager.SpawnWaterSplash(
+                        new Vector3(transform.position.x, waterSurfY, transform.position.z),
+                        bigDive: speedKmh > 24f);
+                }
+
+                if (waterDepth > 0.52f)
+                {
+                    _deepWaterSubmergeTime += dt;
+                    if (_deepWaterSubmergeTime >= 0.85f && _waterFloodTimer <= 0f)
+                    {
+                        _waterFloodTimer = 7.0f;
+                        RealWorldDetailsSystem.PlayEngineSputter();
+                        Vector3 hoodPos = transform.TransformPoint(new Vector3(0f, 0.95f, 1.55f));
+                        VisualEffectsManager.SpawnTireSmoke(hoodPos, Vector3.up * 1.4f, 1.25f);
+                        if (_isPlayerDriving && PlayerModeController.Instance != null)
+                        {
+                            bool enW = LocalizationService.IsEnglish;
+                            PlayerModeController.Instance.RaiseStatusMessage(enW
+                                ? "🌊 Engine hydro-locked in deep water! Exit the car or wait for it to dry."
+                                : "🌊 Motor su aldı ve stop etti! Sudan çık ya da kurumasını bekle.");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                _deepWaterSubmergeTime = Mathf.Max(0f, _deepWaterSubmergeTime - dt * 2f);
+                if (_waterFloodTimer > 0f)
+                {
+                    _waterFloodTimer = Mathf.Max(0f, _waterFloodTimer - dt);
+                    if (_waterFloodTimer <= 0f && _isPlayerDriving && PlayerModeController.Instance != null)
+                    {
+                        bool enDry = LocalizationService.IsEnglish;
+                        PlayerModeController.Instance.RaiseStatusMessage(enDry
+                            ? "🔧 Engine dried out and restarted!"
+                            : "🔧 Motor kurudu, tekrar çalıştı!");
+                    }
+                }
+            }
+
+            if (isRaining && !inWater && _isPlayerDriving && speedKmh > 22f)
+            {
+                _wetSprayTimer -= dt;
+                if (_wetSprayTimer <= 0f)
+                {
+                    _wetSprayTimer = 0.14f;
+                    Vector3 rearL = transform.TransformPoint(new Vector3(-0.82f, 0.14f, -1.45f));
+                    Vector3 rearR = transform.TransformPoint(new Vector3( 0.82f, 0.14f, -1.45f));
+                    VisualEffectsManager.SpawnWaterSplash(rearL, bigDive: false);
+                    VisualEffectsManager.SpawnWaterSplash(rearR, bigDive: false);
                 }
             }
 
             float perDrivenWheelTorque = 0f;
             float damageTorqueMult = _damageSystem != null ? _damageSystem.EngineTorqueMultiplier : 1f;
-            if (!parked && hasFuel && damageTorqueMult > 0.01f && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
+            if (!parked && hasFuel && _waterFloodTimer <= 0f && damageTorqueMult > 0.01f && !handbrake && _shiftTimer <= 0f && effectiveThrottle > 0.001f && drivenWheelCount > 0 && activeGearRatio > 0f)
             {
                 float engineTorque = EvaluateEngineTorque(EngineRpm) * damageTorqueMult * _tuningTurboMult * _dealershipTorqueMult;
                 if (SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasTurboKit)
@@ -1145,7 +1374,8 @@ namespace OurWorld.Vehicle
                 engineBrakeTorque = 18f + rpmNorm * 130f;
             }
 
-            float targetRearStiffness = (!parked && handbrake) ? handbrakeRearSidewaysStiffness : baseRearSidewaysStiffness;
+            float rainGripMult = isRaining ? 0.78f : 1.0f;
+            float targetRearStiffness = ((!parked && handbrake) ? handbrakeRearSidewaysStiffness : baseRearSidewaysStiffness) * rainGripMult;
             float stiffnessRate = targetRearStiffness < _currentRearSidewaysStiffness ? 12f : 4.5f;
             _currentRearSidewaysStiffness = Mathf.MoveTowards(_currentRearSidewaysStiffness, targetRearStiffness, stiffnessRate * dt);
 
@@ -1217,10 +1447,45 @@ namespace OurWorld.Vehicle
 
             MaxRearSidewaysSlip = maxRearSlip;
 
-            // --- Rechargeable Nitro Boost (Left Shift while driving) + Drift-to-Charge & Drift Cash Bonus! ---
+            // Gentle drift yaw-stabilization assist: keeps handbrake drifts sweeping & controllable instead of uncontrollable snap-spins
+            if (_isPlayerDriving && !_inputLocked && maxRearSlip > 0.32f && speedKmh > 18f)
+            {
+                float yawVel = _rb.angularVelocity.y;
+                float excessYaw = Mathf.Abs(yawVel) > 1.35f ? yawVel : yawVel * 0.55f;
+                float stabStrength = Mathf.InverseLerp(0.32f, 1.15f, maxRearSlip) * 1.45f;
+                _rb.AddTorque(Vector3.up * (-excessYaw * stabStrength * _rb.mass * 0.42f), ForceMode.Force);
+            }
+
+            // --- Rechargeable Nitro Boost (Left Shift / Boost while driving) + Drift-to-Charge & Drift Cash Bonus! ---
+            bool nitroActiveNow = false;
             if (_isPlayerDriving && !_inputLocked && fuel > 0.01f && (_damageSystem == null || !_damageSystem.IsStalled))
             {
                 bool isDriftingNow = maxRearSlip > 0.34f && speedKmh > 20f;
+                bool wantTireSmoke = (maxRearSlip > 0.30f && speedKmh > 16f) || (handbrake && speedKmh > 18f);
+                if (wantTireSmoke)
+                {
+                    _driftSmokeTimer -= dt;
+                    if (_driftSmokeTimer <= 0f)
+                    {
+                        _driftSmokeTimer = 0.055f;
+                        float smokeIntensity = Mathf.Clamp(maxRearSlip * 1.3f, 0.7f, 1.35f);
+                        Vector3 rearL = transform.TransformPoint(new Vector3(-0.82f, 0.14f, -1.32f));
+                        Vector3 rearR = transform.TransformPoint(new Vector3( 0.82f, 0.14f, -1.32f));
+                        VisualEffectsManager.SpawnTireSmoke(rearL, _rb.linearVelocity, smokeIntensity);
+                        VisualEffectsManager.SpawnTireSmoke(rearR, _rb.linearVelocity, smokeIntensity);
+                    }
+                }
+                if (effectiveThrottle > 0.65f && speedKmh < 38f)
+                {
+                    _exhaustWispTimer -= dt;
+                    if (_exhaustWispTimer <= 0f)
+                    {
+                        _exhaustWispTimer = 0.16f;
+                        Vector3 exhaustPos = transform.TransformPoint(new Vector3(-0.42f, 0.30f, -2.28f));
+                        VisualEffectsManager.SpawnNitroExhaust(exhaustPos, -transform.forward, isNitro: false);
+                    }
+                }
+
                 if (isDriftingNow)
                 {
                     _driftStreakSeconds += dt;
@@ -1243,7 +1508,11 @@ namespace OurWorld.Vehicle
                         GameFeelAudio.PlayCoinChime();
                         if (PlayerModeController.Instance != null)
                         {
-                            PlayerModeController.Instance.RaiseStatusMessage($"Harika Drift! (+{driftBonus} ₺ · Nitro: %{Mathf.RoundToInt(_nitroCharge * 100f)})");
+                            bool enDrift = LocalizationService.IsEnglish;
+                            int nitroPct = Mathf.RoundToInt(_nitroCharge * 100f);
+                            PlayerModeController.Instance.RaiseStatusMessage(enDrift
+                                ? $"Awesome Drift! (+{driftBonus} ₺ · Nitro: {nitroPct}%)"
+                                : $"Harika Drift! (+{driftBonus} ₺ · Nitro: %{nitroPct})");
                         }
                         _driftStreakSeconds = 0f;
                     }
@@ -1253,18 +1522,21 @@ namespace OurWorld.Vehicle
                     }
                 }
 
-                bool shiftHeld = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
+                bool shiftHeld = (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) ||
+                                 (InputHub.Instance != null && InputHub.Instance.SprintHeld);
                 if (shiftHeld && throttleInput > 0.1f && _nitroCharge > 0.04f)
                 {
+                    nitroActiveNow = true;
                     _wasNitroEmptyWarned = false;
                     _nitroCharge = Mathf.Max(0f, _nitroCharge - dt * 0.40f);
                     _rb.AddForce(transform.forward * (_rb.mass * 10.5f), ForceMode.Force);
                     _nitroFxTimer -= dt;
                     if (_nitroFxTimer <= 0f)
                     {
-                        _nitroFxTimer = 0.11f;
-                        Vector3 exhaustPos = transform.TransformPoint(new Vector3(0f, 0.34f, -2.35f));
-                        GameFeelAudio.SpawnBurst(exhaustPos, new Color(0.26f, 0.78f, 1.0f), count: 4, spread: 0.28f);
+                        _nitroFxTimer = 0.055f;
+                        Vector3 exhaustPos = transform.TransformPoint(new Vector3(-0.42f, 0.30f, -2.35f));
+                        VisualEffectsManager.SpawnNitroExhaust(exhaustPos, -transform.forward, isNitro: true);
+                        DayNightCycle.Instance?.PulseImpactChromatic(0.11f);
                     }
                 }
                 else
@@ -1275,11 +1547,17 @@ namespace OurWorld.Vehicle
                         if (PlayerModeController.Instance != null)
                         {
                             bool isEnNitro = LocalizationService.Instance != null && LocalizationService.Instance.CurrentLanguage == "en";
-                PlayerModeController.Instance.RaiseStatusMessage(isEnNitro ? "Nitro empty — drift to recharge quickly!" : "Nitro bitti — Drift yaparak hızla doldur!");
+                            PlayerModeController.Instance.RaiseStatusMessage(isEnNitro ? "Nitro empty — drift to recharge quickly!" : "Nitro bitti — Drift yaparak hızla doldur!");
                         }
                     }
                     _nitroCharge = Mathf.Min(1f, _nitroCharge + dt * 0.11f);
                 }
+            }
+            if (_isPlayerDriving && nitroActiveNow != _nitroVisualActive)
+            {
+                _nitroVisualActive = nitroActiveNow;
+                if (_cachedCamRig == null) _cachedCamRig = FindAnyObjectByType<OurWorld.CameraSystem.ThirdPersonCameraRig>();
+                _cachedCamRig?.SetNitroBoost(_nitroVisualActive);
             }
 
             Vector3 vel = _rb.linearVelocity;
@@ -1399,10 +1677,11 @@ namespace OurWorld.Vehicle
             float longAccel = Vector3.Dot(worldAccel, transform.forward);
             float latAccel = Vector3.Dot(worldAccel, transform.right);
 
-            float targetPitch = Mathf.Clamp(-longAccel * 0.25f, -2.5f, 2.5f);
-            float targetRoll = Mathf.Clamp(latAccel * 0.30f, -3.5f, 3.5f);
+            _shiftPitchKick = Mathf.Lerp(_shiftPitchKick, 0f, 1f - Mathf.Exp(-9.5f * dt));
+            float targetPitch = Mathf.Clamp(-longAccel * 0.28f + _shiftPitchKick, -3.2f, 3.2f);
+            float targetRoll = Mathf.Clamp(latAccel * 0.32f, -3.8f, 3.8f);
 
-            float blend = 1f - Mathf.Exp(-7.5f * dt);
+            float blend = 1f - Mathf.Exp(-8.5f * dt);
             _bodyPitch = Mathf.Lerp(_bodyPitch, targetPitch, blend);
             _bodyRoll = Mathf.Lerp(_bodyRoll, targetRoll, blend);
 
@@ -1413,6 +1692,11 @@ namespace OurWorld.Vehicle
         {
             if (!_lightsCached) CacheVisualReferences();
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
+
+            if (_alarmTimer > 0f)
+            {
+                return;
+            }
 
             UpdateHeadlightState();
 

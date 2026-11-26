@@ -123,6 +123,7 @@ namespace OurWorld.Input
 
             if (OurWorld.UI.MainMenuController.IsMenuActive)
             {
+                ClearAllTouchInputs();
                 MoveInput = Vector2.zero;
                 SprintHeld = false;
                 AttackHeld = false;
@@ -131,15 +132,12 @@ namespace OurWorld.Input
                 _prevJumpHeld = false;
                 _attackHoldSeconds = 0f;
                 _jumpHoldSeconds = 0f;
-                _touchAttackHeld = false;
-                _touchJumpHeld = false;
                 LookDelta = Vector2.zero;
                 DriveSteer = 0f;
                 DriveThrottle = 0f;
                 DriveBrake = 0f;
                 HandbrakeHeld = false;
                 IsLookingManually = false;
-                _touchLookAccumulator = Vector2.zero;
                 _touchInteractQueued = false;
                 _touchExitVehicleQueued = false;
                 _touchContinueDialogueQueued = false;

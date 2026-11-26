@@ -141,23 +141,34 @@ namespace OurWorld.UI
 
             bool active = _activePointerId != int.MinValue;
 
-            // Smooth spring return when thumb lifts (~0.12 s)
-            if (!active && handle != null)
+            // Smooth spring return when thumb lifts (~0.12 s) and gentle float-home recenter
+            if (!active)
             {
-                if (handle.anchoredPosition.sqrMagnitude > 0.05f)
+                if (handle != null)
                 {
-                    handle.anchoredPosition = Vector2.SmoothDamp(
-                        handle.anchoredPosition,
-                        Vector2.zero,
-                        ref _handleVelocity,
-                        Mathf.Max(0.04f, returnSmoothTime),
-                        Mathf.Infinity,
-                        dt);
+                    if (handle.anchoredPosition.sqrMagnitude > 0.05f)
+                    {
+                        handle.anchoredPosition = Vector2.SmoothDamp(
+                            handle.anchoredPosition,
+                            Vector2.zero,
+                            ref _handleVelocity,
+                            Mathf.Max(0.04f, returnSmoothTime),
+                            Mathf.Infinity,
+                            dt);
+                    }
+                    else
+                    {
+                        handle.anchoredPosition = Vector2.zero;
+                        _handleVelocity = Vector2.zero;
+                    }
                 }
-                else
+                if (floatingMode && background != null && background != _zoneRect &&
+                    (background.anchoredPosition - defaultBackgroundPosition).sqrMagnitude > 0.25f)
                 {
-                    handle.anchoredPosition = Vector2.zero;
-                    _handleVelocity = Vector2.zero;
+                    background.anchoredPosition = Vector2.Lerp(
+                        background.anchoredPosition,
+                        defaultBackgroundPosition,
+                        1f - Mathf.Exp(-9.5f * dt));
                 }
             }
 

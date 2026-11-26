@@ -24,6 +24,8 @@ namespace OurWorld.World
         private ProceduralHumanoid[] _navy;
         private Transform _ball;
         private Transform _ballShadow;
+        private TrailRenderer _ballTrail;
+        private Material _ballTrailMat;
         private TextMesh _scoreboard;
         private AudioSource _audio;
         private AudioClip _bounceClip;
@@ -59,6 +61,12 @@ namespace OurWorld.World
         private bool _playerWonMatch;
         private float _statusBannerTimer;
         private string _statusBannerKey;
+        private string _calloutText;
+        private Color _calloutColor = new Color(1.0f, 0.84f, 0.22f);
+        private float _calloutTimer;
+        private bool _isChargingShot;
+        private float _shotCharge;
+        private bool _lastShotGreenRelease;
         private int _lastHudHash;
 
         public bool IsPlayerActive => _player != null;
@@ -98,6 +106,48 @@ namespace OurWorld.World
 
             ResetPositions(offenseTeam: 0);
             UpdateScoreboard();
+            EnsureBallTrail();
+        }
+
+        private void OnDestroy()
+        {
+            if (_ballTrailMat != null) Destroy(_ballTrailMat);
+        }
+
+        private void EnsureBallTrail()
+        {
+            if (_ball == null || _ballTrail != null) return;
+            _ballTrail = _ball.gameObject.GetComponent<TrailRenderer>();
+            if (_ballTrail == null) _ballTrail = _ball.gameObject.AddComponent<TrailRenderer>();
+            _ballTrail.time = 0.30f;
+            _ballTrail.minVertexDistance = 0.08f;
+            _ballTrail.startWidth = 0.22f;
+            _ballTrail.endWidth = 0.02f;
+            _ballTrail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _ballTrail.receiveShadows = false;
+            Shader sh = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit");
+            if (sh != null)
+            {
+                _ballTrailMat = new Material(sh);
+                _ballTrail.sharedMaterial = _ballTrailMat;
+            }
+            SetTrailColor(new Color(1.0f, 0.56f, 0.16f, 0.82f));
+            _ballTrail.emitting = false;
+        }
+
+        private void SetTrailColor(Color c)
+        {
+            if (_ballTrail == null) return;
+            _ballTrail.startColor = c;
+            _ballTrail.endColor = new Color(c.r, c.g, c.b, 0f);
+        }
+
+        private void SetCallout(string text, Color color, float duration = 1.55f)
+        {
+            _calloutText = text;
+            _calloutColor = color;
+            _calloutTimer = duration;
+            HudRevision++;
         }
 
         private void ResetPositions(int offenseTeam)
@@ -141,6 +191,12 @@ namespace OurWorld.World
             _playerWonMatch = false;
             _statusBannerTimer = 0f;
             _statusBannerKey = null;
+            _calloutTimer = 0f;
+            _isChargingShot = false;
+            _shotCharge = 0f;
+            _lastShotGreenRelease = false;
+            EnsureBallTrail();
+            GameFeelAudio.PlayRefereeWhistle(doubleBlast: false);
 
             if (_gold != null && _gold.Length > 0 && _gold[0] != null)
             {
@@ -176,6 +232,9 @@ namespace OurWorld.World
             }
             _player = null;
             _matchOver = false;
+            _isChargingShot = false;
+            _shotCharge = 0f;
+            if (_ballTrail != null) _ballTrail.emitting = false;
 
             if (_gold != null && _gold.Length > 0 && _gold[0] != null)
             {
@@ -193,6 +252,7 @@ namespace OurWorld.World
         public string PrimaryButtonLabel()
         {
             if (_matchOver) return LocalizationService.Tr("sports.btn.rematch", "Tekrar");
+            if (_isChargingShot) return SportLoc.L("BIRAK!", "RELEASE!");
             if (PlayerHasBall)
             {
                 return PlayerInThreePointZone
@@ -259,7 +319,12 @@ namespace OurWorld.World
 
             if (PlayerHasBall)
             {
-                LaunchPlayerJumpShot();
+                if (!_isChargingShot)
+                {
+                    _isChargingShot = true;
+                    _shotCharge = 0f;
+                    HudRevision++;
+                }
                 return;
             }
 
@@ -303,6 +368,8 @@ namespace OurWorld.World
 
             if (PlayerHasBall && _gold != null && _gold.Length > 1 && _gold[1] != null)
             {
+                _isChargingShot = false;
+                _shotCharge = 0f;
                 _player.Humanoid?.PlaySportAnim(SportAnimKind.BasketballPass, 0.42f);
                 _phase = 1;
                 _releaseGatherStart = _ballPos;
@@ -320,16 +387,48 @@ namespace OurWorld.World
             TriggerPrimaryAction();
         }
 
-        public void TriggerPrimaryRelease(float holdSeconds) { }
+        public void TriggerPrimaryRelease(float holdSeconds)
+        {
+            if (_player == null || !_isChargingShot) return;
+            _isChargingShot = false;
+            if (!PlayerHasBall)
+            {
+                HudRevision++;
+                return;
+            }
+            LaunchPlayerJumpShot(_shotCharge, isTap: holdSeconds < 0.14f);
+        }
 
         public void TriggerSecondaryRelease(float holdSeconds) { }
 
         public SportHudMeterState GetHudMeterState()
         {
-            return default;
+            var state = new SportHudMeterState
+            {
+                CalloutBadge = _calloutTimer > 0f ? _calloutText : null,
+                CalloutColor = _calloutColor
+            };
+
+            if (_player != null && !_matchOver && _isChargingShot)
+            {
+                bool inGreen = _shotCharge >= 0.66f && _shotCharge <= 0.88f;
+                bool over = _shotCharge > 0.93f;
+                state.ShowPrimaryBar = true;
+                state.PrimaryFill01 = Mathf.Clamp01(_shotCharge);
+                state.PrimaryColor = over
+                    ? new Color(0.96f, 0.28f, 0.22f)
+                    : (inGreen ? new Color(0.24f, 0.96f, 0.48f) : new Color(1.0f, 0.72f, 0.20f));
+                state.PrimaryLabel = PlayerInThreePointZone
+                    ? SportLoc.L("3'LÜK ZAMANLAMA", "3PT RELEASE")
+                    : SportLoc.L("ŞUT ZAMANLAMA", "SHOT METER");
+                state.ShowSweetSpot = true;
+                state.SweetSpotMin01 = 0.66f;
+                state.SweetSpotMax01 = 0.88f;
+            }
+            return state;
         }
 
-        private void LaunchPlayerJumpShot()
+        private void LaunchPlayerJumpShot(float charge01, bool isTap)
         {
             Vector3 hoopPos = new Vector3(0f, RimY, RimZ);
             Vector3 flatPlayer = new Vector3(_playerLocalPos.x, 0f, _playerLocalPos.z);
@@ -344,23 +443,55 @@ namespace OurWorld.World
             }
 
             _pendingShotPoints = distToRim > 4.75f ? 3 : 2;
-            float makeChance = distToRim < 3.4f ? 0.94f : (distToRim <= 4.75f ? 0.84f : 0.74f);
+            bool greenRelease = !isTap && charge01 >= 0.66f && charge01 <= 0.88f;
+            bool overcharged = !isTap && charge01 > 0.93f;
+            _lastShotGreenRelease = greenRelease;
+
+            float makeChance;
+            if (greenRelease)
+            {
+                makeChance = 0.99f;
+            }
+            else if (isTap)
+            {
+                makeChance = distToRim < 3.4f ? 0.88f : (distToRim <= 4.75f ? 0.76f : 0.62f);
+            }
+            else if (overcharged)
+            {
+                makeChance = 0.34f;
+            }
+            else
+            {
+                float distToSweet = Mathf.Min(Mathf.Abs(charge01 - 0.66f), Mathf.Abs(charge01 - 0.88f));
+                float baseChance = distToRim < 3.4f ? 0.92f : (distToRim <= 4.75f ? 0.82f : 0.72f);
+                makeChance = Mathf.Clamp(baseChance - distToSweet * 0.95f, 0.30f, 0.94f);
+            }
             _shotWillScore = Random.value < makeChance;
 
             _player.Humanoid?.SetDualHandAction(false, Vector3.zero, Vector3.zero, 0f, 0f, 0f, 0f, 0f);
             _player.Humanoid?.PlaySportAnim(SportAnimKind.BasketballJumpShot, 0.74f);
+
+            if (greenRelease)
+            {
+                SetTrailColor(new Color(1.0f, 0.86f, 0.22f, 0.95f));
+                SetCallout(SportLoc.L("YEŞİL ZAMANLAMA!", "GREEN RELEASE!"), new Color(0.26f, 0.96f, 0.50f), 1.25f);
+            }
+            else
+            {
+                SetTrailColor(new Color(1.0f, 0.54f, 0.16f, 0.80f));
+            }
 
             _phase = 2;
             _releaseGatherStart = _playerLocalPos + _playerLocalRot * new Vector3(0.08f, 1.22f, 0.28f);
             _flightStart = _playerLocalPos + _playerLocalRot * new Vector3(0.06f, 2.18f, 0.20f);
             _flightEnd = _shotWillScore
                 ? hoopPos
-                : hoopPos + new Vector3(Random.Range(-0.42f, 0.42f), 0.1f, -0.32f);
+                : hoopPos + new Vector3(Random.Range(-0.36f, 0.36f), 0.12f, -0.28f);
             _flightDuration = Mathf.Clamp(0.68f + distToRim * 0.055f, 0.72f, 1.12f);
             _flightElapsed = 0f;
             _releaseDelayDuration = 0.24f; // Ball rises in shooter's hands and leaves right at jump-shot extension
             _releaseDelayTimer = 0.24f;
-            _flightArcHeight = Mathf.Clamp(1.35f + distToRim * 0.12f, 1.45f, 2.35f);
+            _flightArcHeight = Mathf.Clamp(1.38f + distToRim * 0.13f + (greenRelease ? 0.22f : 0f), 1.48f, 2.55f);
             HudRevision++;
         }
 
@@ -381,6 +512,29 @@ namespace OurWorld.World
             {
                 _statusBannerTimer -= dt;
                 if (_statusBannerTimer <= 0f) HudRevision++;
+            }
+            if (_calloutTimer > 0f)
+            {
+                _calloutTimer -= dt;
+                if (_calloutTimer <= 0f) HudRevision++;
+            }
+            if (_isChargingShot)
+            {
+                if (!PlayerHasBall || _matchOver)
+                {
+                    _isChargingShot = false;
+                    HudRevision++;
+                }
+                else
+                {
+                    _shotCharge += dt * 1.15f;
+                    if (_shotCharge >= 1.0f)
+                    {
+                        _shotCharge = 1.0f;
+                        _isChargingShot = false;
+                        LaunchPlayerJumpShot(_shotCharge, isTap: false);
+                    }
+                }
             }
 
             ClearHandPoses(_gold);
@@ -414,6 +568,7 @@ namespace OurWorld.World
 
             if (_phase == 0)
             {
+                if (_ballTrail != null && _ballTrail.emitting) _ballTrail.emitting = false;
                 Vector3 handlerPos = handlerIsPlayer ? _playerLocalPos : handlerNpc.transform.localPosition;
                 Quaternion handlerRot = handlerIsPlayer ? _playerLocalRot : handlerNpc.transform.localRotation;
 
@@ -534,7 +689,11 @@ namespace OurWorld.World
                     _releaseDelayTimer -= dt;
                     float gT = _releaseDelayDuration > 0.001f ? 1f - Mathf.Clamp01(_releaseDelayTimer / _releaseDelayDuration) : 1f;
                     _ballPos = Vector3.Lerp(_releaseGatherStart, _flightStart, Mathf.SmoothStep(0f, 1f, gT));
-                    if (_releaseDelayTimer <= 0f) PlayBounce(0.40f, alwaysHear: _player != null);
+                    if (_releaseDelayTimer <= 0f)
+                    {
+                        PlayBounce(0.40f, alwaysHear: _player != null);
+                        if (_ballTrail != null) _ballTrail.emitting = true;
+                    }
                 }
                 else
                 {
@@ -544,6 +703,8 @@ namespace OurWorld.World
 
                     if (u >= 1f)
                 {
+                    if (_ballTrail != null) _ballTrail.emitting = false;
+                    Vector3 hoopWorld = transform.TransformPoint(hoopPos);
                     if (_shotWillScore)
                     {
                         int pts = _pendingShotPoints;
@@ -552,15 +713,32 @@ namespace OurWorld.World
 
                         ProceduralHumanoid shooter = handlerIsPlayer ? _player.Humanoid : handlerNpc;
                         shooter?.PlaySportAnim(SportAnimKind.VictoryJump, 0.64f);
-                        PlayBounce(0.48f, alwaysHear: _player != null);
+
+                        if (_player != null || IsPlayerNear(26f))
+                        {
+                            SportsArenaAtmosphere.PlayBasketballSwish(pts == 3 ? 0.66f : 0.54f);
+                            SportsArenaAtmosphere.PulseNearestNet(hoopWorld, maxDist: 3.5f);
+                            SportsArenaAtmosphere.CelebrateEvent(transform.position, "basketball", _offenseTeam == 0, bigPlay: pts == 3 || _lastShotGreenRelease);
+                            GameFeelAudio.SpawnBurst(
+                                hoopWorld,
+                                _offenseTeam == 0 ? new Color(1.0f, 0.80f, 0.20f) : new Color(0.28f, 0.56f, 0.96f),
+                                count: pts == 3 ? 18 : 12, spread: 0.58f);
+                        }
 
                         if (_player != null)
                         {
                             if (_offenseTeam == 0)
                             {
+                                GameFeelAudio.PlayCrowdCheer(bigCheer: pts == 3 || _lastShotGreenRelease);
                                 GameFeelAudio.PlayCoinChime();
+                                _cameraRig?.AddShake(pts == 3 ? 0.16f : 0.09f, 0.18f);
                                 SaveManager.Instance?.AddMoney(pts == 3 ? 25 : 15);
                                 SetTempStatus(pts == 3 ? "sports.basketball.scored_3pt" : "sports.basketball.scored_2pt", 1.35f);
+                                string swishTag = _lastShotGreenRelease
+                                    ? SportLoc.L($"DELİKSİZ! +{pts}", $"SWISH! +{pts}")
+                                    : (pts == 3 ? SportLoc.L("ÜÇLÜK! +3", "3-POINTER! +3") : SportLoc.L("BASKET! +2", "BUCKET! +2"));
+                                SetCallout(swishTag, new Color(1.0f, 0.86f, 0.22f), 1.55f);
+                                VisualEffectsManager.SpawnFloatingText(hoopWorld + Vector3.up * 0.45f, swishTag, new Color(1.0f, 0.88f, 0.22f), scale: 1.05f, duration: 1.05f);
                             }
                             else
                             {
@@ -571,6 +749,7 @@ namespace OurWorld.World
                             {
                                 _matchOver = true;
                                 _playerWonMatch = _goldScore >= PointsToWin;
+                                GameFeelAudio.PlayRefereeWhistle(doubleBlast: true);
                                 if (_playerWonMatch)
                                 {
                                     GameFeelAudio.PlayMilestoneFanfare();
@@ -581,28 +760,27 @@ namespace OurWorld.World
                                 HudRevision++;
                             }
                         }
-
-                        if (_player != null || IsPlayerNear(24f))
-                        {
-                            GameFeelAudio.SpawnBurst(
-                                transform.TransformPoint(hoopPos),
-                                _offenseTeam == 0 ? new Color(1.0f, 0.78f, 0.18f) : new Color(0.28f, 0.56f, 0.96f),
-                                count: pts == 3 ? 16 : 10, spread: 0.55f);
-                        }
                     }
                     else
                     {
-                        PlayBounce(0.50f, alwaysHear: _player != null);
+                        if (_player != null || IsPlayerNear(26f))
+                        {
+                            SportsArenaAtmosphere.PlayBasketballRimClank(0.56f);
+                            GameFeelAudio.SpawnBurst(hoopWorld, new Color(1.0f, 0.56f, 0.20f), count: 6, spread: 0.32f);
+                        }
                         if (_player != null && _offenseTeam == 0)
                         {
                             SetTempStatus("sports.basketball.missed", 1.0f);
+                            SetCallout(SportLoc.L("ÇEMBERDEN DÖNDÜ!", "OFF THE RIM!"), new Color(0.96f, 0.44f, 0.28f), 1.15f);
                         }
                     }
 
-                    // Switch possession & rebound
+                    // Switch possession & rebound (missed shots bounce higher off the iron rim!)
+                    bool missedRimBounce = !_shotWillScore;
                     _phase = 3;
-                    _phaseTimer = 0.95f;
+                    _phaseTimer = missedRimBounce ? 1.10f : 0.95f;
                     _flightStart = _ballPos;
+                    _flightArcHeight = missedRimBounce ? 1.35f : 0.65f;
                     _offenseTeam = 1 - _offenseTeam;
                     _handlerIdx = (_player != null && _offenseTeam == 0) ? 0 : Random.Range(0, 2);
                     Vector3 reboundTarget = (_player != null && _offenseTeam == 0 && _handlerIdx == 0)
@@ -610,7 +788,7 @@ namespace OurWorld.World
                         : (_offenseTeam == 0 ? _gold : _navy)[_handlerIdx].transform.localPosition;
                     _flightEnd = reboundTarget + Vector3.up * 1.1f;
                     _flightElapsed = 0f;
-                    _flightDuration = 0.68f;
+                    _flightDuration = missedRimBounce ? 0.82f : 0.68f;
                     HudRevision++;
                 }
                 }
@@ -619,7 +797,7 @@ namespace OurWorld.World
             {
                 _flightElapsed += dt;
                 float u = Mathf.Clamp01(_flightElapsed / _flightDuration);
-                _ballPos = ParabolicLerp(_flightStart, _flightEnd, u, 0.65f);
+                _ballPos = ParabolicLerp(_flightStart, _flightEnd, u, _flightArcHeight);
                 IdleAll();
                 _phaseTimer -= dt;
                 if (_phaseTimer <= 0f)

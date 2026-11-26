@@ -422,11 +422,11 @@ namespace OurWorld.World
                 // Residential park lawn & Pool/Sports walkway (eliminates dark shadows around pool & gardens!)
                 (new Vector3(-28f, 0f, -31.5f),   0f),
                 (new Vector3( -3f, 0f, -31.5f),   0f),
-                (new Vector3( 28f, 0f, -31.5f),   0f),
+                (new Vector3(30.8f, 0f, -29.2f),  0f),
                 (new Vector3( 52f, 0f, -31.5f),   0f),
 
-                // Hz. Osman Camii Courtyard & South Promenade
-                (new Vector3( 76f, 0f, -36f),    90f),
+                // Hz. Osman Camii Courtyard & South Promenade (safely outside sanctuary walls!)
+                (new Vector3(72.0f, 0f, -32.5f), 90f),
                 (new Vector3( 88f, 0f, -52f),   -90f),
 
                 // Fatih Bulvarı & Clock Tower Plaza
@@ -435,7 +435,7 @@ namespace OurWorld.World
                 (new Vector3( 72f, 0f, 128f),     0f),
 
                 // Atatürk & Mürşit Avenues + Northern Hamidiye Park + No:48 North Sidewalk
-                (new Vector3(-42f, 0f,  26f),     0f),
+                (new Vector3(-34.2f, 0f, 28.5f),  0f),
                 (new Vector3(  6f, 0f,  42f),   -90f),
                 (new Vector3(  6f, 0f,  90f),   -90f),
                 (new Vector3(-78f, 0f,  42f),    90f),
@@ -455,14 +455,14 @@ namespace OurWorld.World
                 CreateGroundedRuntimeStreetLamp($"RuntimeStreetLamp_{i:00}", p.poleBase, p.armYaw, warmSodium, range: 38f, intensity: 44f, poolDiameter: 18f);
             }
 
-            // Grounded stadium floodlight masts along the perimeter of ALL 4 Playable Sports Courts + Open Pool!
+            // Grounded stadium floodlight masts cleanly OUTSIDE the fence/apron/deck of ALL 4 Sports Courts + Open Pool!
             (string name, Vector3 mastBase, float faceYaw, float range, float intensity)[] courtMasts =
             {
                 ("Floodlight_TennisCourt",     new Vector3(-50.5f, 0f, -42.2f),  90f, 44f, 54f),
-                ("Floodlight_FootballPitch",   new Vector3(-14.0f, 0f, -33.6f), 180f, 48f, 60f),
-                ("Floodlight_OpenPool",        new Vector3( 16.0f, 0f, -33.6f), 180f, 42f, 46f),
-                ("Floodlight_BasketballCourt", new Vector3( 41.0f, 0f, -34.6f), 180f, 44f, 52f),
-                ("Floodlight_VolleyballCourt", new Vector3( 59.0f, 0f, -34.6f), 180f, 44f, 52f)
+                ("Floodlight_FootballPitch",   new Vector3(-26.0f, 0f, -44.0f),  90f, 48f, 60f),
+                ("Floodlight_OpenPool",        new Vector3( 30.4f, 0f, -40.0f), -90f, 42f, 46f),
+                ("Floodlight_BasketballCourt", new Vector3( 50.8f, 0f, -43.5f), -90f, 44f, 52f),
+                ("Floodlight_VolleyballCourt", new Vector3( 67.2f, 0f, -44.0f), -90f, 44f, 52f)
             };
 
             for (int i = 0; i < courtMasts.Length; i++)
@@ -604,6 +604,24 @@ namespace OurWorld.World
                 br.receiveShadows = false;
                 bulb.SetActive(false);
                 _nightOnlyVisuals.Add(bulb);
+
+                // Crossed soft volumetric night-mist halo around every physical lamp head!
+                float haloSize = isCool ? 2.6f : 1.95f;
+                for (int h = 0; h < 2; h++)
+                {
+                    GameObject halo = new GameObject("NightLampHalo");
+                    halo.transform.SetParent(_generatedRoot, false);
+                    halo.transform.SetPositionAndRotation(lightWorldPos, Quaternion.Euler(0f, h * 90f, 0f));
+                    halo.transform.localScale = new Vector3(haloSize, haloSize, 1f);
+                    MeshFilter hf = halo.AddComponent<MeshFilter>();
+                    hf.sharedMesh = _quadMesh;
+                    MeshRenderer hr = halo.AddComponent<MeshRenderer>();
+                    hr.sharedMaterial = isCool ? _poolCoolMat : _poolWarmMat;
+                    hr.shadowCastingMode = ShadowCastingMode.Off;
+                    hr.receiveShadows = false;
+                    halo.SetActive(false);
+                    _nightOnlyVisuals.Add(halo);
+                }
             }
 
             if (spawnPool && poolDiameter > 0.5f)

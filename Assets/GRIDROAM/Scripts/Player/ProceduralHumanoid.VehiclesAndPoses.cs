@@ -81,12 +81,21 @@ namespace OurWorld.Player
                 return;
             }
 
-            // Non-driving seated life: talking decay/blend + chest breathing (desynchronized via _noiseSeed)
+            // Non-driving seated life: talking decay/blend + seated cheer + chest breathing (desynchronized via _noiseSeed)
             if (_talkingTimer > 0f)
             {
                 _talkingTimer = Mathf.Max(0f, _talkingTimer - dt);
             }
             _talkingBlend = Mathf.Lerp(_talkingBlend, _talkingTimer > 0f ? 1f : 0f, 1f - Mathf.Exp(-6f * dt));
+
+            if (_seatedCheerTimer >= 0f)
+            {
+                _seatedCheerTimer += dt;
+                if (_seatedCheerTimer >= _seatedCheerDuration)
+                {
+                    _seatedCheerTimer = -1f;
+                }
+            }
 
             float seatedBreathWave = Mathf.Sin((_idleTime + _noiseSeed) * TwoPi * 0.25f);
             float seatedBreath = seatedBreathWave * 0.8f;
@@ -141,9 +150,21 @@ namespace OurWorld.Player
                     lElbRot = Vector3.Lerp(lElbRot, new Vector3(-58f + beatL * 8f, 0f, 10f), _talkingBlend * 0.65f);
                 }
 
+                if (_seatedCheerTimer >= 0f)
+                {
+                    float cn = Mathf.Clamp01(_seatedCheerTimer / Mathf.Max(0.25f, _seatedCheerDuration));
+                    float cEnv = Mathf.Sin(cn * Mathf.PI);
+                    float pump = Mathf.Sin(cn * TwoPi * 2.5f);
+                    spineRot.x += (-6f + pump * 4f) * cEnv;
+                    lShRot = Vector3.Lerp(lShRot, new Vector3(-152f + pump * 16f, 0f, -26f), cEnv);
+                    rShRot = Vector3.Lerp(rShRot, new Vector3(-152f - pump * 16f, 0f, 26f), cEnv);
+                    lElbRot = Vector3.Lerp(lElbRot, new Vector3(-28f - Mathf.Max(0f, pump) * 18f, 0f, 0f), cEnv);
+                    rElbRot = Vector3.Lerp(rElbRot, new Vector3(-28f - Mathf.Max(0f, -pump) * 18f, 0f, 0f), cEnv);
+                }
+
                 ApplySeatedLookAt(dt, ref spineRot, ref neckRot, ref headRot);
 
-                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.08f, 0.02f), 1f - Mathf.Exp(-12f * dt));
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.105f, 0.03f), 1f - Mathf.Exp(-12f * dt));
                 SmoothRotate(hips, Vector3.zero, 12f, dt);
                 SmoothRotate(spine, spineRot, 10f, dt);
                 SmoothRotate(neck, neckRot, 10f, dt);
@@ -299,9 +320,19 @@ namespace OurWorld.Player
                 spineRot.x += 6f * _talkingBlend;
             }
 
+            float cheerEnv = 0f;
+            float cheerPump = 0f;
+            if (_seatedCheerTimer >= 0f && seated >= 0.85f)
+            {
+                float cn = Mathf.Clamp01(_seatedCheerTimer / Mathf.Max(0.25f, _seatedCheerDuration));
+                cheerEnv = Mathf.Sin(cn * Mathf.PI);
+                cheerPump = Mathf.Sin(cn * TwoPi * 2.5f);
+                spineRot.x += (-6f + cheerPump * 4f) * cheerEnv;
+            }
+
             ApplySeatedLookAt(dt, ref spineRot, ref neckRot, ref headRot);
 
-            hips.localPosition = new Vector3(0f, Mathf.Lerp(hipsBaseY, 0.08f, seated), 0.09f * shift);
+            hips.localPosition = new Vector3(0f, Mathf.Lerp(hipsBaseY, 0.105f, seated) + 0.022f * Mathf.Max(0f, cheerPump) * cheerEnv, 0.03f * seated + 0.09f * shift);
             SmoothRotate(hips, Vector3.zero, 15f, dt);
             SmoothRotate(spine, spineRot, 16f, dt);
             SmoothRotate(neck, neckRot, 14f, dt);
@@ -309,13 +340,13 @@ namespace OurWorld.Player
 
             float scaleY = transform.lossyScale.y;
             float footSlide = (gestureKind == 2 && gestureW > 0.001f) ? 0.14f * gestureW : 0f;
-            Vector3 left = transform.TransformPoint(new Vector3(-0.14f, 0f, Mathf.Lerp(0.04f, 0.46f, seated) + footSlide));
-            Vector3 right = transform.TransformPoint(new Vector3(0.14f, 0f, Mathf.Lerp(0.09f, 0.44f, seated) + footSlide));
+            Vector3 left = transform.TransformPoint(new Vector3(-0.14f, 0f, Mathf.Lerp(0.04f, 0.44f, seated) + footSlide));
+            Vector3 right = transform.TransformPoint(new Vector3(0.14f, 0f, Mathf.Lerp(0.09f, 0.42f, seated) + footSlide));
             left.y = right.y = floor + AnkleHeight * scaleY;
 
             if (gestureKind == 1 && gestureW > 0.001f)
             {
-                Vector3 crossedRight = transform.TransformPoint(new Vector3(-0.06f, 0f, 0.50f));
+                Vector3 crossedRight = transform.TransformPoint(new Vector3(-0.06f, 0f, 0.48f));
                 crossedRight.y = floor + AnkleHeight * scaleY + 0.30f * scaleY;
                 right = Vector3.Lerp(right, crossedRight, gestureW);
             }
@@ -324,6 +355,9 @@ namespace OurWorld.Player
             {
                 float drop = Mathf.Max(0f, Mathf.Max(LegExtension(lHip, lKnee, lAnkle, left),
                     LegExtension(rHip, rKnee, rAnkle, right)));
+                // Never pull the seated pelvis downward through solid wood/cushion geometry on taller chairs or shorter NPCs!
+                float maxSeatDrop = Mathf.Lerp(0.32f, 0.02f, seated) * scaleY;
+                drop = Mathf.Min(drop, maxSeatDrop);
                 hips.position -= transform.up * drop;
                 AimLimb(lHip, lKnee, left, transform.forward, lAnkle.localPosition.magnitude);
                 AimLimb(rHip, rKnee, right, transform.forward, rAnkle.localPosition.magnitude);
@@ -379,6 +413,14 @@ namespace OurWorld.Player
                     Vector3 talkL = lRest + transform.up * (0.11f + 0.03f * Mathf.Sin(talkTime * 6.2f + 1.5f)) + transform.forward * 0.08f;
                     rRest = Vector3.Lerp(rRest, talkR, _talkingBlend);
                     lRest = Vector3.Lerp(lRest, talkL, _talkingBlend);
+                }
+
+                if (cheerEnv > 0.01f)
+                {
+                    Vector3 cheerL = transform.TransformPoint(new Vector3(-0.34f, 0.96f + cheerPump * 0.14f, 0.16f));
+                    Vector3 cheerR = transform.TransformPoint(new Vector3( 0.34f, 0.96f - cheerPump * 0.14f, 0.16f));
+                    lRest = Vector3.Lerp(lRest, cheerL, cheerEnv);
+                    rRest = Vector3.Lerp(rRest, cheerR, cheerEnv);
                 }
 
                 AimHand(lShoulder, lElbow, lRest, -transform.right, 1f);

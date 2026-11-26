@@ -3,6 +3,7 @@ using OurWorld.Core;
 using OurWorld.Player;
 using OurWorld.Vehicle;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace OurWorld.UI
@@ -78,6 +79,20 @@ namespace OurWorld.UI
 
         private void HandleLanguageChanged(string _) => RefreshLabels();
 
+        private void Update()
+        {
+            if (!_inPhotoMode) return;
+
+            bool modalOpened = MainMenuController.IsMenuActive ||
+                               (PhonePanelController.Instance != null && PhonePanelController.Instance.IsOpen) ||
+                               (PlayerModeController.Instance != null && PlayerModeController.Instance.IsModalLocked);
+
+            if (modalOpened)
+            {
+                ExitPhotoMode(restoreHud: !MainMenuController.IsMenuActive);
+            }
+        }
+
         private void BuildDrivingUtilityBar(Transform hudRoot)
         {
             Transform drivingRoot = FindDescendant(hudRoot, "DrivingControls")
@@ -90,17 +105,17 @@ namespace OurWorld.UI
             rt.anchorMin = new Vector2(0.5f, 1f);
             rt.anchorMax = new Vector2(0.5f, 1f);
             rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(0f, -24f);
-            rt.sizeDelta = new Vector2(468f, 52f);
+            rt.anchoredPosition = new Vector2(0f, -20f);
+            rt.sizeDelta = new Vector2(540f, 68f);
 
             HorizontalLayoutGroup hlg = bar.AddComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 12f;
+            hlg.spacing = 14f;
             hlg.childControlWidth = true;
             hlg.childControlHeight = true;
             hlg.childForceExpandWidth = true;
             hlg.childForceExpandHeight = true;
 
-            OurWorldUiKit.CreatePillButton("Btn_CarHorn", bar.transform, "Korna", 18,
+            OurWorldUiKit.CreatePillButton("Btn_CarHorn", bar.transform, "Korna", 22,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.AccentGold, OurWorldUiKit.BorderSubtle, out _hornLabel, () =>
                 {
                     PlayerModeController mode = PlayerModeController.Instance;
@@ -110,7 +125,7 @@ namespace OurWorld.UI
                     }
                 });
 
-            OurWorldUiKit.CreatePillButton("Btn_CarRadio", bar.transform, "FM Radyo", 18,
+            OurWorldUiKit.CreatePillButton("Btn_CarRadio", bar.transform, "FM Radyo", 22,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.AccentTeal, OurWorldUiKit.BorderSubtle, out _radioLabel, () =>
                 {
                     PlayerModeController mode = PlayerModeController.Instance;
@@ -120,7 +135,7 @@ namespace OurWorld.UI
                     }
                 });
 
-            OurWorldUiKit.CreatePillButton("Btn_CarLights", bar.transform, "Farlar", 18,
+            OurWorldUiKit.CreatePillButton("Btn_CarLights", bar.transform, "Farlar", 22,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.TextPrimary, OurWorldUiKit.BorderSubtle, out _lightsLabel, () =>
                 {
                     PlayerModeController mode = PlayerModeController.Instance;
@@ -135,14 +150,14 @@ namespace OurWorld.UI
         {
             Transform safeArea = hudRoot.Find("SafeAreaRoot") ?? hudRoot;
 
-            Button photoBtn = OurWorldUiKit.CreatePillButton("Btn_PhotoMode", safeArea, "Foto", 17,
+            Button photoBtn = OurWorldUiKit.CreatePillButton("Btn_PhotoMode", safeArea, "Foto", 21,
                 OurWorldUiKit.SurfaceBg, OurWorldUiKit.TextPrimary, OurWorldUiKit.BorderSubtle, out _photoBtnLabel, EnterPhotoMode);
             RectTransform prt = (RectTransform)photoBtn.transform;
             prt.anchorMin = new Vector2(1f, 1f);
             prt.anchorMax = new Vector2(1f, 1f);
             prt.pivot = new Vector2(1f, 1f);
-            prt.anchoredPosition = new Vector2(-18f, -158f);
-            prt.sizeDelta = new Vector2(106f, 40f);
+            prt.anchoredPosition = new Vector2(-24f, -194f);
+            prt.sizeDelta = new Vector2(144f, 60f);
 
             // Dedicated minimal exit button on its own overlay canvas so it stays visible while HUD is hidden!
             GameObject cGo = new GameObject("PhotoModeExitCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -155,14 +170,14 @@ namespace OurWorld.UI
             cs.referenceResolution = new Vector2(1920f, 1080f);
             cs.matchWidthOrHeight = 0.5f;
 
-            Button exitBtn = OurWorldUiKit.CreatePillButton("Btn_ExitPhotoMode", cGo.transform, "✕ Fotoğraf Modundan Çık", 20,
-                new Color(0.06f, 0.09f, 0.14f, 0.72f), OurWorldUiKit.AccentGold, OurWorldUiKit.BorderSubtle, out _photoExitLabel, ExitPhotoMode);
+            Button exitBtn = OurWorldUiKit.CreatePillButton("Btn_ExitPhotoMode", cGo.transform, "✕ Fotoğraf Modundan Çık", 22,
+                new Color(0.06f, 0.09f, 0.14f, 0.78f), OurWorldUiKit.AccentGold, OurWorldUiKit.BorderSubtle, out _photoExitLabel, () => ExitPhotoMode(true));
             RectTransform ert = (RectTransform)exitBtn.transform;
             ert.anchorMin = new Vector2(1f, 1f);
             ert.anchorMax = new Vector2(1f, 1f);
             ert.pivot = new Vector2(1f, 1f);
-            ert.anchoredPosition = new Vector2(-28f, -28f);
-            ert.sizeDelta = new Vector2(290f, 50f);
+            ert.anchoredPosition = new Vector2(-28f, -24f);
+            ert.sizeDelta = new Vector2(316f, 62f);
 
             _photoExitOverlay = cGo;
             _photoExitOverlay.SetActive(false);
@@ -178,13 +193,16 @@ namespace OurWorld.UI
             if (_photoExitOverlay != null) _photoExitOverlay.SetActive(true);
         }
 
-        public void ExitPhotoMode()
+        public void ExitPhotoMode(bool restoreHud = true)
         {
             if (!_inPhotoMode) return;
             _inPhotoMode = false;
-            GameFeelAudio.PlayUiClick();
-            GameHUDController hud = FindAnyObjectByType<GameHUDController>();
-            hud?.SetHudVisible(true, 0.18f);
+            if (restoreHud)
+            {
+                GameFeelAudio.PlayUiClick();
+                GameHUDController hud = FindAnyObjectByType<GameHUDController>();
+                hud?.SetHudVisible(true, 0.18f);
+            }
             if (_photoExitOverlay != null) _photoExitOverlay.SetActive(false);
         }
 

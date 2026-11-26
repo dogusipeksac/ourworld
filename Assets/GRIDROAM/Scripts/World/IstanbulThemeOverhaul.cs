@@ -235,7 +235,8 @@ namespace OurWorld.World
                 n.IndexOf("Stripes", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 n.IndexOf("Court", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 n.IndexOf("Pitch", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                n.IndexOf("Turf", StringComparison.OrdinalIgnoreCase) >= 0)
+                n.IndexOf("Turf", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("AydosHill", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return true;
             }
@@ -593,8 +594,8 @@ namespace OurWorld.World
                 (new Vector3(-19.0f, 0.04f, -25.0f), 180f),
                 (new Vector3(31.0f, 0.04f, -24.5f), 180f),
                 (new Vector3(48.5f, 0.04f, -24.5f), 180f),
-                (new Vector3(-18.5f, 0.04f, 8.6f), 0f),
-                (new Vector3(24.0f, 0.04f, 9.2f), 180f),
+                (new Vector3(-22.8f, 0.04f, 5.6f), 180f),
+                (new Vector3(13.2f, 0.04f, 5.6f), 180f),
                 (new Vector3(-164.5f, 0.05f, -9.5f), -90f),
                 (new Vector3(-164.5f, 0.05f, 15.5f), -90f)
             };
@@ -634,13 +635,13 @@ namespace OurWorld.World
                 (new Vector3(16.5f,  0.02f, 23.5f), 1.10f, true),
                 (new Vector3(-14.5f, 0.02f, 16.0f), 1.12f, false),
                 (new Vector3(-24.0f, 0.02f, 12.0f), 1.05f, true),
-                // Mosque Courtyard & Selman Sokağı Boulevard
-                (new Vector3(68.0f,  0.02f, -15.0f), 1.18f, true),
-                (new Vector3(74.0f,  0.02f, -15.0f), 1.24f, true),
+                // Mosque Courtyard & Selman Sokağı Boulevard (safely clear of house walls & garden fences!)
+                (new Vector3(68.0f,  0.02f, -20.5f), 1.18f, true),
+                (new Vector3(74.5f,  0.02f, -20.5f), 1.24f, true),
                 (new Vector3(58.0f,  0.02f, -15.0f), 1.14f, false),
                 (new Vector3(35.0f,  0.02f, 10.5f),  1.05f, false),
-                (new Vector3(-36.0f, 0.02f, 10.5f),  1.08f, false),
-                (new Vector3(-52.0f, 0.02f, 9.5f),   1.12f, true),
+                (new Vector3(-39.2f, 0.02f, 10.5f),  1.08f, false),
+                (new Vector3(-55.2f, 0.02f, 15.0f),  1.12f, true),
                 // Sultanbeyli Lake Scenic Promenade & Aydos Farm Entrance
                 (new Vector3(-160.0f, 0.02f, 18.0f), 1.22f, false),
                 (new Vector3(-160.0f, 0.02f, -18.0f),1.18f, false),
@@ -666,9 +667,9 @@ namespace OurWorld.World
                 (new Vector3(45.5f,  0.03f, -26.5f), 0f),
                 (new Vector3(55.5f,  0.03f, -27.0f), 0f),
                 (new Vector3(62.5f,  0.03f, -27.0f), 0f),
-                (new Vector3(3.5f,   0.03f, 11.5f),  90f),
+                (new Vector3(9.6f,   0.03f, 5.8f),   90f),
                 (new Vector3(11.0f,  0.03f, 11.5f),  0f),
-                (new Vector3(22.0f,  0.03f, 11.5f),  0f),
+                (new Vector3(16.6f,  0.03f, 6.4f),   0f),
                 (new Vector3(-6.0f,  0.03f, 8.5f),   0f),
                 (new Vector3(-165.5f, 0.04f, 3.2f),  90f),
                 (new Vector3(-165.5f, 0.04f, -3.2f), 90f)
@@ -709,15 +710,15 @@ namespace OurWorld.World
                 OurWorldModelLibrary.InstantiateModel("OW_IstanbulLantern", root, lanternSpots[i], Quaternion.identity, Vector3.one);
             }
 
-            // Striped Shop Awnings (Tente) adorning Selman Sokağı shopfronts
+            // Striped Shop Awnings (Tente) mounted flush on Selman Sokağı shopfront facades
             (Vector3 pos, float yaw, bool teal)[] awnings =
             {
-                (new Vector3(-22.0f, 3.05f, 11.4f), 180f, false),
-                (new Vector3(-12.0f, 3.05f, 11.4f), 180f, true),
-                (new Vector3(2.0f,   3.05f, 11.4f), 180f, false),
-                (new Vector3(28.0f,  3.05f, 11.4f), 180f, true),
-                (new Vector3(-26.0f, 3.05f, -10.8f), 0f, true),
-                (new Vector3(34.0f,  3.05f, -10.8f), 0f, false)
+                (new Vector3(-32.5f, 3.05f, 6.45f),  180f, false),
+                (new Vector3(-16.5f, 3.05f, 6.25f),  180f, true),
+                (new Vector3(2.6f,   3.05f, 5.05f),  180f, false),
+                (new Vector3(22.9f,  3.05f, 6.05f),  180f, true),
+                (new Vector3(-31.2f, 3.05f, -6.45f), 0f, true),
+                (new Vector3(44.0f,  3.05f, -6.85f), 0f, false)
             };
             for (int i = 0; i < awnings.Length; i++)
             {
@@ -776,31 +777,20 @@ namespace OurWorld.World
         {
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.0019f;
+            if (DayNightCycle.Instance == null)
+            {
+                RenderSettings.fogColor = new Color(0.68f, 0.77f, 0.85f, 1f);
+                RenderSettings.fogDensity = 0.0016f;
+            }
             UpdateAtmosphereAndFestoonLights();
         }
 
         private void UpdateAtmosphereAndFestoonLights()
         {
+            // DayNightCycle owns RenderSettings.fogColor and RenderSettings.fogDensity smoothly;
+            // never overwrite fog here or distant Aydos hills will strobe-flicker between the two values!
             float hour = DayNightCycle.Instance != null ? DayNightCycle.Instance.CurrentHour : 11f;
             bool isNightOrDusk = hour >= 18.2f || hour < 6.5f;
-
-            // Gentle sunlit Mediterranean horizon mist by day, warm apricot sunset, crisp soft indigo night
-            if (hour >= 7.5f && hour < 16.8f)
-            {
-                RenderSettings.fogColor = new Color(0.72f, 0.85f, 0.94f, 1f);
-                RenderSettings.fogDensity = 0.0016f;
-            }
-            else if ((hour >= 16.8f && hour < 19.6f) || (hour >= 5.6f && hour < 7.5f))
-            {
-                RenderSettings.fogColor = new Color(0.84f, 0.66f, 0.52f, 1f);
-                RenderSettings.fogDensity = 0.0020f;
-            }
-            else
-            {
-                RenderSettings.fogColor = new Color(0.11f, 0.16f, 0.26f, 1f);
-                RenderSettings.fogDensity = 0.0021f;
-            }
 
             if (isNightOrDusk != _festoonsCurrentlyLit)
             {
@@ -819,31 +809,32 @@ namespace OurWorld.World
             if (Time.time - _lastPurchaseTime < 1.1f) return;
 
             string id = trig.InteractableId;
+            bool en = LocalizationService.IsEnglish;
             if (id.StartsWith("istanbul_simit_", StringComparison.Ordinal))
             {
                 _lastPurchaseTime = Time.time;
                 if (SaveManager.Instance != null && !SaveManager.Instance.TrySpend(10))
                 {
-                    PlayerModeController.Instance?.RaiseStatusMessage("Yetersiz bakiye! (Sıcak Simit: 10 ₺)");
+                    PlayerModeController.Instance?.RaiseStatusMessage(en ? "Insufficient funds! (Hot Simit: 10 ₺)" : "Yetersiz bakiye! (Sıcak Simit: 10 ₺)");
                     return;
                 }
                 PlayerNeedsController.Instance?.RestoreEnergy(28f);
                 GameFeelAudio.PlayUiClick();
                 GameFeelAudio.SpawnBurst(trig.transform.position + Vector3.up * 1.35f, new Color(0.98f, 0.78f, 0.26f), count: 10, spread: 0.42f);
-                PlayerModeController.Instance?.RaiseStatusMessage("Sıcacık susamlı İstanbul simidi! (+28 Enerji)");
+                PlayerModeController.Instance?.RaiseStatusMessage(en ? "Warm crispy sesame Istanbul simit! (+28 Energy)" : "Sıcacık susamlı İstanbul simidi! (+28 Enerji)");
             }
             else if (id.StartsWith("istanbul_tea_", StringComparison.Ordinal))
             {
                 _lastPurchaseTime = Time.time;
                 if (SaveManager.Instance != null && !SaveManager.Instance.TrySpend(8))
                 {
-                    PlayerModeController.Instance?.RaiseStatusMessage("Yetersiz bakiye! (Çay: 8 ₺)");
+                    PlayerModeController.Instance?.RaiseStatusMessage(en ? "Insufficient funds! (Turkish Tea: 8 ₺)" : "Yetersiz bakiye! (Çay: 8 ₺)");
                     return;
                 }
                 PlayerNeedsController.Instance?.RestoreEnergy(22f);
                 GameFeelAudio.PlayUiClick();
                 GameFeelAudio.SpawnBurst(trig.transform.position + Vector3.up * 1.10f, new Color(0.94f, 0.42f, 0.16f), count: 8, spread: 0.35f);
-                PlayerModeController.Instance?.RaiseStatusMessage("Tavşan kanı ince belli çay! (+22 Enerji)");
+                PlayerModeController.Instance?.RaiseStatusMessage(en ? "Freshly brewed Turkish tea! (+22 Energy)" : "Tavşan kanı ince belli çay! (+22 Enerji)");
             }
             else if (id.StartsWith("istanbul_fountain_", StringComparison.Ordinal))
             {
@@ -851,7 +842,7 @@ namespace OurWorld.World
                 PlayerNeedsController.Instance?.RestoreEnergy(16f);
                 GameFeelAudio.PlayWaterSplash();
                 GameFeelAudio.SpawnBurst(trig.transform.position + Vector3.up * 1.15f, new Color(0.45f, 0.88f, 0.98f), count: 10, spread: 0.42f);
-                PlayerModeController.Instance?.RaiseStatusMessage("Mahalle çeşmesinden buz gibi su! (+16 Enerji)");
+                PlayerModeController.Instance?.RaiseStatusMessage(en ? "Refreshing cold water from the neighborhood fountain! (+16 Energy)" : "Mahalle çeşmesinden buz gibi su! (+16 Enerji)");
             }
         }
     }

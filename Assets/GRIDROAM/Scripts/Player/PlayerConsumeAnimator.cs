@@ -30,13 +30,16 @@ namespace OurWorld.Player
         private CharacterController _cc;
         private Coroutine _activeRoutine;
         private GameObject _heldProp;
+        private float _heldPropBaseScale = 1f;
         private ConsumeAnimKind _heldKind;
         private float _sipTiltPhase;
         private float _putAwayProgress;
         private bool _holdingModalLock;
-        // Energy already paid for but not yet granted; flushed on explicit cancel so an interrupted
-        // drink/snack (another interaction cancelling it) never eats the player's purchase.
+        // Energy / hunger / health already paid for or taken from backpack but not yet granted;
+        // flushed on explicit cancel so an interrupted drink/snack never wastes the player's item.
         private float _pendingEnergy;
+        private float _pendingHunger;
+        private float _pendingHealth;
         // Guards against a routine that finishes synchronously inside StartCoroutine leaving IsPlaying stuck.
         private int _runSerial;
         private int _completedRunSerial;
@@ -75,6 +78,33 @@ namespace OurWorld.Player
             anim.StartSequence(foot, shopId, kind, itemLabel, energyToRestore, explicitTarget);
         }
 
+        /// <summary>
+        /// Pulls a real 3D fruit bag, snack, or drink directly out of the player's Backpack
+        /// and eats/drinks it with 2 realistic bites/sips while allowing free walking!
+        /// </summary>
+        public static void PlayFromBackpack(
+            PlayerFootController foot,
+            ShopPropVisual propVisual,
+            ConsumeAnimKind kind,
+            string itemLabel,
+            float hungerRestore,
+            float energyRestore,
+            float healthRestore)
+        {
+            if (foot == null || kind == ConsumeAnimKind.None)
+            {
+                PlayerNeedsController.Instance?.ApplyMealRestore(hungerRestore, energyRestore, healthRestore);
+                return;
+            }
+
+            PlayerConsumeAnimator anim = foot.GetComponent<PlayerConsumeAnimator>();
+            if (anim == null)
+            {
+                anim = foot.gameObject.AddComponent<PlayerConsumeAnimator>();
+            }
+            anim.StartBackpackSequence(foot, propVisual, kind, itemLabel, hungerRestore, energyRestore, healthRestore);
+        }
+
         private void Awake()
         {
             _foot = GetComponent<PlayerFootController>();
@@ -109,11 +139,149 @@ namespace OurWorld.Player
             CleanupVisualsAndLocks();
 
             float energy = _pendingEnergy;
+            float hunger = _pendingHunger;
+            float health = _pendingHealth;
             _pendingEnergy = 0f;
-            if (grantPendingEnergy && energy > 0f && PlayerNeedsController.Instance != null)
+            _pendingHunger = 0f;
+            _pendingHealth = 0f;
+            if (grantPendingEnergy && PlayerNeedsController.Instance != null)
             {
-                PlayerNeedsController.Instance.RestoreEnergy(energy);
+                if (hunger > 0f || health > 0f)
+                {
+                    PlayerNeedsController.Instance.ApplyMealRestore(hunger, energy, health);
+                }
+                else if (energy > 0f)
+                {
+                    PlayerNeedsController.Instance.RestoreEnergy(energy);
+                }
             }
+        }
+
+        private void StartBackpackSequence(
+            PlayerFootController foot,
+            ShopPropVisual propVisual,
+            ConsumeAnimKind kind,
+            string itemLabel,
+            float hungerRestore,
+            float energyRestore,
+            float healthRestore)
+        {
+            _foot = foot;
+            if (_cc == null) _cc = foot.GetComponent<CharacterController>();
+            PlayerActionAnimator actionAnim = foot.GetComponent<PlayerActionAnimator>();
+            if (actionAnim != null && actionAnim.IsPlaying)
+            {
+                actionAnim.CancelActive();
+            }
+            CancelActive();
+            int serial = ++_runSerial;
+            Coroutine routine = StartCoroutine(ConsumeFromBackpackRoutine(
+                serial, propVisual, kind, itemLabel ?? string.Empty, hungerRestore, energyRestore, healthRestore));
+            if (_completedRunSerial != serial && _runSerial == serial)
+            {
+                _activeRoutine = routine;
+            }
+        }
+
+        private IEnumerator ConsumeFromBackpackRoutine(
+            int serial,
+            ShopPropVisual propVisual,
+            ConsumeAnimKind kind,
+            string itemLabel,
+            float hungerRestore,
+            float energyRestore,
+            float healthRestore)
+        {
+            ProceduralHumanoid hum = _foot != null ? _foot.Humanoid : null;
+            PlayerModeController mode = PlayerModeController.Instance;
+            if (hum == null || mode == null || mode.CurrentMode != ControlMode.OnFoot)
+            {
+                PlayerNeedsController.Instance?.ApplyMealRestore(hungerRestore, energyRestore, healthRestore);
+                _completedRunSerial = serial;
+                _activeRoutine = null;
+                yield break;
+            }
+
+            _pendingHunger = Mathf.Max(0f, hungerRestore);
+            _pendingEnergy = Mathf.Max(0f, energyRestore);
+            _pendingHealth = Mathf.Max(0f, healthRestore);
+
+            _heldKind = kind;
+            _sipTiltPhase = 0f;
+            _putAwayProgress = 0f;
+            if (propVisual == ShopPropVisual.FreshFruit)
+            {
+                _heldPropBaseScale = 1f;
+                _heldProp = SpawnHandFruitProp(itemLabel);
+            }
+            else
+            {
+                _heldPropBaseScale = 0.78f;
+                _heldProp = ShopPropFactory.BuildProp(null, propVisual, Vector3.zero, uniformScale: _heldPropBaseScale);
+            }
+            SyncHeldPropToPalm();
+
+            bool isDrink = kind == ConsumeAnimKind.DrinkWater || kind == ConsumeAnimKind.DrinkHotCup;
+            int poseMode = isDrink ? 1 : 2;
+            bool en = LocalizationService.IsEnglish;
+
+            mode.RaiseStatusMessage(isDrink
+                ? (en ? $"Drinking {itemLabel} from Backpack..." : $"Çantadan {itemLabel} içiliyor...")
+                : (en ? $"Eating {itemLabel} from Backpack..." : $"Çantadan {itemLabel} yeniyor..."));
+
+            const float consumeTotal = 2.25f;
+            bool midApplied = false;
+            float t = 0f;
+
+            while (t < consumeTotal)
+            {
+                if (mode.CurrentMode != ControlMode.OnFoot) break;
+                t += Time.deltaTime;
+                float norm = Mathf.Clamp01(t / consumeTotal);
+
+                float raiseIn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(norm / 0.14f));
+                float lowerOut = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.80f) / 0.20f));
+                float armWeight = Mathf.Min(raiseIn, lowerOut);
+                _putAwayProgress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((norm - 0.84f) / 0.16f));
+
+                float b1 = Mathf.Sin(Mathf.Clamp01((norm - 0.12f) / 0.28f) * Mathf.PI);
+                float b2 = Mathf.Sin(Mathf.Clamp01((norm - 0.48f) / 0.28f) * Mathf.PI);
+                float cycle = Mathf.SmoothStep(0f, 1f, Mathf.Max(b1, b2));
+
+                hum.SetConsumePose(poseMode, armWeight, cycle);
+                _sipTiltPhase = cycle;
+
+                if (!midApplied && norm >= 0.44f)
+                {
+                    midApplied = true;
+                    _pendingHunger = 0f;
+                    _pendingEnergy = 0f;
+                    _pendingHealth = 0f;
+                    PlayerNeedsController.Instance?.ApplyMealRestore(hungerRestore, energyRestore, healthRestore);
+                    GameFeelAudio.PlayUiClick();
+                    Color fxColor = isDrink ? new Color(0.32f, 0.86f, 0.98f) : new Color(0.98f, 0.78f, 0.26f);
+                    Vector3 fxPos = hum.HeadTransform != null
+                        ? hum.HeadTransform.position + Vector3.up * 0.12f
+                        : _foot.transform.position + Vector3.up * 1.65f;
+                    GameFeelAudio.SpawnBurst(fxPos, fxColor, count: 10, spread: 0.35f);
+                    mode.RaiseStatusMessage(en
+                        ? $"Delicious! {itemLabel} (+{Mathf.RoundToInt(hungerRestore)} Food · +{Mathf.RoundToInt(energyRestore)} Energy)"
+                        : $"Afiyet olsun! {itemLabel} (+{Mathf.RoundToInt(hungerRestore)} Tokluk · +{Mathf.RoundToInt(energyRestore)} Enerji)");
+                }
+                yield return null;
+            }
+
+            _pendingHunger = 0f;
+            _pendingEnergy = 0f;
+            _pendingHealth = 0f;
+            if (!midApplied)
+            {
+                PlayerNeedsController.Instance?.ApplyMealRestore(hungerRestore, energyRestore, healthRestore);
+            }
+
+            _completedRunSerial = serial;
+            CleanupVisualsAndLocks();
+            _activeRoutine = null;
         }
 
         private void StartSequence(PlayerFootController foot, string shopId, ConsumeAnimKind kind, string itemLabel, float energyToRestore, Transform explicitTarget = null)
@@ -256,6 +424,7 @@ namespace OurWorld.Player
 
             // Spawn the visible 3D item right in the player's right hand as fingers touch the shelf!
             _heldKind = kind;
+            _heldPropBaseScale = 1f;
             _sipTiltPhase = 0f;
             _putAwayProgress = 0f;
             _heldProp = SpawnHandProp(kind);
@@ -305,9 +474,14 @@ namespace OurWorld.Player
 
             if (PlayerModeController.Instance != null)
             {
-                string verb = kind == ConsumeAnimKind.DrinkWater ? "Su içiliyor..."
-                    : (kind == ConsumeAnimKind.DrinkHotCup ? "Sıcak içecek yudumlanıyor..."
-                    : (kind == ConsumeAnimKind.EatIceCream ? "Dondurma yeniyor..." : "Afiyetle yeniyor..."));
+                bool enVerb = LocalizationService.IsEnglish;
+                string verb = kind == ConsumeAnimKind.DrinkWater
+                    ? (enVerb ? "Drinking cold drink..." : "İçecek içiliyor...")
+                    : (kind == ConsumeAnimKind.DrinkHotCup
+                        ? (enVerb ? "Sipping hot drink..." : "Sıcak içecek yudumlanıyor...")
+                        : (kind == ConsumeAnimKind.EatIceCream
+                            ? (enVerb ? "Enjoying ice cream..." : "Dondurma yeniyor...")
+                            : (enVerb ? "Enjoying meal..." : "Afiyetle yeniyor...")));
                 PlayerModeController.Instance.RaiseStatusMessage(verb);
             }
 
@@ -360,7 +534,10 @@ namespace OurWorld.Player
 
                     if (PlayerModeController.Instance != null && energyToRestore > 0f)
                     {
-                        PlayerModeController.Instance.RaiseStatusMessage($"Afiyet olsun! +{Mathf.RoundToInt(energyToRestore)} Enerji");
+                        bool enEnjoy = LocalizationService.IsEnglish;
+                        PlayerModeController.Instance.RaiseStatusMessage(enEnjoy
+                            ? $"Enjoy! +{Mathf.RoundToInt(energyToRestore)} Energy"
+                            : $"Afiyet olsun! +{Mathf.RoundToInt(energyToRestore)} Enerji");
                     }
                 }
 
@@ -477,7 +654,30 @@ namespace OurWorld.Player
             _heldProp.transform.position = palmWorld - Vector3.up * (0.045f + _putAwayProgress * 0.04f) + _foot.transform.forward * 0.025f;
             _heldProp.transform.rotation = _foot.transform.rotation * Quaternion.Euler(tiltX, 0f, 0f);
             float scaleFade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((_putAwayProgress - 0.55f) / 0.45f));
-            _heldProp.transform.localScale = Vector3.one * Mathf.Max(0.01f, scaleFade);
+            _heldProp.transform.localScale = Vector3.one * Mathf.Max(0.01f, scaleFade * _heldPropBaseScale);
+        }
+
+        private static GameObject SpawnHandFruitProp(string itemLabel)
+        {
+            GameObject root = new GameObject("HeldFruitProp");
+            root.transform.localRotation = Quaternion.identity;
+            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Sprites/Default");
+            string low = (itemLabel ?? string.Empty).ToLowerInvariant();
+            bool isOrange = low.Contains("portakal") || low.Contains("orange");
+            bool isStrawberry = low.Contains("çilek") || low.Contains("strawberr");
+            Color skin = isOrange
+                ? new Color(0.98f, 0.52f, 0.08f)
+                : (isStrawberry ? new Color(0.90f, 0.16f, 0.24f) : new Color(0.84f, 0.16f, 0.14f));
+            CreatePropPart("FruitBody", PrimitiveType.Sphere, root.transform,
+                new Vector3(0f, 0.045f, 0f), new Vector3(0.088f, 0.084f, 0.088f),
+                MakeSimpleMat(urpLit, skin, 0.58f, 0.04f));
+            CreatePropPart("Stem", PrimitiveType.Cylinder, root.transform,
+                new Vector3(0f, 0.092f, 0f), new Vector3(0.010f, 0.018f, 0.010f),
+                MakeSimpleMat(urpLit, new Color(0.36f, 0.22f, 0.10f), 0.20f, 0f));
+            CreatePropPart("Leaf", PrimitiveType.Cube, root.transform,
+                new Vector3(0.022f, 0.095f, 0f), new Vector3(0.036f, 0.008f, 0.020f),
+                MakeSimpleMat(urpLit, new Color(0.20f, 0.66f, 0.24f), 0.32f, 0f));
+            return root;
         }
 
         private static GameObject SpawnHandProp(ConsumeAnimKind kind)

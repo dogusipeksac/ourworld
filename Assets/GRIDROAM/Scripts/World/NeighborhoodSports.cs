@@ -51,19 +51,22 @@ namespace OurWorld.World
             _cube = PrimitiveMesh(PrimitiveType.Cube);
             _cylinder = PrimitiveMesh(PrimitiveType.Cylinder);
             _sphere = PrimitiveMesh(PrimitiveType.Sphere);
+            _atmosphere = gameObject.AddComponent<SportsArenaAtmosphere>();
 
-            Material paintedSteel = MaterialFor(shader, "Park Painted Steel", new Color(0.24f, 0.36f, 0.32f), 0.42f);
+            Material paintedSteel = MaterialFor(shader, "Park Painted Steel", new Color(0.20f, 0.34f, 0.29f), 0.44f);
             Material rubber = MaterialFor(shader, "Bike Rubber", new Color(0.08f, 0.085f, 0.08f), 0.22f);
-            Material cream = MaterialFor(shader, "Court Line Paint", new Color(0.88f, 0.87f, 0.76f), 0.22f);
-            Material metal = MaterialFor(shader, "Galvanized Steel", new Color(0.59f, 0.61f, 0.59f), 0.53f);
-            Material asphalt = MaterialFor(shader, "Weathered Park Asphalt", new Color(0.27f, 0.32f, 0.27f), 0.18f);
-            Material clay = MaterialFor(shader, "Terra Cotta Court Surface", new Color(0.56f, 0.31f, 0.23f), 0.19f);
-            Material green = MaterialFor(shader, "Tennis Ball Felt", new Color(0.68f, 0.78f, 0.22f), 0.18f);
+            Material cream = MaterialFor(shader, "Court Line Paint", new Color(0.92f, 0.91f, 0.84f), 0.20f);
+            Material metal = MaterialFor(shader, "Galvanized Steel", new Color(0.60f, 0.62f, 0.61f), 0.56f);
+            Texture2D asphaltTex = BuildAsphaltTexture(new Color(0.27f, 0.30f, 0.28f), 1101);
+            Material asphalt = MaterialForTextured(shader, "Weathered Park Asphalt", asphaltTex, Color.white, 0.16f, new Vector2(6f, 10f));
+            Texture2D clayTex = BuildClayCourtTexture(new Color(0.62f, 0.31f, 0.21f), 2202);
+            Material clay = MaterialForTextured(shader, "Terra Cotta Court Surface", clayTex, Color.white, 0.14f, new Vector2(5f, 10f));
+            Material green = MaterialFor(shader, "Tennis Ball Felt", new Color(0.72f, 0.84f, 0.20f), 0.18f);
             green.EnableKeyword("_EMISSION");
-            green.SetColor("_EmissionColor", new Color(0.14f, 0.17f, 0.04f));
+            green.SetColor("_EmissionColor", new Color(0.16f, 0.20f, 0.04f));
             BuildBicycles(shader, paintedSteel, rubber, cream, metal);
             BuildMotorcycles(shader, rubber, cream, metal);
-            BuildCourt(playerModel, paintedSteel, rubber, cream, asphalt, clay, green);
+            BuildCourt(playerModel, shader, paintedSteel, rubber, cream, metal, asphalt, clay, green);
             BuildCommunitySportsArenas(playerModel, shader, paintedSteel, rubber, cream, metal, asphalt, clay);
             BuildDuplexHomes(shader, cream, paintedSteel);
         }
@@ -168,57 +171,139 @@ namespace OurWorld.World
                 .Configure(InteractableKind.Bicycle, triggerId, "ui.btn.ride_bike", 2.6f);
         }
 
-        private void BuildCourt(ProceduralHumanoid playerModel, Material steel, Material rubber, Material cream,
-            Material asphalt, Material clay, Material ballMaterial)
+        private void BuildCourt(ProceduralHumanoid playerModel, Shader shader, Material steel, Material rubber, Material cream,
+            Material metal, Material asphalt, Material clay, Material ballMaterial)
         {
             Transform court = Child(transform, "Gursu_MahalleTenisKortu", CourtPosition);
-            MeshParts surface = new MeshParts(this);
-            surface.Box(asphalt, new Vector3(0f, -0.06f, 0f), new Vector3(15.8f, 0.12f, 30.4f));
-            surface.Box(clay, new Vector3(0f, -0.017f, 0f), new Vector3(11.5f, 0.037f, 26.5f));
-            surface.Box(asphalt, new Vector3(-5.25f, -0.016f, 17.1f), new Vector3(2.3f, 0.032f, 5.1f));
 
+            // Roland-Garros inspired dark emerald outer run-off apron + swept red clay court + subtle baseline scuffing
+            Texture2D outerTex = BuildAcrylicCourtTexture(new Color(0.14f, 0.34f, 0.23f), 2205);
+            Material outerGreen = MaterialForTextured(shader, "Tennis Outer Green Apron", outerTex, Color.white, 0.16f, new Vector2(5f, 9f));
+            Material wornClay = MaterialFor(shader, "Tennis Baseline Worn Clay", new Color(0.50f, 0.24f, 0.16f), 0.10f);
+            Material whiteLine = MaterialFor(shader, "Tennis Pure White Line", new Color(0.96f, 0.96f, 0.94f), 0.18f);
+            Material tarpGreen = MaterialFor(shader, "Tennis Windscreen Tarp", new Color(0.08f, 0.26f, 0.17f), 0.14f);
+            Material wireDark = MaterialFor(shader, "Tennis Cage Wire", new Color(0.14f, 0.22f, 0.18f), 0.38f);
+            Material woodBench = MaterialFor(shader, "Tennis Bench Timber", new Color(0.54f, 0.35f, 0.19f), 0.26f);
+            Material brassMat = MaterialFor(shader, "Tennis Crank Brass", new Color(0.84f, 0.68f, 0.26f), 0.72f);
+
+            const float doublesHalfW = 5.48f;
             const float serviceLength = 6.4f;
+            const float lineY = TennisCourt.LineHeight + 0.004f;
+
+            MeshParts surface = new MeshParts(this);
+            // Perimeter concrete curb + emerald run-off court + swept terracotta clay playing area
+            surface.Box(asphalt, new Vector3(0f, -0.062f, 0f), new Vector3(16.2f, 0.12f, 30.8f));
+            surface.Box(outerGreen, new Vector3(0f, -0.022f, 0f), new Vector3(15.2f, 0.036f, 29.8f));
+            surface.Box(clay, new Vector3(0f, -0.008f, 0f), new Vector3(11.9f, 0.024f, 26.2f));
+            // Subtle darker worn-clay player footwork zones behind both baselines
             foreach (float side in new[] { -1f, 1f })
             {
-                surface.Box(cream, new Vector3(side * TennisCourt.HalfWidth, TennisCourt.LineHeight, 0f),
+                surface.Box(wornClay, new Vector3(0f, 0.0042f, side * (TennisCourt.HalfLength - 0.15f)), new Vector3(5.2f, 0.002f, 1.85f));
+            }
+            surface.Box(asphalt, new Vector3(-5.25f, -0.016f, 17.1f), new Vector3(2.3f, 0.032f, 5.1f));
+
+            // Full ITF markings: Doubles sidelines, Singles sidelines, Baselines, Service boxes & Center service hashes
+            foreach (float side in new[] { -1f, 1f })
+            {
+                // Doubles outer sidelines
+                surface.Box(whiteLine, new Vector3(side * doublesHalfW, lineY, 0f),
+                    new Vector3(0.060f, 0.004f, TennisCourt.HalfLength * 2f));
+                // Singles inner sidelines
+                surface.Box(whiteLine, new Vector3(side * TennisCourt.HalfWidth, lineY, 0f),
                     new Vector3(0.055f, 0.004f, TennisCourt.HalfLength * 2f));
-                surface.Box(cream, new Vector3(0f, TennisCourt.LineHeight, side * TennisCourt.HalfLength),
-                    new Vector3(TennisCourt.HalfWidth * 2f, 0.004f, 0.075f));
-                surface.Box(cream, new Vector3(0f, TennisCourt.LineHeight, side * serviceLength),
+                // Baselines (full doubles width!)
+                surface.Box(whiteLine, new Vector3(0f, lineY, side * TennisCourt.HalfLength),
+                    new Vector3(doublesHalfW * 2f + 0.06f, 0.004f, 0.080f));
+                // Center baseline service hash marks
+                surface.Box(whiteLine, new Vector3(0f, lineY, side * (TennisCourt.HalfLength - 0.16f)),
+                    new Vector3(0.055f, 0.004f, 0.28f));
+                // Service lines (between singles lines)
+                surface.Box(whiteLine, new Vector3(0f, lineY, side * serviceLength),
                     new Vector3(TennisCourt.HalfWidth * 2f, 0.004f, 0.055f));
             }
-            surface.Box(cream, new Vector3(0f, TennisCourt.LineHeight, 0f), new Vector3(0.055f, 0.004f, serviceLength * 2f));
+            surface.Box(whiteLine, new Vector3(0f, lineY, 0f), new Vector3(0.055f, 0.004f, serviceLength * 2f));
             surface.Emit(court, "Paved court and lines");
 
+            // Tall 2.95m municipal tennis perimeter wire cage + forest-green windscreen tarps (Rüzgarlık Branda!)
             MeshParts fences = new MeshParts(this);
-            AddFence(fences, court, steel, new Vector3(-7.6f, 0f, -15f), new Vector3(-7.6f, 0f, 15f));
-            AddFence(fences, court, steel, new Vector3(7.6f, 0f, -15f), new Vector3(7.6f, 0f, 15f));
-            AddFence(fences, court, steel, new Vector3(-7.6f, 0f, -15f), new Vector3(7.6f, 0f, -15f));
-            AddFence(fences, court, steel, new Vector3(-7.6f, 0f, 15f), new Vector3(-6.65f, 0f, 15f));
-            AddFence(fences, court, steel, new Vector3(-3.85f, 0f, 15f), new Vector3(7.6f, 0f, 15f));
-            fences.Emit(court, "Low municipal fence", shadows: false);
+            AddTallCageFence(fences, court, steel, wireDark, new Vector3(-7.6f, 0f, -15f), new Vector3(-7.6f, 0f, 15f), 2.95f);
+            AddTallCageFence(fences, court, steel, wireDark, new Vector3(7.6f, 0f, -15f), new Vector3(7.6f, 0f, 15f), 2.95f);
+            AddTallCageFence(fences, court, steel, wireDark, new Vector3(-7.6f, 0f, -15f), new Vector3(7.6f, 0f, -15f), 2.95f);
+            AddTallCageFence(fences, court, steel, wireDark, new Vector3(-7.6f, 0f, 15f), new Vector3(-6.65f, 0f, 15f), 2.95f);
+            AddTallCageFence(fences, court, steel, wireDark, new Vector3(-3.85f, 0f, 15f), new Vector3(7.6f, 0f, 15f), 2.95f);
 
+            // Signature tennis club green windscreens strapped along South backstop & West flank
+            AddWindscreenTarp(fences, tarpGreen, new Vector3(-7.5f, 0f, -14.95f), new Vector3(7.5f, 0f, -14.95f), 0.22f, 2.25f, new Vector3(0f, 0f, 0.04f));
+            AddWindscreenTarp(fences, tarpGreen, new Vector3(-7.55f, 0f, -14.8f), new Vector3(-7.55f, 0f, -2.5f), 0.22f, 2.05f, new Vector3(0.04f, 0f, 0f));
+            AddWindscreenTarp(fences, tarpGreen, new Vector3(-7.55f, 0f, 2.5f), new Vector3(-7.55f, 0f, 14.8f), 0.22f, 2.05f, new Vector3(0.04f, 0f, 0f));
+            fences.Emit(court, "Tennis club cage and windscreens", shadows: false);
+
+            // Club banner mounted on South windscreen facing the player
+            AddPerimeterAdBoard(court, new Vector3(0f, 1.05f, -14.85f), 180f, 5.2f, 0.72f, steel, whiteLine, "GÜRSU TENİS KULÜBÜ", new Color(0.96f, 0.94f, 0.76f));
+
+            // Pro full-width tennis net with white canvas headband, center anchor strap, round posts & brass crank
             MeshParts net = new MeshParts(this);
-            const float halfNet = 4.8f;
-            net.Box(cream, new Vector3(0f, 0.91f, 0f), new Vector3(halfNet * 2f, 0.048f, 0.024f));
+            const float halfNet = 5.85f;
+            net.Box(whiteLine, new Vector3(0f, 0.93f, 0f), new Vector3(halfNet * 2f, 0.056f, 0.028f));
+            // White center strap anchoring net middle to ground
+            net.Box(whiteLine, new Vector3(0f, 0.465f, 0f), new Vector3(0.055f, 0.92f, 0.032f));
             foreach (float x in new[] { -halfNet, halfNet })
             {
-                net.Box(steel, new Vector3(x, 0.48f, 0f), new Vector3(0.09f, 0.96f, 0.09f));
+                net.Rod(steel, _cylinder, new Vector3(x, 0f, 0f), new Vector3(x, 1.07f, 0f), 0.052f);
+                net.Add(brassMat, _sphere, new Vector3(x, 1.09f, 0f), Quaternion.identity, Vector3.one * 0.11f);
             }
-
-            for (int i = 1; i <= 47; i++)
+            // Brass tension crank handle on East post
+            net.Rod(brassMat, _cylinder, new Vector3(halfNet + 0.05f, 0.84f, 0f), new Vector3(halfNet + 0.16f, 0.84f, 0f), 0.015f);
+            net.Rod(brassMat, _cylinder, new Vector3(halfNet + 0.16f, 0.84f, 0f), new Vector3(halfNet + 0.16f, 0.72f, 0.06f), 0.014f);
+            // Singles sticks at ±4.55m
+            foreach (float sx in new[] { -4.55f, 4.55f })
             {
-                float x = Mathf.Lerp(-halfNet, halfNet, i / 48f);
-                net.Box(rubber, new Vector3(x, 0.46f, 0f), new Vector3(0.013f, 0.89f, 0.013f));
+                net.Rod(whiteLine, _cylinder, new Vector3(sx, 0f, 0f), new Vector3(sx, 1.05f, 0f), 0.018f);
             }
-
+            for (int i = 1; i <= 55; i++)
+            {
+                float x = Mathf.Lerp(-halfNet, halfNet, i / 56f);
+                net.Box(rubber, new Vector3(x, 0.46f, 0f), new Vector3(0.012f, 0.89f, 0.012f));
+            }
             for (int i = 1; i <= 8; i++)
             {
-                net.Box(rubber, new Vector3(0f, i * 0.10f, 0f), new Vector3(halfNet * 2f, 0.012f, 0.013f));
+                net.Box(rubber, new Vector3(0f, i * 0.105f, 0f), new Vector3(halfNet * 2f, 0.011f, 0.012f));
             }
             net.Emit(court, "Tennis net", shadows: false);
-            AddCollider(court, "Net collision", new Vector3(0f, 0.46f, 0f), new Vector3(halfNet * 2f, 0.92f, 0.10f));
+            AddCollider(court, "Net collision", new Vector3(0f, 0.46f, 0f), new Vector3(halfNet * 2f, 0.94f, 0.10f));
 
+            // Elevated Umpire Chair (Hakem Sandalyesi) + 2 Player Changeover Benches + Ball Hopper on East sideline
+            AddElevatedRefChair(court, new Vector3(6.62f, 0f, 0f), -90f, 1.55f, withCanopy: true, shader, steel, woodBench);
+            MeshParts sideProps = new MeshParts(this);
+            foreach (float bz in new[] { -3.1f, 3.1f })
+            {
+                sideProps.Box(woodBench, new Vector3(6.75f, 0.44f, bz), new Vector3(0.46f, 0.055f, 1.75f));
+                sideProps.Box(woodBench, new Vector3(6.96f, 0.72f, bz), new Vector3(0.055f, 0.34f, 1.75f));
+                foreach (float dz in new[] { -0.72f, 0.72f })
+                    sideProps.Box(steel, new Vector3(6.75f, 0.22f, bz + dz), new Vector3(0.40f, 0.44f, 0.06f));
+            }
+            // Tennis ball hopper wire basket filled with yellow balls next to umpire chair
+            sideProps.Box(metal, new Vector3(6.62f, 0.48f, -1.35f), new Vector3(0.38f, 0.34f, 0.38f));
+            foreach (float lx in new[] { -0.16f, 0.16f })
+                foreach (float lz in new[] { -0.16f, 0.16f })
+                    sideProps.Rod(metal, _cylinder, new Vector3(6.62f + lx, 0f, -1.35f + lz), new Vector3(6.62f + lx, 0.65f, -1.35f + lz), 0.012f);
+            for (int b = 0; b < 6; b++)
+            {
+                float bx = 6.62f + ((b % 3) - 1) * 0.09f;
+                float bz2 = -1.35f + ((b / 3) - 0.5f) * 0.10f;
+                sideProps.Add(ballMaterial, _sphere, new Vector3(bx, 0.66f, bz2), Quaternion.identity, Vector3.one * 0.075f);
+            }
+            sideProps.Emit(court, "Tennis benches and hopper", shadows: false);
+
+            // Two East Corner Floodlight Towers pairing with West Floodlight_TennisCourt mast
+            Material floodHousing = MaterialFor(shader, "Tennis Flood Housing", new Color(0.14f, 0.16f, 0.18f), 0.40f);
+            Material floodLens = MaterialFor(shader, "Tennis Flood Lens", new Color(0.98f, 0.97f, 0.90f), 0.60f);
+            Material nightConeMat = MaterialForTranslucent(Shader.Find("Sprites/Default") ?? shader, "Tennis Night Flood Cone", new Color(0.95f, 0.96f, 1.0f, 0.065f), 0f);
+            AddStadiumFloodlightTower(court, new Vector3(8.25f, 0f, -12.6f), Vector3.zero, 6.4f, metal, floodHousing, floodLens, nightConeMat);
+            AddStadiumFloodlightTower(court, new Vector3(8.25f, 0f,  12.6f), Vector3.zero, 6.4f, metal, floodHousing, floodLens, nightConeMat);
+
+            // Live 3D Digital Tennis Scoreboard on North fence + Entrance signage
+            TextMesh tennisScoreboard = AddDigitalScoreboard(court, new Vector3(1.8f, 2.05f, 15.20f), "GÜRSU TENİS\n0 - 0", shader, new Color(0.18f, 0.78f, 0.42f), new Color(1.0f, 0.95f, 0.70f), width: 2.35f, height: 0.74f);
             AddSign(court, new Vector3(-6.75f, 1.6f, 15.1f), "GÜRSU SOKAĞI\nTENİS KORTU", steel, cream.color);
             AddSign(transform, new Vector3(-44.8f, 1.46f, -6.8f), "TENİS KORTU  ↑", steel, cream.color);
 
@@ -234,7 +319,7 @@ namespace OurWorld.World
             Transform ball = Child(court, "Tennis ball", Vector3.zero);
             ballParts.Emit(ball, "Felt sphere", shadows: false);
 
-            Material shadowMaterial = MaterialFor(clay.shader, "Tennis ball shadow", Color.Lerp(clay.color, Color.black, 0.38f), 0f);
+            Material shadowMaterial = MaterialFor(clay.shader, "Tennis ball shadow", Color.Lerp(new Color(0.62f, 0.31f, 0.21f), Color.black, 0.42f), 0f);
             MeshParts shadowParts = new MeshParts(this);
             shadowParts.Add(shadowMaterial, _sphere, Vector3.zero, Quaternion.identity, new Vector3(0.15f, 0.001f, 0.15f));
             Transform ballShadow = Child(court, "Tennis ball ground shadow", Vector3.zero);
@@ -244,6 +329,21 @@ namespace OurWorld.World
             markerParts.Ring(ballMaterial, 0.43f, 0.43f, 0.021f, 24, Quaternion.Euler(90f, 0f, 0f));
             Transform marker = Child(court, "Return timing marker", Vector3.zero);
             markerParts.Emit(marker, "Ready ring", shadows: false);
+
+            // East-side outdoor spectator bleacher in the wide 9.5m open promenade between Tennis & Halı Saha
+            AddSpectatorBleacher(
+                court,
+                new Vector3(9.35f, 0f, 0f),
+                yawDeg: -90f,
+                length: 3.4f,
+                covered: false,
+                shader: shader,
+                steelMat: steel,
+                template: playerModel,
+                sportKind: "tennis",
+                watchBall: ball,
+                spectatorNames: new[] { "Selin", "Mert" },
+                shirtColors: new[] { new Color(0.86f, 0.84f, 0.78f), new Color(0.18f, 0.50f, 0.36f) });
 
             // Use the existing jointed player art with distinct shirts for both neighborhood tennis NPCs
             // so two NPCs rally autonomously whenever the player isn't playing!
@@ -283,7 +383,7 @@ namespace OurWorld.World
             AudioClip hit = BuildBallSound("Racket hit", 340f, 61f, 0.30f);
             AudioClip bounce = BuildBallSound("Court bounce", 155f, 86f, 0.12f);
             court.gameObject.AddComponent<TennisCourt>().Configure(
-                ball, ballShadow, opponent, opponentRacket, playerRacket, marker, ballSound, hit, bounce, ambientPlayer);
+                ball, ballShadow, opponent, opponentRacket, playerRacket, marker, ballSound, hit, bounce, ambientPlayer, tennisScoreboard);
         }
 
         private void ApplyNpcShirtColor(ProceduralHumanoid npc, Shader shader, string matName, Color shirtColor)
@@ -464,6 +564,52 @@ namespace OurWorld.World
 
                 Mesh mesh = new Mesh { name = "Ring", vertices = vertices, triangles = triangles };
                 mesh.RecalculateNormals();
+                _owner._ownedAssets.Add(mesh);
+                Add(material, mesh, Vector3.zero, Quaternion.identity, Vector3.one);
+            }
+
+            public void Arc(Material material, float radius, float width, float startDeg, float endDeg, int segments, Vector3 center)
+            {
+                if (segments < 2) segments = 2;
+                float rIn = Mathf.Max(0.01f, radius - width * 0.5f);
+                float rOut = radius + width * 0.5f;
+                Vector3[] verts = new Vector3[(segments + 1) * 2];
+                int[] tris = new int[segments * 6];
+                for (int i = 0; i <= segments; i++)
+                {
+                    float deg = Mathf.Lerp(startDeg, endDeg, i / (float)segments);
+                    float rad = deg * Mathf.Deg2Rad;
+                    float cs = Mathf.Cos(rad);
+                    float sn = Mathf.Sin(rad);
+                    verts[i * 2] = center + new Vector3(cs * rIn, 0.0025f, sn * rIn);
+                    verts[i * 2 + 1] = center + new Vector3(cs * rOut, 0.0025f, sn * rOut);
+                    if (i < segments)
+                    {
+                        int t = i * 6;
+                        int v = i * 2;
+                        tris[t] = v;
+                        tris[t + 1] = v + 2;
+                        tris[t + 2] = v + 1;
+                        tris[t + 3] = v + 1;
+                        tris[t + 4] = v + 2;
+                        tris[t + 5] = v + 3;
+                    }
+                }
+                Mesh mesh = new Mesh { name = "CourtArc", vertices = verts, triangles = tris };
+                mesh.RecalculateNormals();
+                // Ensure upward-facing normal regardless of winding direction
+                Vector3[] norms = mesh.normals;
+                if (norms.Length > 0 && norms[0].y < 0f)
+                {
+                    for (int i = 0; i < tris.Length; i += 3)
+                    {
+                        int tmp = tris[i + 1];
+                        tris[i + 1] = tris[i + 2];
+                        tris[i + 2] = tmp;
+                    }
+                    mesh.triangles = tris;
+                    mesh.RecalculateNormals();
+                }
                 _owner._ownedAssets.Add(mesh);
                 Add(material, mesh, Vector3.zero, Quaternion.identity, Vector3.one);
             }

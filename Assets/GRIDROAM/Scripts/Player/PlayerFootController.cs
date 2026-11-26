@@ -83,24 +83,44 @@ namespace OurWorld.Player
         private static AudioClip _sharedPunchWhooshClip;
         private static AudioClip _sharedSplashClip;
 
+        private enum GroundSurfaceKind
+        {
+            Stone,
+            Grass,
+            Sand,
+            Wood,
+            Indoor
+        }
+
         private CharacterController _controller;
         private float _nextCamRigLookupTime;
         private ThirdPersonCameraRig _cameraRig;
         private AudioSource _footstepAudio;
         private float _verticalVelocity;
         private float _currentSpeed;
+        private Vector3 _planarVelocity;
+        private float _coyoteTimer;
+        private float _jumpBufferTimer;
+        private float _pivotDustCooldown;
+        private float _rainWetness01;
+        private bool _warnedRainSoaked;
+        private float _drownTickTimer;
+        private GroundSurfaceKind _groundSurface = GroundSurfaceKind.Stone;
         private float _punchCooldown;
         private int _comboStep;
         private float _comboResetTimer;
         private Vector3 _combatLungeVelocity;
+        private Vector3 _hitStumbleVelocity;
+        private bool _wasGrounded = true;
+        private float _airPeakY;
         private bool _isVaulting;
         private Coroutine _vaultRoutine;
-        private Coroutine _hitstopRoutine;
         private bool _isSwimming;
         private bool _isUnderwater;
         private bool _swimBreaststroke;
         private float _swimOxygen01 = 1f;
         private float _bubbleTimer;
+        private float _swimSplashTimer;
         private float _waterSurfaceY;
         private Vector3 _moveDirection = Vector3.forward;
         private bool _movementEnabled = true;
@@ -162,13 +182,20 @@ namespace OurWorld.Player
                     humanoid.SetSwimming(false, 0f);
                 }
             }
+            if (_vaultRoutine != null)
+            {
+                StopCoroutine(_vaultRoutine);
+                _vaultRoutine = null;
+            }
             _isSwimming = false;
             _isVaulting = false;
-            if (_hitstopRoutine != null)
+            _planarVelocity = Vector3.zero;
+            _currentSpeed = 0f;
+            _coyoteTimer = 0f;
+            _jumpBufferTimer = 0f;
+            if (_cameraRig != null)
             {
-                StopCoroutine(_hitstopRoutine);
-                _hitstopRoutine = null;
-                Time.timeScale = 1f;
+                _cameraRig.SetSprintMotion(0f);
             }
         }
 
@@ -198,10 +225,6 @@ namespace OurWorld.Player
 
         private void OnDestroy()
         {
-            if (Time.timeScale < 0.99f)
-            {
-                Time.timeScale = 1f;
-            }
             if (InputHub.Instance != null)
             {
                 InputHub.Instance.OnAttackPressed -= HandleAttackPressed;
@@ -344,13 +367,29 @@ namespace OurWorld.Player
 
         private void HandleAttackPressed()
         {
-            if (!_movementEnabled || _controller == null || !_controller.enabled || _punchCooldown > 0f || _isVaulting || _isSwimming)
+            if (!_movementEnabled || _controller == null || !_controller.enabled || _isVaulting)
             {
                 return;
             }
 
             PlayerModeController mode = PlayerModeController.Instance;
             if (mode == null || mode.CurrentMode != ControlMode.OnFoot || mode.IsModalLocked)
+            {
+                return;
+            }
+
+            // Event-driven swimming stroke toggle (zero frame-rate double-toggle bug!)
+            if (_isSwimming)
+            {
+                _swimBreaststroke = !_swimBreaststroke;
+                bool en = LocalizationService.IsEnglish;
+                mode.RaiseStatusMessage(_swimBreaststroke
+                    ? (en ? "Swim Style: Breaststroke (Low stamina drain)" : "Yüzme Stili: Kurbağalama (Düşük yorgunluk)")
+                    : (en ? "Swim Style: Freestyle (High speed)" : "Yüzme Stili: Serbest Stil (Yüksek hız)"));
+                return;
+            }
+
+            if (_punchCooldown > 0f)
             {
                 return;
             }
@@ -414,19 +453,29 @@ namespace OurWorld.Player
             }
 
             float reach = step == 2 ? 1.28f : 1.08f;
-            float radius = step == 2 ? 1.25f : 1.05f;
-            Vector3 strikeCenter = transform.position + transform.forward * reach + Vector3.up * 1.05f;
-            Collider[] hits = Physics.OverlapSphere(strikeCenter, radius);
+            float radius = step == 2 ? 1.35f : 1.15f;
+            Vector3 strikeCenter = transform.position + transform.forward * reach + Vector3.up * 0.90f;
+            Collider[] hits = Physics.OverlapSphere(strikeCenter, radius, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
 
             TownPedestrian hitPed = null;
             VehicleDamageSystem hitCar = null;
             Collider hitCarCol = null;
+            Collider hitPriorityPropCol = null;
+            Vector3 hitPriorityPropPt = strikeCenter;
+            float bestPriorityDistSq = float.MaxValue;
+            Collider hitWorldCol = null;
+            Vector3 hitWorldPt = strikeCenter;
             float bestDistSq = float.MaxValue;
             float bestCarDistSq = float.MaxValue;
+            float bestWorldDistSq = float.MaxValue;
+
             for (int i = 0; i < hits.Length; i++)
             {
-                if (hits[i] == null) continue;
-                TownPedestrian ped = hits[i].GetComponentInParent<TownPedestrian>();
+                Collider col = hits[i];
+                if (col == null) continue;
+                if (col.transform == transform || col.transform.IsChildOf(transform)) continue;
+
+                TownPedestrian ped = col.GetComponentInParent<TownPedestrian>();
                 if (ped != null)
                 {
                     float dSq = (ped.transform.position - transform.position).sqrMagnitude;
@@ -438,23 +487,129 @@ namespace OurWorld.Player
                     continue;
                 }
 
-                VehicleDamageSystem carDmg = hits[i].GetComponentInParent<VehicleDamageSystem>();
+                VehicleDamageSystem carDmg = col.GetComponentInParent<VehicleDamageSystem>();
                 if (carDmg != null)
                 {
-                    Vector3 pt = hits[i].ClosestPoint(strikeCenter);
+                    Vector3 pt = GetSafeClosestPoint(col, strikeCenter);
                     float dSq = (pt - strikeCenter).sqrMagnitude;
                     if (dSq < bestCarDistSq)
                     {
                         bestCarDistSq = dSq;
                         hitCar = carDmg;
-                        hitCarCol = hits[i];
+                        hitCarCol = col;
                     }
+                    continue;
+                }
+
+                // Ignore colliders belonging to farm/street animals here (handled by dedicated living-creature chain)
+                if (col.GetComponentInParent<FarmAnimalController>() != null ||
+                    col.GetComponentInParent<StreetCatController>() != null)
+                {
+                    continue;
+                }
+
+                Vector3 wPt = GetSafeClosestPoint(col, strikeCenter);
+                float wDistSq = (wPt - strikeCenter).sqrMagnitude;
+
+                // Prioritize interactive physical props (crates, damacana, doors, ATMs, vending machines) over adjacent walls
+                bool isPriorityProp = col.GetComponentInParent<CarryableProp>() != null ||
+                                      col.GetComponentInParent<DoorInteractable>() != null;
+                if (isPriorityProp)
+                {
+                    if (wDistSq < bestPriorityDistSq)
+                    {
+                        bestPriorityDistSq = wDistSq;
+                        hitPriorityPropCol = col;
+                        hitPriorityPropPt = wPt;
+                    }
+                    continue;
+                }
+
+                // Skip flat ground/road/sidewalk/floor/water slabs underneath the player's feet
+                if (wPt.y < transform.position.y + 0.18f || col.bounds.max.y <= transform.position.y + 0.22f)
+                {
+                    continue;
+                }
+                string nLow = col.gameObject.name.ToLowerInvariant();
+                if (nLow.Contains("ground") || nLow.Contains("bedrock") || nLow.Contains("valleyfloor") ||
+                    nLow.Contains("asphalt") || nLow.Contains("sidewalk") || nLow.Contains("lawn") ||
+                    nLow.Contains("lakebed") || nLow.Contains("meadow") || nLow.Contains("water") ||
+                    nLow.Contains("terrain") || nLow.Contains("pavement") || nLow.Contains("shore") ||
+                    (nLow.Contains("floor") && !nLow.Contains("wall")))
+                {
+                    continue;
+                }
+
+                if (wDistSq < bestWorldDistSq)
+                {
+                    bestWorldDistSq = wDistSq;
+                    hitWorldCol = col;
+                    hitWorldPt = wPt;
                 }
             }
 
+            if (hitPriorityPropCol != null)
+            {
+                hitWorldCol = hitPriorityPropCol;
+                hitWorldPt = hitPriorityPropPt;
+            }
+
+            bool hitLiving = false;
             if (hitPed != null)
             {
                 hitPed.OnPunchedByPlayer(transform.position, transform.forward, step);
+                hitLiving = true;
+            }
+            if (!hitLiving && LivingNeighborhoodPopulator.Instance != null)
+            {
+                hitLiving = LivingNeighborhoodPopulator.Instance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving)
+            {
+                hitLiving = StreetCatController.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving)
+            {
+                hitLiving = FarmAnimalController.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving && WorldExpansionAndFarmBuilder.Instance != null)
+            {
+                hitLiving = WorldExpansionAndFarmBuilder.Instance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving && HamidiyeMallInteractionHandler.ActiveInstance != null)
+            {
+                hitLiving = HamidiyeMallInteractionHandler.ActiveInstance.TryReceivePlayerPunch(
+                    strikeCenter, radius, transform.position, transform.forward, step);
+            }
+            if (!hitLiving)
+            {
+                hitLiving = NeighborhoodConsequenceSystem.EnsureInstance().TryPunchAnyOtherHumanoid(
+                    strikeCenter, radius, transform.position, transform.forward, step, this);
+            }
+
+            bool heavy = step >= 2;
+            if (hitLiving)
+            {
+                VisualEffectsManager.SpawnCombatImpact(
+                    strikeCenter,
+                    transform.forward,
+                    heavy,
+                    heavy ? new Color(1.0f, 0.48f, 0.16f) : new Color(1.0f, 0.88f, 0.36f));
+                DayNightCycle.Instance?.PulseImpactChromatic(heavy ? 0.22f : 0.08f);
+                if (heavy)
+                {
+                    bool en = LocalizationService.IsEnglish;
+                    VisualEffectsManager.SpawnFloatingText(
+                        strikeCenter + Vector3.up * 0.45f,
+                        en ? "HEAVY HIT!" : "SERT DARBE!",
+                        new Color(1.0f, 0.78f, 0.22f),
+                        scale: 1.05f,
+                        duration: 0.85f);
+                }
 
                 if (_footstepAudio != null)
                 {
@@ -473,41 +628,61 @@ namespace OurWorld.Player
                     float intensity = step == 2 ? 0.22f : (step == 1 ? 0.14f : 0.08f);
                     float duration = step == 2 ? 0.22f : 0.14f;
                     _cameraRig.AddShake(intensity, duration);
+                    if (heavy) _cameraRig.AddFovImpulse(-1.6f);
                 }
 
-                if (_hitstopRoutine != null)
-                {
-                    StopCoroutine(_hitstopRoutine);
-                    Time.timeScale = 1f;
-                }
-                _hitstopRoutine = StartCoroutine(MicroHitstopRoutine(step >= 1 ? 0.048f : 0.028f));
+                GameFeelAudio.TriggerHitstop(step >= 1 ? 0.048f : 0.028f, slowScale: 0.22f);
             }
             else if (hitCar != null)
             {
-                Vector3 impactPt = hitCarCol != null ? hitCarCol.ClosestPoint(strikeCenter) : strikeCenter;
+                Vector3 impactPt = hitCarCol != null ? GetSafeClosestPoint(hitCarCol, strikeCenter) : strikeCenter;
                 hitCar.ApplyMeleeHit(impactPt, transform.forward, step);
+                VisualEffectsManager.SpawnCombatImpact(impactPt, -transform.forward, heavy, new Color(1.0f, 0.78f, 0.26f));
+                DayNightCycle.Instance?.PulseImpactChromatic(heavy ? 0.18f : 0.07f);
+
+                NeighborhoodConsequenceSystem conseq = NeighborhoodConsequenceSystem.EnsureInstance();
+                conseq.PlayMetalClang(heavy ? 0.70f : 0.52f);
+                conseq.ReportOffense(
+                    NeighborhoodOffenseKind.VehicleDamage,
+                    impactPt,
+                    LocalizationService.IsEnglish ? "Parked Vehicle" : "Park Halindeki Araç",
+                    repPenalty: heavy ? 10 : 6,
+                    immediateFineTl: 0,
+                    heatDelta: heavy ? 0.9f : 0.55f);
 
                 if (_cameraRig != null)
                 {
                     float intensity = step == 2 ? 0.20f : (step == 1 ? 0.12f : 0.07f);
                     _cameraRig.AddShake(intensity, step == 2 ? 0.18f : 0.12f);
+                    if (heavy) _cameraRig.AddFovImpulse(-1.3f);
                 }
 
-                if (_hitstopRoutine != null)
+                GameFeelAudio.TriggerHitstop(step >= 1 ? 0.040f : 0.024f, slowScale: 0.22f);
+            }
+            else if (hitWorldCol != null)
+            {
+                NeighborhoodConsequenceSystem.EnsureInstance().HandleWorldObjectHit(
+                    hitWorldCol, hitWorldPt, transform.forward, heavy, this);
+
+                if (_cameraRig != null)
                 {
-                    StopCoroutine(_hitstopRoutine);
-                    Time.timeScale = 1f;
+                    _cameraRig.AddShake(heavy ? 0.13f : 0.06f, heavy ? 0.14f : 0.09f);
                 }
-                _hitstopRoutine = StartCoroutine(MicroHitstopRoutine(step >= 1 ? 0.040f : 0.024f));
+                if (heavy)
+                {
+                    GameFeelAudio.TriggerHitstop(0.026f, slowScale: 0.24f);
+                }
             }
         }
 
-        private IEnumerator MicroHitstopRoutine(float unscaledSeconds)
+        private static Vector3 GetSafeClosestPoint(Collider col, Vector3 point)
         {
-            Time.timeScale = 0.22f;
-            yield return new WaitForSecondsRealtime(unscaledSeconds);
-            Time.timeScale = 1f;
-            _hitstopRoutine = null;
+            if (col == null) return point;
+            if (col is MeshCollider mc && !mc.convex)
+            {
+                return col.bounds.ClosestPoint(point);
+            }
+            return col.ClosestPoint(point);
         }
 
         private void HandleJumpOrVaultPressed()
@@ -547,21 +722,49 @@ namespace OurWorld.Player
                 return;
             }
 
-            if (!_controller.isGrounded)
+            // Buffer jump/vault for 0.14s so taps just before touchdown or during stair grounded flicker ALWAYS fire!
+            _jumpBufferTimer = 0.14f;
+            TryConsumeBufferedJumpOrVault();
+        }
+
+        private bool TryConsumeBufferedJumpOrVault()
+        {
+            if (_jumpBufferTimer <= 0f || _isVaulting || _isSwimming || _controller == null || !_controller.enabled)
             {
-                return;
+                return false;
             }
+            if (!_controller.isGrounded && _coyoteTimer <= 0f)
+            {
+                return false;
+            }
+            if (_verticalVelocity > 0.5f)
+            {
+                return false;
+            }
+
+            _jumpBufferTimer = 0f;
+            _coyoteTimer = 0f;
 
             StreetCatController.CancelActivePet();
             if (TryDetectVaultObstacle(out Vector3 vaultPeak, out Vector3 vaultLand, out Vector3 vaultSupport))
             {
                 CarryableProp.DropHeldPropIfAny();
                 StartVault(vaultPeak, vaultLand, vaultSupport);
-                return;
+                return true;
             }
             if (!CarryableProp.IsHoldingProp) CarryableProp.DropHeldPropIfAny();
 
             _verticalVelocity = Mathf.Sqrt(2f * Mathf.Abs(gravity) * jumpHeight);
+            _wasGrounded = false;
+            _airPeakY = transform.position.y;
+            SampleGroundSurface();
+            if (_footstepAudio != null && _sharedFootstepClip != null)
+            {
+                _footstepAudio.pitch = UnityEngine.Random.Range(1.06f, 1.18f);
+                _footstepAudio.PlayOneShot(_sharedFootstepClip, 0.18f);
+            }
+            VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: false, tintOverride: GetSurfaceDustTint(_groundSurface));
+            return true;
         }
 
         private bool TryDetectVaultObstacle(out Vector3 peakPos, out Vector3 landPos, out Vector3 support)
@@ -680,6 +883,11 @@ namespace OurWorld.Player
             }
 
             transform.position = landPos;
+            _wasGrounded = true;
+            _airPeakY = landPos.y;
+            _coyoteTimer = 0f;
+            _jumpBufferTimer = 0f;
+            _planarVelocity = transform.forward * Mathf.Min(_currentSpeed, walkSpeed * 0.85f);
             _controller.enabled = true;
             _isVaulting = false;
             _vaultRoutine = null;
@@ -803,6 +1011,52 @@ namespace OurWorld.Player
             return clip;
         }
 
+        private void SampleGroundSurface()
+        {
+            if (Physics.Raycast(transform.position + Vector3.up * 0.25f, Vector3.down, out RaycastHit hit, 0.72f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore) &&
+                hit.collider != null && hit.collider.transform.root != transform.root)
+            {
+                string n = hit.collider.gameObject.name.ToLowerInvariant();
+                if (n.Contains("sand") || n.Contains("beach") || n.Contains("volley") || n.Contains("shore"))
+                {
+                    _groundSurface = GroundSurfaceKind.Sand;
+                    return;
+                }
+                if (n.Contains("turf") || n.Contains("grass") || n.Contains("lawn") || n.Contains("meadow") ||
+                    n.Contains("pitch") || n.Contains("field") || n.Contains("park") || n.Contains("farm") || n.Contains("soil"))
+                {
+                    _groundSurface = GroundSurfaceKind.Grass;
+                    return;
+                }
+                if (n.Contains("wood") || n.Contains("plank") || n.Contains("pier") || n.Contains("deck") ||
+                    n.Contains("porch") || n.Contains("dock") || n.Contains("bench") || n.Contains("bleacher"))
+                {
+                    _groundSurface = GroundSurfaceKind.Wood;
+                    return;
+                }
+                if (n.Contains("tile") || n.Contains("marble") || n.Contains("mall") || n.Contains("carpet") ||
+                    n.Contains("floor") || n.Contains("interior") || n.Contains("shop") || n.Contains("house"))
+                {
+                    _groundSurface = GroundSurfaceKind.Indoor;
+                    return;
+                }
+            }
+            _groundSurface = GroundSurfaceKind.Stone;
+        }
+
+        private static Color GetSurfaceDustTint(GroundSurfaceKind surface)
+        {
+            switch (surface)
+            {
+                case GroundSurfaceKind.Grass: return new Color(0.56f, 0.64f, 0.44f, 1f);
+                case GroundSurfaceKind.Sand: return new Color(0.92f, 0.84f, 0.64f, 1f);
+                case GroundSurfaceKind.Wood: return new Color(0.76f, 0.66f, 0.54f, 1f);
+                case GroundSurfaceKind.Indoor: return new Color(0.88f, 0.89f, 0.92f, 1f);
+                default: return new Color(0.84f, 0.80f, 0.72f, 1f);
+            }
+        }
+
         private void HandleFootstepContact(float runBlend)
         {
             if (_footstepAudio == null || _sharedFootstepClip == null || !_controller.enabled)
@@ -810,9 +1064,42 @@ namespace OurWorld.Player
                 return;
             }
 
-            float vol = Mathf.Lerp(0.10f, 0.24f, Mathf.Clamp01(runBlend));
-            _footstepAudio.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
+            SampleGroundSurface();
+            float pitchBase = 1.0f;
+            float volMult = 1.0f;
+            switch (_groundSurface)
+            {
+                case GroundSurfaceKind.Grass: pitchBase = 0.84f; volMult = 0.78f; break;
+                case GroundSurfaceKind.Sand: pitchBase = 0.76f; volMult = 0.82f; break;
+                case GroundSurfaceKind.Wood: pitchBase = 0.90f; volMult = 1.05f; break;
+                case GroundSurfaceKind.Indoor: pitchBase = 1.12f; volMult = 0.86f; break;
+            }
+
+            float vol = Mathf.Lerp(0.10f, 0.24f, Mathf.Clamp01(runBlend)) * volMult;
+            bool wetSteps = _rainWetness01 > 0.35f && _groundSurface != GroundSurfaceKind.Indoor;
+            _footstepAudio.pitch = pitchBase * (wetSteps ? 0.90f : 1.0f) * UnityEngine.Random.Range(0.93f, 1.07f);
             _footstepAudio.PlayOneShot(_sharedFootstepClip, vol);
+
+            if (wetSteps && runBlend > 0.25f && !_isSwimming && _controller.isGrounded)
+            {
+                VisualEffectsManager.SpawnWaterSplash(transform.position + Vector3.up * 0.04f, bigDive: false);
+            }
+            else if (runBlend > 0.52f && !_isSwimming && _controller.isGrounded && _groundSurface != GroundSurfaceKind.Indoor)
+            {
+                VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: false, tintOverride: GetSurfaceDustTint(_groundSurface));
+            }
+        }
+
+        private void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            if (hit == null || hit.collider == null || _isSwimming || _isVaulting) return;
+            if (_currentSpeed < 3.05f) return;
+
+            TownPedestrian ped = hit.collider.GetComponentInParent<TownPedestrian>();
+            if (ped != null)
+            {
+                ped.OnBumpedByPlayer(transform.position, _planarVelocity);
+            }
         }
 
         private void HandleLanded()
@@ -822,8 +1109,27 @@ namespace OurWorld.Player
                 return;
             }
 
-            _footstepAudio.pitch = 0.84f;
-            _footstepAudio.PlayOneShot(_sharedFootstepClip, 0.30f);
+            SampleGroundSurface();
+            float impact = humanoid != null ? humanoid.LastLandImpact01 : 0.35f;
+            float surfacePitch = _groundSurface == GroundSurfaceKind.Grass ? 0.86f
+                : (_groundSurface == GroundSurfaceKind.Sand ? 0.80f
+                : (_groundSurface == GroundSurfaceKind.Indoor ? 1.06f : 1.0f));
+            _footstepAudio.pitch = Mathf.Lerp(0.92f, 0.76f, impact) * surfacePitch;
+            _footstepAudio.PlayOneShot(_sharedFootstepClip, Mathf.Lerp(0.24f, 0.44f, impact));
+
+            if (_cameraRig != null)
+            {
+                _cameraRig.AddLandingDip(impact);
+                if (impact >= 0.65f)
+                {
+                    _cameraRig.AddShake(Mathf.Lerp(0.05f, 0.14f, (impact - 0.65f) / 0.35f), 0.13f);
+                }
+            }
+
+            if (!_isSwimming)
+            {
+                VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: true, tintOverride: GetSurfaceDustTint(_groundSurface));
+            }
         }
 
         public void SetMovementEnabled(bool enabledState)
@@ -832,6 +1138,9 @@ namespace OurWorld.Player
             if (!enabledState)
             {
                 _currentSpeed = 0f;
+                _planarVelocity = Vector3.zero;
+                _jumpBufferTimer = 0f;
+                if (_cameraRig != null) _cameraRig.SetSprintMotion(0f);
                 if (characterAnimator != null)
                 {
                     characterAnimator.SetFloat(SpeedHash, 0f);
@@ -859,6 +1168,10 @@ namespace OurWorld.Player
             if (!active)
             {
                 _currentSpeed = 0f;
+                _planarVelocity = Vector3.zero;
+                _coyoteTimer = 0f;
+                _jumpBufferTimer = 0f;
+                if (_cameraRig != null) _cameraRig.SetSprintMotion(0f);
             }
             enabled = active;
         }
@@ -877,13 +1190,17 @@ namespace OurWorld.Player
             }
 
             _currentSpeed = 0f;
+            _planarVelocity = Vector3.zero;
             _verticalVelocity = 0f;
+            _coyoteTimer = 0f;
+            _jumpBufferTimer = 0f;
 
             if (seated)
             {
                 _movementEnabled = false;
                 _controller.enabled = false;
                 enabled = false;
+                if (_cameraRig != null) _cameraRig.SetSprintMotion(0f);
                 if (humanoid != null)
                 {
                     humanoid.SetLookAtPoint(false, Vector3.zero);
@@ -897,19 +1214,86 @@ namespace OurWorld.Player
             }
         }
 
+        /// <summary>
+        /// Applies realistic physical recoil, knockback stumble, impact SFX, and camera punch
+        /// when an NPC hits the player or the player suffers heavy impact / knockout.
+        /// </summary>
+        public void ApplyCombatHitImpact(Vector3 knockbackDir, bool heavyHit, bool knockout = false)
+        {
+            Vector3 flat = knockbackDir;
+            flat.y = 0f;
+            if (flat.sqrMagnitude < 0.01f) flat = -transform.forward;
+            else flat.Normalize();
+
+            _hitStumbleVelocity = flat * (knockout ? 6.2f : (heavyHit ? 5.2f : 3.6f));
+            _combatLungeVelocity = Vector3.zero;
+
+            if (humanoid != null)
+            {
+                if (knockout) humanoid.PlayKnockdown(2.8f);
+                else humanoid.PlayHitReact();
+            }
+
+            if (_footstepAudio != null)
+            {
+                AudioClip clip = (heavyHit || knockout) ? _sharedHeavyHitClip : _sharedPunchHitClip;
+                if (clip != null)
+                {
+                    _footstepAudio.pitch = knockout ? 0.78f : (heavyHit ? 0.86f : UnityEngine.Random.Range(0.92f, 1.06f));
+                    _footstepAudio.PlayOneShot(clip, knockout ? 0.78f : (heavyHit ? 0.68f : 0.54f));
+                }
+            }
+
+            if (_cameraRig != null)
+            {
+                _cameraRig.AddShake(knockout ? 0.34f : (heavyHit ? 0.24f : 0.14f), knockout ? 0.36f : (heavyHit ? 0.22f : 0.14f));
+            }
+
+            VisualEffectsManager.SpawnCombatImpact(
+                transform.position + Vector3.up * 1.25f,
+                flat,
+                heavyHit || knockout,
+                new Color(0.98f, 0.18f, 0.22f));
+            DayNightCycle.Instance?.PulseImpactChromatic(knockout ? 0.38f : (heavyHit ? 0.26f : 0.14f));
+        }
+
         public void TeleportTo(Vector3 position, Quaternion rotation)
         {
+            // Prevent unpaid Try-On garments or shelf items from ever leaking out of a store via long-distance teleport!
+            if (PlayerShoppingCart.HasActiveItems &&
+                !StoreAntiTheftSystem.IsCatchingActive &&
+                (position - transform.position).sqrMagnitude > 14f * 14f)
+            {
+                PlayerShoppingCart.ClearAndRevertOnTeleport();
+            }
+
             if (_controller == null) _controller = GetComponent<CharacterController>();
-            bool wasEnabled = _controller.enabled;
+            // Cancel any in-flight parkour vault so TeleportTo never leaves CharacterController disabled!
+            bool wasVaulting = _isVaulting;
+            if (_vaultRoutine != null)
+            {
+                StopCoroutine(_vaultRoutine);
+                _vaultRoutine = null;
+            }
+            _isVaulting = false;
+            bool wasEnabled = wasVaulting ? enabled : _controller.enabled;
             _controller.enabled = false;
             transform.SetPositionAndRotation(position, rotation);
             _verticalVelocity = 0f;
             _currentSpeed = 0f;
+            _planarVelocity = Vector3.zero;
+            _coyoteTimer = 0f;
+            _jumpBufferTimer = 0f;
+            _combatLungeVelocity = Vector3.zero;
+            _hitStumbleVelocity = Vector3.zero;
+            _wasGrounded = true;
+            _airPeakY = position.y;
             _moveDirection = rotation * Vector3.forward;
             _lastGroundCheckY = position.y;
             _hasLastGroundY = true;
             _groundSampleHoldTimer = 0f;
             _controller.enabled = wasEnabled;
+            if (_cameraRig != null) _cameraRig.SetSprintMotion(0f);
         }
 
         private void Update()
@@ -986,6 +1370,9 @@ namespace OurWorld.Player
             {
                 CarryableProp.DropHeldPropIfAny();
                 _isSwimming = true;
+                _wasGrounded = true;
+                _airPeakY = transform.position.y;
+                _hitStumbleVelocity = Vector3.zero;
                 _waterSurfaceY = surfaceY;
                 _verticalVelocity *= 0.25f;
                 if (_footstepAudio != null && _sharedSplashClip != null)
@@ -993,6 +1380,7 @@ namespace OurWorld.Player
                     _footstepAudio.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
                     _footstepAudio.PlayOneShot(_sharedSplashClip, 0.48f);
                 }
+                VisualEffectsManager.SpawnWaterSplash(new Vector3(transform.position.x, surfaceY, transform.position.z), bigDive: true);
             }
             else if (!shouldSwim && _isSwimming)
             {
@@ -1008,15 +1396,13 @@ namespace OurWorld.Player
             if (_isSwimming)
             {
                 _waterSurfaceY = surfaceY;
-                // Secondary/Attack tap toggles Breaststroke vs Freestyle; holding Jump dives underwater!
-                bool diveHeld = InputHub.Instance != null && InputHub.Instance.JumpHeld && _swimOxygen01 > 0.08f;
-                if (InputHub.Instance != null && InputHub.Instance.AttackHeld && InputHub.Instance.AttackHoldSeconds < 0.04f)
-                {
-                    _swimBreaststroke = !_swimBreaststroke;
-                    PlayerModeController.Instance?.RaiseStatusMessage(_swimBreaststroke
-                        ? "Yüzme Stili: Kurbağalama (Düşük yorgunluk)"
-                        : "Yüzme Stili: Serbest Stil (Yüksek hız)");
-                }
+                _rainWetness01 = 1f;
+                _coyoteTimer = 0f;
+                _jumpBufferTimer = 0f;
+                _planarVelocity = Vector3.zero;
+                if (_cameraRig != null) _cameraRig.SetSprintMotion(0f);
+                // Holding Jump dives underwater (stroke toggle is handled cleanly via HandleAttackPressed)
+                bool diveHeld = InputHub.Instance != null && InputHub.Instance.JumpHeld;
 
                 _isUnderwater = diveHeld && (surfaceY - floorY) >= 1.15f;
                 if (_isUnderwater)
@@ -1025,13 +1411,35 @@ namespace OurWorld.Player
                     _bubbleTimer -= dt;
                     if (_bubbleTimer <= 0f)
                     {
-                        _bubbleTimer = 0.28f;
+                        _bubbleTimer = _swimOxygen01 <= 0.15f ? 0.16f : 0.28f;
                         GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 0.95f, new Color(0.76f, 0.96f, 1.0f), count: 3, spread: 0.18f);
+                    }
+
+                    // Real-world drowning risk if staying submerged after running out of air!
+                    if (_swimOxygen01 <= 0.001f)
+                    {
+                        _drownTickTimer -= dt;
+                        if (_drownTickTimer <= 0f)
+                        {
+                            _drownTickTimer = 1.35f;
+                            RealWorldDetailsSystem.PlayDrownGasp();
+                            PlayerNeedsController.Instance?.TakeEnvironmentalDamage(
+                                7f,
+                                transform.position,
+                                "🫁 Nefesin tükendi! Hemen yüzeye çık!",
+                                "🫁 You're out of breath! Surface immediately!",
+                                heavy: false);
+                        }
+                    }
+                    else
+                    {
+                        _drownTickTimer = 0.25f;
                     }
                 }
                 else
                 {
                     _swimOxygen01 = Mathf.Min(1f, _swimOxygen01 + dt * 0.38f);
+                    _drownTickTimer = 0f;
                 }
 
                 float baseSwim = _swimBreaststroke ? 2.55f : 2.95f;
@@ -1048,6 +1456,16 @@ namespace OurWorld.Player
                 Vector3 swimVelocity = _moveDirection * _currentSpeed + Vector3.up * _verticalVelocity;
                 _controller.Move(swimVelocity * dt);
 
+                if (!_isUnderwater && _currentSpeed > 0.55f)
+                {
+                    _swimSplashTimer -= dt;
+                    if (_swimSplashTimer <= 0f)
+                    {
+                        _swimSplashTimer = 0.42f;
+                        VisualEffectsManager.SpawnWaterSplash(new Vector3(transform.position.x, surfaceY, transform.position.z), bigDive: false);
+                    }
+                }
+
                 if (humanoid != null)
                 {
                     humanoid.SetLookAtPoint(false, Vector3.zero);
@@ -1056,16 +1474,29 @@ namespace OurWorld.Player
                 return;
             }
 
-            bool isTired = PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsTired;
-            bool hasShoes = SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasRunningShoes;
-            float baseRun = hasShoes ? (runSpeed * 1.22f) : runSpeed;
-            float effectiveRunSpeed = isTired ? (baseRun * 0.75f) : baseRun;
-            float targetSpeed = autoApproach ? pickupSpeed : (sprint ? effectiveRunSpeed : walkSpeed) * inputMag;
-            float rate = targetSpeed > _currentSpeed ? acceleration : deceleration;
-            _currentSpeed = Mathf.MoveTowards(_currentSpeed, targetSpeed, rate * dt);
+            if (_pivotDustCooldown > 0f) _pivotDustCooldown -= dt;
+            if (_jumpBufferTimer > 0f) _jumpBufferTimer = Mathf.Max(0f, _jumpBufferTimer - dt);
 
-            if (_controller.isGrounded)
+            bool groundedNow = _controller.isGrounded;
+            if (groundedNow && _verticalVelocity <= 0.1f)
             {
+                _coyoteTimer = 0.14f;
+                if (!_wasGrounded)
+                {
+                    _wasGrounded = true;
+                    float dropHeight = _airPeakY - transform.position.y;
+                    if (dropHeight >= 5.2f && !WaterZone.TrySampleWater(transform.position, out _, out _))
+                    {
+                        float fallDmg = Mathf.Clamp((dropHeight - 4.2f) * 12f, 14f, 100f);
+                        bool en = LocalizationService.IsEnglish;
+                        PlayerNeedsController.Instance?.TakeDamage(
+                            fallDmg,
+                            transform.position,
+                            en ? "Hard Fall" : "Yüksekten Düşme",
+                            heavyHit: dropHeight >= 8.0f);
+                    }
+                }
+                _airPeakY = transform.position.y;
                 if (_verticalVelocity < 0f)
                 {
                     _verticalVelocity = -2f;
@@ -1073,15 +1504,128 @@ namespace OurWorld.Player
             }
             else
             {
-                _verticalVelocity += gravity * dt;
+                if (_coyoteTimer > 0f) _coyoteTimer = Mathf.Max(0f, _coyoteTimer - dt);
+                if (_wasGrounded)
+                {
+                    _wasGrounded = false;
+                    _airPeakY = transform.position.y;
+                }
+                else
+                {
+                    _airPeakY = Mathf.Max(_airPeakY, transform.position.y);
+                }
+                // Variable jump height: releasing Jump early while rising gives a crisp short hop
+                float extraGravity = (_verticalVelocity > 1.8f && InputHub.Instance != null && !InputHub.Instance.JumpHeld)
+                    ? gravity * 0.85f
+                    : 0f;
+                _verticalVelocity += (gravity + extraGravity) * dt;
             }
 
-            Vector3 velocity = _moveDirection * _currentSpeed + _combatLungeVelocity + Vector3.up * _verticalVelocity;
+            // Consume buffered Jump / Parkour Vault if grounded or inside Coyote Time window
+            if (_jumpBufferTimer > 0f && (groundedNow || _coyoteTimer > 0f))
+            {
+                if (TryConsumeBufferedJumpOrVault() && _isVaulting)
+                {
+                    return;
+                }
+            }
+
+            // Track outdoor rain wetness (dries smoothly indoors or once the sun comes back out)
+            bool exposedToRain = NeighborhoodWeatherSystem.Instance != null &&
+                                 NeighborhoodWeatherSystem.Instance.CurrentWeather == NeighborhoodWeatherState.SummerShower &&
+                                 !NeighborhoodWeatherSystem.IsPositionSheltered(transform.position);
+            if (exposedToRain)
+            {
+                _rainWetness01 = Mathf.Min(1f, _rainWetness01 + dt * 0.075f);
+                if (_rainWetness01 >= 0.78f && !_warnedRainSoaked)
+                {
+                    _warnedRainSoaked = true;
+                    bool enWet = LocalizationService.IsEnglish;
+                    PlayerModeController.Instance?.RaiseStatusMessage(enWet
+                        ? "🌧️ You're soaked from the Istanbul rain — step indoors or under shelter to dry off!"
+                        : "🌧️ Yağmurda iyice ıslandın — kurulanmak için bir çatı altına ya da eve geç!");
+                }
+            }
+            else
+            {
+                _rainWetness01 = Mathf.Max(0f, _rainWetness01 - dt * 0.12f);
+                if (_rainWetness01 < 0.20f) _warnedRainSoaked = false;
+            }
+
+            bool isTired = PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsTired;
+            bool isStarving = PlayerNeedsController.Instance != null && PlayerNeedsController.Instance.IsStarving;
+            bool hasShoes = SaveManager.Instance != null && SaveManager.Instance.Data != null && SaveManager.Instance.Data.hasRunningShoes;
+            float baseRun = hasShoes ? (runSpeed * 1.22f) : runSpeed;
+            float fatigueMult = (isTired ? 0.75f : 1f) * (isStarving ? 0.80f : 1f) * (_rainWetness01 > 0.75f ? 0.92f : 1f);
+            float effectiveRunSpeed = baseRun * fatigueMult;
+            float targetSpeed = autoApproach ? pickupSpeed : (sprint ? effectiveRunSpeed : walkSpeed) * inputMag;
+            Vector3 targetPlanarVel = desiredDir.sqrMagnitude > 0.0001f ? desiredDir * targetSpeed : Vector3.zero;
+
+            // Real 2D planar momentum (eliminates 180-deg reverse skating while feeling super snappy & athletic!)
+            float curPlanarSpeed = _planarVelocity.magnitude;
+            float moveRate;
+            if (groundedNow)
+            {
+                bool hardCut = curPlanarSpeed > 2.85f && targetPlanarVel.sqrMagnitude > 0.5f &&
+                               Vector3.Dot(_planarVelocity / curPlanarSpeed, desiredDir) < -0.25f;
+                if (hardCut)
+                {
+                    moveRate = 24f;
+                    if (_pivotDustCooldown <= 0f)
+                    {
+                        _pivotDustCooldown = 0.42f;
+                        SampleGroundSurface();
+                        VisualEffectsManager.SpawnFootDust(transform.position, heavyLanding: false, tintOverride: GetSurfaceDustTint(_groundSurface));
+                        if (_footstepAudio != null && _sharedFootstepClip != null)
+                        {
+                            _footstepAudio.pitch = UnityEngine.Random.Range(1.12f, 1.24f);
+                            _footstepAudio.PlayOneShot(_sharedFootstepClip, 0.16f);
+                        }
+                    }
+                }
+                else if (targetPlanarVel.sqrMagnitude > _planarVelocity.sqrMagnitude)
+                {
+                    moveRate = Mathf.Max(acceleration, 13.5f);
+                }
+                else
+                {
+                    moveRate = Mathf.Max(deceleration, 15.5f);
+                }
+            }
+            else
+            {
+                moveRate = targetPlanarVel.sqrMagnitude > 0.01f ? 6.5f : 2.2f;
+            }
+
+            _planarVelocity = Vector3.MoveTowards(_planarVelocity, targetPlanarVel, moveRate * dt);
+            _currentSpeed = _planarVelocity.magnitude;
+            if (_currentSpeed > 0.05f)
+            {
+                _moveDirection = _planarVelocity / _currentSpeed;
+            }
+
+            Vector3 velocity = _planarVelocity + _combatLungeVelocity + _hitStumbleVelocity + Vector3.up * _verticalVelocity;
             _combatLungeVelocity = Vector3.MoveTowards(_combatLungeVelocity, Vector3.zero, 16f * dt);
+            _hitStumbleVelocity = Vector3.MoveTowards(_hitStumbleVelocity, Vector3.zero, 14f * dt);
             Vector3 start = transform.position;
             _controller.Move(velocity * dt);
             Vector3 travel = Vector3.ProjectOnPlane(transform.position - start, Vector3.up);
             float actualSpeed = dt > 0f ? travel.magnitude / dt : 0f;
+
+            // Keep planar velocity aligned with wall slide collisions so running into walls doesn't build phantom speed
+            if (dt > 0.0001f && _planarVelocity.sqrMagnitude > 0.04f && actualSpeed < _currentSpeed * 0.45f)
+            {
+                _planarVelocity = travel / dt;
+                _currentSpeed = actualSpeed;
+            }
+
+            if (_cameraRig != null)
+            {
+                float sprintMotion = (_controller.isGrounded && sprint && !autoApproach)
+                    ? Mathf.InverseLerp(walkSpeed + 0.15f, Mathf.Max(walkSpeed + 0.5f, effectiveRunSpeed), actualSpeed)
+                    : 0f;
+                _cameraRig.SetSprintMotion(sprintMotion);
+            }
 
             if (characterAnimator != null)
             {

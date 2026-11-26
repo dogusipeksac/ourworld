@@ -26,6 +26,7 @@ namespace OurWorld.World
             new StreetZone { DisplayNameTr = "Aydos Çiftlik Yolu",                  DisplayNameEn = "Aydos Farm Road",                     MinX = 108f, MaxX = 136f, MinZ = -12f, MaxZ =  12f, Priority = 3 },
             new StreetZone { DisplayNameTr = "Evimin Bostanı (No:48)",              DisplayNameEn = "Home Garden (No:48)",                 MinX = -60f, MaxX = -51f, MinZ =   6f, MaxZ =  15f, Priority = 4 },
             new StreetZone { DisplayNameTr = "Sultanbeyli Göleti & Aydos Korusu",   DisplayNameEn = "Sultanbeyli Lake & Aydos Grove",      MinX =-244f, MaxX =-156f, MinZ = -62f, MaxZ =  62f, Priority = 4 },
+            new StreetZone { DisplayNameTr = "Aydos Atış Poligonu",                 DisplayNameEn = "Aydos Shooting Range",                MinX =  64f, MaxX = 138f, MinZ =-340f, MaxZ =-200f, Priority = 4 },
             new StreetZone { DisplayNameTr = "Gölet Yürüyüş Yolu",                  DisplayNameEn = "Lakeside Promenade",                  MinX =-160f, MaxX =-108f, MinZ = -12f, MaxZ =  12f, Priority = 3 },
 
             // Landmarks & Hero Streets (higher priority)

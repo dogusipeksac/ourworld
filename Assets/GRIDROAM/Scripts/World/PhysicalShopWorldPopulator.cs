@@ -46,15 +46,16 @@ namespace OurWorld.World
         {
             // 1. Selman Bakkal & Manav (No:58) — Full real-life market experience:
             //    Pick items off the shelves/coolers into your hand, then pay at Bakkal_KasaBandi!
+            //    Includes EAS Anti-Theft Security Gate across the front doorway!
             Transform bakkalFridge = FindTransformByName("Bakkal_DrinkFridge");
             if (bakkalFridge != null)
             {
                 SpawnItem(bakkalFridge, "Soğuk Su", 6, ShopItemEffect.Energy, 18f, ConsumeAnimKind.DrinkWater, ShopPropVisual.WaterBottle,
-                    new Vector3(-0.28f, 1.06f, 0.44f), requiresCheckout: true);
+                    new Vector3(-0.28f, 1.06f, 0.44f), requiresCheckout: true, storeName: "Selman Bakkal");
                 SpawnItem(bakkalFridge, "Yayık Ayran", 14, ShopItemEffect.Energy, 26f, ConsumeAnimKind.DrinkWater, ShopPropVisual.AyranCup,
-                    new Vector3(0.0f, 1.06f, 0.44f), requiresCheckout: true);
+                    new Vector3(0.0f, 1.06f, 0.44f), requiresCheckout: true, storeName: "Selman Bakkal");
                 SpawnItem(bakkalFridge, "Enerji İçeceği", 50, ShopItemEffect.Energy, 100f, ConsumeAnimKind.DrinkWater, ShopPropVisual.EnergyDrink,
-                    new Vector3(0.28f, 1.06f, 0.44f), requiresCheckout: true);
+                    new Vector3(0.28f, 1.06f, 0.44f), requiresCheckout: true, storeName: "Selman Bakkal");
             }
 
             Transform bakkalDondurma = FindTransformByName("Bakkal_DondurmaDolabi");
@@ -62,9 +63,9 @@ namespace OurWorld.World
             {
                 DisableOldShopCounterTrigger(bakkalDondurma);
                 SpawnItem(bakkalDondurma, "Külah Dondurma", 15, ShopItemEffect.Energy, 25f, ConsumeAnimKind.EatIceCream, ShopPropVisual.IceCreamCone,
-                    new Vector3(-0.34f, 0.96f, 0.05f), requiresCheckout: true);
+                    new Vector3(-0.34f, 0.96f, 0.05f), requiresCheckout: true, storeName: "Selman Bakkal");
                 SpawnItem(bakkalDondurma, "Soğuk Gazoz", 18, ShopItemEffect.Energy, 32f, ConsumeAnimKind.DrinkWater, ShopPropVisual.WaterBottle,
-                    new Vector3(0.34f, 0.96f, 0.05f), requiresCheckout: true);
+                    new Vector3(0.34f, 0.96f, 0.05f), requiresCheckout: true, storeName: "Selman Bakkal");
             }
 
             Transform bakkalManav = FindTransformByName("Bakkal_ManavReyonu");
@@ -72,11 +73,11 @@ namespace OurWorld.World
             {
                 DisableOldShopCounterTrigger(bakkalManav);
                 SpawnItem(bakkalManav, "Taze Portakal", 18, ShopItemEffect.Energy, 30f, ConsumeAnimKind.EatFood, ShopPropVisual.FreshFruit,
-                    new Vector3(-0.62f, 0.92f, 0.16f), requiresCheckout: true);
-                SpawnItem(bakkalManav, "Aydos Elması", 24, ShopItemEffect.Energy, 42f, ConsumeAnimKind.EatFood, ShopPropVisual.FreshFruit,
-                    new Vector3(0.0f, 0.92f, 0.16f), requiresCheckout: true);
-                SpawnItem(bakkalManav, "Vitamin Sepeti", 42, ShopItemEffect.Energy, 75f, ConsumeAnimKind.EatFood, ShopPropVisual.FreshFruit,
-                    new Vector3(0.62f, 0.92f, 0.16f), requiresCheckout: true);
+                    new Vector3(-0.62f, 0.92f, 0.16f), requiresCheckout: true, storeName: "Selman Bakkal");
+                SpawnItem(bakkalManav, "Aydos Elması", 22, ShopItemEffect.Energy, 36f, ConsumeAnimKind.EatFood, ShopPropVisual.FreshFruit,
+                    new Vector3(0.0f, 0.92f, 0.16f), requiresCheckout: true, storeName: "Selman Bakkal");
+                SpawnItem(bakkalManav, "Meyve Çantası", 30, ShopItemEffect.Energy, 40f, ConsumeAnimKind.EatFood, ShopPropVisual.FreshFruit,
+                    new Vector3(0.62f, 0.92f, 0.16f), requiresCheckout: true, storeName: "Selman Bakkal");
             }
 
             Transform bakkalSarkuteri = FindTransformByName("Bakkal_Sarkuteri");
@@ -84,30 +85,30 @@ namespace OurWorld.World
             {
                 DisableOldShopCounterTrigger(bakkalSarkuteri);
                 SpawnItem(bakkalSarkuteri, "Ezine Peynir & Zeytin", 24, ShopItemEffect.Energy, 38f, ConsumeAnimKind.EatFood, ShopPropVisual.CheeseOlives,
-                    new Vector3(-0.46f, 1.18f, 0.14f), requiresCheckout: true);
+                    new Vector3(-0.46f, 1.18f, 0.14f), requiresCheckout: true, storeName: "Selman Bakkal");
                 SpawnItem(bakkalSarkuteri, "Sucuklu Tost", 35, ShopItemEffect.Energy, 58f, ConsumeAnimKind.EatFood, ShopPropVisual.ToastSandwich,
-                    new Vector3(0.46f, 1.18f, 0.14f), requiresCheckout: true);
+                    new Vector3(0.46f, 1.18f, 0.14f), requiresCheckout: true, storeName: "Selman Bakkal");
             }
 
             Transform bakkalShelfR = FindTransformByName("Bakkal_ShelfBackR");
             if (bakkalShelfR != null)
             {
                 SpawnItem(bakkalShelfR, "Taze Somun Ekmek", 12, ShopItemEffect.Energy, 24f, ConsumeAnimKind.EatFood, ShopPropVisual.BreadLoaf,
-                    new Vector3(-0.42f, 1.06f, 0.28f), requiresCheckout: true);
+                    new Vector3(-0.42f, 1.06f, 0.28f), requiresCheckout: true, storeName: "Selman Bakkal");
                 SpawnItem(bakkalShelfR, "Kaşarlı Tost", 25, ShopItemEffect.Energy, 40f, ConsumeAnimKind.EatFood, ShopPropVisual.ToastSandwich,
-                    new Vector3(0.42f, 1.06f, 0.28f), requiresCheckout: true);
+                    new Vector3(0.42f, 1.06f, 0.28f), requiresCheckout: true, storeName: "Selman Bakkal");
             }
 
             Transform bakkalShelfL = FindTransformByName("Bakkal_ShelfSideL");
             if (bakkalShelfL != null)
             {
                 SpawnItem(bakkalShelfL, "Sıcak Simit", 12, ShopItemEffect.Energy, 22f, ConsumeAnimKind.EatFood, ShopPropVisual.Simit,
-                    new Vector3(-0.42f, 1.06f, 0.28f), requiresCheckout: true);
+                    new Vector3(-0.42f, 1.06f, 0.28f), requiresCheckout: true, storeName: "Selman Bakkal");
                 SpawnItem(bakkalShelfL, "Kahvaltı Paketi", 48, ShopItemEffect.Energy, 85f, ConsumeAnimKind.EatFood, ShopPropVisual.CheeseOlives,
-                    new Vector3(0.42f, 1.06f, 0.28f), requiresCheckout: true);
+                    new Vector3(0.42f, 1.06f, 0.28f), requiresCheckout: true, storeName: "Selman Bakkal");
             }
 
-            // Label Bakkal_KasaBandi clearly as the physical checkout belt
+            // Label Bakkal_KasaBandi clearly as the physical checkout belt + install EAS door sensor gate!
             Transform bakkalKasa = FindTransformByName("Bakkal_KasaBandi");
             if (bakkalKasa != null)
             {
@@ -117,6 +118,17 @@ namespace OurWorld.World
                     kasaTrig.SetCustomPrompt(
                         "Kasa Bandı (Önce raftan ürün al)",
                         "Checkout Belt (Pick items from shelves first)");
+                }
+
+                Transform bakkalRoom = bakkalKasa.parent;
+                if (bakkalRoom != null && bakkalRoom.GetComponentInChildren<StoreSecurityGate>() == null)
+                {
+                    StoreSecurityGate.BuildPhysicalGate(
+                        bakkalRoom,
+                        "Selman Bakkal",
+                        new Vector3(4.2f, 0.04f, 0.56f),
+                        2.36f,
+                        new Vector3(4.2f, 0.12f, -1.25f));
                 }
             }
 
@@ -270,7 +282,8 @@ namespace OurWorld.World
             ShopPropVisual visual,
             Vector3 localPos,
             bool requiresCheckout,
-            int jacketColorIdx = 0)
+            int jacketColorIdx = 0,
+            string storeName = null)
         {
             if (parent == null) return;
             GameObject go = new GameObject($"PhysicalItem_{itemName}");
@@ -279,7 +292,7 @@ namespace OurWorld.World
             go.transform.localRotation = Quaternion.identity;
 
             PhysicalShopItem item = go.AddComponent<PhysicalShopItem>();
-            item.Configure(itemName, price, effect, param, consumeKind, visual, requiresCheckout, jacketColorIdx, interactionRadius: 2.0f, visualScale: 1.08f);
+            item.Configure(itemName, price, effect, param, consumeKind, visual, requiresCheckout, jacketColorIdx, interactionRadius: 2.0f, visualScale: 1.08f, storeName: storeName);
         }
 
         private static void DisableOldShopCounterTrigger(Transform t)

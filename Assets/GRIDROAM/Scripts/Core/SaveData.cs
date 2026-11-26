@@ -21,6 +21,20 @@ namespace OurWorld.Core
         public bool isWatered;
     }
 
+    [Serializable]
+    public class BackpackItemSaveEntry
+    {
+        public string itemId = string.Empty;
+        public string nameTr = string.Empty;
+        public string nameEn = string.Empty;
+        public int count;
+        public float hungerRestore;
+        public float energyRestore;
+        public float healthRestore;
+        public int consumeKind; // Maps to OurWorld.Player.ConsumeAnimKind
+        public int propVisual;  // Maps to OurWorld.Player.ShopPropVisual
+    }
+
     /// <summary>
     /// Serializable local save structure for mission progress, unlocked keys,
     /// economy, player needs, clock, fuel, stats, player/vehicle world state,
@@ -54,6 +68,8 @@ namespace OurWorld.Core
 
         // E4: Player needs & mission sedan fuel
         public float energy = 80f;
+        public float health = 100f;
+        public float hunger = 88f;
         public float missionSedanFuel = 0.8f;
 
         // E5: Open-world activity stats
@@ -158,5 +174,9 @@ namespace OurWorld.Core
         // Hamidiye Oto Galeri (Owned Vehicle Garage)
         public List<string> ownedVehicleIds = new List<string>();
         public string activeOwnedVehicleId = "car_classic_sedan";
+
+        // Player Backpack / Portable Groceries & Fruit Bag Inventory
+        public bool hasStarterBackpackItems;
+        public List<BackpackItemSaveEntry> backpackItems = new List<BackpackItemSaveEntry>();
     }
 }

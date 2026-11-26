@@ -695,7 +695,7 @@
     },
     {
       "key": "ui.hint.controls_foot",
-      "value": "WASD · Shift Koş · Space Atla · Sol Tık Vur/Şut/Fırlat · E Etkileş · G Işınlan · T Saat · M Harita"
+      "value": "WASD Yürü · Shift Koş · Space Atla · Sol Tık Vur/Şut/Fırlat · E Etkileş · G Işınlan · T Saat · M Harita"
     },
     {
       "key": "ui.hint.controls_drive",
