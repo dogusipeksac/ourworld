@@ -88,7 +88,10 @@ namespace OurWorld.World
             public Vector3 LastProgressPos;
             public float StuckTimer;
 
-            // Combat / flee / reaction state (children NEVER get knocked down or hurt!)
+            // Combat / flee / health / knockout reaction state (children NEVER get knocked down or hurt!)
+            public float Health;
+            public float MaxHealth;
+            public bool IsKnockedOut;
             public float HitCooldown;
             public float KnockdownTimer;
             public float FleeTimer;
@@ -1175,6 +1178,15 @@ namespace OurWorld.World
                     c.StumbleVel = Vector3.MoveTowards(c.StumbleVel, Vector3.zero, 12f * dt);
                 }
                 c.Humanoid?.SetLocomotion(0f, true, 0f);
+                if (c.KnockdownTimer <= 0f && c.IsKnockedOut)
+                {
+                    c.IsKnockedOut = false;
+                    c.Health = c.MaxHealth > 0f ? c.MaxHealth : 100f;
+                    c.FightTimer = 0f;
+                    c.PendingPunchTimer = 0f;
+                    NpcSpeechBubbleManager.Say(tr, c.DisplayName,
+                        en ? "😵 Ugh... my head is spinning..." : "😵 Ah başım... yeni ayıldım...", 2.8f, NpcBubbleMood.Alert, c.BubbleHeight);
+                }
                 return;
             }
 
@@ -1517,6 +1529,13 @@ namespace OurWorld.World
             {
                 DiverseCitizen c = _citizens[i];
                 if (!string.Equals(c.InteractableId, trig.InteractableId, StringComparison.Ordinal)) continue;
+                if (c.IsKnockedOut && c.KnockdownTimer > 0f)
+                {
+                    PlayerModeController.Instance?.RaiseStatusMessage(en
+                        ? $"😵 {c.DisplayName} is knocked out right now..."
+                        : $"😵 {c.DisplayName} şu an baygın yatıyor...");
+                    return;
+                }
 
                 c.PauseTimer = Mathf.Max(c.PauseTimer, 5.0f);
                 SmartNpcInteractionPanel.EnsureInstance().OpenForLivingNpc(
@@ -1604,41 +1623,89 @@ namespace OurWorld.World
             knockDir.y = 0f;
             knockDir = knockDir.sqrMagnitude > 0.001f ? knockDir.normalized : Vector3.forward;
 
+            if (best.MaxHealth <= 0f)
+            {
+                best.MaxHealth = best.IsAuthority ? 130f : (best.IsFighter ? 120f : 100f);
+                best.Health = best.MaxHealth;
+            }
+
             best.HitCount++;
-            bool knockdown = comboStep >= 2 || best.HitCount >= 3;
-            if (knockdown)
+            float dmg = comboStep >= 2 ? 50f : (comboStep == 1 ? 35f : 30f);
+            best.Health = Mathf.Max(0f, best.Health - dmg);
+            bool knockedOut = best.Health <= 0f;
+            bool knockdown = knockedOut || comboStep >= 2 || best.HitCount >= 3;
+
+            if (knockedOut)
+            {
+                const float koDur = 20.0f;
+                best.IsKnockedOut = true;
+                best.HitCooldown = 1.2f;
+                best.KnockdownTimer = koDur;
+                best.FightTimer = 0f;
+                best.PendingPunchTimer = 0f;
+                best.FleeTimer = 0f;
+                best.HitCount = 0;
+                best.StumbleVel = knockDir * 7.4f;
+                best.Root.transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+                best.Humanoid?.PlayKnockdown(koDur);
+
+                VisualEffectsManager.SpawnFloatingText(
+                    best.Root.transform.position + Vector3.up * 1.65f,
+                    en ? "💫 KNOCKED OUT!" : "💫 BAYILDI!",
+                    new Color(1.0f, 0.86f, 0.22f),
+                    scale: 1.18f,
+                    duration: 1.45f);
+                GameFeelAudio.SpawnBurst(best.Root.transform.position + Vector3.up * 1.25f, new Color(1.0f, 0.88f, 0.26f), count: 14, spread: 0.65f);
+                GameFeelAudio.TriggerHitstop(0.068f, slowScale: 0.18f);
+
+                NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName,
+                    en ? "😵 Ugh... lights out..." : "😵 Off... gözlerim karardı...", 3.4f, NpcBubbleMood.Alert, best.BubbleHeight);
+                PlayerModeController.Instance?.RaiseStatusMessage(en
+                    ? $"💫 {best.DisplayName} was knocked out!"
+                    : $"💫 {best.DisplayName} bayıldı!");
+            }
+            else if (knockdown)
             {
                 best.HitCooldown = 0.85f;
-                best.KnockdownTimer = 2.6f;
+                best.KnockdownTimer = 2.4f;
                 best.HitCount = 0;
                 best.StumbleVel = knockDir * 6.2f;
                 best.Root.transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
-                best.Humanoid?.PlayKnockdown(2.6f);
+                best.Humanoid?.PlayKnockdown(2.4f);
             }
             else
             {
                 best.HitCooldown = 0.25f;
                 best.StumbleVel = knockDir * 3.8f;
                 best.Humanoid?.PlayHitReact();
+                VisualEffectsManager.SpawnFloatingText(
+                    best.Root.transform.position + Vector3.up * 1.55f,
+                    $"-{Mathf.RoundToInt(dmg)}",
+                    new Color(1.0f, 0.68f, 0.28f),
+                    scale: 0.88f,
+                    duration: 0.65f);
             }
 
-            if (best.IsAuthority || best.IsFighter)
+            if (!knockedOut)
             {
-                best.FightTimer = 12f;
-                best.PunchCooldown = 0.55f;
-                if (best.IsAuthority) NeighborhoodConsequenceSystem.EnsureInstance().PlayZabitaWhistle(0.75f);
-                NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName,
-                    best.IsAuthority
-                        ? (en ? "Assaulting a Municipal Officer?! Stop right there!" : "Zabıta memuruna saldırı ha?! Dur orada!")
-                        : (en ? "Hey!! Who do you think you are?!" : "Hey!! Kime el kaldırıyorsun sen?!"),
-                    3.0f, NpcBubbleMood.Alert, best.BubbleHeight);
-            }
-            else
-            {
-                best.FleeTimer = 6.5f;
-                best.FleeDir = knockDir;
-                NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName,
-                    en ? "Help! Somebody call Zabıta!" : "İmdat! Zabıta çağırın!", 2.8f, NpcBubbleMood.Alert, best.BubbleHeight);
+                if (best.IsAuthority || best.IsFighter)
+                {
+                    best.FightTimer = 12f;
+                    best.PunchCooldown = 0.55f;
+                    if (best.IsAuthority) NeighborhoodConsequenceSystem.EnsureInstance().PlayZabitaWhistle(0.75f);
+                    NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName,
+                        best.IsAuthority
+                            ? (en ? "Assaulting a Municipal Officer?! Stop right there!" : "Zabıta memuruna saldırı ha?! Dur orada!")
+                            : (en ? "Hey!! Who do you think you are?!" : "Hey!! Kime el kaldırıyorsun sen?!"),
+                        3.0f, NpcBubbleMood.Alert, best.BubbleHeight);
+                }
+                else
+                {
+                    best.FleeTimer = 6.5f;
+                    best.FleeDir = knockDir;
+                    NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName,
+                        en ? "Help! Somebody call Zabıta!" : "İmdat! Zabıta çağırın!", 2.8f, NpcBubbleMood.Alert, best.BubbleHeight);
+                }
             }
 
             NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(

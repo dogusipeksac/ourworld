@@ -54,6 +54,10 @@ namespace OurWorld.World
         private float _lastKnuckleHurtTime = -99f;
         private int _carSmashCount;
         private int _glassHitCount;
+        private readonly System.Collections.Generic.Dictionary<ProceduralHumanoid, float> _fallbackNpcHealth
+            = new System.Collections.Generic.Dictionary<ProceduralHumanoid, float>(16);
+        private readonly System.Collections.Generic.Dictionary<ProceduralHumanoid, float> _fallbackNpcKoUntil
+            = new System.Collections.Generic.Dictionary<ProceduralHumanoid, float>(16);
 
         public static NeighborhoodConsequenceSystem EnsureInstance()
         {
@@ -251,12 +255,17 @@ namespace OurWorld.World
                 ProceduralHumanoid h = all[i];
                 if (h == null || !h.gameObject.activeInHierarchy) continue;
                 if (attackerFoot != null && (h == attackerFoot.Humanoid || h.transform.IsChildOf(attackerFoot.transform))) continue;
-                // Skip NPCs already managed by TownPedestrian, LivingNeighborhoodPopulator, or MallShoppers
+                // Skip NPCs already managed by TownPedestrian, LivingNeighborhoodPopulator, DiverseCitizens, or MallShoppers
                 if (h.GetComponentInParent<TownPedestrian>() != null) continue;
                 string hName = h.gameObject.name;
                 if (hName.Contains("StoreSecurityGuard") ||
                     hName.StartsWith("LivingNPC_", StringComparison.OrdinalIgnoreCase) ||
+                    hName.StartsWith("DiverseCitizen_", StringComparison.OrdinalIgnoreCase) ||
                     hName.StartsWith("MallShopper_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (_fallbackNpcKoUntil.TryGetValue(h, out float koUntil) && Time.time < koUntil)
                 {
                     continue;
                 }
@@ -276,7 +285,6 @@ namespace OurWorld.World
             if (best == null) return false;
 
             _lastHumanoidHitTime = Time.time;
-            best.PlayHitReact();
 
             Vector3 faceDir = attackerPos - best.transform.position;
             faceDir.y = 0f;
@@ -294,6 +302,48 @@ namespace OurWorld.World
                                     rawName.Contains("Mechanic") || rawName.Contains("Usta");
 
             string displayName = ExtractNpcDisplayName(best.gameObject, en);
+
+            // Real HP + Knockout ("Bayıltma") for fallback story / shop / garage NPCs too!
+            float maxHp = isToughAuthority ? 120f : 100f;
+            if (!_fallbackNpcHealth.TryGetValue(best, out float curHp) || curHp <= 0f) curHp = maxHp;
+            float dmg = comboStep >= 2 ? 50f : (comboStep == 1 ? 35f : 30f);
+            curHp = Mathf.Max(0f, curHp - dmg);
+            _fallbackNpcHealth[best] = curHp;
+
+            if (curHp <= 0f)
+            {
+                const float koDur = 18.0f;
+                _fallbackNpcKoUntil[best] = Time.time + koDur;
+                _fallbackNpcHealth[best] = maxHp;
+                best.PlayKnockdown(koDur);
+
+                VisualEffectsManager.SpawnFloatingText(
+                    best.transform.position + Vector3.up * 1.65f,
+                    en ? "💫 KNOCKED OUT!" : "💫 BAYILDI!",
+                    new Color(1.0f, 0.86f, 0.22f),
+                    scale: 1.18f,
+                    duration: 1.45f);
+                GameFeelAudio.SpawnBurst(best.transform.position + Vector3.up * 1.25f, new Color(1.0f, 0.88f, 0.26f), count: 14, spread: 0.65f);
+                GameFeelAudio.TriggerHitstop(0.068f, slowScale: 0.18f);
+
+                NpcSpeechBubbleManager.Say(best.transform, displayName,
+                    en ? "😵 Ugh... lights out..." : "😵 Off... gözlerim karardı...", 3.4f, NpcBubbleMood.Alert, 2.0f);
+                PlayerModeController.Instance?.RaiseStatusMessage(en
+                    ? $"💫 {displayName} was knocked out!"
+                    : $"💫 {displayName} bayıldı!");
+                ReportOffense(
+                    isToughAuthority || isMallStaff ? NeighborhoodOffenseKind.AssaultStaffOrAuthority : NeighborhoodOffenseKind.AssaultCitizen,
+                    best.transform.position, displayName, repPenalty: isToughAuthority ? 18 : 14, immediateFineTl: 0, heatDelta: 1.5f);
+                return true;
+            }
+
+            best.PlayHitReact();
+            VisualEffectsManager.SpawnFloatingText(
+                best.transform.position + Vector3.up * 1.55f,
+                $"-{Mathf.RoundToInt(dmg)}",
+                new Color(1.0f, 0.68f, 0.28f),
+                scale: 0.88f,
+                duration: 0.65f);
 
             if (isMallStaff)
             {

@@ -207,11 +207,13 @@ namespace OurWorld.World
         private Vector3 _lastProgressPos;
         private float _stuckTimer;
 
-        // Startled / combat / vehicle-impact ballistic state
+        // Startled / combat / knockout / vehicle-impact ballistic state
         private float _startledCooldown;
         private float _hitCooldown;
         private float _vehicleHitCooldown;
         private float _knockdownTimer;
+        private float _health = -1f;
+        private bool _isKnockedOut;
         private int _hitCount;
         private float _fleeTimer;
         private Vector3 _fleeDirection = Vector3.forward;
@@ -219,6 +221,9 @@ namespace OurWorld.World
         private Vector3 _airVelocity;
         private bool _isAirborne;
         private bool _droppedPocketMoney;
+
+        private float MaxCitizenHealth => isBrave ? 120f : 100f;
+        public bool IsKnockedOut => _isKnockedOut && _knockdownTimer > 0f;
 
         public CitizenBrainState CurrentBrainState => _brainState;
         public string CitizenName => citizenName;
@@ -348,6 +353,14 @@ namespace OurWorld.World
 
         public void TalkToPlayer(Vector3 playerWorldPos)
         {
+            if (IsKnockedOut)
+            {
+                PlayerModeController.Instance?.RaiseStatusMessage(IsEnglish
+                    ? $"😵 {citizenName} is knocked out right now..."
+                    : $"😵 {citizenName} şu an baygın yatıyor...");
+                return;
+            }
+
             EndNeighborChat();
             _watchTimer = 0f;
             _confrontTimer = 0f;
@@ -565,23 +578,55 @@ namespace OurWorld.World
             }
             knockDir = knockDir.sqrMagnitude > 0.001f ? knockDir.normalized : Vector3.forward;
 
+            if (_health < 0f) _health = MaxCitizenHealth;
             _hitCount++;
             _idleTimer = 0f;
 
-            bool triggerKnockdown = comboStep >= 2 || _hitCount >= 3;
+            float dmg = comboStep >= 2 ? 50f : (comboStep == 1 ? 35f : 30f);
+            _health = Mathf.Max(0f, _health - dmg);
+            bool knockedOut = _health <= 0f;
+            bool triggerKnockdown = knockedOut || comboStep >= 2 || _hitCount >= 3;
             bool isEn = IsEnglish;
             string react;
             string bubbleText;
 
-            if (triggerKnockdown)
+            if (knockedOut)
             {
-                _hitCooldown = 0.85f;
-                _knockdownTimer = 2.65f;
+                const float koDuration = 20.0f;
+                _isKnockedOut = true;
+                _hitCooldown = 1.2f;
+                _knockdownTimer = koDuration;
+                _confrontTimer = 0f;
+                _pendingPunchTimer = 0f;
+                _fleeTimer = 0f;
                 _hitCount = 0;
-                _stumbleVelocity = knockDir * 7.4f;
+                _stumbleVelocity = knockDir * 7.8f;
                 transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
 
-                if (humanoid != null) humanoid.PlayKnockdown();
+                if (humanoid != null) humanoid.PlayKnockdown(koDuration);
+
+                VisualEffectsManager.SpawnFloatingText(
+                    transform.position + Vector3.up * 1.65f,
+                    isEn ? "💫 KNOCKED OUT!" : "💫 BAYILDI!",
+                    new Color(1.0f, 0.86f, 0.22f),
+                    scale: 1.18f,
+                    duration: 1.45f);
+                GameFeelAudio.SpawnBurst(transform.position + Vector3.up * 1.25f, new Color(1.0f, 0.88f, 0.26f), count: 14, spread: 0.65f);
+                GameFeelAudio.TriggerHitstop(0.068f, slowScale: 0.18f);
+
+                bubbleText = isEn ? "😵 Ugh... lights out..." : "😵 Off... gözlerim karardı...";
+                react = isEn ? $"💫 {citizenName} was knocked out!" : $"💫 {citizenName} bayıldı!";
+                _brainState = CitizenBrainState.KnockedDown;
+            }
+            else if (triggerKnockdown)
+            {
+                _hitCooldown = 0.85f;
+                _knockdownTimer = 2.4f;
+                _hitCount = 0;
+                _stumbleVelocity = knockDir * 6.8f;
+                transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+
+                if (humanoid != null) humanoid.PlayKnockdown(2.4f);
 
                 bubbleText = isEn ? "Oof! I'm down!" : "Ah! Yere serildim!";
                 react = isEn ? $"{citizenName}: Knocked down!" : $"{citizenName}: Ah! Yere serildi!";
@@ -593,13 +638,20 @@ namespace OurWorld.World
 
                 if (humanoid != null) humanoid.PlayHitReact();
 
+                VisualEffectsManager.SpawnFloatingText(
+                    transform.position + Vector3.up * 1.55f,
+                    $"-{Mathf.RoundToInt(dmg)}",
+                    new Color(1.0f, 0.68f, 0.28f),
+                    scale: 0.88f,
+                    duration: 0.65f);
+
                 string[] pool = isEn ? HitReactionsEn : HitReactionsTr;
                 react = string.Format(pool[Random.Range(0, pool.Length)], citizenName);
                 int colon = react.IndexOf(':');
                 bubbleText = colon >= 0 && colon + 1 < react.Length ? react.Substring(colon + 1).Trim() : react;
             }
 
-            if (!_droppedPocketMoney && string.IsNullOrEmpty(vendorShopId) && Random.value < 0.45f && SaveManager.Instance != null)
+            if (!_droppedPocketMoney && string.IsNullOrEmpty(vendorShopId) && (knockedOut || Random.value < 0.45f) && SaveManager.Instance != null)
             {
                 _droppedPocketMoney = true;
                 int coins = Random.Range(10, 21);
@@ -607,38 +659,41 @@ namespace OurWorld.World
                 react += isEn ? $" (+{coins} ₺ dropped)" : $" (+{coins} ₺ düştü)";
             }
 
-            bool willFightBack = isBrave || (string.IsNullOrEmpty(vendorShopId) && _hitCount >= 2 && Random.value < 0.65f);
-            if (willFightBack && !isBrave)
+            if (!knockedOut)
             {
-                isBrave = true;
-            }
-
-            if (willFightBack)
-            {
-                // Brave / provoked citizen squares up, chases & throws real punches that drain player Health!
-                BeginSmoothFace(-knockDir);
-                _confrontTimer = 11.5f;
-                _confrontPunchCooldown = triggerKnockdown ? 0.45f : 0.55f;
-                _pendingPunchTimer = 0f;
-                _fleeTimer = 0f;
-                if (!triggerKnockdown)
+                bool willFightBack = isBrave || (string.IsNullOrEmpty(vendorShopId) && _hitCount >= 2 && Random.value < 0.65f);
+                if (willFightBack && !isBrave)
                 {
-                    _brainState = CitizenBrainState.ConfrontPlayer;
-                    string[] fightTr = { "Bana mı vurdun?! Al sana!", "Kiminle uğraştığını bilmiyorsun!", "Öyle kolay kaçamazsın, gel buraya!" };
-                    string[] fightEn = { "You hit me?! Take that!", "You picked the wrong neighbor!", "Oh, you want a fight? Bring it!" };
-                    bubbleText = isEn ? fightEn[Random.Range(0, fightEn.Length)] : fightTr[Random.Range(0, fightTr.Length)];
-                    react = $"{citizenName}: {bubbleText}";
+                    isBrave = true;
+                }
+
+                if (willFightBack)
+                {
+                    // Brave / provoked citizen squares up, chases & throws real punches that drain player Health!
+                    BeginSmoothFace(-knockDir);
+                    _confrontTimer = 11.5f;
+                    _confrontPunchCooldown = triggerKnockdown ? 0.45f : 0.55f;
+                    _pendingPunchTimer = 0f;
+                    _fleeTimer = 0f;
+                    if (!triggerKnockdown)
+                    {
+                        _brainState = CitizenBrainState.ConfrontPlayer;
+                        string[] fightTr = { "Bana mı vurdun?! Al sana!", "Kiminle uğraştığını bilmiyorsun!", "Öyle kolay kaçamazsın, gel buraya!" };
+                        string[] fightEn = { "You hit me?! Take that!", "You picked the wrong neighbor!", "Oh, you want a fight? Bring it!" };
+                        bubbleText = isEn ? fightEn[Random.Range(0, fightEn.Length)] : fightTr[Random.Range(0, fightTr.Length)];
+                        react = $"{citizenName}: {bubbleText}";
+                    }
+                    else
+                    {
+                        _brainState = CitizenBrainState.KnockedDown;
+                    }
                 }
                 else
                 {
-                    _brainState = CitizenBrainState.KnockedDown;
+                    _fleeTimer = 6.5f;
+                    _fleeDirection = knockDir;
+                    _brainState = triggerKnockdown ? CitizenBrainState.KnockedDown : CitizenBrainState.Fleeing;
                 }
-            }
-            else
-            {
-                _fleeTimer = 6.5f;
-                _fleeDirection = knockDir;
-                _brainState = triggerKnockdown ? CitizenBrainState.KnockedDown : CitizenBrainState.Fleeing;
             }
 
             NpcSpeechBubbleManager.Say(transform, citizenName, bubbleText, 3.2f, NpcBubbleMood.Alert);
@@ -1215,12 +1270,23 @@ namespace OurWorld.World
                 _stumbleVelocity = Vector3.MoveTowards(_stumbleVelocity, Vector3.zero, (_knockdownTimer > 0f ? 9.5f : 11f) * dt);
             }
 
-            // 4. Knocked down recovery
+            // 4. Knocked down / unconscious recovery
             if (_knockdownTimer > 0f)
             {
                 _brainState = CitizenBrainState.KnockedDown;
                 _knockdownTimer -= dt;
                 if (humanoid != null) humanoid.SetLocomotion(0f, grounded: true, verticalVelocity: 0f);
+                if (_knockdownTimer <= 0f && _isKnockedOut)
+                {
+                    _isKnockedOut = false;
+                    _health = MaxCitizenHealth;
+                    _confrontTimer = 0f;
+                    _pendingPunchTimer = 0f;
+                    _brainState = CitizenBrainState.Patrol;
+                    NpcSpeechBubbleManager.Say(transform, citizenName,
+                        IsEnglish ? "😵 Ugh... my head is spinning..." : "😵 Ah başım... gözlerim yeni açıldı...",
+                        2.8f, NpcBubbleMood.Alert);
+                }
                 return;
             }
 

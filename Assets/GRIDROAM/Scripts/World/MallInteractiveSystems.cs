@@ -170,6 +170,10 @@ namespace OurWorld.World
         public Vector3 LastProgressPos;
         public float StuckTimer;
         public bool IsFighter;
+        public float Health;
+        public float MaxHealth;
+        public bool IsKnockedOut;
+        public float KnockdownTimer;
         public float HitCooldown;
         public float FightTimer;
         public float PunchCooldown;
@@ -348,7 +352,7 @@ namespace OurWorld.World
             for (int i = 0; i < Strollers.Count; i++)
             {
                 MallStrollingShopper s = Strollers[i];
-                if (s == null || s.Root == null || s.Humanoid == null || s.HitCooldown > 0f) continue;
+                if (s == null || s.Root == null || s.Humanoid == null || s.HitCooldown > 0f || s.KnockdownTimer > 0f) continue;
                 Vector3 p = s.Root.position;
                 if (Mathf.Abs(p.y - attackerPos.y) > 1.8f) continue;
                 float dSq = ((p + Vector3.up * 1.0f) - strikeCenter).sqrMagnitude;
@@ -360,25 +364,78 @@ namespace OurWorld.World
             }
             if (best == null) return false;
 
-            best.HitCooldown = 0.35f;
-            best.Humanoid.PlayHitReact();
+            if (best.MaxHealth <= 0f)
+            {
+                best.MaxHealth = best.IsFighter ? 120f : 100f;
+                best.Health = best.MaxHealth;
+            }
+
+            Vector3 knockDir = punchDir;
+            knockDir.y = 0f;
+            if (knockDir.sqrMagnitude < 0.01f) knockDir = best.Root.position - attackerPos;
+            knockDir.y = 0f;
+            knockDir = knockDir.sqrMagnitude > 0.001f ? knockDir.normalized : Vector3.forward;
+
+            float dmg = comboStep >= 2 ? 50f : (comboStep == 1 ? 35f : 30f);
+            best.Health = Mathf.Max(0f, best.Health - dmg);
+            bool knockedOut = best.Health <= 0f;
+
             bool en = LocalizationService.IsEnglish;
             string who = string.IsNullOrEmpty(best.DisplayName) ? (en ? "Mall Shopper" : "AVM Ziyaretçisi") : best.DisplayName;
-            if (best.IsFighter)
+
+            if (knockedOut)
             {
-                best.FightTimer = 10f;
-                best.PunchCooldown = 0.55f;
+                const float koDur = 20.0f;
+                best.IsKnockedOut = true;
+                best.HitCooldown = 1.2f;
+                best.KnockdownTimer = koDur;
+                best.FightTimer = 0f;
                 best.PendingPunchTimer = 0f;
-                string line = en ? "Hey! Don't touch me in the mall!" : "Hey! AVM'nin ortasında kime vuruyorsun sen?!";
-                NpcSpeechBubbleManager.Say(best.Root, who, line, 2.8f, NpcBubbleMood.Alert, 2.0f);
-                PlayerModeController.Instance?.RaiseStatusMessage($"{who}: {line}");
+                best.StumbleVel = knockDir * 6.8f;
+                best.Root.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+                best.Humanoid.PlayKnockdown(koDur);
+
+                VisualEffectsManager.SpawnFloatingText(
+                    best.Root.position + Vector3.up * 1.65f,
+                    en ? "💫 KNOCKED OUT!" : "💫 BAYILDI!",
+                    new Color(1.0f, 0.86f, 0.22f),
+                    scale: 1.18f,
+                    duration: 1.45f);
+                GameFeelAudio.SpawnBurst(best.Root.position + Vector3.up * 1.25f, new Color(1.0f, 0.88f, 0.26f), count: 14, spread: 0.65f);
+                GameFeelAudio.TriggerHitstop(0.068f, slowScale: 0.18f);
+
+                NpcSpeechBubbleManager.Say(best.Root, who,
+                    en ? "😵 Ugh... lights out..." : "😵 Off... gözlerim karardı...", 3.4f, NpcBubbleMood.Alert, 2.0f);
+                PlayerModeController.Instance?.RaiseStatusMessage(en ? $"💫 {who} was knocked out!" : $"💫 {who} bayıldı!");
             }
             else
             {
-                best.PauseTimer = 0f;
-                string line = en ? "Security! Help!" : "Güvenlik! İmdat!";
-                NpcSpeechBubbleManager.Say(best.Root, who, line, 2.8f, NpcBubbleMood.Alert, 2.0f);
-                PlayerModeController.Instance?.RaiseStatusMessage($"{who}: {line}");
+                best.HitCooldown = 0.30f;
+                best.StumbleVel = knockDir * 3.8f;
+                best.Humanoid.PlayHitReact();
+                VisualEffectsManager.SpawnFloatingText(
+                    best.Root.position + Vector3.up * 1.55f,
+                    $"-{Mathf.RoundToInt(dmg)}",
+                    new Color(1.0f, 0.68f, 0.28f),
+                    scale: 0.88f,
+                    duration: 0.65f);
+
+                if (best.IsFighter)
+                {
+                    best.FightTimer = 10f;
+                    best.PunchCooldown = 0.55f;
+                    best.PendingPunchTimer = 0f;
+                    string line = en ? "Hey! Don't touch me in the mall!" : "Hey! AVM'nin ortasında kime vuruyorsun sen?!";
+                    NpcSpeechBubbleManager.Say(best.Root, who, line, 2.8f, NpcBubbleMood.Alert, 2.0f);
+                    PlayerModeController.Instance?.RaiseStatusMessage($"{who}: {line}");
+                }
+                else
+                {
+                    best.PauseTimer = 0f;
+                    string line = en ? "Security! Help!" : "Güvenlik! İmdat!";
+                    NpcSpeechBubbleManager.Say(best.Root, who, line, 2.8f, NpcBubbleMood.Alert, 2.0f);
+                    PlayerModeController.Instance?.RaiseStatusMessage($"{who}: {line}");
+                }
             }
             NeighborhoodConsequenceSystem.EnsureInstance().ReportOffense(
                 NeighborhoodOffenseKind.AssaultCitizen,
@@ -414,6 +471,21 @@ namespace OurWorld.World
                     fixY.y = floorY;
                     s.Root.position = fixY;
                     s.StumbleVel = Vector3.MoveTowards(s.StumbleVel, Vector3.zero, 10f * dt);
+                }
+
+                // Unconscious knockout state inside Atlas AVM
+                if (s.KnockdownTimer > 0f)
+                {
+                    s.KnockdownTimer -= dt;
+                    s.Humanoid?.SetLocomotion(0f, true, 0f);
+                    if (s.KnockdownTimer <= 0f && s.IsKnockedOut)
+                    {
+                        s.IsKnockedOut = false;
+                        s.Health = s.MaxHealth > 0f ? s.MaxHealth : 100f;
+                        s.FightTimer = 0f;
+                        s.PendingPunchTimer = 0f;
+                    }
+                    continue;
                 }
 
                 // Retaliating mall shopper fights back!

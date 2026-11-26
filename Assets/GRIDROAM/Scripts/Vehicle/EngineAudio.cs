@@ -41,9 +41,16 @@ namespace OurWorld.Vehicle
 
         private AudioClip _silentCarrierClip;
         private AudioClip _skidNoiseClip;
-        private AudioClip _ignitionCrankClip;
-        private AudioClip _gearShiftClip;
+        private static AudioClip _sharedIgnitionCrankClip;
+        private static AudioClip _sharedGearShiftClip;
         private AudioSource _oneShotSource;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetSharedClips()
+        {
+            _sharedIgnitionCrankClip = null;
+            _sharedGearShiftClip = null;
+        }
 
         public void Configure(SedanVehicleController targetVehicle, AudioSource engineSrc, AudioSource skidSrc)
         {
@@ -99,34 +106,44 @@ namespace OurWorld.Vehicle
                 }
             }
 
-            _oneShotSource = gameObject.AddComponent<AudioSource>();
+            // Place one-shot AudioSource on a dedicated child GameObject so the vehicle root keeps
+            // strictly ONE AudioSource for EngineAudio.OnAudioFilterRead (prevents Unity's multi-AudioSource filter error).
+            Transform oneShotChild = transform.Find("EngineOneShotAudio");
+            GameObject oneShotObj = oneShotChild != null ? oneShotChild.gameObject : new GameObject("EngineOneShotAudio");
+            if (oneShotChild == null)
+            {
+                oneShotObj.transform.SetParent(transform, false);
+            }
+            _oneShotSource = oneShotObj.GetComponent<AudioSource>();
+            if (_oneShotSource == null)
+            {
+                _oneShotSource = oneShotObj.AddComponent<AudioSource>();
+            }
             _oneShotSource.spatialBlend = 0.35f;
             _oneShotSource.playOnAwake = false;
             _oneShotSource.loop = false;
-            _ignitionCrankClip = BuildIgnitionCrankClip(22050);
-            _gearShiftClip = BuildGearShiftClip(22050);
+            if (_sharedIgnitionCrankClip == null) _sharedIgnitionCrankClip = BuildIgnitionCrankClip(22050);
+            if (_sharedGearShiftClip == null) _sharedGearShiftClip = BuildGearShiftClip(22050);
         }
 
         private void OnDestroy()
         {
             if (_silentCarrierClip != null) Destroy(_silentCarrierClip);
             if (_skidNoiseClip != null) Destroy(_skidNoiseClip);
-            if (_ignitionCrankClip != null) Destroy(_ignitionCrankClip);
-            if (_gearShiftClip != null) Destroy(_gearShiftClip);
         }
 
         public void PlayIgnitionStart()
         {
-            if (_oneShotSource == null || _ignitionCrankClip == null) return;
+            if (_oneShotSource == null || _sharedIgnitionCrankClip == null) return;
             _oneShotSource.pitch = UnityEngine.Random.Range(0.96f, 1.05f);
-            _oneShotSource.PlayOneShot(_ignitionCrankClip, 0.34f);
+            _oneShotSource.PlayOneShot(_sharedIgnitionCrankClip, 0.34f);
         }
 
         public void PlayGearShiftClick(bool upshift)
         {
-            if (_oneShotSource == null || _gearShiftClip == null) return;
+            if (_oneShotSource == null || _sharedGearShiftClip == null) return;
             _oneShotSource.pitch = upshift ? UnityEngine.Random.Range(1.02f, 1.12f) : UnityEngine.Random.Range(0.84f, 0.94f);
-            _oneShotSource.PlayOneShot(_gearShiftClip, upshift ? 0.22f : 0.16f);
+            _oneShotSource.PlayOneShot(_sharedGearShiftClip, upshift ? 0.22f : 0.16f);
         }
 
         private static AudioClip BuildIgnitionCrankClip(int sr)

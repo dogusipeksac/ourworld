@@ -60,8 +60,11 @@ namespace OurWorld.World
             public Vector3 LastProgressPos;
             public float StuckTimer;
 
-            // Street-fight & retaliation combat state
+            // Street-fight, health & unconscious knockout state
             public bool IsFighter;
+            public float Health;
+            public float MaxHealth;
+            public bool IsKnockedOut;
             public float HitCooldown;
             public float KnockdownTimer;
             public float FleeTimer;
@@ -977,58 +980,105 @@ namespace OurWorld.World
             }
             knockDir = knockDir.sqrMagnitude > 0.001f ? knockDir.normalized : Vector3.forward;
 
+            if (best.MaxHealth <= 0f)
+            {
+                best.MaxHealth = best.IsFighter ? 120f : 100f;
+                best.Health = best.MaxHealth;
+            }
+
             best.HitCount++;
-            bool knockdown = comboStep >= 2 || best.HitCount >= 3;
+            float dmg = comboStep >= 2 ? 50f : (comboStep == 1 ? 35f : 30f);
+            best.Health = Mathf.Max(0f, best.Health - dmg);
+            bool knockedOut = best.Health <= 0f;
+            bool knockdown = knockedOut || comboStep >= 2 || best.HitCount >= 3;
             bool en = LocalizationService.IsEnglish;
 
-            if (knockdown)
+            if (knockedOut)
+            {
+                const float koDur = 20.0f;
+                best.IsKnockedOut = true;
+                best.HitCooldown = 1.2f;
+                best.KnockdownTimer = koDur;
+                best.FightTimer = 0f;
+                best.PendingPunchTimer = 0f;
+                best.FleeTimer = 0f;
+                best.HitCount = 0;
+                best.StumbleVel = knockDir * 7.6f;
+                best.Root.transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
+                best.Humanoid.PlayKnockdown(koDur);
+
+                VisualEffectsManager.SpawnFloatingText(
+                    best.Root.transform.position + Vector3.up * 1.65f,
+                    en ? "💫 KNOCKED OUT!" : "💫 BAYILDI!",
+                    new Color(1.0f, 0.86f, 0.22f),
+                    scale: 1.18f,
+                    duration: 1.45f);
+                GameFeelAudio.SpawnBurst(best.Root.transform.position + Vector3.up * 1.25f, new Color(1.0f, 0.88f, 0.26f), count: 14, spread: 0.65f);
+                GameFeelAudio.TriggerHitstop(0.068f, slowScale: 0.18f);
+
+                NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName,
+                    en ? "😵 Ugh... lights out..." : "😵 Off... gözlerim karardı...", 3.4f, NpcBubbleMood.Alert, 2.08f);
+                PlayerModeController.Instance?.RaiseStatusMessage(en
+                    ? $"💫 {best.DisplayName} was knocked out!"
+                    : $"💫 {best.DisplayName} bayıldı!");
+            }
+            else if (knockdown)
             {
                 best.HitCooldown = 0.85f;
-                best.KnockdownTimer = 2.6f;
+                best.KnockdownTimer = 2.4f;
                 best.HitCount = 0;
-                best.StumbleVel = knockDir * 6.8f;
+                best.StumbleVel = knockDir * 6.5f;
                 best.Root.transform.rotation = Quaternion.LookRotation(-knockDir, Vector3.up);
-                best.Humanoid.PlayKnockdown(2.6f);
+                best.Humanoid.PlayKnockdown(2.4f);
             }
             else
             {
                 best.HitCooldown = 0.24f;
                 best.StumbleVel = knockDir * (comboStep == 0 ? 3.5f : 5.2f);
                 best.Humanoid.PlayHitReact();
+                VisualEffectsManager.SpawnFloatingText(
+                    best.Root.transform.position + Vector3.up * 1.55f,
+                    $"-{Mathf.RoundToInt(dmg)}",
+                    new Color(1.0f, 0.68f, 0.28f),
+                    scale: 0.88f,
+                    duration: 0.65f);
             }
 
-            bool willFight = best.IsFighter || (best.Role != NpcRole.Vendor && best.HitCount >= 2 && UnityEngine.Random.value < 0.65f);
-            if (willFight)
+            if (!knockedOut)
             {
-                best.IsFighter = true;
-                best.FightTimer = 11.0f;
-                best.PunchCooldown = knockdown ? 0.45f : 0.55f;
-                best.PendingPunchTimer = 0f;
-                best.FleeTimer = 0f;
-                if (!knockdown)
+                bool willFight = best.IsFighter || (best.Role != NpcRole.Vendor && best.HitCount >= 2 && UnityEngine.Random.value < 0.65f);
+                if (willFight)
                 {
-                    string[] fightTr = { "Bana mı vurdun?! Al sana!", "Kiminle uğraştığını göreceksin!", "Gel buraya bakalım!" };
-                    string[] fightEn = { "You hit me?! Take that!", "You picked the wrong fight!", "Oh, you asked for it!" };
-                    string line = en ? fightEn[UnityEngine.Random.Range(0, fightEn.Length)] : fightTr[UnityEngine.Random.Range(0, fightTr.Length)];
-                    NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName, line, 3.0f, NpcBubbleMood.Alert, 2.08f);
-                    PlayerModeController.Instance?.RaiseStatusMessage($"{best.DisplayName}: {line}");
+                    best.IsFighter = true;
+                    best.FightTimer = 11.0f;
+                    best.PunchCooldown = knockdown ? 0.45f : 0.55f;
+                    best.PendingPunchTimer = 0f;
+                    best.FleeTimer = 0f;
+                    if (!knockdown)
+                    {
+                        string[] fightTr = { "Bana mı vurdun?! Al sana!", "Kiminle uğraştığını göreceksin!", "Gel buraya bakalım!" };
+                        string[] fightEn = { "You hit me?! Take that!", "You picked the wrong fight!", "Oh, you asked for it!" };
+                        string line = en ? fightEn[UnityEngine.Random.Range(0, fightEn.Length)] : fightTr[UnityEngine.Random.Range(0, fightTr.Length)];
+                        NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName, line, 3.0f, NpcBubbleMood.Alert, 2.08f);
+                        PlayerModeController.Instance?.RaiseStatusMessage($"{best.DisplayName}: {line}");
+                    }
+                    else
+                    {
+                        string down = en ? "Ugh! You'll pay for that!" : "Ah! Bunun hesabını soracağım!";
+                        NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName, down, 2.8f, NpcBubbleMood.Alert, 2.08f);
+                    }
                 }
                 else
                 {
-                    string down = en ? "Ugh! You'll pay for that!" : "Ah! Bunun hesabını soracağım!";
-                    NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName, down, 2.8f, NpcBubbleMood.Alert, 2.08f);
+                    best.FleeTimer = 6.5f;
+                    best.FleeDir = knockDir;
+                    best.FightTimer = 0f;
+                    string[] fleeTr = { "İmdat! Yardım edin!", "Delirdin mi, bırak beni!", "Hey! Uzak dur benden!" };
+                    string[] fleeEn = { "Help! Somebody stop them!", "Back off! Leave me alone!", "Whoa, stay away!" };
+                    string line = en ? fleeEn[UnityEngine.Random.Range(0, fleeEn.Length)] : fleeTr[UnityEngine.Random.Range(0, fleeTr.Length)];
+                    NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName, line, 3.0f, NpcBubbleMood.Alert, 2.08f);
+                    PlayerModeController.Instance?.RaiseStatusMessage($"{best.DisplayName}: {line}");
                 }
-            }
-            else
-            {
-                best.FleeTimer = 6.5f;
-                best.FleeDir = knockDir;
-                best.FightTimer = 0f;
-                string[] fleeTr = { "İmdat! Yardım edin!", "Delirdin mi, bırak beni!", "Hey! Uzak dur benden!" };
-                string[] fleeEn = { "Help! Somebody stop them!", "Back off! Leave me alone!", "Whoa, stay away!" };
-                string line = en ? fleeEn[UnityEngine.Random.Range(0, fleeEn.Length)] : fleeTr[UnityEngine.Random.Range(0, fleeTr.Length)];
-                NpcSpeechBubbleManager.Say(best.Root.transform, best.DisplayName, line, 3.0f, NpcBubbleMood.Alert, 2.08f);
-                PlayerModeController.Instance?.RaiseStatusMessage($"{best.DisplayName}: {line}");
             }
 
             NpcWorldAwareness.NotifyViolence(best.Root.transform.position, attackerPos, null);
@@ -1557,6 +1607,16 @@ namespace OurWorld.World
                     {
                         npc.KnockdownTimer -= stepDt;
                         npc.Humanoid.SetLocomotion(0f, true, 0f);
+                        if (npc.KnockdownTimer <= 0f && npc.IsKnockedOut)
+                        {
+                            npc.IsKnockedOut = false;
+                            npc.Health = npc.MaxHealth > 0f ? npc.MaxHealth : 100f;
+                            npc.FightTimer = 0f;
+                            npc.PendingPunchTimer = 0f;
+                            NpcSpeechBubbleManager.Say(npc.Root.transform, npc.DisplayName,
+                                LocalizationService.IsEnglish ? "😵 Ugh... my head hurts..." : "😵 Ah başım... yeni ayıldım...",
+                                2.8f, NpcBubbleMood.Alert, 2.08f);
+                        }
                         continue;
                     }
 
@@ -2581,6 +2641,14 @@ namespace OurWorld.World
                 {
                     LivingNpc npc = _npcs[i];
                     if (!string.Equals(npc.InteractableId, trig.InteractableId, StringComparison.Ordinal)) continue;
+                    if (npc.IsKnockedOut && npc.KnockdownTimer > 0f)
+                    {
+                        bool isEnKo = LocalizationService.IsEnglish;
+                        PlayerModeController.Instance?.RaiseStatusMessage(isEnKo
+                            ? $"😵 {npc.DisplayName} is knocked out right now..."
+                            : $"😵 {npc.DisplayName} şu an baygın yatıyor...");
+                        return;
+                    }
                     npc.PauseTimer = Mathf.Max(npc.PauseTimer, 4.5f);
                     string roleTr = npc.Role == NpcRole.Jogger ? "Mahalle Koşucusu"
                         : npc.Role == NpcRole.Spectator ? "Spor İzleyicisi"
