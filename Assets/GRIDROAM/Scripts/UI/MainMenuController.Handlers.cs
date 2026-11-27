@@ -268,6 +268,7 @@ namespace OurWorld.UI
             if (_eyebrowText != null) _eyebrowText.text = Tr("ui.menu.eyebrow", "İSTANBUL  ·  SULTANBEYLİ  ·  HAMİDİYE");
             if (_brandTitleText != null) _brandTitleText.text = Tr("ui.menu.title", "BİZİM DÜNYAMIZ");
             if (_brandSubtitleText != null) _brandSubtitleText.text = Tr("ui.menu.subtitle", "Yaşayan Açık Dünya · Mahalle Yaşamı");
+            ApplyBrandLogoForLanguage();
             if (_pauseBadgeText != null) _pauseBadgeText.text = $"●  {Tr("ui.menu.pause_badge", "DURAKLATILDI")}";
             if (_pauseBadgeObj != null) _pauseBadgeObj.SetActive(IsPauseMode);
 

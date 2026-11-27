@@ -27,12 +27,18 @@ namespace OurWorld.UI
             _pillOutlineSprite = CreateRoundedRectSprite(96, 48, 23, outlineOnly: true, outlineThickness: 2.0f);
 
             _leftVignetteSprite = CreateHorizontalGradientSprite(192,
-                new Color(0.028f, 0.045f, 0.082f, 0.88f),
-                new Color(0.028f, 0.045f, 0.082f, 0.52f),
-                new Color(0.028f, 0.045f, 0.082f, 0.0f));
+                new Color(0.020f, 0.034f, 0.066f, 0.92f),
+                new Color(0.020f, 0.034f, 0.066f, 0.56f),
+                new Color(0.020f, 0.034f, 0.066f, 0.0f));
             _bottomVignetteSprite = CreateVerticalGradientSprite(96,
-                new Color(0.028f, 0.045f, 0.082f, 0.64f),
-                new Color(0.028f, 0.045f, 0.082f, 0.0f));
+                new Color(0.020f, 0.034f, 0.066f, 0.70f),
+                new Color(0.020f, 0.034f, 0.066f, 0.0f));
+
+            // Hero CTA: warm amber → sunset orange, lighter top edge
+            _ctaGradientSprite = CreateRoundedGradientSprite(256, 96, 22,
+                new Color(1.00f, 0.80f, 0.30f, 1f), new Color(0.98f, 0.55f, 0.13f, 1f), topLighten: 0.22f);
+            _shineBandSprite = CreateHorizontalGradientSprite(64,
+                new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, 1f), new Color(1f, 1f, 1f, 0f));
 
             // Crisp 64x64 procedural SDF vector icons (100% consistent across iOS, Android, macOS)
             _iconPlaySprite = CreateVectorIconSprite(64, SamplePlayTriangle);
@@ -220,6 +226,45 @@ namespace OurWorld.UI
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(b, b, b, b));
         }
 
+        private static Sprite CreateRoundedGradientSprite(int w, int h, int radius, Color left, Color right, float topLighten)
+        {
+            Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            Color32[] pixels = new Color32[w * h];
+            float r = Mathf.Min(radius, Mathf.Min(w, h) * 0.5f - 1f);
+            float halfW = w * 0.5f;
+            float halfH = h * 0.5f;
+            float bx = halfW - r;
+            float by = halfH - r;
+            for (int y = 0; y < h; y++)
+            {
+                float v = (y + 0.5f) / h; // 0 bottom → 1 top
+                float py = Mathf.Abs(y + 0.5f - halfH) - by;
+                float lighten = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, v)) * topLighten;
+                float darken = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.30f, 0f, v)) * 0.12f;
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + 0.5f) / w;
+                    float px = Mathf.Abs(x + 0.5f - halfW) - bx;
+                    float dist = Mathf.Sqrt(Mathf.Max(px, 0f) * Mathf.Max(px, 0f) + Mathf.Max(py, 0f) * Mathf.Max(py, 0f))
+                                 + Mathf.Min(Mathf.Max(px, py), 0f) - r;
+                    float alpha = Mathf.Clamp01(0.5f - dist);
+                    Color c = Color.Lerp(left, right, Mathf.SmoothStep(0f, 1f, u));
+                    c = Color.Lerp(c, Color.white, lighten);
+                    c = Color.Lerp(c, Color.black, darken);
+                    c.a = alpha;
+                    pixels[y * w + x] = c;
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+            int b = Mathf.Min(radius + 2, Mathf.Min(w, h) / 2 - 1);
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(b, b, b, b));
+        }
+
         private static Sprite CreateHorizontalGradientSprite(int width, Color left, Color mid, Color right)
         {
             Texture2D tex = new Texture2D(width, 2, TextureFormat.RGBA32, false)
@@ -353,6 +398,7 @@ namespace OurWorld.UI
             t.raycastTarget = false;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
+            OurWorldUiKit.UpgradeFont(t); // real Bold cut instead of synthesized bold
 
             if (addShadow)
             {

@@ -55,7 +55,42 @@ namespace OurWorld.UI
         public static Sprite IconCommunity { get; private set; }
         public static Sprite IconUpdate { get; private set; }
 
-        public static Font DefaultFont
+        // --- Typography (SIL OFL fonts bundled in Resources/UI/Fonts) ---
+        private static Font _bodyFont;
+        private static Font _bodyBoldFont;
+        private static Font _displayFont;
+
+        /// <summary>Hanken Grotesk Regular — body copy and all generic labels.</summary>
+        public static Font BodyFont
+        {
+            get
+            {
+                if (_bodyFont == null) _bodyFont = Resources.Load<Font>("UI/Fonts/HankenGrotesk-Regular");
+                return _bodyFont != null ? _bodyFont : LegacyFont;
+            }
+        }
+
+        /// <summary>Hanken Grotesk Bold — true bold weight used instead of synthesized bold.</summary>
+        public static Font BodyBoldFont
+        {
+            get
+            {
+                if (_bodyBoldFont == null) _bodyBoldFont = Resources.Load<Font>("UI/Fonts/HankenGrotesk-Bold");
+                return _bodyBoldFont != null ? _bodyBoldFont : BodyFont;
+            }
+        }
+
+        /// <summary>Sora Bold — display titles, big numbers and hero buttons.</summary>
+        public static Font DisplayFont
+        {
+            get
+            {
+                if (_displayFont == null) _displayFont = Resources.Load<Font>("UI/Fonts/Sora-Bold");
+                return _displayFont != null ? _displayFont : BodyBoldFont;
+            }
+        }
+
+        public static Font LegacyFont
         {
             get
             {
@@ -67,6 +102,84 @@ namespace OurWorld.UI
                 }
                 return _cachedFont;
             }
+        }
+
+        public static Font DefaultFont => BodyFont;
+
+        /// <summary>Arial line height (1.117em) / Hanken Grotesk line height (1.303em).</summary>
+        private const float LegacyLineHeightRatio = 0.86f;
+
+        public static bool IsLegacyFont(Font f)
+        {
+            if (f == null) return true;
+            string n = f.name;
+            return n == "LegacyRuntime" || n == "Arial";
+        }
+
+        private static readonly System.Collections.Generic.HashSet<int> _typeProcessed =
+            new System.Collections.Generic.HashSet<int>();
+
+        /// <summary>
+        /// Moves a legacy (Arial) or synthesized-bold label onto the bundled type family.
+        /// Bold labels switch to the real Bold cut with Normal style so glyphs stay crisp.
+        /// Single-line boxes that were sized for Arial's shorter line height switch to vertical
+        /// overflow so the taller Hanken line box never gets truncated away.
+        /// </summary>
+        public static void UpgradeFont(Text t)
+        {
+            if (t == null) return;
+            Font f = t.font;
+            bool legacy = IsLegacyFont(f);
+            int id = t.GetInstanceID();
+            bool seen = _typeProcessed.Contains(id);
+            if (seen && !legacy) return;
+
+            Font body = BodyFont;
+            if (IsLegacyFont(body)) return; // bundled fonts missing → keep everything as-is
+
+            bool ours = f == body || f == _bodyBoldFont;
+            if (!legacy && !ours)
+            {
+                _typeProcessed.Add(id); // display face or a custom font: leave untouched
+                return;
+            }
+
+            bool bold = t.fontStyle == FontStyle.Bold || t.fontStyle == FontStyle.BoldAndItalic;
+            Font target = bold ? BodyBoldFont : body;
+            t.font = target;
+            if (bold && target != body)
+            {
+                t.fontStyle = t.fontStyle == FontStyle.BoldAndItalic ? FontStyle.Italic : FontStyle.Normal;
+            }
+
+            if (!seen)
+            {
+                _typeProcessed.Add(id);
+                // Hanken's line box is 1.303em vs Arial's 1.117em: compensate so multi-line labels
+                // keep the same number of visible lines inside boxes that were sized for Arial.
+                t.lineSpacing *= LegacyLineHeightRatio;
+
+                if (t.verticalOverflow == VerticalWrapMode.Truncate && !t.resizeTextForBestFit)
+                {
+                    float h = t.rectTransform.rect.height;
+                    if (h > 0.5f && h < t.fontSize * 1.34f + 1f)
+                    {
+                        t.verticalOverflow = VerticalWrapMode.Overflow;
+                    }
+                }
+            }
+        }
+
+        /// <summary>Applies the display face (Sora Bold) to a headline label.</summary>
+        public static void UseDisplayFont(Text t)
+        {
+            if (t == null) return;
+            Font d = DisplayFont;
+            if (d == null || IsLegacyFont(d)) return;
+            t.font = d;
+            _typeProcessed.Add(t.GetInstanceID());
+            if (t.fontStyle == FontStyle.Bold) t.fontStyle = FontStyle.Normal;
+            else if (t.fontStyle == FontStyle.BoldAndItalic) t.fontStyle = FontStyle.Italic;
         }
 
         public static void EnsureInitialized()

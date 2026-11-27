@@ -163,6 +163,97 @@ namespace OurWorld.UI
 
             // 10. PHONE / TOWN GUIDE MODAL (Map, Jobs, Stats, Ideas!)
             StylePhoneModal(FindChild(root, "PhonePanel"));
+
+            // 11. OPEN-WORLD HUD POLISH: typography, edge legibility scrims & accent rails
+            OurWorldFontUpgrader.UpgradeHierarchy(root);
+            ApplyHudDisplayType(root);
+            EnsureEdgeLegibilityScrims(root);
+            EnsureAccentRail(FindChild(root, "MissionBox"), OurWorldUiKit.AccentTeal);
+            EnsureAccentRail(FindChild(root, "DialoguePanel"), OurWorldUiKit.AccentTeal);
+            EnsureAccentRail(FindChild(root, "MissionCompleteBanner"), OurWorldUiKit.AccentGold);
+            EnsureAccentRail(FindChild(root, "MissionFailedPanel"), OurWorldUiKit.AccentCoral);
+            if (speedDisc != null)
+            {
+                Transform rim = speedDisc.Find("HairlineBorder");
+                Image rimImg = rim != null ? rim.GetComponent<Image>() : null;
+                if (rimImg != null) rimImg.color = new Color(OurWorldUiKit.AccentGold.r, OurWorldUiKit.AccentGold.g, OurWorldUiKit.AccentGold.b, 0.38f);
+            }
+        }
+
+        /// <summary>Short numeric HUD readouts use the Sora display face for a punchy, game-like look.</summary>
+        private static void ApplyHudDisplayType(Transform root)
+        {
+            string[] names = { "MoneyText", "ClockText", "WaypointIndicator/Distance", "TimerText", "SpeedText", "GearText" };
+            for (int i = 0; i < names.Length; i++)
+            {
+                Transform tf = FindChild(root, names[i]);
+                Text t = tf != null ? tf.GetComponent<Text>() : null;
+                if (t == null) continue;
+                OurWorldUiKit.UseDisplayFont(t);
+                t.verticalOverflow = VerticalWrapMode.Overflow;
+                if (t.GetComponent<Shadow>() == null)
+                {
+                    Shadow sh = t.gameObject.AddComponent<Shadow>();
+                    sh.effectColor = new Color(0f, 0f, 0f, 0.45f);
+                    sh.effectDistance = new Vector2(0f, -1.5f);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Soft dark gradients along the top and bottom screen edges (behind every HUD element) so
+        /// minimap, objective card, money and touch controls stay readable against bright sky / roads.
+        /// </summary>
+        private static void EnsureEdgeLegibilityScrims(Transform root)
+        {
+            if (root == null || root.Find("HudScrim_Top") != null) return;
+            Color ink = new Color(0.012f, 0.024f, 0.05f, 1f);
+
+            Image top = CreateScrim(root, "HudScrim_Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), 190f,
+                new Color(ink.r, ink.g, ink.b, 0.42f), flip: false);
+            Image bottom = CreateScrim(root, "HudScrim_Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), 230f,
+                new Color(ink.r, ink.g, ink.b, 0.36f), flip: true);
+            bottom.transform.SetAsFirstSibling();
+            top.transform.SetAsFirstSibling();
+        }
+
+        private static Image CreateScrim(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
+            float height, Color color, bool flip)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            RectTransform rt = (RectTransform)go.transform;
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.pivot = pivot;
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(0f, height);
+            if (flip) rt.localScale = new Vector3(1f, -1f, 1f);
+            Image img = go.GetComponent<Image>();
+            img.sprite = OurWorldUiKit.TopGlowSprite;
+            img.type = Image.Type.Simple;
+            img.color = color;
+            img.raycastTarget = false;
+            return img;
+        }
+
+        /// <summary>Slim vertical accent bar on a card's left edge (objective-card style).</summary>
+        private static void EnsureAccentRail(Transform card, Color accent)
+        {
+            if (card == null || card.Find("AccentRail") != null) return;
+            GameObject go = new GameObject("AccentRail", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(card, false);
+            RectTransform rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.offsetMin = new Vector2(7f, 22f);
+            rt.offsetMax = new Vector2(12f, -22f);
+            Image img = go.GetComponent<Image>();
+            img.sprite = OurWorldUiKit.PillSprite;
+            img.type = Image.Type.Simple;
+            img.color = new Color(accent.r, accent.g, accent.b, 0.95f);
+            img.raycastTarget = false;
         }
 
         private static void StyleMinimap(Transform root)

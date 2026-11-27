@@ -15,6 +15,53 @@ namespace OurWorld.UI
 {
     public sealed partial class MainMenuController
     {
+        // --- Brand / hero CTA visual assets ---
+        private const float LogoMaxWidth = 470f;
+        private const float LogoMaxHeight = 150f;
+        private static readonly Color CtaInk = new Color(0.10f, 0.07f, 0.03f, 1f);
+
+        private RectTransform _brandLogoRect;
+        private UnityEngine.UI.Image _brandLogoImage;
+        private Sprite _logoTrSprite;
+        private Sprite _logoEnSprite;
+        private Sprite _ctaGradientSprite;
+        private Sprite _shineBandSprite;
+        private readonly List<Sprite> _runtimeBrandSprites = new List<Sprite>();
+
+        private Sprite LoadBrandSprite(string resourcePath)
+        {
+            Sprite sp = Resources.Load<Sprite>(resourcePath);
+            if (sp != null) return sp;
+            Texture2D tex = Resources.Load<Texture2D>(resourcePath);
+            if (tex == null) return null;
+            sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            _runtimeBrandSprites.Add(sp);
+            return sp;
+        }
+
+        /// <summary>Swaps the wordmark between TR (Bizim Dünyamız) and EN (Our World) and hides the text fallback.</summary>
+        private void ApplyBrandLogoForLanguage()
+        {
+            if (_brandLogoImage == null) return;
+            if (_logoTrSprite == null) _logoTrSprite = LoadBrandSprite("UI/Branding/ourworld_logo_tr");
+            if (_logoEnSprite == null) _logoEnSprite = LoadBrandSprite("UI/Branding/ourworld_logo_en");
+
+            Sprite target = IsEnglish() && _logoEnSprite != null ? _logoEnSprite : _logoTrSprite;
+            bool hasLogo = target != null;
+            _brandLogoImage.sprite = target;
+            _brandLogoImage.enabled = hasLogo;
+
+            if (hasLogo && _brandLogoRect != null)
+            {
+                float aspect = target.rect.width / Mathf.Max(1f, target.rect.height);
+                float w = Mathf.Min(LogoMaxWidth, LogoMaxHeight * aspect);
+                _brandLogoRect.sizeDelta = new Vector2(w, w / aspect);
+            }
+
+            if (_brandTitleText != null) _brandTitleText.gameObject.SetActive(!hasLogo);
+            if (_brandSubtitleText != null) _brandSubtitleText.gameObject.SetActive(!hasLogo);
+        }
+
         // =====================================================================
         // HUD PAUSE / MENU BUTTON INTEGRATION
         // =====================================================================
@@ -83,8 +130,8 @@ namespace OurWorld.UI
 
         private void BuildMenuCanvas()
         {
-            _uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (_uiFont == null) _uiFont = Font.CreateDynamicFontFromOSFont("Arial", 24);
+            OurWorldUiKit.EnsureInitialized();
+            _uiFont = OurWorldUiKit.BodyFont;
 
             _canvasObj = new GameObject("Canvas_OurWorld_MainMenu");
             _canvasObj.transform.SetParent(transform, false);
@@ -149,68 +196,58 @@ namespace OurWorld.UI
             _leftRailRect.anchoredPosition = Vector2.zero;
             _leftRailRect.sizeDelta = new Vector2(612f, 0f);
 
-            // --- Brand Header (Top-Left) ---
+            // --- Brand Header (Top-Left): official wordmark logo ---
             GameObject header = new GameObject("BrandHeader", typeof(RectTransform));
             header.transform.SetParent(rail.transform, false);
             RectTransform hrt = (RectTransform)header.transform;
             hrt.anchorMin = new Vector2(0f, 1f);
             hrt.anchorMax = new Vector2(1f, 1f);
             hrt.pivot = new Vector2(0f, 1f);
-            hrt.anchoredPosition = new Vector2(54f, -52f);
-            hrt.sizeDelta = new Vector2(-64f, 152f);
+            hrt.anchoredPosition = new Vector2(46f, -38f);
+            hrt.sizeDelta = new Vector2(-56f, 230f);
 
-            // Official App Icon Emblem with rounded mask and golden frame
-            GameObject iconFrame = CreateRoundedPanel("AppIconBadge", header.transform, _roundedCardSprite,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(0f, -6f), new Vector2(92f, 92f),
-                new Color(0.10f, 0.16f, 0.24f, 0.96f), addBorder: false);
+            GameObject logoGo = new GameObject("BrandLogo", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            logoGo.transform.SetParent(header.transform, false);
+            _brandLogoRect = (RectTransform)logoGo.transform;
+            _brandLogoRect.anchorMin = new Vector2(0f, 1f);
+            _brandLogoRect.anchorMax = new Vector2(0f, 1f);
+            _brandLogoRect.pivot = new Vector2(0f, 1f);
+            _brandLogoRect.anchoredPosition = Vector2.zero;
+            _brandLogoRect.sizeDelta = new Vector2(LogoMaxWidth, LogoMaxHeight);
+            _brandLogoImage = logoGo.GetComponent<UnityEngine.UI.Image>();
+            _brandLogoImage.preserveAspect = true;
+            _brandLogoImage.raycastTarget = false;
 
-            if (_brandIconSprite != null)
-            {
-                GameObject maskHolder = CreateRoundedPanel("IconMask", iconFrame.transform, _roundedCardSprite,
-                    Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                    Vector2.zero, Vector2.zero, Color.white, addBorder: false);
-                StretchFull((RectTransform)maskHolder.transform, 4f, 4f);
-                UnityEngine.UI.Mask iconMask = maskHolder.AddComponent<UnityEngine.UI.Mask>();
-                iconMask.showMaskGraphic = false;
-
-                GameObject iconImgObj = new GameObject("IconImage", typeof(RectTransform), typeof(UnityEngine.UI.Image));
-                iconImgObj.transform.SetParent(maskHolder.transform, false);
-                StretchFull((RectTransform)iconImgObj.transform, 0f, 0f);
-                UnityEngine.UI.Image iconImg = iconImgObj.GetComponent<UnityEngine.UI.Image>();
-                iconImg.sprite = _brandIconSprite;
-                iconImg.preserveAspect = true;
-                iconImg.raycastTarget = false;
-            }
-            else
-            {
-                UnityEngine.UI.Text fallbackGlyph = CreateText("IconGlyph", iconFrame.transform, "OW", 34, FontStyle.Bold, AccentGold, TextAnchor.MiddleCenter);
-                StretchFull(fallbackGlyph.rectTransform, 0f, 0f);
-            }
-            AddOutlineOverlay(iconFrame.transform, new Color(0.98f, 0.76f, 0.28f, 0.72f));
-
-            // Eyebrow + Display Title + Subtitle
-            _eyebrowText = CreateText("Eyebrow", header.transform, "İSTANBUL  ·  SULTANBEYLİ  ·  HAMİDİYE",
-                15, FontStyle.Bold, AccentGold, TextAnchor.MiddleLeft, addShadow: true);
-            PlaceTopLeft(_eyebrowText.rectTransform, 112f, -4f, 440f, 24f);
-
+            // Text fallback (only visible when the logo textures are missing)
             _brandTitleText = CreateText("BrandTitle", header.transform, "BİZİM DÜNYAMIZ",
-                46, FontStyle.Bold, TextPrimary, TextAnchor.MiddleLeft, addShadow: true);
-            PlaceTopLeft(_brandTitleText.rectTransform, 110f, -28f, 450f, 56f);
+                50, FontStyle.Bold, AccentGold, TextAnchor.MiddleLeft, addShadow: true);
+            OurWorldUiKit.UseDisplayFont(_brandTitleText);
+            PlaceTopLeft(_brandTitleText.rectTransform, 0f, -18f, 520f, 64f);
 
             _brandSubtitleText = CreateText("BrandSubtitle", header.transform, "Yaşayan Açık Dünya · Mahalle Yaşamı",
                 19, FontStyle.Normal, TextSecondary, TextAnchor.MiddleLeft, addShadow: true);
-            PlaceTopLeft(_brandSubtitleText.rectTransform, 112f, -84f, 440f, 28f);
+            PlaceTopLeft(_brandSubtitleText.rectTransform, 2f, -88f, 500f, 28f);
+
+            // Location eyebrow with a short gold lead line, sitting under the logo
+            GameObject leadLine = CreateRoundedPanel("EyebrowLead", header.transform, _pillSprite,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 0.5f),
+                new Vector2(8f, -LogoMaxHeight - 22f), new Vector2(30f, 4f), AccentGold, addBorder: false);
+            leadLine.GetComponent<UnityEngine.UI.Image>().type = UnityEngine.UI.Image.Type.Simple;
+            _eyebrowText = CreateText("Eyebrow", header.transform, "İSTANBUL  ·  SULTANBEYLİ  ·  HAMİDİYE",
+                15, FontStyle.Bold, new Color(0.99f, 0.86f, 0.55f, 1f), TextAnchor.MiddleLeft, addShadow: true);
+            PlaceTopLeft(_eyebrowText.rectTransform, 48f, -LogoMaxHeight - 10f, 460f, 24f);
 
             // Pause Badge (shown only when opened mid-session)
             _pauseBadgeObj = CreateRoundedPanel("PauseBadge", header.transform, _pillSprite,
                 new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(112f, -118f), new Vector2(174f, 30f),
+                new Vector2(8f, -LogoMaxHeight - 44f), new Vector2(174f, 30f),
                 BadgeExploreBg, addBorder: false);
             AddOutlineOverlay(_pauseBadgeObj.transform, new Color(0.98f, 0.76f, 0.28f, 0.72f), _pillOutlineSprite);
             _pauseBadgeText = CreateText("Label", _pauseBadgeObj.transform, "●  DURAKLATILDI", 14, FontStyle.Bold, AccentGold, TextAnchor.MiddleCenter);
             StretchFull(_pauseBadgeText.rectTransform, 8f, 0f);
             _pauseBadgeObj.SetActive(false);
+
+            ApplyBrandLogoForLanguage();
 
             // --- Action Stack ---
             GameObject actionStack = new GameObject("ActionStack", typeof(RectTransform));
@@ -230,31 +267,80 @@ namespace OurWorld.UI
             vlg.childForceExpandWidth = true;
             vlg.childForceExpandHeight = false;
 
-            // 1. Primary Hero CTA Button
-            GameObject playGo = CreateRoundedPanel("Btn_PrimaryPlay", actionStack.transform, _roundedCardSprite,
+            // 1. Primary Hero CTA — warm amber gradient card with soft glow + periodic light sweep
+            GameObject playCard = new GameObject("PlayCard", typeof(RectTransform));
+            playCard.transform.SetParent(actionStack.transform, false);
+            ((RectTransform)playCard.transform).sizeDelta = new Vector2(516f, 96f);
+            LayoutElement playLe = playCard.AddComponent<LayoutElement>();
+            playLe.preferredHeight = 96f;
+
+            GameObject glowGo = new GameObject("CtaGlow", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            glowGo.transform.SetParent(playCard.transform, false);
+            RectTransform glowRt = (RectTransform)glowGo.transform;
+            glowRt.anchorMin = Vector2.zero;
+            glowRt.anchorMax = Vector2.one;
+            glowRt.offsetMin = new Vector2(-26f, -30f);
+            glowRt.offsetMax = new Vector2(26f, 18f);
+            UnityEngine.UI.Image glowImg = glowGo.GetComponent<UnityEngine.UI.Image>();
+            glowImg.sprite = OurWorldUiKit.DropShadowSprite;
+            glowImg.type = UnityEngine.UI.Image.Type.Sliced;
+            glowImg.color = new Color(1f, 0.66f, 0.16f, 0.42f);
+            glowImg.raycastTarget = false;
+
+            GameObject playGo = CreateRoundedPanel("Btn_PrimaryPlay", playCard.transform, _ctaGradientSprite,
                 Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(516f, 92f), AccentTeal, addBorder: false);
-            playGo.AddComponent<LayoutElement>().preferredHeight = 92f;
-            AddOutlineOverlay(playGo.transform, new Color(0.72f, 0.99f, 0.95f, 0.56f));
+                Vector2.zero, Vector2.zero, Color.white, addBorder: false);
+            AddOutlineOverlay(playGo.transform, new Color(1f, 0.95f, 0.78f, 0.70f));
 
             UnityEngine.UI.Image playImg = playGo.GetComponent<UnityEngine.UI.Image>();
             playImg.raycastTarget = true;
             _primaryPlayBtn = playGo.AddComponent<UnityEngine.UI.Button>();
             _primaryPlayBtn.targetGraphic = playImg;
+            _primaryPlayBtn.transition = Selectable.Transition.None;
             _primaryPlayBtn.onClick.AddListener(ResumeOrEnterWorld);
             UiButtonFeedback playFb = playGo.AddComponent<UiButtonFeedback>();
             playFb.Configure(_primaryPlayBtn, playImg);
 
+            // Light sweep clipped to the rounded card shape
+            GameObject shineMask = CreateRoundedPanel("ShineMask", playGo.transform, _roundedCardSprite,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, Color.white, addBorder: false);
+            StretchFull((RectTransform)shineMask.transform, 0f, 0f);
+            UnityEngine.UI.Mask sm = shineMask.AddComponent<UnityEngine.UI.Mask>();
+            sm.showMaskGraphic = false;
+            GameObject shineGo = new GameObject("Shine", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            shineGo.transform.SetParent(shineMask.transform, false);
+            RectTransform shineRt = (RectTransform)shineGo.transform;
+            shineRt.anchorMin = new Vector2(0f, 0.5f);
+            shineRt.anchorMax = new Vector2(0f, 0.5f);
+            shineRt.pivot = new Vector2(0.5f, 0.5f);
+            shineRt.sizeDelta = new Vector2(90f, 220f);
+            shineRt.localRotation = Quaternion.Euler(0f, 0f, -22f);
+            UnityEngine.UI.Image shineImg = shineGo.GetComponent<UnityEngine.UI.Image>();
+            shineImg.sprite = _shineBandSprite;
+            shineImg.color = new Color(1f, 1f, 1f, 0.55f);
+            shineImg.raycastTarget = false;
+            MenuCtaShine shine = playCard.AddComponent<MenuCtaShine>();
+            shine.Configure(shineRt, (RectTransform)playGo.transform, glowImg);
+
             GameObject playGlyphBg = CreateRoundedPanel("PlayGlyphCircle", playGo.transform, _pillSprite,
                 new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                new Vector2(20f, 0f), new Vector2(52f, 52f), new Color(0.03f, 0.16f, 0.16f, 0.36f), addBorder: false);
-            CreateCenteredIcon("PlayIcon", playGlyphBg.transform, _iconPlaySprite, 23f, Color.white);
+                new Vector2(20f, 0f), new Vector2(58f, 58f), CtaInk, addBorder: false);
+            CreateCenteredIcon("PlayIcon", playGlyphBg.transform, _iconPlaySprite, 24f, AccentGold);
 
-            _primaryPlayLabel = CreateText("Title", playGo.transform, "MAHALLEYE GİR", 27, FontStyle.Bold, Color.white, TextAnchor.MiddleLeft, addShadow: true);
-            PlaceTopLeft(_primaryPlayLabel.rectTransform, 90f, -12f, 390f, 36f);
+            _primaryPlayLabel = CreateText("Title", playGo.transform, "MAHALLEYE GİR", 28, FontStyle.Bold, CtaInk, TextAnchor.MiddleLeft);
+            OurWorldUiKit.UseDisplayFont(_primaryPlayLabel);
+            PlaceTopLeft(_primaryPlayLabel.rectTransform, 96f, -12f, 396f, 38f);
 
-            _primaryPlaySubLabel = CreateText("Sub", playGo.transform, "Selman Sokağı No:48 · Yeni Hayat", 16, FontStyle.Normal, new Color(0.88f, 0.99f, 0.97f, 0.96f), TextAnchor.MiddleLeft);
-            PlaceTopLeft(_primaryPlaySubLabel.rectTransform, 90f, -49f, 390f, 26f);
+            _primaryPlaySubLabel = CreateText("Sub", playGo.transform, "Selman Sokağı No:48 · Yeni Hayat", 16, FontStyle.Bold, new Color(CtaInk.r, CtaInk.g, CtaInk.b, 0.72f), TextAnchor.MiddleLeft);
+            PlaceTopLeft(_primaryPlaySubLabel.rectTransform, 97f, -52f, 396f, 26f);
+
+            UnityEngine.UI.Text ctaChev = CreateText("Chevron", playGo.transform, "›", 40, FontStyle.Bold, new Color(CtaInk.r, CtaInk.g, CtaInk.b, 0.8f), TextAnchor.MiddleCenter);
+            RectTransform ctaChevRt = ctaChev.rectTransform;
+            ctaChevRt.anchorMin = new Vector2(1f, 0.5f);
+            ctaChevRt.anchorMax = new Vector2(1f, 0.5f);
+            ctaChevRt.pivot = new Vector2(1f, 0.5f);
+            ctaChevRt.anchoredPosition = new Vector2(-20f, 2f);
+            ctaChevRt.sizeDelta = new Vector2(30f, 50f);
 
             // 2. Quick-Play Sports & Mini-Games Button
             (_navSportsBtn, _navSportsBg, _navSportsLabel) = CreateMenuNavButton(
@@ -284,7 +370,7 @@ namespace OurWorld.UI
 
             // --- Footer (Bottom-Left) ---
             string version = string.IsNullOrEmpty(Application.version) ? "1.0.0" : Application.version;
-            _footerText = CreateText("FooterVersion", rail.transform, $"Our World v{version}  ·  Doğuş İpeksaç",
+            _footerText = CreateText("FooterVersion", rail.transform, $"v{version}  ·  Dogus Store",
                 15, FontStyle.Normal, TextSecondary, TextAnchor.MiddleLeft, addShadow: true);
             RectTransform frt = _footerText.rectTransform;
             frt.anchorMin = new Vector2(0f, 0f);
@@ -310,6 +396,13 @@ namespace OurWorld.UI
 
             UiButtonFeedback fb = go.AddComponent<UiButtonFeedback>();
             fb.Configure(btn, bg);
+
+            // Slim accent rail on the left edge (open-world menu style)
+            GameObject rail = CreateRoundedPanel("AccentRail", go.transform, _pillSprite,
+                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                new Vector2(3f, 0f), new Vector2(4f, 30f),
+                new Color(iconAccent.r, iconAccent.g, iconAccent.b, 0.95f), addBorder: false);
+            rail.GetComponent<UnityEngine.UI.Image>().type = UnityEngine.UI.Image.Type.Simple;
 
             // Distinct tinted icon chip on left
             GameObject chip = CreateRoundedPanel("IconChip", go.transform, _roundedCardSprite,
@@ -349,6 +442,7 @@ namespace OurWorld.UI
                 new Vector2(-48f, -44f), new Vector2(548f, 86f), PanelDark, addBorder: true);
 
             _liveClockText = CreateText("Clock", topPill.transform, "09:00", 28, FontStyle.Bold, TextPrimary, TextAnchor.MiddleLeft);
+            OurWorldUiKit.UseDisplayFont(_liveClockText);
             PlaceTopLeft(_liveClockText.rectTransform, 24f, -12f, 120f, 34f);
 
             _liveWeatherText = CreateText("Weather", topPill.transform, "Açık & Güneşli", 15, FontStyle.Bold, AccentGold, TextAnchor.MiddleLeft);
@@ -440,7 +534,8 @@ namespace OurWorld.UI
             UnityEngine.UI.Text cap = CreateText("Caption", tile.transform, caption, 15, FontStyle.Bold, TextMuted, TextAnchor.MiddleLeft);
             PlaceTopLeft(cap.rectTransform, 16f, -7f, 212f, 20f);
 
-            UnityEngine.UI.Text val = CreateText("Value", tile.transform, value, 24, FontStyle.Bold, valueColor, TextAnchor.MiddleLeft);
+            UnityEngine.UI.Text val = CreateText("Value", tile.transform, value, 23, FontStyle.Bold, valueColor, TextAnchor.MiddleLeft);
+            OurWorldUiKit.UseDisplayFont(val);
             PlaceTopLeft(val.rectTransform, 16f, -29f, 212f, 28f);
 
             return (cap, val);

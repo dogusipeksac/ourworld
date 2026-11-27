@@ -765,7 +765,14 @@ namespace OurWorld.UI
             DestroySpriteAndTex(_iconSparkleSprite);
             DestroySpriteAndTex(_iconMapSprite);
             DestroySpriteAndTex(_iconMenuBarsSprite);
+            DestroySpriteAndTex(_ctaGradientSprite);
+            DestroySpriteAndTex(_shineBandSprite);
             if (_brandIconCreatedAtRuntime && _brandIconSprite != null) Destroy(_brandIconSprite);
+            for (int i = 0; i < _runtimeBrandSprites.Count; i++)
+            {
+                if (_runtimeBrandSprites[i] != null) Destroy(_runtimeBrandSprites[i]);
+            }
+            _runtimeBrandSprites.Clear();
 
             if (Instance == this) Instance = null;
         }

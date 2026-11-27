@@ -186,9 +186,15 @@ namespace OurWorld.UI
                 {
                     _leftRailRect.anchoredPosition = new Vector2(Mathf.Lerp(-36f, 0f, k), 0f);
                 }
+                if (_brandLogoRect != null)
+                {
+                    float s = Mathf.Lerp(0.92f, 1f, k);
+                    _brandLogoRect.localScale = new Vector3(s, s, 1f);
+                }
                 yield return null;
             }
 
+            if (_brandLogoRect != null) _brandLogoRect.localScale = Vector3.one;
             _menuCanvasGroup.alpha = 1f;
             _menuCanvasGroup.interactable = true;
             if (_leftRailRect != null) _leftRailRect.anchoredPosition = Vector2.zero;
