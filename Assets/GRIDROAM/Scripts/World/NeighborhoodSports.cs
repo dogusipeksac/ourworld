@@ -104,6 +104,29 @@ namespace OurWorld.World
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 bike.position = surface.point + Vector3.up * 0.015f;
             Transform visual = Child(bike, "BicycleVisual", Vector3.zero);
+            GameObject bikeFbx = OurWorldModelLibrary.InstantiateModel("OW_Bicycle", visual, Vector3.zero, Quaternion.identity);
+            if (bikeFbx != null)
+            {
+                Color paintCol = frame != null && frame.HasProperty("_BaseColor") ? frame.GetColor("_BaseColor") : new Color(0.14f, 0.44f, 0.56f);
+                OurWorldModelLibrary.TintMaterialByKeyword(bikeFbx, "BikePaint", paintCol);
+
+                Transform fbxFork = OurWorldModelLibrary.FindPart(bikeFbx.transform, "Fork");
+                Transform fbxFrontW = OurWorldModelLibrary.FindPart(bikeFbx.transform, "Wheel_Front");
+                Transform fbxRearW = OurWorldModelLibrary.FindPart(bikeFbx.transform, "Wheel_Rear");
+                Transform fbxCrank = OurWorldModelLibrary.FindPart(bikeFbx.transform, "Crank");
+                // Parent front wheel under steering fork so turning handlebars steers the wheel smoothly!
+                if (fbxFork != null && fbxFrontW != null)
+                {
+                    fbxFrontW.SetParent(fbxFork, true);
+                }
+
+                BicycleController fbxCtrl = bike.gameObject.AddComponent<BicycleController>();
+                fbxCtrl.Configure(visual, fbxFork, fbxFrontW, fbxRearW, fbxCrank);
+                bike.gameObject.AddComponent<InteractableTrigger>()
+                    .Configure(InteractableKind.Bicycle, triggerId, "ui.btn.ride_bike", 2.6f);
+                return;
+            }
+
             Vector3 frontAxle = new Vector3(0f, 0.34f, 0.57f);
             Vector3 rearAxle = new Vector3(0f, 0.34f, -0.55f);
             Vector3 bottomBracket = new Vector3(0f, 0.36f, -0.07f);

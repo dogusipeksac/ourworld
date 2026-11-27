@@ -721,10 +721,12 @@ namespace OurWorld.World
             CharacterArchetype meshArch = arch switch
             {
                 CitizenArchetype.ChildPlay or CitizenArchetype.ChildWithParent => CharacterArchetype.Child,
-                CitizenArchetype.Mother or CitizenArchetype.ElderWoman => CharacterArchetype.CasualFemale,
-                CitizenArchetype.Student => (serial % 2 == 0) ? CharacterArchetype.CasualFemale : CharacterArchetype.CasualMale,
+                CitizenArchetype.ElderWoman => CharacterArchetype.ElderFemale,
+                CitizenArchetype.ElderMan => CharacterArchetype.ElderMale,
+                CitizenArchetype.Mother => CharacterArchetype.CasualFemale,
+                CitizenArchetype.Student => (serial % 2 == 0) ? CharacterArchetype.CasualFemale : CharacterArchetype.SportyYouth,
                 CitizenArchetype.Sweeper or CitizenArchetype.Courier or CitizenArchetype.Zabita or CitizenArchetype.Worker => CharacterArchetype.Worker,
-                _ => CharacterArchetype.CasualMale
+                _ => (serial % 4 == 3) ? CharacterArchetype.Shopkeeper : CharacterArchetype.CasualMale
             };
 
             Color shirtCol = ExtractMatColor(arch switch

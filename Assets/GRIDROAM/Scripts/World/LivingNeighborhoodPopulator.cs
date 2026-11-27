@@ -554,10 +554,15 @@ namespace OurWorld.World
             string[] lines,
             int index)
         {
-            // Real diverse Blender 5.3.0 silhouettes (Male, Female & Worker) with live PBR normal-mapped fabrics/skin/hair!
-            CharacterArchetype meshArch = role == NpcRole.Vendor
-                ? CharacterArchetype.Worker
-                : ((index % 2 == 1) ? CharacterArchetype.CasualFemale : CharacterArchetype.CasualMale);
+            // Real diverse stylized-realistic Blender 5.3.0 silhouettes (9 distinct archetypes!) with live PBR materials!
+            bool isElderWoman = !string.IsNullOrEmpty(displayName) && displayName.Contains("Teyze");
+            bool isElderMan = !string.IsNullOrEmpty(displayName) && displayName.Contains("Amca");
+            bool isElder = isElderWoman || isElderMan;
+            CharacterArchetype meshArch = isElderWoman ? CharacterArchetype.ElderFemale
+                : isElderMan ? CharacterArchetype.ElderMale
+                : role == NpcRole.Vendor ? CharacterArchetype.Shopkeeper
+                : (index % 5 == 4 ? CharacterArchetype.SportyYouth
+                : ((index % 2 == 1) ? CharacterArchetype.CasualFemale : CharacterArchetype.CasualMale));
             Color shirtCol = (shirtMat != null && shirtMat.HasProperty("_BaseColor"))
                 ? shirtMat.GetColor("_BaseColor")
                 : new Color(0.24f, 0.38f, 0.56f);
@@ -569,8 +574,6 @@ namespace OurWorld.World
                 new Color(0.20f, 0.22f, 0.28f)
             };
             Color pantsCol = npcPants[index % npcPants.Length];
-            bool isElder = !string.IsNullOrEmpty(displayName) &&
-                           (displayName.Contains("Teyze") || displayName.Contains("Amca"));
             Color hairCol = isElder
                 ? new Color(0.68f, 0.69f, 0.72f)
                 : RealisticCharacterFactory.DiverseHairPalette[(index * 3) % RealisticCharacterFactory.DiverseHairPalette.Length];

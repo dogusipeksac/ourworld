@@ -98,11 +98,30 @@ namespace OurWorld.EditorTools
             ModelImporter importer = assetImporter as ModelImporter;
             if (importer == null) return;
 
+            ModelImporterClipAnimation[] defaults = importer.defaultClipAnimations;
             ModelImporterClipAnimation[] clips = importer.clipAnimations;
-            if (clips == null || clips.Length == 0)
+
+            // If saved clipAnimations reference stale takeNames that no longer exist in the FBX,
+            // seamlessly refresh from defaultClipAnimations so SkeletalClipPlayer NEVER loses a clip!
+            bool staleTakes = clips == null || clips.Length == 0;
+            if (!staleTakes && defaults != null && defaults.Length > 0)
             {
-                clips = importer.defaultClipAnimations;
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    bool found = false;
+                    string tn = clips[i] != null ? clips[i].takeName : null;
+                    for (int d = 0; d < defaults.Length; d++)
+                    {
+                        if (defaults[d] != null && string.Equals(defaults[d].takeName, tn, StringComparison.Ordinal))
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) { staleTakes = true; break; }
+                }
             }
+            if (staleTakes) clips = defaults;
             if (clips == null || clips.Length == 0) return;
 
             for (int i = 0; i < clips.Length; i++)

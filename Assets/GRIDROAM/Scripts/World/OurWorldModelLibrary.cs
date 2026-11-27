@@ -227,15 +227,23 @@ namespace OurWorld.World
             return mat;
         }
 
-        private static Material GetOrCreatePbrSurfaceMaterial(string key, string albedoName, string normalName, Color tint, float smoothness, float bumpScale, Vector2 tiling)
+        private static Material GetOrCreatePbrSurfaceMaterial(
+            string key,
+            string albedoName,
+            string normalName,
+            Color tint,
+            float smoothness,
+            float bumpScale,
+            Vector2 tiling,
+            float metallic = 0f)
         {
             if (SharedSpecialMats.TryGetValue(key, out Material cached) && cached != null) return cached;
 
             Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             Material mat = new Material(urpLit) { name = "MAT_OW_" + key };
 
-            Texture2D alb = Resources.Load<Texture2D>(ThemeTexRoot + albedoName);
-            Texture2D nor = Resources.Load<Texture2D>(ThemeTexRoot + normalName);
+            Texture2D alb = !string.IsNullOrEmpty(albedoName) ? Resources.Load<Texture2D>(ThemeTexRoot + albedoName) : null;
+            Texture2D nor = !string.IsNullOrEmpty(normalName) ? Resources.Load<Texture2D>(ThemeTexRoot + normalName) : null;
             if (alb != null)
             {
                 if (mat.HasProperty(BaseMapId)) { mat.SetTexture(BaseMapId, alb); mat.SetTextureScale(BaseMapId, tiling); }
@@ -251,7 +259,25 @@ namespace OurWorld.World
             if (mat.HasProperty(BaseColorId)) mat.SetColor(BaseColorId, tint);
             if (mat.HasProperty(ColorId)) mat.SetColor(ColorId, tint);
             if (mat.HasProperty(SmoothnessId)) mat.SetFloat(SmoothnessId, smoothness);
+            if (mat.HasProperty(MetallicId)) mat.SetFloat(MetallicId, metallic);
 
+            SharedSpecialMats[key] = mat;
+            return mat;
+        }
+
+        private static Material GetOrCreateEmissiveMaterial(string key, Color baseColor, Color emissionColor, float smoothness = 0.85f)
+        {
+            if (SharedSpecialMats.TryGetValue(key, out Material cached) && cached != null) return cached;
+            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material mat = new Material(urpLit) { name = "MAT_OW_" + key };
+            if (mat.HasProperty(BaseColorId)) mat.SetColor(BaseColorId, baseColor);
+            if (mat.HasProperty(ColorId)) mat.SetColor(ColorId, baseColor);
+            if (mat.HasProperty(SmoothnessId)) mat.SetFloat(SmoothnessId, smoothness);
+            if (mat.HasProperty(EmissionColorId))
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.SetColor(EmissionColorId, emissionColor);
+            }
             SharedSpecialMats[key] = mat;
             return mat;
         }
@@ -274,20 +300,33 @@ namespace OurWorld.World
             if (rawMatName.StartsWith("CastleWoodOak", StringComparison.OrdinalIgnoreCase))
                 return GetOrCreatePbrSurfaceMaterial("CastleWoodOak", "ph_woodplanks_albedo", "ph_woodplanks_normal", new Color(0.76f, 0.58f, 0.42f), 0.24f, 1.05f, new Vector2(0.85f, 0.85f));
 
+            // Phase 3 Stylized-Realism Benchmark PBR Materials (Animals & Agricultural Machinery)
+            if (rawMatName.StartsWith("OW_SheepWool", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("SheepWool", "animal_sheep_wool_albedo", "animal_sheep_wool_normal", new Color(0.98f, 0.96f, 0.93f), 0.10f, 0.95f, new Vector2(1.0f, 1.0f));
+            if (rawMatName.StartsWith("OW_SheepFace", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("SheepFace", "animal_sheep_face_albedo", "animal_sheep_face_normal", new Color(0.95f, 0.93f, 0.91f), 0.24f, 0.60f, new Vector2(1.0f, 1.0f));
+            if (rawMatName.StartsWith("OW_EyeGloss", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("EyeGloss", null, null, new Color(0.11f, 0.07f, 0.045f), 0.90f, 0.0f, Vector2.one, metallic: 0.08f);
+
+            if (rawMatName.StartsWith("OW_TractorRed", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("TractorRed", null, "tractor_paint_normal", new Color(0.78f, 0.12f, 0.10f), 0.72f, 0.12f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
+            if (rawMatName.StartsWith("OW_SafetyYellow", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("SafetyYellow", null, "tractor_paint_normal", new Color(0.92f, 0.72f, 0.16f), 0.68f, 0.12f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
+            if (rawMatName.StartsWith("OW_TireRubber", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("TireRubber", "tractor_tire_albedo", "tractor_tire_normal", new Color(0.92f, 0.92f, 0.94f), 0.14f, 0.50f, new Vector2(1.5f, 1.5f), metallic: 0.0f);
+            if (rawMatName.StartsWith("OW_Chrome", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("Chrome", null, null, new Color(0.86f, 0.88f, 0.90f), 0.88f, 0.0f, Vector2.one, metallic: 0.92f);
+            if (rawMatName.StartsWith("OW_SteelDark", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("SteelDark", null, null, new Color(0.17f, 0.18f, 0.20f), 0.54f, 0.0f, Vector2.one, metallic: 0.68f);
+            if (rawMatName.StartsWith("OW_StoneWhite", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("StoneWhite", null, null, new Color(0.93f, 0.91f, 0.86f), 0.56f, 0.0f, Vector2.one, metallic: 0.04f);
+            if (rawMatName.StartsWith("OW_HeadlightGlow", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateEmissiveMaterial("HeadlightGlow", new Color(1.0f, 0.95f, 0.80f), new Color(1.0f, 0.90f, 0.66f) * 1.6f, smoothness: 0.90f);
+
             if (rawMatName.StartsWith("MetroLedGlow", StringComparison.OrdinalIgnoreCase))
             {
-                if (SharedSpecialMats.TryGetValue("MetroLedGlow", out Material cachedLed) && cachedLed != null) return cachedLed;
-                Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                Material led = new Material(urpLit) { name = "MAT_OW_MetroLedGlow" };
                 Color warm = new Color(1.0f, 0.96f, 0.86f, 1f);
-                if (led.HasProperty(BaseColorId)) led.SetColor(BaseColorId, warm);
-                if (led.HasProperty(EmissionColorId))
-                {
-                    led.EnableKeyword("_EMISSION");
-                    led.SetColor(EmissionColorId, warm * 2.6f);
-                }
-                SharedSpecialMats["MetroLedGlow"] = led;
-                return led;
+                return GetOrCreateEmissiveMaterial("MetroLedGlow", warm, warm * 2.6f, smoothness: 0.65f);
             }
 
             return null;

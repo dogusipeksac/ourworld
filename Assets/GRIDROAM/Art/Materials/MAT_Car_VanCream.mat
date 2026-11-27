@@ -90,8 +90,8 @@ Material:
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
-    - _ClearCoatMask: 0.9
-    - _ClearCoatSmoothness: 0.96
+    - _ClearCoatMask: 0.94
+    - _ClearCoatSmoothness: 0.95
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1

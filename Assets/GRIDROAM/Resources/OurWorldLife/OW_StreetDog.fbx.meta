@@ -32,8 +32,8 @@ ModelImporter:
     clipAnimations:
     - serializedVersion: 16
       name: Death
-      takeName: Death
-      internalID: 4348485665485846014
+      takeName: AnimalArmature|Death
+      internalID: 7370985682789098114
       firstFrame: 0
       lastFrame: 32
       wrapMode: 0
@@ -61,8 +61,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Eating
-      takeName: Eating
-      internalID: 3673095150341620287
+      takeName: AnimalArmature|Eating
+      internalID: 5845618705403835542
       firstFrame: 0
       lastFrame: 80
       wrapMode: 0
@@ -90,8 +90,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Gallop
-      takeName: Gallop
-      internalID: -7180914814543497415
+      takeName: AnimalArmature|Gallop
+      internalID: -7666980397028532464
       firstFrame: 0
       lastFrame: 17
       wrapMode: 0
@@ -119,8 +119,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Gallop_Jump
-      takeName: Gallop_Jump
-      internalID: 1485581873647467237
+      takeName: AnimalArmature|Gallop_Jump
+      internalID: 9013133730026320192
       firstFrame: 0
       lastFrame: 28
       wrapMode: 0
@@ -148,8 +148,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Idle
-      takeName: Idle
-      internalID: -3100369314251171874
+      takeName: AnimalArmature|Idle
+      internalID: -5105944257485555118
       firstFrame: 0
       lastFrame: 100
       wrapMode: 0
@@ -177,8 +177,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Idle_2
-      takeName: Idle_2
-      internalID: 1245882690682072010
+      takeName: AnimalArmature|Idle_2
+      internalID: 9203789705941672436
       firstFrame: 0
       lastFrame: 100
       wrapMode: 0
@@ -206,8 +206,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Idle_2_HeadLow
-      takeName: Idle_2_HeadLow
-      internalID: 7526571243659665568
+      takeName: AnimalArmature|Idle_2_HeadLow
+      internalID: -7984107131484065872
       firstFrame: 0
       lastFrame: 120
       wrapMode: 0
@@ -235,8 +235,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Idle_HitReact_Left
-      takeName: Idle_HitReact_Left
-      internalID: 1524733597206663280
+      takeName: AnimalArmature|Idle_HitReact_Left
+      internalID: -3818105308243361847
       firstFrame: 0
       lastFrame: 20
       wrapMode: 0
@@ -264,8 +264,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Idle_HitReact_Right
-      takeName: Idle_HitReact_Right
-      internalID: -3892366662005823256
+      takeName: AnimalArmature|Idle_HitReact_Right
+      internalID: -3992859531268994507
       firstFrame: 0
       lastFrame: 20
       wrapMode: 0
@@ -293,8 +293,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Jump_ToIdle
-      takeName: Jump_ToIdle
-      internalID: -7274149910649245272
+      takeName: AnimalArmature|Jump_ToIdle
+      internalID: 8400692634799720655
       firstFrame: 0
       lastFrame: 40
       wrapMode: 0
@@ -322,8 +322,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: Walk
-      takeName: Walk
-      internalID: 2667949614841947897
+      takeName: AnimalArmature|Walk
+      internalID: -4864718358596981803
       firstFrame: 0
       lastFrame: 32
       wrapMode: 0

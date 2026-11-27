@@ -68,3 +68,6 @@ release/store_screenshots/google_play_phone/
 release/store_screenshots/google_play_tablet_7/
 release/store_screenshots/google_play_tablet_10/
 release/store_screenshots/en-US/
+
+# Local Blender rig backup scratch folder (originals already tracked in git history)
+scripts/blender/reference_rigs/

@@ -10,7 +10,11 @@ namespace OurWorld.Player
         CasualFemale = 1,
         Worker = 2,
         Child = 3,
-        BossKuzgun = 4
+        BossKuzgun = 4,
+        ElderMale = 5,
+        ElderFemale = 6,
+        SportyYouth = 7,
+        Shopkeeper = 8
     }
 
     /// <summary>
@@ -50,7 +54,7 @@ namespace OurWorld.Player
         public static readonly Color SilverElderHair = new Color(0.82f, 0.84f, 0.87f);
 
         private static readonly Dictionary<CharacterArchetype, Dictionary<string, Transform>> CachedPartMaps
-            = new Dictionary<CharacterArchetype, Dictionary<string, Transform>>(5);
+            = new Dictionary<CharacterArchetype, Dictionary<string, Transform>>(9);
         private static readonly Dictionary<string, Material> BaseTemplateMats = new Dictionary<string, Material>(16);
         private static readonly Dictionary<string, Material> TintedMatCache = new Dictionary<string, Material>(96);
         private static bool _templateMatsHarvested;
@@ -72,6 +76,10 @@ namespace OurWorld.Player
                 case CharacterArchetype.Worker:       return "Character_Worker";
                 case CharacterArchetype.Child:        return "Character_Child";
                 case CharacterArchetype.BossKuzgun:   return "Character_BossKuzgun";
+                case CharacterArchetype.ElderMale:    return "Character_ElderMale";
+                case CharacterArchetype.ElderFemale:  return "Character_ElderFemale";
+                case CharacterArchetype.SportyYouth:  return "Character_SportyYouth";
+                case CharacterArchetype.Shopkeeper:   return "Character_Shopkeeper";
                 default:                              return "Character_CasualMale";
             }
         }
@@ -233,7 +241,9 @@ namespace OurWorld.Player
                 ? GetTintedPbrMaterial("CharBelt", backpackOrBeltColor.Value, 0.34f)
                 : (BaseTemplateMats.TryGetValue("CharBelt", out Material blt) ? blt : GetTintedPbrMaterial("CharBelt", new Color(0.18f, 0.11f, 0.07f), 0.45f));
 
-            bool narrowFrame = archetype == CharacterArchetype.CasualFemale || archetype == CharacterArchetype.Child;
+            bool narrowFrame = archetype == CharacterArchetype.CasualFemale
+                            || archetype == CharacterArchetype.Child
+                            || archetype == CharacterArchetype.ElderFemale;
             float shldrX = narrowFrame ? 0.174f : (archetype == CharacterArchetype.BossKuzgun ? 0.212f : 0.200f);
             float hipX = narrowFrame ? 0.102f : 0.106f;
 

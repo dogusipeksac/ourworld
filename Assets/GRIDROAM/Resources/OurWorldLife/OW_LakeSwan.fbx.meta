@@ -32,8 +32,8 @@ ModelImporter:
     clipAnimations:
     - serializedVersion: 16
       name: Swim
-      takeName: Swim
-      internalID: 5414490534771693905
+      takeName: SwanArmature|Swim
+      internalID: -6494778630364549922
       firstFrame: 0
       lastFrame: 47
       wrapMode: 0
@@ -61,8 +61,8 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: WingSpread
-      takeName: WingSpread
-      internalID: 3693268255494570630
+      takeName: SwanArmature|WingSpread
+      internalID: 4208197348341411544
       firstFrame: 0
       lastFrame: 35
       wrapMode: 0

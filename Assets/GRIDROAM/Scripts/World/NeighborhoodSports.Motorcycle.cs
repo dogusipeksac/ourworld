@@ -51,6 +51,34 @@ namespace OurWorld.World
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 motor.position = surface.point + Vector3.up * 0.018f;
             Transform visual = Child(motor, "Leaning frame", Vector3.zero);
+            GameObject motoFbx = OurWorldModelLibrary.InstantiateModel("OW_Motorcycle", visual, Vector3.zero, Quaternion.identity);
+            if (motoFbx != null)
+            {
+                Color paintCol = paint != null && paint.HasProperty("_BaseColor") ? paint.GetColor("_BaseColor") : new Color(0.64f, 0.13f, 0.08f);
+                OurWorldModelLibrary.TintMaterialByKeyword(motoFbx, "BikePaint", paintCol);
+
+                Transform fbxFork = OurWorldModelLibrary.FindPart(motoFbx.transform, "Fork");
+                Transform fbxFrontW = OurWorldModelLibrary.FindPart(motoFbx.transform, "Wheel_Front");
+                Transform fbxRearW = OurWorldModelLibrary.FindPart(motoFbx.transform, "Wheel_Rear");
+                if (fbxFork != null && fbxFrontW != null)
+                {
+                    fbxFrontW.SetParent(fbxFork, true);
+                }
+
+                AudioSource fbxEngine = motor.gameObject.AddComponent<AudioSource>();
+                fbxEngine.clip = engineLoop;
+                fbxEngine.loop = true;
+                fbxEngine.playOnAwake = false;
+                fbxEngine.spatialBlend = 0.8f;
+                fbxEngine.minDistance = 1.5f;
+                fbxEngine.maxDistance = 24f;
+                fbxEngine.volume = 0.14f;
+                motor.gameObject.AddComponent<BicycleController>().ConfigureMotorcycle(visual, fbxFork, fbxFrontW, fbxRearW, fbxEngine);
+                motor.gameObject.AddComponent<InteractableTrigger>()
+                    .Configure(InteractableKind.Motorcycle, triggerId, "ui.btn.ride_motorcycle", 2.7f);
+                return;
+            }
+
             Vector3 front = new Vector3(0f, 0.36f, 0.73f);
             Vector3 rear = new Vector3(0f, 0.36f, -0.73f);
             MeshParts frame = new MeshParts(this);
