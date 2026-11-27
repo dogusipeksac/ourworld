@@ -78,6 +78,7 @@ namespace OurWorld.EditorTools
 
             importer.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
             importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
+            importer.meshCompression = ModelImporterMeshCompression.Medium;
 
             if (IsRiggedAnimalFbx())
             {

@@ -20,15 +20,45 @@ namespace OurWorld.World
 
         private static readonly HashSet<NightLight> RegisteredLights = new HashSet<NightLight>();
         private static readonly int ExposureId = Shader.PropertyToID("_Exposure");
+        private static readonly int TexAId = Shader.PropertyToID("_TexA");
+        private static readonly int TexBId = Shader.PropertyToID("_TexB");
+        private static readonly int BlendId = Shader.PropertyToID("_Blend");
+        private static readonly int TintId = Shader.PropertyToID("_Tint");
+        private static readonly int RotationId = Shader.PropertyToID("_Rotation");
+        private static readonly int HorizonColorId = Shader.PropertyToID("_HorizonColor");
+        private static readonly int HorizonStrengthId = Shader.PropertyToID("_HorizonStrength");
+
+        private enum SkyPhase
+        {
+            None = -1,
+            Night = 0,
+            Dawn = 1,
+            Day = 2,
+            Sunset = 3
+        }
 
         [Header("Clock")]
         [SerializeField] private float realSecondsPerGameHour = 60f;
         [SerializeField] private float startHour = 9.0f;
         [SerializeField] private float lightingUpdateInterval = 0.12f; // ~8.3 Hz (<= 10 times/sec)
         [SerializeField] private float sunAzimuthYaw = -52f;
+        [SerializeField] private float panoramaYawOffset = 0f;
 
         private Light _sunLight;
         private Material _runtimeSkybox;
+        private bool _usePanoramicSky;
+        private Texture2D _skyDawnTex;
+        private Texture2D _skyDayTex;
+        private Texture2D _skySunsetTex;
+        private Texture2D _skyNightTex;
+        private Texture2D _lastTexA;
+        private Texture2D _lastTexB;
+        private float _lastBlend = -1f;
+        private float _lastRotation = -999f;
+        private float _lastHorizonStrength = -1f;
+        private Color _lastTint = new Color(-1f, -1f, -1f, -1f);
+        private Color _lastHorizonColor = new Color(-1f, -1f, -1f, -1f);
+        private SkyPhase _lastSkyPhase = SkyPhase.None;
         private float _currentHour = 9.0f;
         private float _updateTimer;
         private bool _lastNightState;
@@ -133,10 +163,31 @@ namespace OurWorld.World
                 }
             }
 
-            if (RenderSettings.skybox != null)
+            Shader panoShader = Resources.Load<Shader>("OurWorldSky/OurWorldSkyboxBlend");
+            if (panoShader == null)
+            {
+                panoShader = Shader.Find("OurWorld/Skybox/PanoramicBlend");
+            }
+            _skyDawnTex = Resources.Load<Texture2D>("OurWorldSky/Sky_Dawn");
+            _skyDayTex = Resources.Load<Texture2D>("OurWorldSky/Sky_Day");
+            _skySunsetTex = Resources.Load<Texture2D>("OurWorldSky/Sky_Sunset");
+            _skyNightTex = Resources.Load<Texture2D>("OurWorldSky/Sky_Night");
+
+            if (panoShader != null &&
+                _skyDawnTex != null &&
+                _skyDayTex != null &&
+                _skySunsetTex != null &&
+                _skyNightTex != null)
+            {
+                _runtimeSkybox = new Material(panoShader);
+                RenderSettings.skybox = _runtimeSkybox;
+                _usePanoramicSky = true;
+            }
+            else if (RenderSettings.skybox != null)
             {
                 _runtimeSkybox = new Material(RenderSettings.skybox);
                 RenderSettings.skybox = _runtimeSkybox;
+                _usePanoramicSky = false;
             }
 
             _baseDayFogDensity = RenderSettings.fogDensity > 0f ? RenderSettings.fogDensity : 0.0020f;
@@ -483,7 +534,20 @@ namespace OurWorld.World
 
             if (_runtimeSkybox != null && _runtimeSkybox.HasProperty(ExposureId))
             {
-                _runtimeSkybox.SetFloat(ExposureId, sample.SkyExposure + lightningFlash * 0.65f);
+                float skyExposure = sample.SkyExposure;
+                if (_usePanoramicSky)
+                {
+                    // Panoramic textures already bake day/night luminance; compensate sample.SkyExposure
+                    // (~1.1 day -> ~1.0, ~0.44 night -> ~0.90) so the night sky stays rich navy instead of pitch black.
+                    float panoExposureMul = Mathf.Lerp(0.92f, 2.05f, NightFactor);
+                    skyExposure *= panoExposureMul;
+                }
+                _runtimeSkybox.SetFloat(ExposureId, skyExposure + lightningFlash * 0.65f);
+            }
+
+            if (_usePanoramicSky)
+            {
+                UpdatePanoramicSky();
             }
 
             ApplyNightVolumeGrading(NightFactor);
@@ -496,6 +560,127 @@ namespace OurWorld.World
                 ApplyAllNightLights(nightNow, forceNightToggle);
                 OnNightStateChanged?.Invoke(nightNow);
             }
+        }
+
+        private void UpdatePanoramicSky()
+        {
+            if (!_usePanoramicSky || _runtimeSkybox == null) return;
+
+            float lightElevDeg = _sunLight != null
+                ? Mathf.Asin(Mathf.Clamp(-_sunLight.transform.forward.y, -1f, 1f)) * Mathf.Rad2Deg
+                : 0f;
+            // _sunLight stays at positive pitch (34..46 deg) at night for readable moonlight and >= 16 deg at dawn/sunset;
+            // combine with solar clock elevation so Night / Dawn / Day / Sunset panoramas transition accurately.
+            float clockSolarElevDeg = Mathf.Cos((_currentHour - 12.5f) * (Mathf.PI / 12f)) * 44f + 2f;
+            float e = Mathf.Min(lightElevDeg, clockSolarElevDeg);
+
+            bool isMorning = _currentHour < 12f;
+            Texture2D twilightTex = isMorning ? _skyDawnTex : _skySunsetTex;
+            SkyPhase twilightPhase = isMorning ? SkyPhase.Dawn : SkyPhase.Sunset;
+
+            Texture2D texA;
+            Texture2D texB;
+            float blend;
+            SkyPhase phase;
+
+            if (e < -8f)
+            {
+                texA = _skyNightTex;
+                texB = _skyNightTex;
+                blend = 0f;
+                phase = SkyPhase.Night;
+            }
+            else if (e < 2f)
+            {
+                texA = _skyNightTex;
+                texB = twilightTex;
+                blend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-8f, 2f, e));
+                phase = blend >= 0.5f ? twilightPhase : SkyPhase.Night;
+            }
+            else if (e <= 14f)
+            {
+                texA = twilightTex;
+                texB = _skyDayTex;
+                blend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2f, 14f, e));
+                phase = blend >= 0.5f ? SkyPhase.Day : twilightPhase;
+            }
+            else
+            {
+                texA = _skyDayTex;
+                texB = _skyDayTex;
+                blend = 0f;
+                phase = SkyPhase.Day;
+            }
+
+            if (texA != _lastTexA)
+            {
+                _runtimeSkybox.SetTexture(TexAId, texA);
+                _lastTexA = texA;
+            }
+
+            if (texB != _lastTexB)
+            {
+                _runtimeSkybox.SetTexture(TexBId, texB);
+                _lastTexB = texB;
+            }
+
+            if (Mathf.Abs(blend - _lastBlend) > 0.002f)
+            {
+                _runtimeSkybox.SetFloat(BlendId, blend);
+                _lastBlend = blend;
+            }
+
+            if (_sunLight != null)
+            {
+                float yaw = _sunLight.transform.rotation.eulerAngles.y;
+                float rotation = Mathf.Repeat(yaw - 180f + panoramaYawOffset, 360f);
+                if (_lastRotation < -900f || Mathf.Abs(Mathf.DeltaAngle(_lastRotation, rotation)) > 0.05f)
+                {
+                    _runtimeSkybox.SetFloat(RotationId, rotation);
+                    _lastRotation = rotation;
+                }
+            }
+
+            NeighborhoodWeatherState weather = NeighborhoodWeatherSystem.Instance != null
+                ? NeighborhoodWeatherSystem.Instance.CurrentWeather
+                : NeighborhoodWeatherState.Clear;
+            float rain01 = weather == NeighborhoodWeatherState.SummerShower ? 1f
+                : (weather == NeighborhoodWeatherState.BreezyOvercast ? 0.5f : 0f);
+
+            Color tint = Color.Lerp(Color.white, new Color(0.62f, 0.66f, 0.72f, 1f), rain01);
+            if (!ColorsNearlyEqual(tint, _lastTint))
+            {
+                _runtimeSkybox.SetColor(TintId, tint);
+                _lastTint = tint;
+            }
+
+            Color horizonColor = RenderSettings.fogColor;
+            if (!ColorsNearlyEqual(horizonColor, _lastHorizonColor))
+            {
+                _runtimeSkybox.SetColor(HorizonColorId, horizonColor);
+                _lastHorizonColor = horizonColor;
+            }
+
+            float horizonStrength = 0.25f + rain01 * 0.5f;
+            if (Mathf.Abs(horizonStrength - _lastHorizonStrength) > 0.002f)
+            {
+                _runtimeSkybox.SetFloat(HorizonStrengthId, horizonStrength);
+                _lastHorizonStrength = horizonStrength;
+            }
+
+            if (phase != _lastSkyPhase)
+            {
+                _lastSkyPhase = phase;
+                DynamicGI.UpdateEnvironment();
+            }
+        }
+
+        private static bool ColorsNearlyEqual(Color a, Color b)
+        {
+            return Mathf.Abs(a.r - b.r) <= 0.002f &&
+                   Mathf.Abs(a.g - b.g) <= 0.002f &&
+                   Mathf.Abs(a.b - b.b) <= 0.002f &&
+                   Mathf.Abs(a.a - b.a) <= 0.002f;
         }
 
         private static void ApplyAllNightLights(bool isNight, bool force)

@@ -1083,6 +1083,7 @@ namespace OurWorld.Editor
                 mat.SetFloat("_OcclusionStrength", 0.75f);
             }
 
+            OurWorldPbrMaterialUpgrader.ApplyPbrMaps(mat, acgFolder);
             EditorUtility.SetDirty(mat);
             return mat;
         }

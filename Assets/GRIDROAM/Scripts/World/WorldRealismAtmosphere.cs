@@ -181,6 +181,25 @@ namespace OurWorld.World
             Instance._steamPs.Emit(ep, 1);
         }
 
+        public void RegisterSway(Transform target)
+        {
+            if (target == null || target.GetComponent<Collider>() != null) return;
+            for (int i = 0; i < _swayTargets.Count; i++)
+            {
+                if (_swayTargets[i].Target == target) return;
+            }
+            float h = Mathf.Abs(target.position.x * 13.7f + target.position.z * 29.3f);
+            _swayTargets.Add(new SwayEntry
+            {
+                Target = target,
+                BaseLocalRot = target.localRotation,
+                Phase = h % 6.283185f,
+                AmplitudeDeg = 1.65f,
+                Speed = 1.15f + (h % 0.55f)
+            });
+            _swayCollected = true;
+        }
+
         private void PlaceDecal(Vector3 pos, Quaternion rot, Vector3 scale, Material mat, Color color, float duration)
         {
             int count = _decalPool.Count;

@@ -193,6 +193,7 @@ namespace OurWorld.World
             mat.EnableKeyword("_ALPHATEST_ON");
             mat.SetOverrideTag("RenderType", "TransparentCutout");
             mat.renderQueue = (int)RenderQueue.AlphaTest;
+            mat.enableInstancing = true;
 
             SharedSpecialMats[key] = mat;
             return mat;
@@ -222,6 +223,7 @@ namespace OurWorld.World
             mat.DisableKeyword("_SPECULARHIGHLIGHTS_OFF");
             mat.SetOverrideTag("RenderType", "Transparent");
             mat.renderQueue = (int)RenderQueue.Transparent;
+            mat.enableInstancing = true;
 
             SharedSpecialMats[key] = mat;
             return mat;
@@ -260,6 +262,7 @@ namespace OurWorld.World
             if (mat.HasProperty(ColorId)) mat.SetColor(ColorId, tint);
             if (mat.HasProperty(SmoothnessId)) mat.SetFloat(SmoothnessId, smoothness);
             if (mat.HasProperty(MetallicId)) mat.SetFloat(MetallicId, metallic);
+            mat.enableInstancing = true;
 
             SharedSpecialMats[key] = mat;
             return mat;
@@ -278,6 +281,7 @@ namespace OurWorld.World
                 mat.EnableKeyword("_EMISSION");
                 mat.SetColor(EmissionColorId, emissionColor);
             }
+            mat.enableInstancing = true;
             SharedSpecialMats[key] = mat;
             return mat;
         }
