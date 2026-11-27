@@ -282,16 +282,35 @@ namespace OurWorld.World
             return mat;
         }
 
-        private static Material ResolveSpecialRealismMaterial(string rawMatName)
+        private static Color ExtractSourceColor(Material src)
         {
-            if (string.IsNullOrEmpty(rawMatName)) return null;
+            if (src == null) return Color.white;
+            if (src.HasProperty(BaseColorId)) return src.GetColor(BaseColorId);
+            if (src.HasProperty(ColorId)) return src.GetColor(ColorId);
+            return Color.white;
+        }
+
+        private static string ColorKey(Color c)
+        {
+            return ColorUtility.ToHtmlStringRGB(c);
+        }
+
+        private static Material ResolveSpecialRealismMaterial(Material src)
+        {
+            if (src == null || string.IsNullOrEmpty(src.name)) return null;
+            string rawMatName = src.name;
+            Color srcCol = ExtractSourceColor(src);
 
             if (rawMatName.StartsWith("FoliagePlaneB", StringComparison.OrdinalIgnoreCase)) return GetFoliagePlaneMaterial(altTint: true);
             if (rawMatName.StartsWith("FoliagePlane", StringComparison.OrdinalIgnoreCase))  return GetFoliagePlaneMaterial(altTint: false);
             if (rawMatName.StartsWith("FoliagePine", StringComparison.OrdinalIgnoreCase))   return GetFoliagePineMaterial();
             if (rawMatName.StartsWith("FoliageCypress", StringComparison.OrdinalIgnoreCase)) return GetFoliageCypressMaterial();
-            if (rawMatName.StartsWith("BarkTree", StringComparison.OrdinalIgnoreCase))      return GetBarkTreeMaterial();
+            if (rawMatName.StartsWith("BarkTree", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_BarkWood", StringComparison.OrdinalIgnoreCase)) return GetBarkTreeMaterial();
             if (rawMatName.StartsWith("MetroGlass", StringComparison.OrdinalIgnoreCase))    return GetTransparentArchitecturalGlassMaterial();
+            if (rawMatName.StartsWith("Windows", StringComparison.OrdinalIgnoreCase))       return GetTransparentAutomotiveGlassMaterial();
+            if (rawMatName.StartsWith("GlassClear", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateTransparentGlassMaterial("SimitGlassClear", new Color(0.84f, 0.93f, 0.96f, 0.28f), smoothness: 0.96f, metallic: 0.08f);
 
             if (rawMatName.StartsWith("CastleStoneWall", StringComparison.OrdinalIgnoreCase))
                 return GetOrCreatePbrSurfaceMaterial("CastleStoneWall", "ph_cobblestone_albedo", "ph_cobblestone_normal", new Color(0.84f, 0.78f, 0.68f), 0.16f, 1.30f, new Vector2(0.85f, 0.85f));
@@ -300,34 +319,156 @@ namespace OurWorld.World
             if (rawMatName.StartsWith("CastleWoodOak", StringComparison.OrdinalIgnoreCase))
                 return GetOrCreatePbrSurfaceMaterial("CastleWoodOak", "ph_woodplanks_albedo", "ph_woodplanks_normal", new Color(0.76f, 0.58f, 0.42f), 0.24f, 1.05f, new Vector2(0.85f, 0.85f));
 
-            // Phase 3 Stylized-Realism Benchmark PBR Materials (Animals & Agricultural Machinery)
+            // Phase 3 Stylized-Realism Benchmark PBR Materials (Hero Sheep & Farm Tractor)
             if (rawMatName.StartsWith("OW_SheepWool", StringComparison.OrdinalIgnoreCase))
                 return GetOrCreatePbrSurfaceMaterial("SheepWool", "animal_sheep_wool_albedo", "animal_sheep_wool_normal", new Color(0.98f, 0.96f, 0.93f), 0.10f, 0.95f, new Vector2(1.0f, 1.0f));
             if (rawMatName.StartsWith("OW_SheepFace", StringComparison.OrdinalIgnoreCase))
                 return GetOrCreatePbrSurfaceMaterial("SheepFace", "animal_sheep_face_albedo", "animal_sheep_face_normal", new Color(0.95f, 0.93f, 0.91f), 0.24f, 0.60f, new Vector2(1.0f, 1.0f));
-            if (rawMatName.StartsWith("OW_EyeGloss", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreatePbrSurfaceMaterial("EyeGloss", null, null, new Color(0.11f, 0.07f, 0.045f), 0.90f, 0.0f, Vector2.one, metallic: 0.08f);
+            if (rawMatName.StartsWith("OW_EyeGloss", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_EyeDark", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("Eye_Black", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("AnimalPupil", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("EyeGloss", null, null, new Color(0.09f, 0.06f, 0.045f), 0.92f, 0.0f, Vector2.one, metallic: 0.08f);
+            if (rawMatName.StartsWith("CatAmberEye", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DogEyeAmber", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("EyeAmber_" + ColorKey(srcCol), null, null, srcCol, 0.92f, 0.0f, Vector2.one, metallic: 0.08f);
 
             if (rawMatName.StartsWith("OW_TractorRed", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreatePbrSurfaceMaterial("TractorRed", null, "tractor_paint_normal", new Color(0.78f, 0.12f, 0.10f), 0.72f, 0.12f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
+                return GetOrCreatePbrSurfaceMaterial("TractorRed", null, "tractor_paint_normal", new Color(0.78f, 0.12f, 0.10f), 0.72f, 0.10f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
             if (rawMatName.StartsWith("OW_SafetyYellow", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreatePbrSurfaceMaterial("SafetyYellow", null, "tractor_paint_normal", new Color(0.92f, 0.72f, 0.16f), 0.68f, 0.12f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
-            if (rawMatName.StartsWith("OW_TireRubber", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("SafetyYellow", null, "tractor_paint_normal", new Color(0.92f, 0.72f, 0.16f), 0.68f, 0.10f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
+            if (rawMatName.StartsWith("OW_TireRubber", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("GripRubber", StringComparison.OrdinalIgnoreCase))
                 return GetOrCreatePbrSurfaceMaterial("TireRubber", "tractor_tire_albedo", "tractor_tire_normal", new Color(0.92f, 0.92f, 0.94f), 0.14f, 0.50f, new Vector2(1.5f, 1.5f), metallic: 0.0f);
-            if (rawMatName.StartsWith("OW_Chrome", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreatePbrSurfaceMaterial("Chrome", null, null, new Color(0.86f, 0.88f, 0.90f), 0.88f, 0.0f, Vector2.one, metallic: 0.92f);
-            if (rawMatName.StartsWith("OW_SteelDark", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreatePbrSurfaceMaterial("SteelDark", null, null, new Color(0.17f, 0.18f, 0.20f), 0.54f, 0.0f, Vector2.one, metallic: 0.68f);
-            if (rawMatName.StartsWith("OW_StoneWhite", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreatePbrSurfaceMaterial("StoneWhite", null, null, new Color(0.93f, 0.91f, 0.86f), 0.56f, 0.0f, Vector2.one, metallic: 0.04f);
-            if (rawMatName.StartsWith("OW_HeadlightGlow", StringComparison.OrdinalIgnoreCase))
-                return GetOrCreateEmissiveMaterial("HeadlightGlow", new Color(1.0f, 0.95f, 0.80f), new Color(1.0f, 0.90f, 0.66f) * 1.6f, smoothness: 0.90f);
+            if (rawMatName.StartsWith("OW_Chrome", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("BrushedChrome", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("WheelChrome", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("Chrome", null, "metal_brushed_normal", new Color(0.86f, 0.88f, 0.90f), 0.88f, 0.14f, new Vector2(2.0f, 2.0f), metallic: 0.92f);
+            if (rawMatName.StartsWith("OW_SteelDark", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("WroughtIron", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("GunMetalDark", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("BluedSteel", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("MachinedSteel", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("MetalDark_" + ColorKey(srcCol), null, "metal_brushed_normal", srcCol, 0.56f, 0.30f, new Vector2(2.0f, 2.0f), metallic: 0.72f);
+            if (rawMatName.StartsWith("OW_GoldBrass", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("PolishedBrass", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("ShellBrass", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("Brass_" + ColorKey(srcCol), null, "metal_brushed_normal", srcCol, 0.80f, 0.18f, new Vector2(2.0f, 2.0f), metallic: 0.86f);
+            if (rawMatName.StartsWith("OW_StoneWhite", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("LimestoneCarved", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("MarbleLight", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("StoneLight_" + ColorKey(srcCol), null, "ph_cobblestone_normal", srcCol, 0.36f, 0.28f, new Vector2(1.4f, 1.4f), metallic: 0.02f);
 
+            // Phase 4 Emissive Lights, Screens & Glowing Fixtures
+            if (rawMatName.StartsWith("OW_HeadlightGlow", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("Headlights", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateEmissiveMaterial("HeadlightGlow", new Color(1.0f, 0.95f, 0.80f), new Color(1.0f, 0.90f, 0.66f) * 1.6f, smoothness: 0.90f);
+            if (rawMatName.StartsWith("OW_TailGlow", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("TailLights", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateEmissiveMaterial("TailGlow", new Color(0.92f, 0.10f, 0.08f), new Color(0.95f, 0.12f, 0.08f) * 1.6f, smoothness: 0.86f);
+            if (rawMatName.StartsWith("OW_WarmLampGlow", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("WarmLanternGlow", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateEmissiveMaterial("WarmLampGlow", new Color(1.0f, 0.91f, 0.72f), new Color(1.0f, 0.84f, 0.52f) * 1.9f, smoothness: 0.72f);
+            if (rawMatName.StartsWith("OW_AquariumGlow", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateEmissiveMaterial("AquariumGlow", new Color(0.28f, 0.78f, 0.88f), new Color(0.20f, 0.74f, 0.86f) * 1.25f, smoothness: 0.92f);
+            if (rawMatName.StartsWith("OW_CharcoalEmber", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreateEmissiveMaterial("CharcoalEmber", new Color(0.22f, 0.07f, 0.05f), new Color(1.0f, 0.30f, 0.06f) * 1.55f, smoothness: 0.12f);
             if (rawMatName.StartsWith("MetroLedGlow", StringComparison.OrdinalIgnoreCase))
             {
                 Color warm = new Color(1.0f, 0.96f, 0.86f, 1f);
                 return GetOrCreateEmissiveMaterial("MetroLedGlow", warm, warm * 2.6f, smoothness: 0.65f);
             }
+
+            // Phase 4 Animals — Short Mammalian Fur (Cow, Dogs, Goat, Cat)
+            // Keep rawMatName in cache key so TintMaterialByKeyword("CatFurPrimary"/"CowSpot"/"CowWhite") always matches!
+            if (rawMatName.StartsWith("OW_CowWhite", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_CowSpot", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("Muzzle", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DogKangal", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DogBelly", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DogBlackMask", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("GoatCoat", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("CatFur", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(srcCol), null, "animal_fur_short_normal", srcCol, 0.16f, 0.62f, new Vector2(2.0f, 2.0f), metallic: 0.0f);
+
+            // Phase 4 Animals — Layered Bird Feathers (Chicken, Pigeon, PondDuck, LakeSwan)
+            if (rawMatName.StartsWith("OW_ChickenFeather", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_ChickenWing", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_ChickenTail", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("PigeonSlate", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("PigeonWingBar", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DuckWhite", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DuckWing", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DuckCollar", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("SwanPlumage", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(srcCol), null, "animal_feather_normal", srcCol, 0.24f, 0.66f, new Vector2(2.0f, 2.0f), metallic: 0.0f);
+
+            if (rawMatName.StartsWith("PigeonIridescent", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_DuckEmerald", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(srcCol), null, "animal_feather_normal", srcCol, 0.48f, 0.58f, new Vector2(2.0f, 2.0f), metallic: 0.18f);
+
+            // Phase 4 Animals — Iridescent Fish Scales (LakeFish)
+            if (rawMatName.StartsWith("OW_FishScale", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("FishScale", "animal_fish_scales_albedo", "animal_fish_scales_normal", new Color(0.92f, 0.96f, 1.0f), 0.78f, 0.78f, new Vector2(1.5f, 1.5f), metallic: 0.28f);
+            if (rawMatName.StartsWith("OW_FishBelly", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("FishBelly", null, "animal_fish_scales_normal", new Color(0.88f, 0.91f, 0.94f), 0.72f, 0.45f, new Vector2(1.5f, 1.5f), metallic: 0.18f);
+
+            // Phase 4 Vehicles — Metallic Clearcoat Paint & Tactile Saddle/Wheel Leather
+            if (rawMatName.StartsWith("OW_CarPaint", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(srcCol), null, "tractor_paint_normal", srcCol, 0.82f, 0.06f, new Vector2(2.0f, 2.0f), metallic: 0.42f);
+            if (rawMatName.StartsWith("OW_BikePaint", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_LiftBlue", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_ToolChestRed", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_TealAccent", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(srcCol), null, "tractor_paint_normal", srcCol, 0.74f, 0.08f, new Vector2(2.0f, 2.0f), metallic: 0.34f);
+            if (rawMatName.StartsWith("OW_LeatherDark", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("WheelLeather", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(srcCol), null, "fabric_linen_normal", srcCol, 0.42f, 0.34f, new Vector2(2.5f, 2.5f), metallic: 0.0f);
+
+            // Phase 4 Furniture & Architecture — Natural Wood Grain & Woven Fabrics / Kilims
+            if (rawMatName.StartsWith("OW_TimberOak", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_TimberDark", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_WalnutWood", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("WarmOakWood", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("DarkWalnut", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("RangeTimber", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("WalnutStock", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("IstanbulBenchTealWood", StringComparison.OrdinalIgnoreCase))
+            {
+                Color woodTint = Color.Lerp(Color.white, srcCol, 0.52f);
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(woodTint), "wood_oak_albedo", "wood_oak_normal", woodTint, 0.28f, 0.72f, new Vector2(1.4f, 1.4f), metallic: 0.0f);
+            }
+
+            if (rawMatName.StartsWith("OW_SofaVelvetTeal", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_CushionGold", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_KilimRed", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_KilimCream", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("IstanbulCream", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("IstanbulCrimson", StringComparison.OrdinalIgnoreCase))
+            {
+                Color fabTint = new Color(Mathf.Min(1f, srcCol.r * 1.12f), Mathf.Min(1f, srcCol.g * 1.12f), Mathf.Min(1f, srcCol.b * 1.12f), 1f);
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(fabTint), "fabric_linen_albedo", "fabric_linen_normal", fabTint, 0.14f, 0.64f, new Vector2(2.2f, 2.2f), metallic: 0.0f);
+            }
+
+            // Phase 4 Botanical Crops, Shrubs & Mossy Limestone Rocks
+            if (rawMatName.StartsWith("OW_BushLeafA", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_BushLeafB", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_CropLeaf", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("OW_OliveLeaf", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("LeafDeepOlive", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.StartsWith("LeafMidEmerald", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.Equals("Green", StringComparison.OrdinalIgnoreCase) ||
+                rawMatName.Equals("DarkGreen2", StringComparison.OrdinalIgnoreCase))
+            {
+                Color leafTint = Color.Lerp(Color.white, new Color(
+                    Mathf.Clamp01(srcCol.r * 1.6f),
+                    Mathf.Clamp01(srcCol.g * 1.45f),
+                    Mathf.Clamp01(srcCol.b * 1.5f), 1f), 0.45f);
+                return GetOrCreatePbrSurfaceMaterial(rawMatName + "_" + ColorKey(leafTint), "crop_leaf_albedo", "crop_leaf_normal", leafTint, 0.18f, 0.72f, new Vector2(1.8f, 1.8f), metallic: 0.0f);
+            }
+
+            if (rawMatName.StartsWith("OW_RockLimestone", StringComparison.OrdinalIgnoreCase))
+                return GetOrCreatePbrSurfaceMaterial("RockLimestone", "ph_cobblestone_albedo", "ph_cobblestone_normal", new Color(0.84f, 0.82f, 0.76f), 0.15f, 1.10f, new Vector2(1.2f, 1.2f), metallic: 0.0f);
 
             return null;
         }
@@ -350,7 +491,7 @@ namespace OurWorld.World
                     if (mat == null || mat.shader == null ||
                         mat.shader.name.Contains("Error") ||
                         mat.shader.name == "Standard" ||
-                        ResolveSpecialRealismMaterial(mat.name) != null)
+                        ResolveSpecialRealismMaterial(mat) != null)
                     {
                         needsReplace = true;
                         break;
@@ -363,7 +504,7 @@ namespace OurWorld.World
                 for (int m = 0; m < shared.Length; m++)
                 {
                     Material src = shared[m];
-                    Material special = src != null ? ResolveSpecialRealismMaterial(src.name) : null;
+                    Material special = ResolveSpecialRealismMaterial(src);
                     if (special != null)
                     {
                         fixedMats[m] = special;
@@ -378,12 +519,7 @@ namespace OurWorld.World
                         continue;
                     }
 
-                    Color col = Color.white;
-                    if (src != null)
-                    {
-                        if (src.HasProperty(BaseColorId)) col = src.GetColor(BaseColorId);
-                        else if (src.HasProperty(ColorId)) col = src.GetColor(ColorId);
-                    }
+                    Color col = ExtractSourceColor(src);
                     Material clean = new Material(urpLit) { name = src != null ? src.name : "URP_Fallback" };
                     clean.SetColor(BaseColorId, col);
                     if (clean.HasProperty(SmoothnessId)) clean.SetFloat(SmoothnessId, 0.35f);

@@ -736,6 +736,30 @@ namespace OurWorld.World
                 WorldPhysicsSolidifier.EnsureBoxCollider(plGo, new Vector3(0f, 0.36f, 0f), new Vector3(1.62f, 0.72f, 0.80f));
             }
 
+            // F2. Sculpted Botanical Bushes, Flowering Shrubs & Lakeside Mossy Rocks (Phase 4 Batch 8)
+            (string model, Vector3 pos, float yaw, float scale)[] homeNature =
+            {
+                // Sultanbeyli Lake promenade & shoreline rocks
+                ("OW_MossyRockCluster", new Vector3(-164.5f, 0.01f,  15.5f),  25f, 1.30f),
+                ("OW_MossyRockCluster", new Vector3(-164.5f, 0.01f, -15.5f), 145f, 1.25f),
+                ("OW_BushCluster",      new Vector3(-158.0f, 0.02f,  21.0f),  60f, 1.25f),
+                ("OW_FloweringShrub",   new Vector3(-158.0f, 0.02f, -21.0f), 205f, 1.15f),
+                ("OW_BushCluster",      new Vector3(-172.0f, 0.02f,  19.0f), 110f, 1.20f),
+                ("OW_GrassTuft",        new Vector3(-163.0f, 0.01f,  12.0f),  35f, 1.40f),
+                ("OW_GrassTuft",        new Vector3(-163.0f, 0.01f, -12.0f), 190f, 1.40f),
+                // Aydos Farm Entrance & Home Courtyard Borders
+                ("OW_FloweringShrub",   new Vector3( 128.5f, 0.02f,  11.0f),  40f, 1.20f),
+                ("OW_BushCluster",      new Vector3( 128.5f, 0.02f, -11.0f), 130f, 1.25f),
+                ("OW_MossyRockCluster", new Vector3( 135.0f, 0.01f,  12.5f),  80f, 1.15f),
+                ("OW_FloweringShrub",   new Vector3(  -9.5f, 0.02f,  10.8f),  15f, 1.05f),
+                ("OW_BushCluster",      new Vector3(  22.5f, 0.02f,  10.2f), 175f, 1.10f)
+            };
+            for (int i = 0; i < homeNature.Length; i++)
+            {
+                var hn = homeNature[i];
+                OurWorldModelLibrary.InstantiateModel(hn.model, root, hn.pos, Quaternion.Euler(0f, hn.yaw, 0f), Vector3.one * hn.scale, removeColliders: true);
+            }
+
             // G. Decorative Striped Turkish Shop Awnings (Tente) & Brass Lanterns on Tea Garden Posts!
             BuildFestoonStringLights(root, new Vector3(11.5f, 3.4f, 14.0f), new Vector3(21.5f, 3.4f, 14.0f), 8);
             BuildFestoonStringLights(root, new Vector3(11.5f, 3.4f, 19.5f), new Vector3(21.5f, 3.4f, 19.5f), 8);

@@ -828,6 +828,37 @@ namespace OurWorld.World
                 GameObject cart = OurWorldModelLibrary.InstantiateModel("OW_SimitCart", propsRoot, simitCarts[i].pos, Quaternion.Euler(0f, simitCarts[i].yaw, 0f), Vector3.one * 1.05f, removeColliders: true);
                 if (cart != null) WorldPhysicsSolidifier.EnsureBoxCollider(cart, new Vector3(0f, 0.85f, 0f), new Vector3(1.55f, 1.70f, 0.85f));
             }
+
+            // 4. Sculpted Botanical Shrubs, Flowering Bushes & Mossy Limestone Rocks (Phase 4 Batch 8 Nature Dressing)
+            (string model, Vector3 pos, float yaw, float scale)[] natureClusters =
+            {
+                // Abdurrahmangazi Kent Meydanı park borders
+                ("OW_FloweringShrub",   new Vector3( 159f, 0.04f,  188f),  18f, 1.15f),
+                ("OW_BushCluster",      new Vector3( 159f, 0.04f,  204f),  85f, 1.25f),
+                ("OW_FloweringShrub",   new Vector3( 199f, 0.04f,  188f), 140f, 1.10f),
+                ("OW_BushCluster",      new Vector3( 199f, 0.04f,  204f), 220f, 1.20f),
+                // Hasanpaşa Millet Parkı greenery
+                ("OW_BushCluster",      new Vector3(-166f, 0.04f,  196f),  32f, 1.30f),
+                ("OW_FloweringShrub",   new Vector3(-178f, 0.04f,  203f), 115f, 1.18f),
+                ("OW_MossyRockCluster", new Vector3(-176f, 0.02f,  191f),  48f, 1.20f),
+                // Mimar Sinan Park Fountain corners
+                ("OW_FloweringShrub",   new Vector3( -42f, 0.04f, -295f),  65f, 1.15f),
+                ("OW_BushCluster",      new Vector3( -62f, 0.04f, -295f), 195f, 1.22f),
+                ("OW_MossyRockCluster", new Vector3( -52f, 0.02f, -307f),  12f, 1.15f),
+                // Aydos Kale hilltop limestone boulders & wild shrubs
+                ("OW_MossyRockCluster", new Vector3( 221f, 0.02f, -133f),  24f, 1.45f),
+                ("OW_MossyRockCluster", new Vector3( 238f, 0.02f, -122f), 142f, 1.35f),
+                ("OW_BushCluster",      new Vector3( 219f, 0.04f, -121f),  78f, 1.30f),
+                ("OW_FloweringShrub",   new Vector3( 236f, 0.04f, -135f), 210f, 1.15f),
+                // M5 Metro green plaza edges
+                ("OW_FloweringShrub",   new Vector3( -23f, 0.04f,  265f),  45f, 1.05f),
+                ("OW_BushCluster",      new Vector3(  11f, 0.04f,  265f), 160f, 1.10f)
+            };
+            for (int i = 0; i < natureClusters.Length; i++)
+            {
+                var nc = natureClusters[i];
+                OurWorldModelLibrary.InstantiateModel(nc.model, propsRoot, nc.pos, Quaternion.Euler(0f, nc.yaw, 0f), Vector3.one * nc.scale, removeColliders: true);
+            }
         }
 
         // =====================================================================

@@ -102,7 +102,7 @@ namespace OurWorld.Editor
 
             PlayerSettings.companyName = "Doğuş İpeksaç";
             PlayerSettings.productName = "Our World";
-            PlayerSettings.bundleVersion = "1.0.10";
+            PlayerSettings.bundleVersion = "1.0.11";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
             PlayerSettings.allowedAutorotateToPortrait = false;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;

@@ -15,7 +15,7 @@ APP_ID = ENV.fetch("ASC_APP_ID", "6838324963")
 KEY_ID = ENV.fetch("ASC_KEY_ID")
 ISSUER_ID = ENV.fetch("ASC_ISSUER_ID")
 KEY_PATH = ENV.fetch("ASC_KEY_PATH")
-VERSION_STR = ENV.fetch("IOS_MARKETING_VERSION", "1.0.10")
+VERSION_STR = ENV.fetch("IOS_MARKETING_VERSION", "1.0.11")
 BUILD_NUM = ENV["IOS_BUILD_NUMBER"]
 ATTACH_BUILD = ARGV.include?("--attach-build")
 SKIP_SCREENSHOTS = ARGV.include?("--skip-screenshots")
@@ -273,17 +273,17 @@ desc_en = <<~TEXT.strip
 TEXT
 
 whats_new_tr = <<~WN.strip
-  • YENİ: 5 Katlı Hamidiye Atlas AVM! Panoramik cam asansör ve yürüyen merdivenlerle gezilebilen 18 gerçek mağaza (5M Atlas Market, StarBean Coffee, Kahve Diyarı, Gratis Beauty, Atlas Waikiki 8 ceket stili, Mavi & Kotonica, TeknoCell, Karaca Home, D&M Kitap), 6 restoranlı Yemek Katı, canlı film izlenebilen CineAtlas Sinema Salonu, 6 makineli JoyPark Arcade ve Ennjoy Çatı Teras Kafe!
-  • YENİ: Harita 2 gerçek sokakla (Havadis Sokağı & Kadife Sokağı) büyüdü, tüm ev girişleri ferahlatıldı.
-  • Zeki ve Etkileşimli NPC'ler: Artık tüm komşularla sohbet edebilir, yol tarifi alıp haritada işaretletebilir, mini iyilikler yapabilir ve birlikte yürüyebilirsin!
-  • Keşif Odaklı Dağıtım & Yenilenen Arayüz: Görevler, yan işler, 7 bisiklet, 5 motosiklet, arabalar ve 15 hatıra tüm haritaya dağıtıldı; HUD, telefon ve tüm paneller yeni gece arduvazı & turkuaz tasarımla yenilendi.
+  • YENİ: Baştan Aşağı 3D Görsel & Gerçekçilik Güncellemesi! Tüm karakterler doğal insan oranları, detaylı yüzler, parmaklı eller ve katmanlı kıyafetlerle yenilendi; 4 yeni mahalle sakini arketipi (esnaf, yaşlı amca/teyze, sportif genç) eklendi.
+  • YENİ: Tüm Hayvanlar & Araçlar Yenilendi! İnek, koyun, keçi, köpek, kedi, tavuk, ördek, kuğu, güvercin ve balıklar doğal anatomi ve PBR tüy/yün/pul dokularıyla; bisiklet, motosiklet, traktör ve otomobiller detaylı 3D gövde ve tekerleklerle güncellendi.
+  • YENİ: Hamidiye Binaları, Şehir Hatları Vapuru, İstiklal Tramvayı, 6 Sultanbeyli Mahallesi, Aydos Kalesi, M5 Metro, yeni çalı/kaya doğa detayları, URP yumuşak gölgeler ve 1. Şahıs kokpit kamerası!
+  • İyileştirme: Yürürken oluşan fazla rüzgar/ayak sesi azaltıldı, daha doğal ve keyifli bir atmosfer sağlandı.
 WN
 
 whats_new_en = <<~WN.strip
-  • NEW: 5-Level Hamidiye Atlas Mall! Explore 18 walk-in glass-fronted stores via panoramic elevator & escalators — 5M Market, StarBean Coffee, Kahve Diyarı, Atlas Waikiki (8 jacket styles), Mavi & Kotonica, TeknoCell, Karaca Home, D&M Books, a 6-restaurant Food Court, live CineAtlas Movie Theater, 6-cabinet JoyPark Arcade & Ennjoy Rooftop Cafe!
-  • NEW: Map expanded with 2 real streets (Havadis St. & Kadife St.) and cleared enterable home foyers.
-  • Smart Interactive NPCs: Chat with every neighbor, ask for pinned map directions, complete mini favors, or invite them to stroll with you!
-  • Map-Wide Exploration & Flagship UI: Missions, side jobs, 7 bicycles, 5 motorcycles, cars & 15 golden memories now span the full map with a unified night-slate & turquoise HUD.
+  • NEW: Complete 3D Stylized-Realism Visual Overhaul! Every human character & NPC has been resculpted with natural anatomy, expressive faces, detailed hands & layered garments, plus 4 brand-new neighborhood citizen archetypes.
+  • NEW: Upgraded Animals & Vehicles! All 11 animals (cows, sheep, goats, dogs, cats, chickens, ducks, swans, pigeons & fish) feature smooth anatomy and PBR wool/fur/feather/scale materials; bicycles, motorcycles, tractors & cars now sport sculpted 3D silhouettes.
+  • NEW: Detailed Hamidiye Avenue buildings, classic Bosphorus Ferry & İstiklal Tram, 6 Sultanbeyli districts, Aydos Castle, M5 Metro, organic shrubs & mossy rocks, URP soft shadows & 1st-Person Cockpit camera!
+  • Polish: Tamed walking wind & footstep ambience for a cleaner, more immersive open-world stroll.
 WN
 
 version_locs = {
@@ -524,8 +524,8 @@ if ATTACH_BUILD
     bbl_map = {}
     (bbl["data"] || []).each { |l| bbl_map[l.dig("attributes", "locale")] = l["id"] }
     what_to_test = {
-      "tr" => "v#{VERSION_STR} Build #{BUILD_NUM || '10'}: 5 katlı Hamidiye Atlas AVM (18 mağaza, CineAtlas sinema, JoyPark arcade, 6 restoranlı yemek katı, panoramik asansör), Havadis & Kadife Sokakları, zeki NPC'ler, harita geneli görev/araç dağıtımı ve yenilenen arayüz.",
-      "en-US" => "v#{VERSION_STR} Build #{BUILD_NUM || '10'}: 5-level Hamidiye Atlas Mall (18 walk-in stores, CineAtlas cinema, JoyPark arcade, 6-restaurant food court, glass elevator), Havadis & Kadife Streets, smart NPCs, map-wide distribution & flagship UI."
+      "tr" => "v#{VERSION_STR} Build #{BUILD_NUM || '11'}: Komple 3D stilize gerçekçilik yükseltmesi (9 karakter, 11 hayvan, yeni bisiklet/motosiklet/traktör/araba, Hamidiye binaları, Boğaz Vapuru & İstiklal Tramvayı, PBR dokular, URP yumuşak gölgeler, 1. Şahıs kokpit kamerası ve azaltılmış yürüme sesi).",
+      "en-US" => "v#{VERSION_STR} Build #{BUILD_NUM || '11'}: Complete 3D stylized-realism visual overhaul (9 characters, 11 animals, sculpted bikes/motorcycles/tractor/cars, articulated Hamidiye avenues, Bosphorus Ferry & İstiklal Tram, PBR textures, URP soft shadows, 1st-Person cockpit camera & cleaner walking audio)."
     }
     what_to_test.each do |loc, text|
       if bbl_map[loc]

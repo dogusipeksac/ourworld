@@ -402,7 +402,8 @@ namespace OurWorld.UI
             Shadow sh = tf.GetComponent<Shadow>();
             if (sh != null && !(sh is Outline))
             {
-                Destroy(sh);
+                if (Application.isPlaying) Destroy(sh);
+                else DestroyImmediate(sh);
             }
         }
 
